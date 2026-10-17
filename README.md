@@ -6,7 +6,7 @@ Zakładki: **vMix graphics** (domyślna, działająca) i **Commentator** (ekran 
 
 ## Wymagania
 
-- Node.js 20 lub nowszy (sprawdzone na Node 22), npm.
+- Node.js **22.12 lub nowszy** (albo 20.19+), npm. Starsze wersje (np. 22.11) nie instalują natywnego modułu narzędzia budującego (Vite/rolldown) i `npm run build` kończy się błędem „Cannot find native binding”. Sprawdź: `node -v`.
 - Windows, macOS lub Linux. `better-sqlite3` ma gotowe binaria dla popularnych platform, więc zwykle nie trzeba kompilatora.
 
 ## Uruchomienie
