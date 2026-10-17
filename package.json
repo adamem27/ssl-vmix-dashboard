@@ -1,0 +1,25 @@
+{
+  "name": "ssl-vmix-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web && npm run build -w server",
+    "start": "npm run start -w server",
+    "test": "npm run test -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "seed:demo": "npm run seed:demo -w server",
+    "backup": "npm run backup -w server",
+    "restore": "npm run restore -w server --"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.5"
+  }
+}
