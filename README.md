@@ -119,6 +119,16 @@ Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/impo
 - Osoba, która zniknęła ze źródła, jest usuwana ze składu, chyba że operator ją edytował; wtedy zostaje z oznaczeniem „Brak w źródle”.
 - Wagi i inne zbędne dane nie są zapisywane.
 
+## JSON dla vMix
+
+Przycisk **JSON** na ekranie Teams & crews pokazuje adresy do wklejenia w vMix (Data Sources → JSON). Każdy wiersz to płaski obiekt z samymi tekstami, a pola grafik zawierają ścieżkę, której ma użyć vMix (mapowanie z Settings, a bez niego lokalną ścieżkę pliku).
+
+- `/json/teams`: drużyny z 11 grafikami.
+- `/json/sailors`: żeglarze z deklaracji na dziś (bez deklaracji cały skład). Parametry: `?date=RRRR-MM-DD`, `?team=KOD`.
+- `/json/fleets/<id>`: floty zestawu, 4 miejsca na flotę; nierozstrzygnięte miejsca mają etykietę zamiast kodu.
+
+Jeśli vMix działa na innym komputerze, uruchom dashboard z `HOST=0.0.0.0` (patrz sekcja o sieci lokalnej).
+
 ## Matchboard SSL Gold Cup 2026
 
 **Settings → Matchboard → Load SSL Gold Cup 2026 matchboard** (albo `npm run seed:goldcup`) tworzy 61 drużyn z kodami z matchboardu i po jednym zestawie flot na etap: Qualifying Series, 1/32, 1/16, 1/8, ćwierćfinały, półfinały i finał. Miejsca jeszcze nierozstrzygnięte (losowanie, wyniki wcześniejszych rund) zostają puste z etykietą, np. „R1 C1” albo „DRAW 3”. Ponowne uruchomienie niczego nie dubluje: drużyny z istniejącym kodem i zestawy o istniejącej nazwie są pomijane.

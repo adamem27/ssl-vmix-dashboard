@@ -5,7 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    proxy: { '/api': { target: `http://127.0.0.1:${process.env.PORT ?? 4310}`, changeOrigin: false } },
+    proxy: {
+      '/api': { target: `http://127.0.0.1:${process.env.PORT ?? 4310}`, changeOrigin: false },
+      '/json': { target: `http://127.0.0.1:${process.env.PORT ?? 4310}`, changeOrigin: false },
+    },
   },
   build: { outDir: 'dist', emptyOutDir: true },
 });

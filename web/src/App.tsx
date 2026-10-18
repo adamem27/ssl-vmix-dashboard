@@ -4,7 +4,6 @@ import { api, Meta } from './api';
 import { cx } from './components/ui';
 import { CommentatorPage } from './pages/Commentator';
 import { OverviewPage } from './pages/Overview';
-import { TeamsPage } from './pages/Teams';
 import { TeamDetailPage } from './pages/TeamDetail';
 import { SailorPage } from './pages/Sailor';
 import { FleetsPage } from './pages/Fleets';
@@ -46,10 +45,9 @@ function VmixLayout() {
     <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 md:flex-row lg:px-6">
       <nav aria-label="vMix graphics" className="md:sticky md:top-[64px] md:h-fit md:w-48 md:shrink-0">
         <ul className="flex gap-1 overflow-x-auto md:flex-col">
-          <li><NavLink to="/vmix/overview" className={item}>Overview</NavLink></li>
-          <li><NavLink to="/vmix/teams" className={item}>Teams</NavLink></li>
+          <li><NavLink to="/vmix/overview" className={item}>Teams & crews</NavLink></li>
           <li><NavLink to="/vmix/fleets" className={item}>Fleets</NavLink></li>
-          <li><NavLink to="/vmix/declarations" className={item}>Crew declarations</NavLink></li>
+          <li><NavLink to="/vmix/declarations" className={item}>Declarations</NavLink></li>
           <li><NavLink to="/vmix/settings" className={item}>Settings</NavLink></li>
         </ul>
       </nav>
@@ -67,7 +65,7 @@ export function App() {
         <Route path="/vmix" element={<VmixLayout />}>
           <Route index element={<Navigate to="overview" replace />} />
           <Route path="overview" element={<OverviewPage />} />
-          <Route path="teams" element={<TeamsPage />} />
+          <Route path="teams" element={<Navigate to="/vmix/overview" replace />} />
           <Route path="teams/:id" element={<TeamDetailPage />} />
           <Route path="sailors/:id" element={<SailorPage />} />
           <Route path="fleets" element={<FleetsPage />} />

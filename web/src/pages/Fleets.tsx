@@ -126,7 +126,6 @@ export function FleetsPage() {
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-bold">Fleets</h1>
-          <p className="text-sm text-ink-400">Four boats per fleet, one team per boat. Drag a team or use the pickers.</p>
         </div>
         {!!sets.data?.length && (
           <Field label="Fleet set / round">
@@ -159,7 +158,6 @@ export function FleetsPage() {
                 ))}
                 {!pool.length && <li className="py-6 text-center text-xs text-ink-500">{teams.data?.length ? 'All teams are assigned.' : 'No teams in the database.'}</li>}
               </ul>
-              <p className="mt-2 text-[11px] text-ink-500">Drop a team here to remove it from its fleet (it stays in the database).</p>
             </Pool>
 
             <div>
@@ -202,7 +200,7 @@ export function FleetsPage() {
                             ) : (
                               <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Choose a team for place ${i + 1} in ${f.name}`}
                                 onChange={(e) => { if (e.target.value) void place(e.target.value, f.id, i + 1); }}>
-                                <option value="">{f.placeholders?.[i] ? `${f.placeholders[i]} (to be decided) – choose or drag a team` : 'Empty place – choose or drag a team'}</option>
+                                <option value="">{f.placeholders?.[i] ? `${f.placeholders[i]}` : '—'}</option>
                                 <optgroup label="Available">
                                   {(teams.data ?? []).filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>

@@ -54,7 +54,7 @@ function EventSection({ event }: { event: EventInfo }) {
     catch (err) { toast.error(err); } finally { setBusy(false); }
   };
   return (
-    <Section id="event" title="Event" desc="One active event. The year completes dates the organiser publishes without a year (e.g. “11-06”).">
+    <Section id="event" title="Event">
       <form onSubmit={save} className="grid gap-3 md:grid-cols-[1fr_240px_120px_auto] md:items-end">
         <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
         <Field label="Event time zone">
@@ -105,13 +105,11 @@ function SyncSection() {
   const dirty = f.url !== st.url || f.enabled !== st.enabled || f.intervalMinutes !== st.intervalMinutes || f.importer !== st.importer;
 
   return (
-    <Section id="sync" title="Declaration sync" desc={<>
-      Fetching runs in the dashboard backend, even with the browser tab closed, but <b className="text-ink-200">only while the server is running</b> (running since {fmtDateTime(st.backendStartedAt, tz)}). Nothing is fetched while the computer or server is off. Runs never overlap.
-    </>}>
+    <Section id="sync" title="Declaration sync">
       <div className="grid gap-5 xl:grid-cols-2">
         <form onSubmit={save} className="space-y-3">
           <Field label="Source URL"><input className="input font-mono text-xs" value={f.url} onChange={(e) => setF({ ...f, url: e.target.value })} placeholder="https://…" /></Field>
-          <Field label="Importer" hint={imp?.description}>
+          <Field label="Importer">
             <select className="input" value={f.importer} onChange={(e) => setF({ ...f, importer: e.target.value })}>
               {st.importers.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
             </select>
@@ -145,16 +143,6 @@ function SyncSection() {
         </div>
       </div>
 
-      <details className="mt-4 rounded-lg border border-ink-800 p-3 text-sm text-ink-400">
-        <summary className="cursor-pointer text-ink-200">How the SSL importer works and what it needs</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>Source checked (qualify3 archive, June 2026): the data is in an HTML table (Joomla/Fabrik). The page uses no separate API and no PDF files.</li>
-          <li>Columns are found by their headers: <i>Country</i>, <i>Sailing Date</i>, <i>Crews</i>, <i>Posted</i>. Crew format: “First Last (W:weight) (J-number) --&gt;Position”. Weights are ignored.</li>
-          <li>The declaration date is the <i>Sailing Date</i> (racing day) plus the event year, never the fetch date.</li>
-          <li>Teams are matched by code (e.g. AUT), name or aliases. Unknown codes are reported as warnings, never created automatically.</li>
-          <li>If the organiser changes the page layout or system, a new module in <code>server/src/importers/</code> will be needed.</li>
-        </ul>
-      </details>
 
       <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-wide text-ink-400">Sync history</h3>
       {!runs.data?.length ? <p className="text-sm text-ink-500">No entries.</p> : (
@@ -241,24 +229,17 @@ function PathsSection({ info }: { info: SettingsInfo }) {
     <div className="grid grid-cols-[200px_1fr] gap-2 py-1"><span className="text-ink-400">{label}</span><code className="break-all text-ink-200">{value ?? '—'}</code></div>
   );
   return (
-    <Section id="paths" title="Files & vMix paths" desc="The app keeps three things apart: the file stored by the app, the browser preview address, and the path the vMix computer (Windows) will use.">
+    <Section id="paths" title="Files & vMix paths">
       <div className="text-sm">
         <Row label="Database (SQLite)" value={info.paths.dbPath} />
         <Row label="Uploaded files folder" value={info.paths.assetsDir} />
-        <p className="mt-1 text-xs text-ink-500">Change locations with the <code>DATA_DIR</code>, <code>DB_PATH</code>, <code>ASSETS_DIR</code> environment variables before starting the server (see README).</p>
       </div>
       <form onSubmit={save} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-        <Field label="Asset folder as seen by the vMix computer (optional)"
-          hint={<>How the vMix computer sees the uploaded files folder, e.g. <code>\\DASHBOARD-PC\ssl-assets</code> (network share) or <code>Z:\ssl-assets</code>. The dashboard builds vMix paths for uploaded files from it. Availability on the vMix computer is not checked.</>}>
+        <Field label="vMix assets folder">
           <input className="input font-mono text-xs" value={root} onChange={(e) => setRoot(e.target.value)} placeholder="\\DASHBOARD-PC\ssl-assets" />
         </Field>
         <Button type="submit" variant="primary" busy={busy} disabled={root === info.paths.vmixAssetsRoot}>Save</Button>
       </form>
-      <div className="mt-4 grid gap-2 text-xs text-ink-400 md:grid-cols-3">
-        <div className="rounded-md border border-ink-800 p-3"><Badge tone="ok">File stored</Badge><p className="mt-1">File uploaded to the app, kept under a unique name in the asset folder.</p></div>
-        <div className="rounded-md border border-ink-800 p-3"><Badge tone="info">Path reachable</Badge><p className="mt-1">The dashboard server can read the entered path (preview works). This is not a check on the vMix computer.</p></div>
-        <div className="rounded-md border border-ink-800 p-3"><Badge tone="warn">Path unverified</Badge><p className="mt-1">The path is saved, but the dashboard server cannot reach it, so there is no preview.</p></div>
-      </div>
     </Section>
   );
 }
@@ -277,10 +258,9 @@ function PresetSection() {
     } catch (e) { toast.error(e); } finally { setBusy(false); }
   };
   return (
-    <Section id="presets" title="Matchboard" desc="Creates the SSL Gold Cup 2026 teams (61 nations, by code) and one fleet set per stage: Qualifying Series, 1/32, 1/16, 1/8, quarterfinals, semifinals and final. Places not decided yet (draws, results of earlier rounds) stay empty with their label, e.g. “R1 C1”.">
+    <Section id="presets" title="Matchboard">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" busy={busy} onClick={load}>Load SSL Gold Cup 2026 matchboard</Button>
-        <span className="text-xs text-ink-500">Safe to run again: existing teams (same code) and fleet sets (same name) are left as they are.</span>
       </div>
       {result && (
         <p className="mt-2 text-sm text-ink-300">
@@ -303,7 +283,7 @@ function DemoSection({ hasDemo }: { hasDemo: boolean }) {
     catch (e) { toast.error(e); } finally { setBusy(null); }
   };
   return (
-    <Section id="demo" title="Demo data" desc="A small, clearly labelled DEMO set to check the layout: 8 teams with codes DMA–DMH, generated placeholder graphics, “Demo …” sailors and one fleet set. These are not real teams, people or results.">
+    <Section id="demo" title="Demo data">
       <div className="flex flex-wrap gap-2">
         <Button variant="primary" busy={busy === 'seed'} disabled={hasDemo} onClick={() => call('seed', '/api/demo/seed', 'DEMO data added')}>Load demo data</Button>
         <Button busy={busy === 'imp'} disabled={!hasDemo} onClick={() => call('imp', '/api/sync/demo-import', 'Test declaration page imported (DEMO)')}>Import test declaration page (DEMO)</Button>
@@ -311,7 +291,6 @@ function DemoSection({ hasDemo }: { hasDemo: boolean }) {
           if (await ask('Remove demo data?', 'All teams and sailors labelled DEMO, their graphics, declarations and the demo fleet set will be deleted. Your own data is not touched.', 'Remove demo data')) await call('rm', '/api/demo/remove', 'DEMO data removed');
         }}>Remove demo data</Button>
       </div>
-      <p className="mt-2 text-xs text-ink-500">The test declaration page has the SSL page structure but contains only DEMO teams, one unknown team and one unknown person, to show warnings and manual assignment.</p>
       {dialog}
     </Section>
   );
@@ -319,13 +298,12 @@ function DemoSection({ hasDemo }: { hasDemo: boolean }) {
 
 function BackupSection({ info }: { info: SettingsInfo }) {
   return (
-    <Section id="backup" title="Backup" desc="All data is one SQLite file plus the uploaded files folder.">
+    <Section id="backup" title="Backup">
       <div className="space-y-2 text-sm text-ink-300">
         <p><b>Create a backup</b> (works while the server runs):</p>
         <pre className="overflow-x-auto rounded-md bg-ink-950 p-3 text-xs text-ink-200">npm run backup{'\n'}npm run backup -- D:\Backups\SSL</pre>
         <p><b>Restore</b> (stop the server first):</p>
         <pre className="overflow-x-auto rounded-md bg-ink-950 p-3 text-xs text-ink-200">npm run restore -- backups\2026-06-11-08-30-00</pre>
-        <p className="text-xs text-ink-500">Current data is kept aside with a <code>.before-restore-…</code> suffix before restoring. Database: <code>{info.paths.dbPath}</code>, files: <code>{info.paths.assetsDir}</code>.</p>
       </div>
     </Section>
   );

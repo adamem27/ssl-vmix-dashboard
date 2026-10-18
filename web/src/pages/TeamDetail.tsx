@@ -41,7 +41,7 @@ export function TeamDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/vmix/teams" className="text-xs text-ink-400 hover:text-ink-100">← Teams</Link>
+        <Link to="/vmix/overview" className="text-xs text-ink-400 hover:text-ink-100">← Teams & crews</Link>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold">{t.name}</h1>
           <span className="rounded bg-ink-800 px-2 py-0.5 font-mono text-sm text-ink-200">{t.code}</span>
@@ -61,7 +61,6 @@ export function TeamDetailPage() {
       <section aria-labelledby="assets-h">
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <h2 id="assets-h" className="text-lg font-semibold">Graphic assets</h2>
-          <span className="text-xs text-ink-500">PNG · drop a file on a slot, choose a file or enter a path</span>
           <div className="ml-auto"><BgToggle value={bg} onChange={setBg} /></div>
         </div>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
@@ -74,7 +73,7 @@ export function TeamDetailPage() {
       <section aria-labelledby="sailors-h">
         <div className="mb-3 flex items-center gap-3">
           <h2 id="sailors-h" className="text-lg font-semibold">Sailors</h2>
-          <span className="text-xs text-ink-500">{sailors.data?.length ?? 0} in database (about 11 expected)</span>
+          <span className="text-xs text-ink-500">{sailors.data?.length ?? 0} in database</span>
           <Button className="ml-auto" variant="primary" onClick={() => setSailorModal({ open: true, sailor: null })}>+ Add sailor</Button>
         </div>
         {sailors.isLoading ? <Loading /> : sailors.error ? <ErrorBox error={sailors.error} /> : !sailors.data!.length ? (

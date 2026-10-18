@@ -14,6 +14,8 @@ import * as decl from './services/declarations.js';
 import { SyncService } from './services/sync.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
+import { jsonFleetSet, jsonIndex, jsonSailors, jsonTeams } from './services/jsonExport.js';
+import { todayIn } from './services/dates.js';
 import { applyGoldCup2026, PRESETS } from './services/presets.js';
 import { isWindowsPath, validateEnteredPath } from './services/paths.js';
 
@@ -271,6 +273,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.post('/api/demo/seed', async () => seedDemo(ctx));
   app.post('/api/demo/remove', async () => removeDemo(ctx));
+  // ---------- JSON for vMix data sources ----------
+  app.get('/api/json-index', async () => jsonIndex(db, ev().id));
+  app.get('/json/teams', async () => jsonTeams(ctx));
+  app.get<{ Querystring: { date?: string; team?: string } }>('/json/sailors', async (req) =>
+    jsonSailors(ctx, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone), req.query.team ? String(req.query.team) : undefined));
+  app.get<{ Params: { id: string } }>('/json/fleets/:id', async (req) => jsonFleetSet(ctx, req.params.id));
   app.get('/api/presets', async () => PRESETS);
   app.post('/api/presets/ssl-gold-cup-2026', async () => applyGoldCup2026(db));
 

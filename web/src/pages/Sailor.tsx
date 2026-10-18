@@ -49,7 +49,6 @@ export function SailorPage() {
         <form onSubmit={save} className="card space-y-4 p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-400">Profile</h2>
           <SailorFields value={form} onChange={setForm} />
-          <p className="text-xs text-ink-500">Position and number in the profile are defaults. Values for a specific day are stored in that day's declaration, so changing them never alters history.</p>
           <div className="flex justify-end"><Button type="submit" variant="primary" busy={busy}>Save profile</Button></div>
         </form>
       </div>

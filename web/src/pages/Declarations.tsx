@@ -36,7 +36,6 @@ export function DeclarationsPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-bold">Crew declarations</h1>
-          <p className="text-sm text-ink-400">Each team's crew for a given racing day. Manual corrections take precedence over sync.</p>
         </div>
         <SyncMini />
       </div>
@@ -94,12 +93,11 @@ export function DeclarationsPage() {
         </aside>
 
         <section className="min-w-0">
-          {teamId ? <DeclarationPanel key={`${teamId}|${date}`} teamId={teamId} date={date} tz={tz} /> : <Empty title="Choose a team">Pick a team from the list to view or create its crew for this day.</Empty>}
+          {teamId ? <DeclarationPanel key={`${teamId}|${date}`} teamId={teamId} date={date} tz={tz} /> : <Empty title="Choose a team" />}
         </section>
       </div>
 
       <Modal open={showUnmatched} onClose={() => setShowUnmatched(false)} title="Unmatched imported entries" wide>
-        <p className="mb-3 text-sm text-ink-400">These source names were not linked to a profile automatically (no match or several matches). Open the declaration to assign a sailor or create a new profile.</p>
         <ul className="divide-y divide-ink-800 text-sm">
           {(unmatched.data ?? []).map((u) => (
             <li key={u.id} className="flex items-center gap-3 py-2">
@@ -255,7 +253,7 @@ function DeclarationPanel({ teamId, date, tz }: { teamId: string; date: string; 
             {available.map((s) => <option key={s.id} value={s.id}>{s.defaultNumber ? `#${s.defaultNumber} ` : ''}{s.firstName} {s.lastName}{s.defaultPosition ? ` – ${s.defaultPosition}` : ''}</option>)}
           </select>
           <Button disabled={!addId} busy={busy === 'add'} onClick={async () => { if (await act('add', () => api.post<Declaration>(`/api/declarations/${decl.id}/members`, { sailorId: addId }), 'Added to crew')) setAddId(''); }}>Add</Button>
-          <span className="text-xs text-ink-500">Someone missing? <Link className="text-accent-300" to={`/vmix/teams/${teamId}`}>Add a sailor in the team profile</Link>.</span>
+          
         </div>
       </div>
 

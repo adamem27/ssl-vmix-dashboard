@@ -106,7 +106,7 @@ export interface SettingsInfo {
 
 export interface OverviewSailor extends Sailor { declared: { position: string; number: string; manual: boolean; sort: number } | null }
 export interface OverviewTeam {
-  id: string; code: string; name: string; isDemo: boolean; thumb: Team['thumb'];
+  id: string; code: string; name: string; isDemo: boolean; thumb: Team['thumb']; assets: Record<string, Asset>;
   slots: { key: string; label: string; status: Asset['checkStatus'] | 'missing' }[]; assetsFilled: number; assetsTotal: number;
   place: { fleetName: string; position: number } | null;
   declaration: { members: number; unmatched: { name: string; position: string; number: string }[] } | null;
