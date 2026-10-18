@@ -309,6 +309,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       sheets: allSheets(ctx).map((s) => ({ name: s.name, path: s.path, rows: s.rows.length })),
     };
   });
+  // XML with every sheet under one address; vMix picks a sheet with XPath, e.g. //sheet[@name='Teams']/row
+  app.get('/xml/all', async (_req, reply) => {
+    const x = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    const tag = (k: string) => (/^[A-Za-z_][\w.-]*$/.test(k) ? k : `f_${k.replace(/[^\w.-]/g, '_')}`);
+    const body = allSheets(ctx).map((s) => `<sheet name="${x(s.name)}">${s.rows.map((r) => `<row>${Object.entries(r).map(([k, v]) => `<${tag(k)}>${x(String(v))}</${tag(k)}>`).join('')}</row>`).join('')}</sheet>`).join('');
+    return reply.type('application/xml; charset=utf-8').send(`<?xml version="1.0" encoding="UTF-8"?><data>${body}</data>`);
+  });
   app.get('/json/all', async () => Object.fromEntries(allSheets(ctx).map((s) => [s.name, s.rows])));
   app.get('/workbook.xlsx', async (_req, reply) => {
     reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="ssl-vmix.xlsx"');

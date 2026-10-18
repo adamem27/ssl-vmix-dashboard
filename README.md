@@ -123,7 +123,7 @@ Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/impo
 
 Dashboard sam utrzymuje plik `data/assets/ssl-vmix.xlsx` z arkuszami: Teams, Sailors, Captains, Weather, Schedule, People oraz po jednym arkuszu na każdy zestaw flot. Plik nadpisuje się w ciągu kilku sekund po każdej zmianie danych. W vMix dodaj go jako Data Source → Excel/CSV i wybierz arkusz. Ponieważ plik leży w folderze `data/assets`, udostępnienie tego folderu w sieci (patrz niżej) wystarcza, żeby vMix na innym komputerze go widział. Inne miejsce ustawisz zmienną `WORKBOOK_FILE`.
 
-To samo jako jeden adres JSON: `/json/all` (obiekt, w którym nazwy arkuszy są kluczami). Ekran **JSON** pokazuje arkusze jak w Excelu: zakładki na dole, numery wierszy i kolumn, ścieżkę pliku i przycisk pobrania.
+Jeden adres z wyborem arkusza jest też jako XML: `/xml/all`. W vMix: Data Source → XML, adres `http://<komputer>:4310/xml/all`, XPath np. `//sheet[@name='Teams']/row` (ekran JSON podaje XPath dla wybranego arkusza). Zbiorczy `/json/all` (nazwy arkuszy jako klucze) jest dla innych narzędzi; źródło JSON w vMix czyta tablicę obiektów, więc w vMix używaj adresów pojedynczych arkuszy, np. `/json/teams`. Ekran **JSON** pokazuje arkusze jak w Excelu: zakładki na dole, numery wierszy i kolumn, ścieżkę pliku i przycisk pobrania.
 
 ## JSON dla vMix
 

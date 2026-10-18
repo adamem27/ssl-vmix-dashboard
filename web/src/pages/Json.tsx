@@ -23,6 +23,7 @@ export function JsonPage() {
   const selField = sel ? cols[sel.c - 1] : null;
   const selValue = sel && selField ? String(rows[sel.r - 1]?.[selField] ?? '') : '';
   const filePath = wb.data?.vmixPath ?? wb.data?.file ?? '';
+  const xpath = `//sheet[@name='${current?.name ?? ''}']/row`;
 
   return (
     <div className="space-y-2">
@@ -38,6 +39,12 @@ export function JsonPage() {
         <span className="flex gap-1">
           <Button size="sm" onClick={() => copy(`${origin}/json/all`)}>Copy URL</Button>
           <a href="/json/all" target="_blank" rel="noreferrer"><Button size="sm" variant="ghost">Raw</Button></a>
+        </span>
+        <span className="self-center font-semibold uppercase tracking-wide text-ink-400">XML</span>
+        <code className="self-center truncate text-ink-100">{origin}/xml/all <span className="text-ink-400">XPath</span> {xpath}</code>
+        <span className="flex gap-1">
+          <Button size="sm" onClick={() => copy(`${origin}/xml/all`)}>Copy URL</Button>
+          <Button size="sm" onClick={() => copy(xpath)}>Copy XPath</Button>
         </span>
         {wb.data?.error && <span className="text-amber-300 md:col-span-3">{wb.data.error}</span>}
       </div>
