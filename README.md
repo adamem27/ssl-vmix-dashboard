@@ -2,7 +2,7 @@
 
 Lokalna aplikacja dla operatora transmisji regat: drużyny i ich 11 slotów graficznych (PNG), baza zawodników, floty po cztery łódki oraz dzienne deklaracje załóg z synchronizacją ze strony organizatora. Dane trzymane są w SQLite i w lokalnym katalogu plików. Przygotowuje grunt pod późniejsze zasilanie grafik vMix (JSON / Google Sheets).
 
-Interfejs jest po angielsku. Zakładki: **vMix graphics** (domyślna, działająca) i **Commentator** (ekran „w przygotowaniu”).
+Interfejs jest po angielsku. Zakładki: **vMix graphics** (dane i grafiki) i **Commentator** (podgląd dla komentatorów: zakładki flot, 4 składy obok siebie, po najechaniu na zawodnika popup ze zdjęciem, numerem, pozycją, kapitanem i wynikami; klawisze 1–9 przełączają floty).
 
 Ekran startowy **Overview** to jedna tabela wszystkich drużyn: flaga, kod, nazwa, flota w wybranym zestawie, stan 11 grafik, liczba żeglarzy i deklaracja na wybrany dzień. Kliknięcie drużyny rozwija jej żeglarzy (zdjęcie, numer i pozycja z profilu, numer i pozycja z deklaracji dnia, najlepsze wyniki). Wyszukiwarka filtruje po drużynie i nazwisku, a dane odświeżają się co 30 s.
 
