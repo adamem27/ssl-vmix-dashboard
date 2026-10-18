@@ -11,7 +11,7 @@ function cleanAliases(a: string[] | undefined) {
 
 function assertCodeFree(db: DB, code: string, exceptId?: string) {
   const r = db.prepare('SELECT id, name FROM teams WHERE code = ? COLLATE NOCASE').get(code) as { id: string; name: string } | undefined;
-  if (r && r.id !== exceptId) throw conflict(`Kod „${code}” jest już używany przez drużynę „${r.name}”.`);
+  if (r && r.id !== exceptId) throw conflict(`Code “${code}” is already used by team “${r.name}”.`);
 }
 
 export function createTeam(db: DB, input: Required<Pick<TeamInput, 'name' | 'code'>> & TeamInput, isDemo = false) {
@@ -26,7 +26,7 @@ export function createTeam(db: DB, input: Required<Pick<TeamInput, 'name' | 'cod
 
 export function updateTeam(db: DB, id: string, input: TeamInput) {
   const cur = db.prepare('SELECT * FROM teams WHERE id = ?').get(id) as any;
-  if (!cur) throw notFound('Drużyna');
+  if (!cur) throw notFound('Team');
   const code = input.code !== undefined ? input.code.trim() : cur.code;
   if (code !== cur.code) assertCodeFree(db, code, id);
   db.prepare('UPDATE teams SET name = ?, code = ?, aliases = ?, notes = ?, updated_at = ? WHERE id = ?').run(
@@ -38,7 +38,7 @@ export function updateTeam(db: DB, id: string, input: TeamInput) {
 export function deleteTeam(ctx: AssetCtx, id: string) {
   const sailors = ctx.db.prepare('SELECT id FROM sailors WHERE team_id = ?').all(id) as { id: string }[];
   const r = ctx.db.prepare('DELETE FROM teams WHERE id = ?').run(id);
-  if (!r.changes) throw notFound('Drużyna');
+  if (!r.changes) throw notFound('Team');
   removeAllForOwner(ctx, 'team', id);
   for (const s of sailors) removeAllForOwner(ctx, 'sailor', s.id);
 }
@@ -64,6 +64,6 @@ export function listTeams(ctx: AssetCtx) {
 
 export function getTeam(ctx: AssetCtx, id: string) {
   const t = ctx.db.prepare('SELECT * FROM teams WHERE id = ?').get(id);
-  if (!t) throw notFound('Drużyna');
+  if (!t) throw notFound('Team');
   return teamDto(ctx, t);
 }

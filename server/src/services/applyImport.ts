@@ -106,7 +106,7 @@ export function applyParsed(db: DB, eventId: string, parsed: ParsedDeclaration[]
 
     p.members.forEach((m, i) => {
       const key = nameKey(m.sourceName);
-      if (!key || seen.has(key)) { if (key) s.warnings.push(`${p.teamRef} ${p.dateRaw}: zdublowany wpis „${m.sourceName}”, pominięto.`); return; }
+      if (!key || seen.has(key)) { if (key) s.warnings.push(`${p.teamRef} ${p.dateRaw}: duplicate entry “${m.sourceName}”, skipped.`); return; }
       seen.add(key);
       let row = bySource.get(key);
       const match = row?.sailor_locked ? null : matchSailor(db, team.id, m);
@@ -156,7 +156,7 @@ export function applyParsed(db: DB, eventId: string, parsed: ParsedDeclaration[]
       const operatorTouched = r.origin === 'manual' || r.ovr_position !== null || r.ovr_number !== null || r.sailor_locked;
       if (operatorTouched) {
         db.prepare('UPDATE declaration_members SET in_source = 0, updated_at = ? WHERE id = ?').run(t, r.id);
-        s.warnings.push(`${p.teamRef} ${p.dateRaw}: „${r.source_name}” zniknął ze źródła; wpis zachowano, bo zawiera ręczne zmiany.`);
+        s.warnings.push(`${p.teamRef} ${p.dateRaw}: “${r.source_name}” is no longer in the source; entry kept because it has manual changes.`);
       } else {
         db.prepare('DELETE FROM declaration_members WHERE id = ?').run(r.id);
         s.membersRemoved++;
@@ -168,7 +168,7 @@ export function applyParsed(db: DB, eventId: string, parsed: ParsedDeclaration[]
     if (!created) changedHere ? s.declarationsUpdated++ : s.declarationsUnchanged++;
   }
   if (s.unmatchedTeams.length) {
-    s.warnings.push(`Nie rozpoznano drużyn: ${s.unmatchedTeams.join(', ')}. Dodaj drużynę z takim kodem lub alias, a następnie pobierz ponownie.`);
+    s.warnings.push(`Unrecognised teams: ${s.unmatchedTeams.join(', ')}. Add a team with that code or alias, then fetch again.`);
   }
   return s;
 }

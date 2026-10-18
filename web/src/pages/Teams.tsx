@@ -32,25 +32,25 @@ export function TeamsPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-2xl font-bold">Drużyny</h1>
-          <p className="text-sm text-ink-400">{q.data ? `${q.data.length} drużyn · ${missingCount} z brakującymi zasobami` : ' '}</p>
+          <h1 className="text-2xl font-bold">Teams</h1>
+          <p className="text-sm text-ink-400">{q.data ? `${q.data.length} teams · ${missingCount} with missing assets` : ' '}</p>
         </div>
-        <input className="input w-64" type="search" placeholder="Szukaj po nazwie lub kodzie…" value={search} onChange={(e) => set('q', e.target.value)} aria-label="Szukaj drużyn" />
-        <div role="radiogroup" aria-label="Filtr kompletności" className="inline-flex rounded-md border border-ink-700 bg-ink-900 p-0.5">
-          {([['all', 'Wszystkie'], ['missing', 'Z brakami'], ['complete', 'Komplet']] as [Filter, string][]).map(([v, l]) => (
+        <input className="input w-64" type="search" placeholder="Search by name or code…" value={search} onChange={(e) => set('q', e.target.value)} aria-label="Search teams" />
+        <div role="radiogroup" aria-label="Completeness filter" className="inline-flex rounded-md border border-ink-700 bg-ink-900 p-0.5">
+          {([['all', 'All'], ['missing', 'Missing assets'], ['complete', 'Complete']] as [Filter, string][]).map(([v, l]) => (
             <button key={v} role="radio" aria-checked={filter === v} onClick={() => set('f', v === 'all' ? '' : v)}
               className={cx('rounded px-3 py-1.5 text-xs font-medium', filter === v ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{l}</button>
           ))}
         </div>
-        <Button variant="primary" onClick={() => setAdding(true)}>+ Dodaj drużynę</Button>
+        <Button variant="primary" onClick={() => setAdding(true)}>+ Add team</Button>
       </div>
 
       {q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : !q.data!.length ? (
-        <Empty title="Brak drużyn" action={<div className="flex gap-2"><Button variant="primary" onClick={() => setAdding(true)}>Dodaj pierwszą drużynę</Button><Link to="/vmix/settings#demo"><Button>Dane demo</Button></Link></div>}>
-          Dodaj drużyny ręcznie albo załaduj oznaczony zestaw demonstracyjny w Ustawieniach.
+        <Empty title="No teams yet" action={<div className="flex gap-2"><Button variant="primary" onClick={() => setAdding(true)}>Add the first team</Button><Link to="/vmix/settings#demo"><Button>Demo data</Button></Link></div>}>
+          Add teams manually or load the labelled demo dataset in Settings.
         </Empty>
       ) : !list.length ? (
-        <Empty title="Brak wyników">Żadna drużyna nie pasuje do wyszukiwania lub filtra.</Empty>
+        <Empty title="No results">No team matches the search or filter.</Empty>
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {list.map((t) => <TeamCard key={t.id} t={t} />)}
@@ -70,7 +70,7 @@ function TeamCard({ t }: { t: Team }) {
       <Link to={`/vmix/teams/${t.id}`} className="card group block overflow-hidden transition-colors hover:border-ink-600">
         <div className="checker flex aspect-[16/9] items-center justify-center">
           {t.thumb?.previewUrl ? <img src={t.thumb.previewUrl} alt="" className="max-h-[80%] max-w-[80%] object-contain" />
-            : <span className="rounded bg-ink-950/80 px-2 py-1 text-xs text-ink-300">{t.thumb ? 'Podgląd niedostępny' : 'Brak flagi i emblematu'}</span>}
+            : <span className="rounded bg-ink-950/80 px-2 py-1 text-xs text-ink-300">{t.thumb ? 'Preview unavailable' : 'No flag or emblem'}</span>}
         </div>
         <div className="space-y-2 p-3">
           <div className="flex items-start justify-between gap-2">
@@ -84,9 +84,9 @@ function TeamCard({ t }: { t: Team }) {
             <div className="h-1.5 flex-1 overflow-hidden rounded bg-ink-800" aria-hidden>
               <div className={cx('h-full', complete ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: `${pct}%` }} />
             </div>
-            <span className={cx('tabular-nums font-semibold', complete ? 'text-emerald-300' : 'text-amber-300')} title="Wypełnione sloty graficzne">{t.assetsFilled}/{t.assetsTotal}</span>
+            <span className={cx('tabular-nums font-semibold', complete ? 'text-emerald-300' : 'text-amber-300')} title="Filled graphic slots">{t.assetsFilled}/{t.assetsTotal}</span>
           </div>
-          <p className="text-xs text-ink-500">{t.sailorCount} zawodników</p>
+          <p className="text-xs text-ink-500">{t.sailorCount} sailors</p>
         </div>
       </Link>
     </li>

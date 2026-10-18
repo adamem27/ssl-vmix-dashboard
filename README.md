@@ -2,7 +2,9 @@
 
 Lokalna aplikacja dla operatora transmisji regat: drużyny i ich 11 slotów graficznych (PNG), baza zawodników, floty po cztery łódki oraz dzienne deklaracje załóg z synchronizacją ze strony organizatora. Dane trzymane są w SQLite i w lokalnym katalogu plików. Przygotowuje grunt pod późniejsze zasilanie grafik vMix (JSON / Google Sheets).
 
-Zakładki: **vMix graphics** (domyślna, działająca) i **Commentator** (ekran „w przygotowaniu”).
+Interfejs jest po angielsku. Zakładki: **vMix graphics** (domyślna, działająca) i **Commentator** (ekran „w przygotowaniu”).
+
+Ekran startowy **Overview** to jedna tabela wszystkich drużyn: flaga, kod, nazwa, flota w wybranym zestawie, stan 11 grafik, liczba żeglarzy i deklaracja na wybrany dzień. Kliknięcie drużyny rozwija jej żeglarzy (zdjęcie, numer i pozycja z profilu, numer i pozycja z deklaracji dnia, najlepsze wyniki). Wyszukiwarka filtruje po drużynie i nazwisku, a dane odświeżają się co 30 s.
 
 ## Wymagania
 
@@ -25,7 +27,7 @@ Tryb deweloperski (przeładowanie na żywo, UI na porcie 5173, API na 4310):
 npm run dev
 ```
 
-Dane demonstracyjne (opcjonalnie, oznaczone „DEMO”): **Ustawienia → Dane demonstracyjne → Załaduj dane demo** albo `npm run seed:demo` (`npm run seed:demo -- --remove` usuwa). Przycisk „Importuj testową stronę deklaracji (DEMO)” przepuszcza przez importer plik `server/fixtures/demo-crew-list.html` o strukturze strony SSL, ale z fikcyjnymi drużynami DMA–DMH i nazwiskami „Demo …”.
+Dane demonstracyjne (opcjonalnie, oznaczone „DEMO”): **Settings → Demo data → Load demo data** albo `npm run seed:demo` (`npm run seed:demo -- --remove` usuwa). Przycisk „Import test declaration page (DEMO)” przepuszcza przez importer plik `server/fixtures/demo-crew-list.html` o strukturze strony SSL, ale z fikcyjnymi drużynami DMA–DMH i nazwiskami „Demo …”.
 
 Testy: `npm test`. Kontrola typów: `npm run typecheck`.
 
@@ -63,7 +65,7 @@ Bieżąca baza i katalog plików są przed odtworzeniem zachowywane z sufiksem `
    - macOS/Linux: `HOST=0.0.0.0 npm start`
 2. Zezwól na port 4310 w zaporze (Windows: Zapora Defender → reguła przychodząca TCP 4310, profil „Prywatna”).
 3. Otwórz `http://<IP-komputera-z-dashboardem>:4310` z innego komputera.
-4. Aby vMix widział przesłane grafiki, udostępnij katalog `data/assets` w sieci (np. udział SMB `\\DASHBOARD-PC\ssl-assets`, tylko do odczytu wystarczy) i wpisz tę ścieżkę w **Ustawienia → Pliki i ścieżki vMix**. Dashboard pokaże wtedy dla każdego pliku ścieżkę do użycia w vMix.
+4. Aby vMix widział przesłane grafiki, udostępnij katalog `data/assets` w sieci (np. udział SMB `\\DASHBOARD-PC\ssl-assets`, tylko do odczytu wystarczy) i wpisz tę ścieżkę w **Settings → Files & vMix paths**. Dashboard pokaże wtedy dla każdego pliku ścieżkę do użycia w vMix.
 
 Aplikacja nie ma logowania. Nie wystawiaj jej do internetu; używaj tylko w zaufanej sieci lokalnej.
 
@@ -87,7 +89,7 @@ Strona archiwalna `https://onb.sslgoldcup.com/qualify3/index.php/en/daily-weight
 - załoga jest w jednej komórce: `Imię Nazwisko (W:67.00) (J-23) -->Pozycja`, kolejne osoby bez separatora lub w nowych liniach;
 - są wiersze grup dat (`11-06(7)`) i „No records”, a każdy wiersz ma link „View” do `.../details/67/<id>`.
 
-Zastrzeżenie: z tego środowiska nie dało się pobrać surowego HTML (proxy odrzuciło połączenie z tym hostem), więc strukturę ustaliłem z wyrenderowanej treści strony listy i strony szczegółów. Dlatego importer szuka tabeli **po tekstach nagłówków**, a nie po klasach CSS czy pozycjach kolumn, i rozpoznaje osoby po wzorcu `(J-…) -->`. Weryfikacja na żywej stronie to pierwsza rzecz do sprawdzenia przyciskiem **Pobierz teraz**. Jeśli serwer nie ma dostępu do strony, można ją zapisać w przeglądarce (Ctrl+S) i wczytać przyciskiem **Importuj zapisany plik HTML**.
+Zastrzeżenie: z tego środowiska nie dało się pobrać surowego HTML (proxy odrzuciło połączenie z tym hostem), więc strukturę ustaliłem z wyrenderowanej treści strony listy i strony szczegółów. Dlatego importer szuka tabeli **po tekstach nagłówków**, a nie po klasach CSS czy pozycjach kolumn, i rozpoznaje osoby po wzorcu `(J-…) -->`. Weryfikacja na żywej stronie to pierwsza rzecz do sprawdzenia przyciskiem **Fetch now**. Jeśli serwer nie ma dostępu do strony, można ją zapisać w przeglądarce (Ctrl+S) i wczytać przyciskiem **Import saved HTML file**.
 
 Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/importers/index.ts`. Kolejne zawody dostają nowy moduł z tym samym interfejsem `Importer.parse(body, { year, baseUrl })`.
 
@@ -109,6 +111,10 @@ Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/impo
 - Zawodnicy: identyfikator źródłowy (gdy istnieje), potem zapamiętane ręczne przypisania, potem znormalizowane imię i nazwisko w obrębie drużyny (wielkość liter, akcenty, odwrócona kolejność). Numer i pozycja nie służą do identyfikacji. Kilka pasujących osób oznacza „Niejednoznaczny”, bez łączenia. Nierozpoznane rekordy można przypisać lub utworzyć z nich profil.
 - Osoba, która zniknęła ze źródła, jest usuwana ze składu, chyba że operator ją edytował; wtedy zostaje z oznaczeniem „Brak w źródle”.
 - Wagi i inne zbędne dane nie są zapisywane.
+
+## Matchboard SSL Gold Cup 2026
+
+**Settings → Matchboard → Load SSL Gold Cup 2026 matchboard** (albo `npm run seed:goldcup`) tworzy 61 drużyn z kodami z matchboardu i po jednym zestawie flot na etap: Qualifying Series, 1/32, 1/16, 1/8, ćwierćfinały, półfinały i finał. Miejsca jeszcze nierozstrzygnięte (losowanie, wyniki wcześniejszych rund) zostają puste z etykietą, np. „R1 C1” albo „DRAW 3”. Ponowne uruchomienie niczego nie dubluje: drużyny z istniejącym kodem i zestawy o istniejącej nazwie są pomijane.
 
 ## Floty
 

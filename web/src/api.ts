@@ -13,12 +13,12 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   try {
     res = await fetch(url, init);
   } catch {
-    throw new ApiError(0, 'Brak połączenia z serwerem dashboardu. Sprawdź, czy backend jest uruchomiony.');
+    throw new ApiError(0, 'Cannot reach the dashboard server. Check that the backend is running.');
   }
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Błąd serwera (HTTP ${res.status}).`, data?.details);
+  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Server error (HTTP ${res.status}).`, data?.details);
   return data as T;
 }
 
@@ -60,7 +60,7 @@ export interface SailorDetail extends Sailor {
 export interface FleetSetSummary { id: string; name: string; fleetCount: number; assignedCount: number; updatedAt: string }
 export interface FleetSetDetail {
   set: { id: string; name: string; updatedAt: string };
-  fleets: { id: string; name: string; positions: (string | null)[]; filled: number; complete: boolean }[];
+  fleets: { id: string; name: string; positions: (string | null)[]; placeholders: (string | null)[]; filled: number; complete: boolean }[];
   assignedTeamIds: string[];
 }
 
@@ -103,3 +103,13 @@ export interface SettingsInfo {
   paths: { dataDir: string | null; dbPath: string | null; assetsDir: string; vmixAssetsRoot: string };
   hasDemo: boolean;
 }
+
+export interface OverviewSailor extends Sailor { declared: { position: string; number: string; manual: boolean; sort: number } | null }
+export interface OverviewTeam {
+  id: string; code: string; name: string; isDemo: boolean; thumb: Team['thumb'];
+  slots: { key: string; label: string; status: Asset['checkStatus'] | 'missing' }[]; assetsFilled: number; assetsTotal: number;
+  place: { fleetName: string; position: number } | null;
+  declaration: { members: number; unmatched: { name: string; position: string; number: string }[] } | null;
+  sailors: OverviewSailor[];
+}
+export interface Overview { date: string; fleetSetId: string | null; teams: OverviewTeam[] }

@@ -25,10 +25,10 @@ export function Button({ variant = 'secondary', size = 'md', className, busy, ch
 }
 
 export function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
-  return <span role="status" aria-label="Ładowanie" className={cx('inline-block animate-spin rounded-full border-2 border-current border-r-transparent', className)} />;
+  return <span role="status" aria-label="Loading" className={cx('inline-block animate-spin rounded-full border-2 border-current border-r-transparent', className)} />;
 }
 
-export function Loading({ label = 'Ładowanie…' }: { label?: string }) {
+export function Loading({ label = 'Loading…' }: { label?: string }) {
   return <div className="flex items-center gap-3 p-8 text-ink-400"><Spinner /> {label}</div>;
 }
 
@@ -37,7 +37,7 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
   return (
     <div role="alert" className="flex items-start justify-between gap-4 rounded-lg border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-200">
       <span>{msg}</span>
-      {onRetry && <Button size="sm" onClick={onRetry}>Spróbuj ponownie</Button>}
+      {onRetry && <Button size="sm" onClick={onRetry}>Retry</Button>}
     </div>
   );
 }
@@ -93,7 +93,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
       <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={cx('card max-h-[90vh] w-full overflow-auto shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b border-ink-800 px-5 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
-          <button onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-100" aria-label="Zamknij">✕</button>
+          <button onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-100" aria-label="Close">✕</button>
         </div>
         <div className="p-5">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-ink-800 px-5 py-3">{footer}</div>}
@@ -144,13 +144,13 @@ export function useToast() {
 // ---------- confirm ----------
 export function useConfirm() {
   const [state, setState] = useState<null | { title: string; body: ReactNode; confirm: string; danger?: boolean; resolve: (v: boolean) => void }>(null);
-  const ask = (title: string, body: ReactNode, confirm = 'Potwierdź', danger = true) =>
+  const ask = (title: string, body: ReactNode, confirm = 'Confirm', danger = true) =>
     new Promise<boolean>((resolve) => setState({ title, body, confirm, danger, resolve }));
   const close = (v: boolean) => { state?.resolve(v); setState(null); };
   const dialog = (
     <Modal open={!!state} onClose={() => close(false)} title={state?.title ?? ''}
       footer={<>
-        <Button onClick={() => close(false)}>Anuluj</Button>
+        <Button onClick={() => close(false)}>Cancel</Button>
         <Button data-autofocus variant={state?.danger ? 'danger' : 'primary'} onClick={() => close(true)}>{state?.confirm}</Button>
       </>}>
       <div className="text-sm text-ink-300">{state?.body}</div>
@@ -163,12 +163,12 @@ export function useConfirm() {
 export function fmtDateTime(iso: string | null | undefined, tz?: string) {
   if (!iso) return '—';
   try {
-    return new Intl.DateTimeFormat('pl-PL', { dateStyle: 'short', timeStyle: 'medium', timeZone: tz }).format(new Date(iso));
+    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'short', timeStyle: 'medium', timeZone: tz }).format(new Date(iso));
   } catch { return iso; }
 }
 export function fmtDate(isoDate: string) {
   const [y, m, d] = isoDate.split('-').map(Number);
-  return new Intl.DateTimeFormat('pl-PL', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.UTC(y, m - 1, d));
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(Date.UTC(y, m - 1, d));
 }
 export function fmtBytes(n: number | null) {
   if (n == null) return '—';

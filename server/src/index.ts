@@ -10,7 +10,7 @@ const app = await buildApp({ db, assetsDir: config.assetsDir, sync, webDist: con
 sync.start();
 await app.listen({ host: config.host, port: config.port });
 app.log.info(`Baza danych: ${config.dbPath}`);
-app.log.info(`Katalog zasobów: ${config.assetsDir}`);
+app.log.info(`Assets folder: ${config.assetsDir}`);
 app.log.info(`Dashboard: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`);
 
 const shutdown = async () => {

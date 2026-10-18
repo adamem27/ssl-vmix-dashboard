@@ -8,8 +8,8 @@ function world() {
   const s = setup();
   const teams = ['AAA', 'BBB', 'CCC', 'DDD', 'EEE', 'FFF'].map((c) => createTeam(s.db, { name: c, code: c }));
   const setId = fleets.createSet(s.db, s.eventId, 'Runda 1');
-  const f1 = fleets.createFleet(s.db, setId, 'Flota 1');
-  const f2 = fleets.createFleet(s.db, setId, 'Flota 2');
+  const f1 = fleets.createFleet(s.db, setId, 'Fleet 1');
+  const f2 = fleets.createFleet(s.db, setId, 'Fleet 2');
   return { ...s, teams, setId, f1, f2 };
 }
 
@@ -71,11 +71,11 @@ describe('fleets', () => {
   it('assignments are per fleet set, so other rounds can split the same teams differently', () => {
     const { db, eventId, teams, setId, f1 } = world();
     const set2 = fleets.createSet(db, eventId, 'Runda 2');
-    const g1 = fleets.createFleet(db, set2, 'Flota 1');
+    const g1 = fleets.createFleet(db, set2, 'Fleet 1');
     fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: f1, position: 1 });
     fleets.placeTeam(db, set2, { teamId: teams[0], fleetId: g1, position: 4 });
     expect(fleets.getSetDetail(db, setId).fleets[0].positions[0]).toBe(teams[0]);
     expect(fleets.getSetDetail(db, set2).fleets[0].positions[3]).toBe(teams[0]);
-    expect(() => fleets.placeTeam(db, set2, { teamId: teams[1], fleetId: f1, position: 2 })).toThrow(/innego zestawu/);
+    expect(() => fleets.placeTeam(db, set2, { teamId: teams[1], fleetId: f1, position: 2 })).toThrow(/different fleet set/);
   });
 });

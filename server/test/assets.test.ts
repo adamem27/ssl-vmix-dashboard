@@ -38,7 +38,7 @@ describe('assets', () => {
     const a = createTeam(db, { name: 'A', code: 'AAA' });
     const r = savePath(ctx, 'team', a, 'flag_big', '\\\\VMIX-PC\\grafiki\\AAA\\flag_big.png');
     expect(r).toMatchObject({ checkStatus: 'unverified', previewUrl: null, vmixPath: '\\\\VMIX-PC\\grafiki\\AAA\\flag_big.png' });
-    expect(() => savePath(ctx, 'team', a, 'flag_big', 'flag.png')).toThrow(/bezwzględna/);
+    expect(() => savePath(ctx, 'team', a, 'flag_big', 'flag.png')).toThrow(/absolute/);
     expect(() => savePath(ctx, 'team', a, 'flag_big', 'D:\\SSL\\flag.jpg')).toThrow(/PNG/);
   });
 

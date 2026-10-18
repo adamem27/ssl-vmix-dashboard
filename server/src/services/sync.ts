@@ -13,13 +13,13 @@ export const defaultFetcher: Fetcher = async (url) => {
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'ssl-vmix-dashboard/0.1 (+local operator tool)', Accept: 'text/html,application/xhtml+xml' } });
-    if (!res.ok) throw new SourceError(`Źródło odpowiedziało błędem HTTP ${res.status} ${res.statusText}.`);
+    if (!res.ok) throw new SourceError(`The source responded with HTTP error ${res.status} ${res.statusText}.`);
     return await res.text();
   } catch (e: any) {
     if (e instanceof SourceError) throw e;
-    if (e?.name === 'AbortError') throw new SourceError(`Przekroczono czas oczekiwania na odpowiedź źródła (${FETCH_TIMEOUT_MS / 1000} s).`);
+    if (e?.name === 'AbortError') throw new SourceError(`Timed out waiting for the source (${FETCH_TIMEOUT_MS / 1000} s).`);
     const code = e?.cause?.code ?? e?.code;
-    throw new SourceError(`Nie można połączyć się ze źródłem${code ? ` (${code})` : ''}. Sprawdź adres i połączenie z internetem.`);
+    throw new SourceError(`Cannot connect to the source${code ? ` (${code})` : ''}. Check the URL and the internet connection.`);
   } finally {
     clearTimeout(timer);
   }
@@ -36,7 +36,7 @@ export class SyncService {
 
   constructor(private db: DB, private fetcher: Fetcher = defaultFetcher) {
     // A run left "running" means the process stopped mid-run; nothing was committed for it.
-    db.prepare(`UPDATE sync_runs SET status = 'error', finished_at = ?, error_message = 'Przerwane: serwer został zatrzymany w trakcie pobierania.' WHERE status = 'running'`).run(nowIso());
+    db.prepare(`UPDATE sync_runs SET status = 'error', finished_at = ?, error_message = 'Interrupted: the server stopped during the fetch.' WHERE status = 'running'`).run(nowIso());
   }
 
   config() {
@@ -91,15 +91,15 @@ export class SyncService {
   async runNow(trigger: 'auto' | 'manual' | 'upload', upload?: { body: string; filename: string; baseUrl?: string | null }): Promise<RunOutcome> {
     if (this.running) return { status: 'already_running' };
     const c = this.config();
-    const sourceLabel = upload ? `plik: ${upload.filename}` : c.url;
+    const sourceLabel = upload ? `file: ${upload.filename}` : c.url;
     const importer = importers[c.importer];
     this.running = true;
     let runId: string | null = null;
     try {
       runId = this.claim(trigger, sourceLabel, c.importer);
       if (!runId) return { status: 'already_running' };
-      if (!importer) throw new SourceError(`Nieznany importer „${c.importer}”.`);
-      if (!upload && !/^https?:\/\//i.test(c.url)) throw new SourceError('Adres źródła musi zaczynać się od http:// lub https://.');
+      if (!importer) throw new SourceError(`Unknown importer “${c.importer}”.`);
+      if (!upload && !/^https?:\/\//i.test(c.url)) throw new SourceError('The source URL must start with http:// or https://.');
       const body = upload ? upload.body : await this.fetcher(c.url);
       const ev = activeEvent(this.db);
       const baseUrl = upload && upload.baseUrl !== undefined ? upload.baseUrl ?? '' : c.url;
@@ -112,7 +112,7 @@ export class SyncService {
       if (!upload) setSetting(this.db, 'sync.lastSuccessAt', fetchedAt);
       return { status: 'success', runId, summary };
     } catch (e: any) {
-      const msg = e instanceof SourceError || e instanceof ParseError ? e.message : `Błąd importu: ${e?.message ?? String(e)}. Dane z poprzedniego pobrania pozostały bez zmian.`;
+      const msg = e instanceof SourceError || e instanceof ParseError ? e.message : `Import error: ${e?.message ?? String(e)}. Data from the previous fetch was kept unchanged.`;
       if (runId) this.db.prepare(`UPDATE sync_runs SET status = 'error', finished_at = ?, error_message = ? WHERE id = ?`).run(nowIso(), msg, runId);
       return { status: 'error', runId: runId ?? undefined, error: msg };
     } finally {

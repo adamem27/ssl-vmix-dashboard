@@ -98,7 +98,7 @@ describe('import', () => {
     mode = 'garbage';
     const r = await sync.runNow('auto');
     expect(r.status).toBe('error');
-    expect(r.error).toMatch(/Nie znaleziono tabeli/);
+    expect(r.error).toMatch(/Crew table not found/);
     mode = 'empty-table';
     expect((await sync.runNow('auto')).status).toBe('success');
 

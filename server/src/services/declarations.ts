@@ -6,7 +6,7 @@ import { createSailor } from './sailors.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export function assertDate(d: string) {
-  if (!DATE_RE.test(d) || Number.isNaN(Date.parse(d + 'T00:00:00Z'))) throw badRequest('Data musi mieć format RRRR-MM-DD.');
+  if (!DATE_RE.test(d) || Number.isNaN(Date.parse(d + 'T00:00:00Z'))) throw badRequest('Date must be in YYYY-MM-DD format.');
 }
 
 interface DeclRow {
@@ -79,7 +79,7 @@ export function getDeclaration(ctx: AssetCtx, eventId: string, teamId: string, d
 
 export function getDeclarationById(ctx: AssetCtx, id: string) {
   const d = ctx.db.prepare('SELECT * FROM declarations WHERE id = ?').get(id) as DeclRow | undefined;
-  if (!d) throw notFound('Deklaracja');
+  if (!d) throw notFound('Declaration');
   return declDto(ctx, d);
 }
 
@@ -87,9 +87,9 @@ export function getDeclarationById(ctx: AssetCtx, id: string) {
 export function createManualDeclaration(ctx: AssetCtx, eventId: string, teamId: string, date: string, prefill: 'empty' | 'previous' | 'roster') {
   assertDate(date);
   const db = ctx.db;
-  if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId)) throw notFound('Drużyna');
+  if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId)) throw notFound('Team');
   if (db.prepare('SELECT 1 FROM declarations WHERE event_id = ? AND team_id = ? AND declaration_date = ?').get(eventId, teamId, date)) {
-    throw conflict('Deklaracja tej drużyny na ten dzień już istnieje.');
+    throw conflict('A declaration for this team on this day already exists.');
   }
   const id = newId();
   const t = nowIso();
@@ -114,7 +114,7 @@ export function createManualDeclaration(ctx: AssetCtx, eventId: string, teamId: 
 
 function getMember(db: DB, id: string) {
   const m = db.prepare('SELECT * FROM declaration_members WHERE id = ?').get(id) as MemberRow | undefined;
-  if (!m) throw notFound('Członek załogi');
+  if (!m) throw notFound('Crew member');
   return m;
 }
 function declTeam(db: DB, declId: string) {
@@ -127,11 +127,11 @@ function touch(db: DB, declId: string) {
 export function addMember(ctx: AssetCtx, declId: string, input: { sailorId: string; position?: string; number?: string }) {
   const db = ctx.db;
   const d = db.prepare('SELECT * FROM declarations WHERE id = ?').get(declId) as DeclRow | undefined;
-  if (!d) throw notFound('Deklaracja');
+  if (!d) throw notFound('Declaration');
   const s = db.prepare('SELECT * FROM sailors WHERE id = ?').get(input.sailorId) as any;
-  if (!s) throw notFound('Zawodnik');
-  if (s.team_id !== d.team_id) throw badRequest('Zawodnik należy do innej drużyny.');
-  if (db.prepare('SELECT 1 FROM declaration_members WHERE declaration_id = ? AND sailor_id = ?').get(declId, s.id)) throw conflict('Ten zawodnik jest już w składzie.');
+  if (!s) throw notFound('Sailor');
+  if (s.team_id !== d.team_id) throw badRequest('This sailor belongs to another team.');
+  if (db.prepare('SELECT 1 FROM declaration_members WHERE declaration_id = ? AND sailor_id = ?').get(declId, s.id)) throw conflict('This sailor is already in the crew.');
   const t = nowIso();
   const sort = (db.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS n FROM declaration_members WHERE declaration_id = ?').get(declId) as { n: number }).n;
   db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, sailor_id, sailor_locked, match_status, ovr_position, ovr_number, ovr_updated_at, created_at, updated_at)
@@ -152,7 +152,7 @@ export function setOverride(db: DB, memberId: string, patch: { position?: string
 /** Drop the manual value so the field shows the source value again. */
 export function clearOverride(db: DB, memberId: string, field: 'position' | 'number' | 'all') {
   const m = getMember(db, memberId);
-  if (m.source_key === null) throw badRequest('Ten wpis nie ma wartości źródłowej, do której można wrócić.');
+  if (m.source_key === null) throw badRequest('This entry has no source value to reset to.');
   const t = nowIso();
   if (field === 'position' || field === 'all') db.prepare('UPDATE declaration_members SET ovr_position = NULL, updated_at = ? WHERE id = ?').run(t, m.id);
   if (field === 'number' || field === 'all') db.prepare('UPDATE declaration_members SET ovr_number = NULL, updated_at = ? WHERE id = ?').run(t, m.id);
@@ -167,10 +167,10 @@ export function assignSailor(db: DB, memberId: string, sailorId: string | null, 
   db.transaction(() => {
     if (sailorId) {
       const s = db.prepare('SELECT team_id FROM sailors WHERE id = ?').get(sailorId) as { team_id: string } | undefined;
-      if (!s) throw notFound('Zawodnik');
-      if (s.team_id !== teamId) throw badRequest('Zawodnik należy do innej drużyny.');
+      if (!s) throw notFound('Sailor');
+      if (s.team_id !== teamId) throw badRequest('This sailor belongs to another team.');
       const dup = db.prepare('SELECT 1 FROM declaration_members WHERE declaration_id = ? AND sailor_id = ? AND id != ?').get(m.declaration_id, sailorId, m.id);
-      if (dup) throw conflict('Ten zawodnik jest już przypisany do innego wpisu w tym składzie.');
+      if (dup) throw conflict('This sailor is already assigned to another entry in this crew.');
       db.prepare(`UPDATE declaration_members SET sailor_id = ?, sailor_locked = 1, match_status = 'matched', updated_at = ? WHERE id = ?`).run(sailorId, t, m.id);
       if (remember && m.source_key) {
         db.prepare('INSERT INTO sailor_source_aliases (team_id, name_key, sailor_id, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(team_id, name_key) DO UPDATE SET sailor_id = excluded.sailor_id')
@@ -187,7 +187,7 @@ export function assignSailor(db: DB, memberId: string, sailorId: string | null, 
 
 export function createSailorFromMember(db: DB, memberId: string) {
   const m = getMember(db, memberId);
-  if (!m.source_name) throw badRequest('Wpis nie ma nazwiska ze źródła.');
+  if (!m.source_name) throw badRequest('This entry has no name from the source.');
   const teamId = declTeam(db, m.declaration_id);
   const { first, last } = splitName(m.source_name);
   return db.transaction(() => {
@@ -203,7 +203,7 @@ export function createSailorFromMember(db: DB, memberId: string) {
 /** Manual rows can be removed. Imported rows only once the source no longer lists them (else the next sync restores them). */
 export function removeMember(db: DB, memberId: string) {
   const m = getMember(db, memberId);
-  if (m.origin === 'import' && m.in_source) throw badRequest('Tego wpisu nie można usunąć: pochodzi z aktualnych danych źródła i wróci przy następnej synchronizacji. Możesz poprawić jego pozycję i numer.');
+  if (m.origin === 'import' && m.in_source) throw badRequest('This entry cannot be removed: it comes from the current source data and would return on the next sync. You can correct its position and number.');
   db.prepare('DELETE FROM declaration_members WHERE id = ?').run(m.id);
   touch(db, m.declaration_id);
 }
@@ -221,12 +221,12 @@ export function moveMember(db: DB, memberId: string, direction: -1 | 1) {
 
 export function deleteDeclaration(db: DB, id: string) {
   const r = db.prepare('DELETE FROM declarations WHERE id = ?').run(id);
-  if (!r.changes) throw notFound('Deklaracja');
+  if (!r.changes) throw notFound('Declaration');
 }
 
 export function updateDeclarationNotes(db: DB, id: string, notes: string) {
   const r = db.prepare('UPDATE declarations SET notes = ?, updated_at = ? WHERE id = ?').run(notes, nowIso(), id);
-  if (!r.changes) throw notFound('Deklaracja');
+  if (!r.changes) throw notFound('Declaration');
 }
 
 /** Unmatched or ambiguous imported rows across the event, for the review list. */

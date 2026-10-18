@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, Meta } from './api';
 import { cx } from './components/ui';
 import { CommentatorPage } from './pages/Commentator';
+import { OverviewPage } from './pages/Overview';
 import { TeamsPage } from './pages/Teams';
 import { TeamDetailPage } from './pages/TeamDetail';
 import { SailorPage } from './pages/Sailor';
@@ -24,14 +25,14 @@ function TopBar() {
       <div className="mx-auto flex max-w-[1800px] items-center gap-6 px-4 lg:px-6">
         <div className="flex items-center gap-2 py-3">
           <span className="grid h-7 w-7 place-items-center rounded bg-accent-500 text-xs font-black text-white">SSL</span>
-          <span className="hidden text-sm font-semibold text-ink-200 sm:inline">Regaty · broadcast</span>
+          <span className="hidden text-sm font-semibold text-ink-200 sm:inline">Regatta · broadcast</span>
         </div>
-        <nav className="flex" aria-label="Moduły">
+        <nav className="flex" aria-label="Modules">
           <NavLink to="/vmix" className={tab}>vMix graphics</NavLink>
           <NavLink to="/commentator" className={tab}>Commentator</NavLink>
         </nav>
-        <div className="ml-auto truncate text-xs text-ink-400" title="Aktywne wydarzenie">
-          {meta.data && <>Wydarzenie: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
+        <div className="ml-auto truncate text-xs text-ink-400" title="Active event">
+          {meta.data && <>Event: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
         </div>
       </div>
     </header>
@@ -45,10 +46,11 @@ function VmixLayout() {
     <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 md:flex-row lg:px-6">
       <nav aria-label="vMix graphics" className="md:sticky md:top-[64px] md:h-fit md:w-48 md:shrink-0">
         <ul className="flex gap-1 overflow-x-auto md:flex-col">
-          <li><NavLink to="/vmix/teams" className={item}>Drużyny</NavLink></li>
-          <li><NavLink to="/vmix/fleets" className={item}>Floty</NavLink></li>
-          <li><NavLink to="/vmix/declarations" className={item}>Deklaracje załóg</NavLink></li>
-          <li><NavLink to="/vmix/settings" className={item}>Ustawienia</NavLink></li>
+          <li><NavLink to="/vmix/overview" className={item}>Overview</NavLink></li>
+          <li><NavLink to="/vmix/teams" className={item}>Teams</NavLink></li>
+          <li><NavLink to="/vmix/fleets" className={item}>Fleets</NavLink></li>
+          <li><NavLink to="/vmix/declarations" className={item}>Crew declarations</NavLink></li>
+          <li><NavLink to="/vmix/settings" className={item}>Settings</NavLink></li>
         </ul>
       </nav>
       <main className="min-w-0 flex-1"><Outlet /></main>
@@ -61,9 +63,10 @@ export function App() {
     <div className="min-h-screen">
       <TopBar />
       <Routes>
-        <Route path="/" element={<Navigate to="/vmix/teams" replace />} />
+        <Route path="/" element={<Navigate to="/vmix/overview" replace />} />
         <Route path="/vmix" element={<VmixLayout />}>
-          <Route index element={<Navigate to="teams" replace />} />
+          <Route index element={<Navigate to="overview" replace />} />
+          <Route path="overview" element={<OverviewPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:id" element={<TeamDetailPage />} />
           <Route path="sailors/:id" element={<SailorPage />} />
@@ -72,7 +75,7 @@ export function App() {
           <Route path="settings" element={<SettingsPage />} />
         </Route>
         <Route path="/commentator" element={<CommentatorPage />} />
-        <Route path="*" element={<div className="p-10 text-center text-ink-400">Nie ma takiej strony.</div>} />
+        <Route path="*" element={<div className="p-10 text-center text-ink-400">Page not found.</div>} />
       </Routes>
     </div>
   );

@@ -36,8 +36,8 @@ export function assetDto(ctx: AssetCtx, r: AssetRow) {
     enteredPath: r.entered_path,
     vmixPath,
     vmixPathNote: vmixPath
-      ? 'Ścieżka do użycia na komputerze vMix (nie weryfikowana na tym komputerze).'
-      : 'Brak mapowania katalogu zasobów dla vMix (Ustawienia → Pliki i ścieżki).',
+      ? 'Path to use on the vMix computer (not verified from this computer).'
+      : 'No vMix assets folder mapping (Settings → Files and paths).',
     previewUrl: previewable ? `/api/assets/${r.id}/file?v=${encodeURIComponent(r.updated_at)}` : null,
     checkStatus: r.check_status,
     checkMessage: r.check_message,
@@ -76,12 +76,12 @@ function removeStoredFile(ctx: AssetCtx, rel: string | null) {
 
 export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, buf: Buffer, filename: string): AssetDto {
   assertSlot(owner, slot);
-  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Drużyna' : 'Zawodnik');
-  if (!buf.length) throw badRequest('Plik jest pusty.');
+  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Team' : 'Sailor');
+  if (!buf.length) throw badRequest('The file is empty.');
   const info = inspectImage(buf);
   const kinds = allowedKinds(owner);
   if (!info || !kinds.includes(info.kind)) {
-    throw badRequest(`Nieobsługiwany format pliku „${filename}”. Wymagany format: ${kindLabel(kinds)}.`);
+    throw badRequest(`Unsupported file format “${filename}”. Required format: ${kindLabel(kinds)}.`);
   }
   // Unique name per owner + slot + random suffix: identical source filenames never collide.
   const ext = info.kind === 'png' ? 'png' : 'jpg';
@@ -100,7 +100,7 @@ export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slo
       VALUES (@id, @owner_type, @owner_id, @slot, 'upload', @rel, NULL, @fn, @mime, @w, @h, @size, @t, 'stored', '', @t, @t)
       ON CONFLICT(owner_type, owner_id, slot) DO UPDATE SET storage_kind='upload', stored_rel_path=@rel, entered_path=NULL,
         original_filename=@fn, mime=@mime, width=@w, height=@h, size_bytes=@size, checked_at=@t, check_status='stored', check_message='', updated_at=@t
-    `).run({ id: newId(), owner_type: owner, owner_id: ownerId, slot, rel, fn: path.basename(filename || 'plik'), mime: info.mime, w: info.width, h: info.height, size: buf.length, t });
+    `).run({ id: newId(), owner_type: owner, owner_id: ownerId, slot, rel, fn: path.basename(filename || 'file'), mime: info.mime, w: info.width, h: info.height, size: buf.length, t });
   } catch (e) {
     removeStoredFile(ctx, rel);
     throw e;
@@ -119,28 +119,28 @@ export function checkEnteredPath(ctx: AssetCtx, owner: OwnerType, entered: strin
     return {
       status: 'unverified',
       message: local
-        ? 'Serwer dashboardu nie znalazł pliku pod tą ścieżką. Ścieżka zapisana, ale niezweryfikowana.'
-        : 'Ta ścieżka nie jest dostępna z komputera, na którym działa dashboard. Ścieżka zapisana, ale niezweryfikowana.',
+        ? 'The dashboard server found no file at this path. Path saved but unverified.'
+        : 'This path is not reachable from the computer running the dashboard. Path saved but unverified.',
       mime: null, width: null, height: null, size: null,
     };
   }
   const info = inspectImage(buf);
   if (!info || !kinds.includes(info.kind)) {
-    return { status: 'invalid', message: `Plik istnieje, ale nie jest w formacie ${kindLabel(kinds)}.`, mime: null, width: null, height: null, size: buf.length };
+    return { status: 'invalid', message: `The file exists but is not a ${kindLabel(kinds)} file.`, mime: null, width: null, height: null, size: buf.length };
   }
-  return { status: 'reachable', message: 'Plik jest dostępny dla serwera dashboardu. Dostępność na komputerze vMix nie jest sprawdzana.', mime: info.mime, width: info.width, height: info.height, size: buf.length };
+  return { status: 'reachable', message: 'The file is reachable by the dashboard server. Availability on the vMix computer is not checked.', mime: info.mime, width: info.width, height: info.height, size: buf.length };
 }
 
 export function savePath(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, entered: string): AssetDto {
   assertSlot(owner, slot);
-  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Drużyna' : 'Zawodnik');
+  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Team' : 'Sailor');
   const v = entered.trim();
   const err = validateEnteredPath(v);
   if (err) throw badRequest(err);
   const kinds = allowedKinds(owner);
   const ext = path.extname(v.replace(/\\/g, '/')).toLowerCase();
   const okExt = kinds.includes('png') && ext === '.png' || kinds.includes('jpeg') && (ext === '.jpg' || ext === '.jpeg');
-  if (!okExt) throw badRequest(`Ścieżka musi wskazywać plik ${kindLabel(kinds)} (rozszerzenie ${kinds.includes('jpeg') ? '.png, .jpg' : '.png'}).`);
+  if (!okExt) throw badRequest(`The path must point to a ${kindLabel(kinds)} file (extension ${kinds.includes('jpeg') ? '.png, .jpg' : '.png'}).`);
   const c = checkEnteredPath(ctx, owner, v);
   if (c.status === 'invalid') throw badRequest(c.message);
   const prev = getRow(ctx.db, owner, ownerId, slot);
@@ -158,12 +158,12 @@ export function savePath(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot:
 
 export function recheckAsset(ctx: AssetCtx, id: string): AssetDto {
   const r = ctx.db.prepare('SELECT * FROM assets WHERE id = ?').get(id) as AssetRow | undefined;
-  if (!r) throw notFound('Zasób');
+  if (!r) throw notFound('Asset');
   const t = nowIso();
   if (r.storage_kind === 'upload') {
     const ok = r.stored_rel_path && fs.existsSync(path.join(ctx.assetsDir, r.stored_rel_path));
     ctx.db.prepare('UPDATE assets SET check_status = ?, check_message = ?, checked_at = ?, updated_at = ? WHERE id = ?')
-      .run(ok ? 'stored' : 'invalid', ok ? '' : 'Brak pliku w katalogu zasobów aplikacji.', t, t, id);
+      .run(ok ? 'stored' : 'invalid', ok ? '' : 'File missing from the app assets folder.', t, t, id);
   } else {
     const c = checkEnteredPath(ctx, r.owner_type, r.entered_path ?? '');
     ctx.db.prepare('UPDATE assets SET check_status=?, check_message=?, mime=COALESCE(?, mime), width=COALESCE(?, width), height=COALESCE(?, height), size_bytes=COALESCE(?, size_bytes), checked_at=?, updated_at=? WHERE id=?')

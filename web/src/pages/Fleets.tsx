@@ -55,8 +55,8 @@ export function FleetsPage() {
       if (!res.result.changed) return;
       const dsp = res.result.displaced;
       toast.ok(dsp
-        ? `Zamieniono: ${tName(teamId)} ↔ ${tName(dsp.teamId)}${dsp.to === 'unassigned' ? ` (${tName(dsp.teamId)} wróciła do listy dostępnych)` : ''}`
-        : `${tName(teamId)} → ${fleetName(fleetId)}, miejsce ${res.fleets.find((f) => f.id === fleetId)?.positions.indexOf(teamId)! + 1}`);
+        ? `Swapped: ${tName(teamId)} ↔ ${tName(dsp.teamId)}${dsp.to === 'unassigned' ? ` (${tName(dsp.teamId)} returned to available teams)` : ''}`
+        : `${tName(teamId)} → ${fleetName(fleetId)}, place ${res.fleets.find((f) => f.id === fleetId)?.positions.indexOf(teamId)! + 1}`);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && e.details?.occupantTeamId && position) {
         setOccupied({ teamId, fleetId, position, occupantId: e.details.occupantTeamId, from: locate(teamId), freePositions: e.details.freePositions ?? [] });
@@ -66,7 +66,7 @@ export function FleetsPage() {
 
   const unassign = async (teamId: string) => {
     if (!setId) return;
-    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId })); toast.ok(`${tName(teamId)} usunięta z floty (pozostaje w bazie drużyn)`); }
+    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId })); toast.ok(`${tName(teamId)} removed from the fleet (still in the team database)`); }
     catch (e) { toast.error(e); }
   };
 
@@ -93,13 +93,13 @@ export function FleetsPage() {
     try {
       if (nameModal.mode === 'newSet') {
         const r = await api.post<FleetSetDetail>('/api/fleet-sets', { name: value, fleetCount: 0 });
-        qc.invalidateQueries({ queryKey: ['fleet-sets'] }); setSetId(r.set.id); toast.ok(`Utworzono zestaw „${value}”`);
+        qc.invalidateQueries({ queryKey: ['fleet-sets'] }); setSetId(r.set.id); toast.ok(`Fleet set “${value}” created`);
       } else if (nameModal.mode === 'renameSet') {
-        refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { name: value })); toast.ok('Zmieniono nazwę zestawu');
+        refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { name: value })); toast.ok('Fleet set renamed');
       } else if (nameModal.mode === 'newFleet') {
-        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value })); toast.ok(`Dodano flotę „${value}”`);
+        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value })); toast.ok(`Fleet “${value}” added`);
       } else {
-        await api.patch(`/api/fleets/${nameModal.id}`, { name: value }); refresh(); toast.ok('Zmieniono nazwę floty');
+        await api.patch(`/api/fleets/${nameModal.id}`, { name: value }); refresh(); toast.ok('Fleet renamed');
       }
       setNameModal(null);
     } catch (e) { toast.error(e); }
@@ -107,12 +107,12 @@ export function FleetsPage() {
 
   const deleteSet = async () => {
     const s = sets.data?.find((x) => x.id === setId);
-    if (!s || !(await ask('Usunąć zestaw flot?', <>Zestaw <b>{s.name}</b> i wszystkie jego floty zostaną usunięte. Drużyny pozostaną w bazie.</>, 'Usuń zestaw'))) return;
-    try { await api.del(`/api/fleet-sets/${s.id}`); setSetId(null); qc.invalidateQueries({ queryKey: ['fleet-sets'] }); toast.ok('Usunięto zestaw'); } catch (e) { toast.error(e); }
+    if (!s || !(await ask('Delete fleet set?', <>Set <b>{s.name}</b> and all its fleets will be deleted. Teams stay in the database.</>, 'Delete set'))) return;
+    try { await api.del(`/api/fleet-sets/${s.id}`); setSetId(null); qc.invalidateQueries({ queryKey: ['fleet-sets'] }); toast.ok('Fleet set deleted'); } catch (e) { toast.error(e); }
   };
   const deleteFleet = async (f: FleetSetDetail['fleets'][number]) => {
-    if (!(await ask('Usunąć flotę?', <>Flota <b>{f.name}</b> zostanie usunięta{f.filled ? `, a ${f.filled} drużyn(y) wróci do listy dostępnych` : ''}.</>, 'Usuń flotę'))) return;
-    try { await api.del(`/api/fleets/${f.id}`); refresh(); toast.ok('Usunięto flotę'); } catch (e) { toast.error(e); }
+    if (!(await ask('Delete fleet?', <>Fleet <b>{f.name}</b> will be deleted{f.filled ? ` and ${f.filled} team(s) will return to available teams` : ''}.</>, 'Delete fleet'))) return;
+    try { await api.del(`/api/fleets/${f.id}`); refresh(); toast.ok('Fleet deleted'); } catch (e) { toast.error(e); }
   };
   const moveFleet = async (id: string, direction: -1 | 1) => {
     try { await api.post(`/api/fleets/${id}/move`, { direction }); refresh(); } catch (e) { toast.error(e); }
@@ -125,62 +125,62 @@ export function FleetsPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-2xl font-bold">Floty</h1>
-          <p className="text-sm text-ink-400">Cztery łódki we flocie, po jednej drużynie na łódkę. Przeciągnij drużynę albo użyj list wyboru.</p>
+          <h1 className="text-2xl font-bold">Fleets</h1>
+          <p className="text-sm text-ink-400">Four boats per fleet, one team per boat. Drag a team or use the pickers.</p>
         </div>
         {!!sets.data?.length && (
-          <Field label="Zestaw flot / runda">
+          <Field label="Fleet set / round">
             <select className="input w-64" value={setId ?? ''} onChange={(e) => setSetId(e.target.value)}>
-              {sets.data.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.assignedCount} drużyn)</option>)}
+              {sets.data.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.assignedCount} teams)</option>)}
             </select>
           </Field>
         )}
-        {setId && <Button onClick={() => setNameModal({ mode: 'renameSet', initial: d?.set.name ?? '' })}>Zmień nazwę</Button>}
-        {setId && <Button variant="danger" onClick={deleteSet}>Usuń zestaw</Button>}
-        <Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: `Runda ${(sets.data?.length ?? 0) + 1}` })}>+ Nowy zestaw</Button>
+        {setId && <Button onClick={() => setNameModal({ mode: 'renameSet', initial: d?.set.name ?? '' })}>Rename</Button>}
+        {setId && <Button variant="danger" onClick={deleteSet}>Delete set</Button>}
+        <Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: `Round ${(sets.data?.length ?? 0) + 1}` })}>+ New set</Button>
       </div>
 
       {!sets.data?.length ? (
-        <Empty title="Brak zestawów flot" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: 'Runda 1' })}>Utwórz pierwszy zestaw</Button>}>
-          Zestaw to jeden podział drużyn na floty (np. runda kwalifikacyjna). Różne zestawy mogą dzielić te same drużyny inaczej.
+        <Empty title="No fleet sets yet" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: 'Round 1' })}>Create the first set</Button>}>
+          A set is one split of teams into fleets (e.g. a qualifying round). Different sets can split the same teams differently.
         </Empty>
       ) : detail.isLoading ? <Loading /> : detail.error ? <ErrorBox error={detail.error} /> : d && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragTeam(null)}>
           <div className="grid gap-4 xl:grid-cols-[280px_1fr]">
             <Pool>
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Dostępne drużyny</h2>
+                <h2 className="text-sm font-semibold">Available teams</h2>
                 <span className="text-xs text-ink-500">{(teams.data?.length ?? 0) - assigned.size}</span>
               </div>
-              <input className="input mt-2" type="search" placeholder="Filtruj…" value={poolSearch} onChange={(e) => setPoolSearch(e.target.value)} aria-label="Filtruj dostępne drużyny" />
+              <input className="input mt-2" type="search" placeholder="Filter…" value={poolSearch} onChange={(e) => setPoolSearch(e.target.value)} aria-label="Filter available teams" />
               <ul className="mt-2 max-h-[60vh] space-y-1 overflow-auto pr-1">
                 {pool.map((t) => (
                   <li key={t.id}><TeamChip team={t} /></li>
                 ))}
-                {!pool.length && <li className="py-6 text-center text-xs text-ink-500">{teams.data?.length ? 'Wszystkie drużyny są przypisane.' : 'Brak drużyn w bazie.'}</li>}
+                {!pool.length && <li className="py-6 text-center text-xs text-ink-500">{teams.data?.length ? 'All teams are assigned.' : 'No teams in the database.'}</li>}
               </ul>
-              <p className="mt-2 text-[11px] text-ink-500">Upuść tutaj drużynę z floty, aby ją wypisać (pozostaje w bazie).</p>
+              <p className="mt-2 text-[11px] text-ink-500">Drop a team here to remove it from its fleet (it stays in the database).</p>
             </Pool>
 
             <div>
               <div className="mb-2 flex items-center gap-3">
-                <span className="text-sm text-ink-400">{d.fleets.length} flot · {d.fleets.filter((f) => !f.complete).length} niekompletnych</span>
-                <Button size="sm" className="ml-auto" variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: `Flota ${d.fleets.length + 1}` })}>+ Dodaj flotę</Button>
+                <span className="text-sm text-ink-400">{d.fleets.length} fleets · {d.fleets.filter((f) => !f.complete).length} incomplete</span>
+                <Button size="sm" className="ml-auto" variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: `Fleet ${d.fleets.length + 1}` })}>+ Add fleet</Button>
               </div>
               {!d.fleets.length ? (
-                <Empty title="Zestaw nie ma flot" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: 'Flota 1' })}>Dodaj flotę</Button>} />
+                <Empty title="This set has no fleets" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: 'Fleet 1' })}>Add fleet</Button>} />
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
                   {d.fleets.map((f, fi) => (
                     <section key={f.id} className={cx('card', !f.complete && 'border-amber-900/60')} aria-label={f.name}>
                       <header className="flex items-center gap-2 border-b border-ink-800 px-3 py-2">
                         <h3 className="truncate font-semibold">{f.name}</h3>
-                        <Badge tone={f.complete ? 'ok' : 'warn'}>{f.complete ? 'Komplet' : `Niekompletna ${f.filled}/4`}</Badge>
+                        <Badge tone={f.complete ? 'ok' : 'warn'}>{f.complete ? 'Complete' : `Incomplete ${f.filled}/4`}</Badge>
                         <div className="ml-auto flex">
-                          <IconBtn label="Przesuń flotę w lewo" disabled={fi === 0} onClick={() => moveFleet(f.id, -1)}>←</IconBtn>
-                          <IconBtn label="Przesuń flotę w prawo" disabled={fi === d.fleets.length - 1} onClick={() => moveFleet(f.id, 1)}>→</IconBtn>
-                          <IconBtn label="Zmień nazwę floty" onClick={() => setNameModal({ mode: 'renameFleet', id: f.id, initial: f.name })}>✎</IconBtn>
-                          <IconBtn label="Usuń flotę" onClick={() => deleteFleet(f)}>🗑</IconBtn>
+                          <IconBtn label="Move fleet left" disabled={fi === 0} onClick={() => moveFleet(f.id, -1)}>←</IconBtn>
+                          <IconBtn label="Move fleet right" disabled={fi === d.fleets.length - 1} onClick={() => moveFleet(f.id, 1)}>→</IconBtn>
+                          <IconBtn label="Rename fleet" onClick={() => setNameModal({ mode: 'renameFleet', id: f.id, initial: f.name })}>✎</IconBtn>
+                          <IconBtn label="Delete fleet" onClick={() => deleteFleet(f)}>🗑</IconBtn>
                         </div>
                       </header>
                       <ol className="space-y-1.5 p-2">
@@ -190,23 +190,23 @@ export function FleetsPage() {
                             {tid ? (
                               <>
                                 <div className="min-w-0 flex-1"><TeamChip team={teamById.get(tid)} compact /></div>
-                                <IconBtn label="W górę" disabled={i === 0} onClick={() => place(tid, f.id, i, 'swap')}>↑</IconBtn>
-                                <IconBtn label="W dół" disabled={i === 3} onClick={() => place(tid, f.id, i + 2, 'swap')}>↓</IconBtn>
-                                <select className="w-8 cursor-pointer rounded bg-transparent text-xs text-ink-400 hover:bg-ink-800" aria-label={`Przenieś ${tName(tid)} do innej floty`} value=""
+                                <IconBtn label="Move up" disabled={i === 0} onClick={() => place(tid, f.id, i, 'swap')}>↑</IconBtn>
+                                <IconBtn label="Move down" disabled={i === 3} onClick={() => place(tid, f.id, i + 2, 'swap')}>↓</IconBtn>
+                                <select className="w-8 cursor-pointer rounded bg-transparent text-xs text-ink-400 hover:bg-ink-800" aria-label={`Move ${tName(tid)} to another fleet`} value=""
                                   onChange={(e) => { if (e.target.value) void place(tid, e.target.value, undefined); }}>
                                   <option value="">⇄</option>
-                                  {d.fleets.filter((o) => o.id !== f.id).map((o) => <option key={o.id} value={o.id} disabled={o.complete}>{o.name}{o.complete ? ' (pełna)' : ''}</option>)}
+                                  {d.fleets.filter((o) => o.id !== f.id).map((o) => <option key={o.id} value={o.id} disabled={o.complete}>{o.name}{o.complete ? ' (full)' : ''}</option>)}
                                 </select>
-                                <IconBtn label={`Usuń ${tName(tid)} z floty`} onClick={() => unassign(tid)}>✕</IconBtn>
+                                <IconBtn label={`Remove ${tName(tid)} from the fleet`} onClick={() => unassign(tid)}>✕</IconBtn>
                               </>
                             ) : (
-                              <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Wybierz drużynę na miejsce ${i + 1} we flocie ${f.name}`}
+                              <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Choose a team for place ${i + 1} in ${f.name}`}
                                 onChange={(e) => { if (e.target.value) void place(e.target.value, f.id, i + 1); }}>
-                                <option value="">Puste miejsce – wybierz lub przeciągnij drużynę</option>
-                                <optgroup label="Dostępne">
+                                <option value="">{f.placeholders?.[i] ? `${f.placeholders[i]} (to be decided) – choose or drag a team` : 'Empty place – choose or drag a team'}</option>
+                                <optgroup label="Available">
                                   {(teams.data ?? []).filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>
-                                <optgroup label="Przenieś z innej floty">
+                                <optgroup label="Move from another fleet">
                                   {(teams.data ?? []).filter((t) => assigned.has(t.id) && !f.positions.includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name} ({locate(t.id)?.fleetName})</option>)}
                                 </optgroup>
                               </select>
@@ -225,20 +225,20 @@ export function FleetsPage() {
       )}
 
       <NameModal state={nameModal} onClose={() => setNameModal(null)} onSave={saveName} />
-      <Modal open={!!occupied} onClose={() => setOccupied(null)} title="Miejsce jest zajęte">
+      <Modal open={!!occupied} onClose={() => setOccupied(null)} title="Place is occupied">
         {occupied && (
           <div className="space-y-4 text-sm">
             <p className="text-ink-300">
-              Miejsce {occupied.position} we flocie <b>{fleetName(occupied.fleetId)}</b> zajmuje <b>{tName(occupied.occupantId)}</b>. Wybierz, co zrobić z <b>{tName(occupied.teamId)}</b>:
+              Place {occupied.position} in <b>{fleetName(occupied.fleetId)}</b> is taken by <b>{tName(occupied.occupantId)}</b>. Choose what to do with <b>{tName(occupied.teamId)}</b>:
             </p>
             <div className="flex flex-col gap-2">
               <Button variant="primary" data-autofocus onClick={() => { const o = occupied; setOccupied(null); void place(o.teamId, o.fleetId, o.position, 'swap'); }}>
-                Zamień miejscami: {tName(occupied.occupantId)} {occupied.from ? `→ ${occupied.from.fleetName}, miejsce ${occupied.from.position}` : 'wróci do listy dostępnych'}
+                Swap: {tName(occupied.occupantId)} {occupied.from ? `→ ${occupied.from.fleetName}, place ${occupied.from.position}` : 'returns to available teams'}
               </Button>
               {occupied.freePositions.map((p) => (
-                <Button key={p} onClick={() => { const o = occupied; setOccupied(null); void place(o.teamId, o.fleetId, p); }}>Wstaw na wolne miejsce {p}</Button>
+                <Button key={p} onClick={() => { const o = occupied; setOccupied(null); void place(o.teamId, o.fleetId, p); }}>Put in free place {p}</Button>
               ))}
-              <Button variant="ghost" onClick={() => setOccupied(null)}>Anuluj</Button>
+              <Button variant="ghost" onClick={() => setOccupied(null)}>Cancel</Button>
             </div>
           </div>
         )}
@@ -264,10 +264,10 @@ function Slot({ fleetId, position, children }: { fleetId: string; position: numb
 
 function TeamChip({ team, compact, overlay }: { team?: Team; compact?: boolean; overlay?: boolean }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `team:${team?.id}`, data: { teamId: team?.id }, disabled: !team || overlay });
-  if (!team) return <div className="px-2 py-1.5 text-xs text-red-300">Nieznana drużyna</div>;
+  if (!team) return <div className="px-2 py-1.5 text-xs text-red-300">Unknown team</div>;
   return (
     <div ref={overlay ? undefined : setNodeRef} {...(overlay ? {} : listeners)} {...(overlay ? {} : attributes)}
-      aria-label={overlay ? undefined : `${team.name}, przeciągnij (spacja, strzałki, spacja)`} aria-hidden={overlay || undefined}
+      aria-label={overlay ? undefined : `${team.name}, drag (space, arrows, space)`} aria-hidden={overlay || undefined}
       className={cx('flex cursor-grab items-center gap-2 rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 active:cursor-grabbing',
         isDragging && 'opacity-30', overlay && 'shadow-2xl ring-2 ring-accent-400', compact && 'border-transparent bg-transparent')}>
       <span className="checker grid h-6 w-9 shrink-0 place-items-center overflow-hidden rounded-sm">
@@ -284,12 +284,12 @@ function NameModal({ state, onClose, onSave }: { state: { mode: string; initial:
   const [v, setV] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (state) setV(state.initial); }, [state]);
-  const titles: Record<string, string> = { newSet: 'Nowy zestaw flot', renameSet: 'Nazwa zestawu', newFleet: 'Nowa flota', renameFleet: 'Nazwa floty' };
+  const titles: Record<string, string> = { newSet: 'New fleet set', renameSet: 'Set name', newFleet: 'New fleet', renameFleet: 'Fleet name' };
   return (
     <Modal open={!!state} onClose={onClose} title={state ? titles[state.mode] : ''}>
       <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); await onSave(v.trim()); setBusy(false); }} className="space-y-4">
-        <Field label="Nazwa"><input className="input" value={v} onChange={(e) => setV(e.target.value)} required maxLength={120} /></Field>
-        <div className="flex justify-end gap-2"><Button type="button" onClick={onClose}>Anuluj</Button><Button type="submit" variant="primary" busy={busy} disabled={!v.trim()}>Zapisz</Button></div>
+        <Field label="Name"><input className="input" value={v} onChange={(e) => setV(e.target.value)} required maxLength={120} /></Field>
+        <div className="flex justify-end gap-2"><Button type="button" onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy} disabled={!v.trim()}>Save</Button></div>
       </form>
     </Modal>
   );

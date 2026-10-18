@@ -14,14 +14,14 @@ import { createFleet, createSet, placeTeam } from './fleets.js';
  */
 // Deliberately abstract colour pairs and diagonal patterns, so placeholders never resemble a real national flag.
 const DEMO_TEAMS = [
-  { code: 'DMA', name: 'DEMO Drużyna A', colors: [[20, 140, 150], [245, 150, 40], [30, 40, 60]] },
-  { code: 'DMB', name: 'DEMO Drużyna B', colors: [[120, 70, 170], [120, 210, 190], [30, 40, 60]] },
-  { code: 'DMC', name: 'DEMO Drużyna C', colors: [[230, 90, 120], [60, 70, 90], [240, 230, 210]] },
-  { code: 'DMD', name: 'DEMO Drużyna D', colors: [[90, 160, 60], [40, 50, 120], [240, 240, 240]] },
-  { code: 'DME', name: 'DEMO Drużyna E', colors: [[200, 120, 40], [70, 100, 110], [250, 240, 220]] },
-  { code: 'DMF', name: 'DEMO Drużyna F', colors: [[60, 120, 200], [230, 200, 80], [40, 40, 50]] },
-  { code: 'DMG', name: 'DEMO Drużyna G', colors: [[160, 60, 80], [150, 170, 180], [20, 30, 40]] },
-  { code: 'DMH', name: 'DEMO Drużyna H', colors: [[50, 170, 120], [110, 60, 140], [235, 235, 235]] },
+  { code: 'DMA', name: 'DEMO Team A', colors: [[20, 140, 150], [245, 150, 40], [30, 40, 60]] },
+  { code: 'DMB', name: 'DEMO Team B', colors: [[120, 70, 170], [120, 210, 190], [30, 40, 60]] },
+  { code: 'DMC', name: 'DEMO Team C', colors: [[230, 90, 120], [60, 70, 90], [240, 230, 210]] },
+  { code: 'DMD', name: 'DEMO Team D', colors: [[90, 160, 60], [40, 50, 120], [240, 240, 240]] },
+  { code: 'DME', name: 'DEMO Team E', colors: [[200, 120, 40], [70, 100, 110], [250, 240, 220]] },
+  { code: 'DMF', name: 'DEMO Team F', colors: [[60, 120, 200], [230, 200, 80], [40, 40, 50]] },
+  { code: 'DMG', name: 'DEMO Team G', colors: [[160, 60, 80], [150, 170, 180], [20, 30, 40]] },
+  { code: 'DMH', name: 'DEMO Team H', colors: [[50, 170, 120], [110, 60, 140], [235, 235, 235]] },
 ] as const;
 
 const POSITIONS = ['Helm', 'Tactician', 'Mainsail trimmer', 'Trimmer', 'Trimmer', 'Pit', 'Bow', 'Grinder', 'Grinder', 'Floater', 'Reserve'];
@@ -62,7 +62,7 @@ export function seedDemo(ctx: AssetCtx) {
   db.transaction(() => {
     DEMO_TEAMS.forEach((t, ti) => {
       if (db.prepare('SELECT 1 FROM teams WHERE code = ? COLLATE NOCASE').get(t.code)) return;
-      const id = createTeam(db, { name: t.name, code: t.code, aliases: [`Demo ${t.code}`], notes: 'Dane demonstracyjne (DEMO).' }, true);
+      const id = createTeam(db, { name: t.name, code: t.code, aliases: [`Demo ${t.code}`], notes: 'Demo data (DEMO).' }, true);
       teamIds.push(id);
       // Fill a varying number of slots so completeness indicators have something to show.
       saveUpload(ctx, 'team', id, 'flag_small', stripes(t.colors, 120, 80), `DEMO_${t.code}_flag_small.png`);
@@ -74,15 +74,15 @@ export function seedDemo(ctx: AssetCtx) {
         const sid = createSailor(db, id, {
           firstName: 'Demo', lastName: `${t.code} ${String(i + 1).padStart(2, '0')}`,
           defaultPosition: POSITIONS[i], defaultNumber: String(i + 1),
-          bestResult1: 'DEMO – przykładowy wynik', bestResult2: '',
+          bestResult1: 'DEMO – sample result', bestResult2: '',
         }, true);
         if (i < 6) saveUpload(ctx, 'sailor', sid, 'photo', silhouette(t.colors[0]), `DEMO_${t.code}_${i + 1}.png`);
       }
     });
     const ev = activeEvent(db);
-    const setId = createSet(db, ev.id, 'DEMO – Runda 1');
-    const f1 = createFleet(db, setId, 'Flota A');
-    const f2 = createFleet(db, setId, 'Flota B');
+    const setId = createSet(db, ev.id, 'DEMO – Round 1');
+    const f1 = createFleet(db, setId, 'Fleet A');
+    const f2 = createFleet(db, setId, 'Fleet B');
     teamIds.slice(0, 4).forEach((tid, i) => placeTeam(db, setId, { teamId: tid, fleetId: f1, position: i + 1 }));
     teamIds.slice(4, 7).forEach((tid, i) => placeTeam(db, setId, { teamId: tid, fleetId: f2, position: i + 1 }));
     setSetting(db, 'demo.fleetSetIds', JSON.stringify([setId]));
@@ -113,5 +113,5 @@ export function demoSourceHtml(): string {
   for (const p of [path.join(here, '..', '..', 'fixtures', 'demo-crew-list.html'), path.join(here, '..', 'fixtures', 'demo-crew-list.html')]) {
     if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
   }
-  throw new Error('Brak pliku fixtures/demo-crew-list.html');
+  throw new Error('Missing file fixtures/demo-crew-list.html');
 }

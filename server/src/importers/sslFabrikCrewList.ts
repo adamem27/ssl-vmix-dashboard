@@ -41,7 +41,7 @@ function splitRoleAndName(seg: string, warnings: string[]): [string, string] {
   }
   const camel = s.search(/[a-zà-ÿ][A-ZÀ-ÖØ-Þ]/);
   if (camel >= 0) return [s.slice(0, camel + 1), clean(s.slice(camel + 1))];
-  warnings.push(`Nie udało się oddzielić pozycji od nazwiska w „${s}”.`);
+  warnings.push(`Could not separate the position from the name in “${s}”.`);
   return ['', s];
 }
 
@@ -60,7 +60,7 @@ export function parseCrewCell(text: string, warnings: string[]): ParsedMember[] 
     else role = clean(seg.split('\n').map(clean).filter(Boolean).join(' '));
     const num = clean(m[1] ?? '');
     if (name) members.push({ sourceName: name, number: num || null, position: role || null, sourceId: null });
-    else warnings.push('Pominięto wpis załogi bez nazwiska.');
+    else warnings.push('Skipped a crew entry with no name.');
     name = nextName;
   }
   return members;
@@ -109,7 +109,7 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
     });
   });
   if (!found) {
-    throw new ParseError('Nie znaleziono tabeli składów (oczekiwane kolumny: Country, Sailing Date, Crews). Struktura strony mogła się zmienić albo adres wskazuje inną stronę.');
+    throw new ParseError('Crew table not found (expected columns: Country, Sailing Date, Crews). The page structure may have changed or the URL points to a different page.');
   }
   const { table, cols, headerRow } = found as { table: any; cols: Cols; headerRow: any };
   const byKey = new Map<string, ParsedDeclaration>();
@@ -124,9 +124,9 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
     if (!teamRef || !dateRaw) return;
     rows++;
     const date = toIsoDate(dateRaw, ctx.year);
-    if (!date) { warnings.push(`${teamRef}: nieczytelna data „${dateRaw}”, wiersz pominięty.`); return; }
+    if (!date) { warnings.push(`${teamRef}: unreadable date “${dateRaw}”, row skipped.`); return; }
     const members = parseCrewCell(cellText($, cells[cols.crews]), warnings);
-    if (!members.length) warnings.push(`${teamRef} ${dateRaw}: nie rozpoznano żadnego członka załogi.`);
+    if (!members.length) warnings.push(`${teamRef} ${dateRaw}: no crew members recognised.`);
     const postedRaw = cols.posted >= 0 && cells[cols.posted] ? clean($(cells[cols.posted]).text()) || null : null;
     const href = $(tr).find('a[href*="details"]').first().attr('href');
     let sourceRef: string | null = null;
@@ -137,19 +137,19 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
     const key = `${teamRef.toLowerCase()}|${date}`;
     const prev = byKey.get(key);
     if (prev) {
-      warnings.push(`${teamRef} ${dateRaw}: źródło zawiera kilka deklaracji, użyto najnowszej.`);
+      warnings.push(`${teamRef} ${dateRaw}: the source has several declarations, used the newest.`);
       if (postedKey(prev.postedRaw) > postedKey(postedRaw)) return;
     }
     byKey.set(key, decl);
   });
 
-  if (!rows) warnings.push('Tabela składów nie zawiera jeszcze żadnych deklaracji.');
+  if (!rows) warnings.push('The crew table has no declarations yet.');
   return { declarations: [...byKey.values()], warnings };
 }
 
 export const sslFabrikCrewList: Importer = {
   id: 'ssl-fabrik-crew-list',
   label: 'SSL Gold Cup – Daily Crew List (tabela HTML)',
-  description: 'Lista Fabrik/Joomla z kolumnami Country, Sailing Date, Crews, Posted. Wagi są pomijane.',
+  description: 'Fabrik/Joomla list with Country, Sailing Date, Crews, Posted columns. Weights are ignored.',
   parse: parseSslFabrikCrewList,
 };

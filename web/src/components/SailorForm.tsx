@@ -12,8 +12,8 @@ export function SailorFields({ value, onChange }: { value: typeof EMPTY; onChang
     <div className="grid grid-cols-6 gap-3">
       <Field label="First name" className="col-span-3"><input className="input" {...f('firstName')} maxLength={80} /></Field>
       <Field label="Last name" className="col-span-3"><input className="input" {...f('lastName')} maxLength={80} /></Field>
-      <Field label="Position (domyślna)" className="col-span-4"><input className="input" {...f('defaultPosition')} maxLength={80} placeholder="np. Helm" /></Field>
-      <Field label="Number (domyślny)" className="col-span-2"><input className="input tabular-nums" {...f('defaultNumber')} maxLength={10} placeholder="np. 7" /></Field>
+      <Field label="Position (default)" className="col-span-4"><input className="input" {...f('defaultPosition')} maxLength={80} placeholder="e.g. Helm" /></Field>
+      <Field label="Number (default)" className="col-span-2"><input className="input tabular-nums" {...f('defaultNumber')} maxLength={10} placeholder="e.g. 7" /></Field>
       <Field label="Best results 1" className="col-span-6"><input className="input" {...f('bestResult1')} maxLength={500} /></Field>
       <Field label="Best results 2" className="col-span-6"><input className="input" {...f('bestResult2')} maxLength={500} /></Field>
     </div>
@@ -39,7 +39,7 @@ export function SailorFormModal({ open, onClose, teamId, sailor }: { open: boole
     setBusy(true); setErr(null);
     try {
       const s = current ? await api.patch<SailorDetail>(`/api/sailors/${current.id}`, form) : await api.post<SailorDetail>(`/api/teams/${teamId}/sailors`, form);
-      toast.ok(current ? 'Zapisano profil zawodnika' : `Dodano zawodnika ${s.firstName} ${s.lastName}. Możesz teraz dodać zdjęcie.`);
+      toast.ok(current ? 'Sailor profile saved' : `Sailor ${s.firstName} ${s.lastName} added. You can add a photo now.`);
       refresh();
       if (current) onClose(); else setCurrent(s);
     } catch (e) { setErr(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
@@ -52,21 +52,21 @@ export function SailorFormModal({ open, onClose, teamId, sailor }: { open: boole
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={current ? `${current.firstName} ${current.lastName}`.trim() || 'Zawodnik' : 'Nowy zawodnik'} wide>
+    <Modal open={open} onClose={onClose} title={current ? `${current.firstName} ${current.lastName}`.trim() || 'Sailor' : 'New sailor'} wide>
       <form onSubmit={submit} className="grid gap-5 md:grid-cols-[220px_1fr]">
         <div>
           {current ? (
             <AssetSlot ownerKind="sailors" ownerId={current.id} slot={{ key: 'photo', label: 'Photo' }} asset={current.photo} bg="dark" accept="png+jpg" aspect="aspect-[4/5]" onChanged={reloadPhoto} />
           ) : (
-            <div className="flex aspect-[4/5] items-center justify-center rounded-xl border border-dashed border-ink-700 p-4 text-center text-xs text-ink-500">Zdjęcie dodasz po zapisaniu zawodnika.</div>
+            <div className="flex aspect-[4/5] items-center justify-center rounded-xl border border-dashed border-ink-700 p-4 text-center text-xs text-ink-500">Add a photo after saving the sailor.</div>
           )}
         </div>
         <div className="space-y-4">
           <SailorFields value={form} onChange={setForm} />
           {err && <p role="alert" className="text-sm text-red-300">{err}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" onClick={onClose}>{current && !sailor ? 'Gotowe' : 'Anuluj'}</Button>
-            <Button type="submit" variant="primary" busy={busy}>{current ? 'Zapisz' : 'Dodaj zawodnika'}</Button>
+            <Button type="button" onClick={onClose}>{current && !sailor ? 'Done' : 'Cancel'}</Button>
+            <Button type="submit" variant="primary" busy={busy}>{current ? 'Save' : 'Add sailor'}</Button>
           </div>
         </div>
       </form>

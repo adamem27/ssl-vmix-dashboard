@@ -7,10 +7,10 @@ export function CommentatorPage() {
         </svg>
       </div>
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent-400">Commentator</p>
-      <h1 className="mt-3 text-3xl font-bold text-ink-50">Moduł w przygotowaniu</h1>
+      <h1 className="mt-3 text-3xl font-bold text-ink-50">Module in preparation</h1>
       <p className="mt-4 max-w-xl text-ink-400">
-        Ten moduł będzie rozwijany w kolejnym etapie. Wszystkie dane drużyn, zawodników, flot i deklaracji są już gromadzone w zakładce
-        <span className="font-semibold text-ink-200"> vMix graphics</span>.
+        This module will be developed in a later stage. Team, sailor, fleet and declaration data is already being collected in the
+        <span className="font-semibold text-ink-200"> vMix graphics</span> tab.
       </p>
     </div>
   );

@@ -10,9 +10,9 @@ export function isUncPath(p: string) { return UNC.test(p); }
 /** Paths the operator may type: Windows drive, UNC, or absolute POSIX. */
 export function validateEnteredPath(p: string): string | null {
   const v = p.trim();
-  if (!v) return 'Ścieżka jest pusta.';
-  if (/^(https?|file):/i.test(v)) return 'Podaj ścieżkę pliku (np. D:\\SSL\\flag.png lub \\\\SERWER\\udzial\\flag.png), a nie adres URL.';
-  if (!isWindowsPath(v) && !v.startsWith('/')) return 'Ścieżka musi być bezwzględna: litera dysku (D:\\...), UNC (\\\\SERWER\\udzial\\...) lub /...';
+  if (!v) return 'The path is empty.';
+  if (/^(https?|file):/i.test(v)) return 'Enter a file path (e.g. D:\\SSL\\flag.png or \\\\SERVER\\share\\flag.png), not a URL.';
+  if (!isWindowsPath(v) && !v.startsWith('/')) return 'The path must be absolute: drive letter (D:\\...), UNC (\\\\SERVER\\share\\...) or /...';
   return null;
 }
 

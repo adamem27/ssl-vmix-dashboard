@@ -14,11 +14,11 @@ const dir = path.join(target, stamp);
 fs.mkdirSync(dir, { recursive: true });
 
 if (!fs.existsSync(config.dbPath)) {
-  console.error(`Brak bazy danych: ${config.dbPath}`);
+  console.error(`Database not found: ${config.dbPath}`);
   process.exit(1);
 }
 const db = new Database(config.dbPath, { readonly: true });
 await db.backup(path.join(dir, 'ssl-vmix.sqlite'));
 db.close();
 if (fs.existsSync(config.assetsDir)) fs.cpSync(config.assetsDir, path.join(dir, 'assets'), { recursive: true });
-console.log(`Kopia zapasowa: ${dir}`);
+console.log(`Backup: ${dir}`);

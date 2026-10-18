@@ -9,7 +9,7 @@ export interface SailorInput {
 }
 
 export function createSailor(db: DB, teamId: string, input: SailorInput, isDemo = false): string {
-  if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId)) throw notFound('Drużyna');
+  if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId)) throw notFound('Team');
   const id = newId();
   const t = nowIso();
   const first = (input.firstName ?? '').trim();
@@ -23,7 +23,7 @@ export function createSailor(db: DB, teamId: string, input: SailorInput, isDemo 
 
 export function updateSailor(db: DB, id: string, input: SailorInput) {
   const s = db.prepare('SELECT * FROM sailors WHERE id = ?').get(id) as any;
-  if (!s) throw notFound('Zawodnik');
+  if (!s) throw notFound('Sailor');
   const first = input.firstName !== undefined ? input.firstName.trim() : s.first_name;
   const last = input.lastName !== undefined ? input.lastName.trim() : s.last_name;
   db.prepare(`UPDATE sailors SET first_name = ?, last_name = ?, name_key = ?, default_position = ?, default_number = ?, best_result_1 = ?, best_result_2 = ?, source_ref = ?, updated_at = ? WHERE id = ?`)
@@ -36,7 +36,7 @@ export function updateSailor(db: DB, id: string, input: SailorInput) {
 
 export function deleteSailor(ctx: AssetCtx, id: string) {
   const r = ctx.db.prepare('DELETE FROM sailors WHERE id = ?').run(id);
-  if (!r.changes) throw notFound('Zawodnik');
+  if (!r.changes) throw notFound('Sailor');
   removeAllForOwner(ctx, 'sailor', id);
 }
 
@@ -56,7 +56,7 @@ export function listSailors(ctx: AssetCtx, teamId: string) {
 
 export function getSailor(ctx: AssetCtx, id: string) {
   const s = ctx.db.prepare('SELECT * FROM sailors WHERE id = ?').get(id);
-  if (!s) throw notFound('Zawodnik');
+  if (!s) throw notFound('Sailor');
   const history = ctx.db.prepare(`SELECT d.declaration_date AS date, d.team_id AS teamId, m.id AS memberId,
       COALESCE(m.ovr_position, m.src_position, '') AS position, COALESCE(m.ovr_number, m.src_number, '') AS number,
       (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL) AS hasOverride, d.origin

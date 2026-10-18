@@ -52,7 +52,7 @@ function ensureDefaults(db: DB) {
     else {
       const t = nowIso();
       db.prepare('INSERT INTO events (id, name, timezone, year, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)')
-        .run(newId(), 'Wydarzenie', 'Europe/Warsaw', new Date().getFullYear(), t, t);
+        .run(newId(), 'Event', 'Europe/Warsaw', new Date().getFullYear(), t, t);
     }
   }
 }

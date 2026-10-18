@@ -27,5 +27,5 @@ export function inspectImage(buf: Buffer): ImageInfo | null {
 }
 
 export function kindLabel(kinds: ImageKind[]) {
-  return kinds.map((k) => k.toUpperCase()).join(' lub ');
+  return kinds.map((k) => k.toUpperCase()).join(' or ');
 }

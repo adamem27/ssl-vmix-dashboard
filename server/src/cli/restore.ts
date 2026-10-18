@@ -4,10 +4,10 @@ import { config } from '../config.js';
 
 /** npm run restore -- <katalog kopii>. Run only with the server stopped. */
 const src = process.argv[2];
-if (!src) { console.error('Użycie: npm run restore -- <katalog kopii zapasowej>'); process.exit(1); }
+if (!src) { console.error('Usage: npm run restore -- <backup folder>'); process.exit(1); }
 const dir = path.resolve(src);
 const dbFile = path.join(dir, 'ssl-vmix.sqlite');
-if (!fs.existsSync(dbFile)) { console.error(`W katalogu ${dir} nie ma pliku ssl-vmix.sqlite.`); process.exit(1); }
+if (!fs.existsSync(dbFile)) { console.error(`No ssl-vmix.sqlite file in ${dir}.`); process.exit(1); }
 
 const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
 // Keep the current state aside instead of deleting it.
@@ -17,4 +17,4 @@ if (fs.existsSync(config.assetsDir)) fs.renameSync(config.assetsDir, `${config.a
 fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 fs.copyFileSync(dbFile, config.dbPath);
 if (fs.existsSync(path.join(dir, 'assets'))) fs.cpSync(path.join(dir, 'assets'), config.assetsDir, { recursive: true });
-console.log(`Przywrócono z ${dir}. Poprzednie dane zachowano z sufiksem .before-restore-${stamp}.`);
+console.log(`Restored from ${dir}. Previous data kept with suffix .before-restore-${stamp}.`);

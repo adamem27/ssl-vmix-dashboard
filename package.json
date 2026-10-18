@@ -16,6 +16,7 @@
     "test": "npm run test -w server",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
     "seed:demo": "npm run seed:demo -w server",
+    "seed:goldcup": "npm run seed:goldcup -w server",
     "backup": "npm run backup -w server",
     "restore": "npm run restore -w server --"
   },

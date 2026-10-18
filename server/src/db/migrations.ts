@@ -165,4 +165,12 @@ CREATE TABLE sync_runs (
 CREATE INDEX sync_runs_started_idx ON sync_runs(started_at);
 `,
   },
+  {
+    version: 2,
+    name: 'fleet_placeholders',
+    sql: `
+-- Labels shown in empty fleet places, e.g. "R1 C1" or "DRAW 3" (JSON array of 4 strings).
+ALTER TABLE fleets ADD COLUMN placeholders TEXT NOT NULL DEFAULT '[]';
+`,
+  },
 ];
