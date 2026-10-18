@@ -13,6 +13,10 @@ export const config = {
   get assetsDir() {
     return process.env.ASSETS_DIR ? path.resolve(process.env.ASSETS_DIR) : path.join(this.dataDir, 'assets');
   },
+  /** Workbook for vMix; inside the assets folder by default so the vMix share mapping covers it. */
+  get workbookFile() {
+    return process.env.WORKBOOK_FILE ? path.resolve(process.env.WORKBOOK_FILE) : path.join(this.assetsDir, 'ssl-vmix.xlsx');
+  },
   host: process.env.HOST ?? '127.0.0.1',
   port: Number(process.env.PORT ?? 4310),
   webDist: path.join(ROOT_DIR, 'web', 'dist'),

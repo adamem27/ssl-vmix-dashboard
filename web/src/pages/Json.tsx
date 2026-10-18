@@ -4,50 +4,58 @@ import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 type Row = Record<string, unknown>;
+interface Workbook { file: string | null; vmixPath: string | null; updatedAt: string | null; error: string | null; sheets: { name: string; path: string; rows: number }[] }
 
 export function JsonPage() {
   const toast = useToast();
-  const idx = useQuery({ queryKey: ['json-index'], queryFn: () => api.get<{ name: string; path: string }[]>('/api/json-index') });
-  const [path, setPath] = useState<string | null>(null);
-  const current = path ?? idx.data?.[0]?.path ?? null;
-  const data = useQuery({ queryKey: ['json', current], queryFn: () => api.get<Row[]>(current!), enabled: !!current, refetchInterval: 5000 });
+  const wb = useQuery({ queryKey: ['workbook'], queryFn: () => api.get<Workbook>('/api/workbook'), refetchInterval: 5000 });
+  const all = useQuery({ queryKey: ['json-all'], queryFn: () => api.get<Record<string, Row[]>>('/json/all'), refetchInterval: 5000 });
+  const [sheet, setSheet] = useState<string | null>(null);
+  const sheets = wb.data?.sheets ?? [];
+  const current = sheets.find((s) => s.name === sheet) ?? sheets[0];
   const [sel, setSel] = useState<{ r: number; c: number } | null>(null);
-  const url = current ? window.location.origin + current : '';
+  const origin = window.location.origin;
   const copy = (t: string) => navigator.clipboard?.writeText(t).then(() => toast.info('Copied'), () => {});
+  const data = { data: current ? all.data?.[current.name] : undefined, error: all.error ?? wb.error, isLoading: all.isLoading || wb.isLoading };
 
   const rows = data.data ?? [];
   const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
   const selField = sel ? cols[sel.c - 1] : null;
   const selValue = sel && selField ? String(rows[sel.r - 1]?.[selField] ?? '') : '';
+  const filePath = wb.data?.vmixPath ?? wb.data?.file ?? '';
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row">
-      <aside className="card h-fit shrink-0 p-1 lg:w-64">
-        {idx.isLoading ? <Loading /> : (idx.data ?? []).map((j) => (
-          <button key={j.path} onClick={() => { setPath(j.path); setSel(null); }}
-            className={cx('block w-full truncate rounded px-3 py-1.5 text-left text-sm', j.path === current ? 'bg-ink-800 text-ink-50' : 'text-ink-300 hover:bg-ink-850')}>{j.name}</button>
-        ))}
-      </aside>
-      <section className="min-w-0 flex-1 space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <code className="rounded bg-ink-900 px-2 py-1.5 text-xs text-ink-200">{url}</code>
-          <Button size="sm" onClick={() => copy(url)}>Copy URL</Button>
-          <a href={current ?? '#'} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost">Raw</Button></a>
-          <span className="ml-auto text-xs tabular-nums text-ink-400">{rows.length} rows · {cols.length} columns</span>
-        </div>
-        <div className="flex min-h-[34px] items-center gap-3 rounded border border-ink-800 bg-ink-900 px-3 py-1 text-sm">
-          {sel && selField ? (
-            <>
-              <span className="font-mono text-accent-300">R{sel.r} · C{sel.c}</span>
-              <span className="font-mono text-ink-300">{selField}</span>
-              <span className="min-w-0 flex-1 truncate font-mono text-ink-50" title={selValue}>{selValue || '—'}</span>
-              <Button size="sm" variant="ghost" onClick={() => copy(selField)}>Copy field</Button>
-              <Button size="sm" variant="ghost" onClick={() => copy(selValue)}>Copy value</Button>
-            </>
-          ) : <span className="text-ink-500">—</span>}
-        </div>
+    <div className="space-y-2">
+      <div className="card grid gap-x-4 gap-y-1.5 px-3 py-2 text-xs md:grid-cols-[auto_1fr_auto]">
+        <span className="self-center font-semibold uppercase tracking-wide text-ink-400">Excel</span>
+        <code className="self-center truncate text-ink-100" title={filePath}>{filePath}</code>
+        <span className="flex gap-1">
+          <Button size="sm" onClick={() => copy(filePath)}>Copy path</Button>
+          <a href="/workbook.xlsx"><Button size="sm" variant="ghost">Download</Button></a>
+        </span>
+        <span className="self-center font-semibold uppercase tracking-wide text-ink-400">JSON</span>
+        <code className="self-center truncate text-ink-100">{origin}/json/all</code>
+        <span className="flex gap-1">
+          <Button size="sm" onClick={() => copy(`${origin}/json/all`)}>Copy URL</Button>
+          <a href="/json/all" target="_blank" rel="noreferrer"><Button size="sm" variant="ghost">Raw</Button></a>
+        </span>
+        {wb.data?.error && <span className="text-amber-300 md:col-span-3">{wb.data.error}</span>}
+      </div>
+      <div className="flex min-h-[34px] items-center gap-3 rounded border border-ink-800 bg-ink-900 px-3 py-1 text-sm">
+        {sel && selField ? (
+          <>
+            <span className="font-mono text-accent-300">{current?.name} · R{sel.r} · C{sel.c}</span>
+            <span className="font-mono text-ink-300">{selField}</span>
+            <span className="min-w-0 flex-1 truncate font-mono text-ink-50" title={selValue}>{selValue || '—'}</span>
+            <Button size="sm" variant="ghost" onClick={() => copy(selField)}>Copy field</Button>
+            <Button size="sm" variant="ghost" onClick={() => copy(selValue)}>Copy value</Button>
+          </>
+        ) : <span className="text-ink-500">—</span>}
+        {current && <span className="ml-auto shrink-0 font-mono text-xs text-ink-500" title="This sheet alone">{current.path}</span>}
+      </div>
+      <section className="min-w-0">
         {data.error ? <ErrorBox error={data.error} /> : data.isLoading ? <Loading /> : (
-          <div className="card max-h-[calc(100vh-220px)] overflow-auto">
+          <div className="card max-h-[calc(100vh-260px)] rounded-b-none overflow-auto">
             <table className="border-collapse font-mono text-xs">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-ink-850 text-ink-400">
@@ -81,6 +89,14 @@ export function JsonPage() {
           </div>
         )}
       </section>
+      <nav className="-mt-2 flex gap-0.5 overflow-x-auto border-t border-ink-800" aria-label="Sheets">
+        {sheets.map((s) => (
+          <button key={s.name} onClick={() => { setSheet(s.name); setSel(null); }}
+            className={cx('shrink-0 rounded-b border-x border-b px-3 py-1.5 text-xs', s.name === current?.name ? 'border-ink-700 bg-ink-800 font-semibold text-ink-50' : 'border-transparent text-ink-400 hover:bg-ink-900 hover:text-ink-100')}>
+            {s.name} <span className="text-ink-500">{s.rows}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

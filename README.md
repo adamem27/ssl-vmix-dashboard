@@ -119,6 +119,12 @@ Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/impo
 - Osoba, która zniknęła ze źródła, jest usuwana ze składu, chyba że operator ją edytował; wtedy zostaje z oznaczeniem „Brak w źródle”.
 - Wagi i inne zbędne dane nie są zapisywane.
 
+## Jeden plik dla vMix (Excel z arkuszami)
+
+Dashboard sam utrzymuje plik `data/assets/ssl-vmix.xlsx` z arkuszami: Teams, Sailors, Captains, Weather, Schedule, People oraz po jednym arkuszu na każdy zestaw flot. Plik nadpisuje się w ciągu kilku sekund po każdej zmianie danych. W vMix dodaj go jako Data Source → Excel/CSV i wybierz arkusz. Ponieważ plik leży w folderze `data/assets`, udostępnienie tego folderu w sieci (patrz niżej) wystarcza, żeby vMix na innym komputerze go widział. Inne miejsce ustawisz zmienną `WORKBOOK_FILE`.
+
+To samo jako jeden adres JSON: `/json/all` (obiekt, w którym nazwy arkuszy są kluczami). Ekran **JSON** pokazuje arkusze jak w Excelu: zakładki na dole, numery wierszy i kolumn, ścieżkę pliku i przycisk pobrania.
+
 ## JSON dla vMix
 
 Przycisk **JSON** na ekranie Teams & crews pokazuje adresy do wklejenia w vMix (Data Sources → JSON). Każdy wiersz to płaski obiekt z samymi tekstami, a pola grafik zawierają ścieżkę, której ma użyć vMix (mapowanie z Settings, a bez niego lokalną ścieżkę pliku).

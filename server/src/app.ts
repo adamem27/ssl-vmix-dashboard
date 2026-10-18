@@ -12,15 +12,17 @@ import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateS
 import * as fleets from './services/fleets.js';
 import * as decl from './services/declarations.js';
 import { SyncService } from './services/sync.js';
+import { allSheets, WorkbookWriter } from './services/workbook.js';
+import { buildXlsx } from './services/xlsx.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
 import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './services/jsonExport.js';
 import { todayIn } from './services/dates.js';
 import { applyGoldCup2026, PRESETS } from './services/presets.js';
-import { isWindowsPath, validateEnteredPath } from './services/paths.js';
+import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 
-export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; webDist?: string; dbPath?: string; maxUploadBytes?: number }
+export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number }
 
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -298,6 +300,20 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // ---------- JSON for vMix data sources ----------
   app.get('/api/json-index', async () => jsonIndex(db, ev().id));
+  app.get('/api/workbook', async () => {
+    const root = getSetting(db, 'paths.vmixAssetsRoot');
+    const wb = deps.workbook;
+    const rel = wb && wb.file.startsWith(deps.assetsDir) ? wb.file.slice(deps.assetsDir.length).replace(/^[\\/]+/, '') : null;
+    return {
+      file: wb?.file ?? null, vmixPath: root && rel ? joinVmixPath(root, rel) : null, updatedAt: wb?.updatedAt ?? null, error: wb?.lastError ?? null,
+      sheets: allSheets(ctx).map((s) => ({ name: s.name, path: s.path, rows: s.rows.length })),
+    };
+  });
+  app.get('/json/all', async () => Object.fromEntries(allSheets(ctx).map((s) => [s.name, s.rows])));
+  app.get('/workbook.xlsx', async (_req, reply) => {
+    reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="ssl-vmix.xlsx"');
+    return reply.send(buildXlsx(allSheets(ctx)));
+  });
   app.get('/json/teams', async () => jsonTeams(ctx));
   app.get<{ Querystring: { date?: string; team?: string } }>('/json/sailors', async (req) =>
     jsonSailors(ctx, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone), req.query.team ? String(req.query.team) : undefined));
