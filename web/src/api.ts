@@ -50,7 +50,7 @@ export interface Team {
 
 export interface Sailor {
   id: string; teamId: string; firstName: string; lastName: string; defaultPosition: string; defaultNumber: string;
-  bestResult1: string; bestResult2: string; sourceRef: string | null; isDemo: boolean; updatedAt: string; photo: Asset | null;
+  bestResult1: string; bestResult2: string; sourceRef: string | null; isDemo: boolean; isCaptain: boolean; updatedAt: string; photo: Asset | null;
 }
 export interface SailorDetail extends Sailor {
   history: { date: string; teamId: string; memberId: string; position: string; number: string; hasOverride: number; origin: string }[];

@@ -8,13 +8,14 @@ import { AssetCtx, listAssets, previewFile, recheckAsset, removeAsset, saveUploa
 import { HttpError, badRequest, notFound } from './services/errors.js';
 import { OwnerType, SAILOR_SLOTS, TEAM_SLOTS } from './services/slots.js';
 import { createTeam, deleteTeam, getTeam, listTeams, updateTeam } from './services/teams.js';
-import { createSailor, deleteSailor, getSailor, listSailors, updateSailor } from './services/sailors.js';
+import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateSailor } from './services/sailors.js';
 import * as fleets from './services/fleets.js';
 import * as decl from './services/declarations.js';
 import { SyncService } from './services/sync.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
-import { jsonFleetSet, jsonIndex, jsonSailors, jsonTeams } from './services/jsonExport.js';
+import * as gen from './services/general.js';
+import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './services/jsonExport.js';
 import { todayIn } from './services/dates.js';
 import { applyGoldCup2026, PRESETS } from './services/presets.js';
 import { isWindowsPath, validateEnteredPath } from './services/paths.js';
@@ -72,6 +73,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const ownerOf = (kind: string): OwnerType => {
     if (kind === 'teams') return 'team';
     if (kind === 'sailors') return 'sailor';
+    if (kind === 'people') return 'person';
     throw notFound('Asset');
   };
   app.post<{ Params: { kind: string; id: string; slot: string } }>('/api/:kind/:id/assets/:slot/upload', async (req) => {
@@ -111,6 +113,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get<{ Params: { id: string } }>('/api/sailors/:id', async (req) => getSailor(ctx, req.params.id));
   app.patch<{ Params: { id: string } }>('/api/sailors/:id', async (req) => {
     updateSailor(db, req.params.id, sailorBody.parse(req.body));
+    return getSailor(ctx, req.params.id);
+  });
+  app.post<{ Params: { id: string } }>('/api/sailors/:id/captain', async (req) => {
+    setCaptain(db, req.params.id, z.object({ value: z.boolean() }).parse(req.body).value);
     return getSailor(ctx, req.params.id);
   });
   app.delete<{ Params: { id: string } }>('/api/sailors/:id', async (req) => { deleteSailor(ctx, req.params.id); return { ok: true }; });
@@ -273,12 +279,33 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.post('/api/demo/seed', async () => seedDemo(ctx));
   app.post('/api/demo/remove', async () => removeDemo(ctx));
+  // ---------- general graphics ----------
+  const text = z.string().max(500);
+  app.get('/api/weather', async () => gen.getWeather(db));
+  app.put('/api/weather', async (req) => gen.setWeather(db, z.record(z.string(), text).parse(req.body)));
+  const scheduleBody = z.object({ date: str(10), time: str(20), race: str(200), fleet: str(200), status: str(60), note: str(500) }).partial();
+  app.get<{ Querystring: { date?: string } }>('/api/schedule', async (req) => gen.listSchedule(db, ev().id, req.query.date ? String(req.query.date) : undefined));
+  app.get('/api/schedule/dates', async () => gen.listScheduleDates(db, ev().id));
+  app.post('/api/schedule', async (req) => ({ id: gen.createScheduleItem(db, ev().id, scheduleBody.parse(req.body)) }));
+  app.patch<{ Params: { id: string } }>('/api/schedule/:id', async (req) => { gen.updateScheduleItem(db, req.params.id, scheduleBody.parse(req.body)); return { ok: true }; });
+  app.delete<{ Params: { id: string } }>('/api/schedule/:id', async (req) => { gen.deleteScheduleItem(db, req.params.id); return { ok: true }; });
+  const personBody = z.object({ name: str(120), role: str(80), language: str(40), title: str(200) }).partial();
+  app.get('/api/people', async () => ({ people: gen.listPeople(ctx, ev().id), roles: gen.PERSON_ROLES }));
+  app.post('/api/people', async (req) => ({ id: gen.createPerson(db, ev().id, personBody.parse(req.body)) }));
+  app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).min(1) }).parse(req.body).language));
+  app.patch<{ Params: { id: string } }>('/api/people/:id', async (req) => { gen.updatePerson(db, req.params.id, personBody.parse(req.body)); return { ok: true }; });
+  app.delete<{ Params: { id: string } }>('/api/people/:id', async (req) => { gen.deletePerson(ctx, req.params.id); return { ok: true }; });
+
   // ---------- JSON for vMix data sources ----------
   app.get('/api/json-index', async () => jsonIndex(db, ev().id));
   app.get('/json/teams', async () => jsonTeams(ctx));
   app.get<{ Querystring: { date?: string; team?: string } }>('/json/sailors', async (req) =>
     jsonSailors(ctx, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone), req.query.team ? String(req.query.team) : undefined));
   app.get<{ Params: { id: string } }>('/json/fleets/:id', async (req) => jsonFleetSet(ctx, req.params.id));
+  app.get('/json/weather', async () => jsonWeather(db));
+  app.get<{ Querystring: { date?: string } }>('/json/schedule', async (req) => jsonSchedule(db, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone)));
+  app.get<{ Querystring: { role?: string; language?: string } }>('/json/people', async (req) => jsonPeople(ctx, ev().id, req.query.role, req.query.language));
+  app.get('/json/captains', async () => jsonCaptains(ctx));
   app.get('/api/presets', async () => PRESETS);
   app.post('/api/presets/ssl-gold-cup-2026', async () => applyGoldCup2026(db));
 

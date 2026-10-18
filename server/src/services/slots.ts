@@ -14,13 +14,15 @@ export const TEAM_SLOTS = [
 
 export const SAILOR_SLOTS = [{ key: 'photo', label: 'Photo' }] as const;
 
-export type OwnerType = 'team' | 'sailor';
+export const PERSON_SLOTS = [{ key: 'photo', label: 'Photo' }] as const;
+
+export type OwnerType = 'team' | 'sailor' | 'person';
 
 export function slotsFor(owner: OwnerType) {
-  return owner === 'team' ? TEAM_SLOTS : SAILOR_SLOTS;
+  return owner === 'team' ? TEAM_SLOTS : owner === 'sailor' ? SAILOR_SLOTS : PERSON_SLOTS;
 }
 
-/** Team graphics are PNG only (transparency). Sailor photos may also be JPEG. */
+/** Team graphics are PNG only (transparency). Photos may also be JPEG. */
 export function allowedKinds(owner: OwnerType): ImageKind[] {
   return owner === 'team' ? ['png'] : ['png', 'jpeg'];
 }

@@ -47,8 +47,11 @@ export function assetDto(ctx: AssetCtx, r: AssetRow) {
 }
 export type AssetDto = ReturnType<typeof assetDto>;
 
+const OWNER_TABLE: Record<OwnerType, string> = { team: 'teams', sailor: 'sailors', person: 'people' };
+const OWNER_LABEL: Record<OwnerType, string> = { team: 'Team', sailor: 'Sailor', person: 'Person' };
+
 function ownerExists(db: DB, owner: OwnerType, id: string) {
-  const t = owner === 'team' ? 'teams' : 'sailors';
+  const t = OWNER_TABLE[owner];
   return !!db.prepare(`SELECT 1 FROM ${t} WHERE id = ?`).get(id);
 }
 
@@ -76,7 +79,7 @@ function removeStoredFile(ctx: AssetCtx, rel: string | null) {
 
 export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, buf: Buffer, filename: string): AssetDto {
   assertSlot(owner, slot);
-  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Team' : 'Sailor');
+  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(OWNER_LABEL[owner]);
   if (!buf.length) throw badRequest('The file is empty.');
   const info = inspectImage(buf);
   const kinds = allowedKinds(owner);
@@ -85,7 +88,7 @@ export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slo
   }
   // Unique name per owner + slot + random suffix: identical source filenames never collide.
   const ext = info.kind === 'png' ? 'png' : 'jpg';
-  const rel = path.join(owner === 'team' ? 'teams' : 'sailors', safeSegment(ownerId), `${safeSegment(slot)}_${randomBytes(4).toString('hex')}.${ext}`);
+  const rel = path.join(OWNER_TABLE[owner], safeSegment(ownerId), `${safeSegment(slot)}_${randomBytes(4).toString('hex')}.${ext}`);
   const abs = path.join(ctx.assetsDir, rel);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   const tmp = abs + '.part';
@@ -133,7 +136,7 @@ export function checkEnteredPath(ctx: AssetCtx, owner: OwnerType, entered: strin
 
 export function savePath(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, entered: string): AssetDto {
   assertSlot(owner, slot);
-  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(owner === 'team' ? 'Team' : 'Sailor');
+  if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(OWNER_LABEL[owner]);
   const v = entered.trim();
   const err = validateEnteredPath(v);
   if (err) throw badRequest(err);
@@ -183,7 +186,7 @@ export function removeAllForOwner(ctx: AssetCtx, owner: OwnerType, ownerId: stri
   const rows = ctx.db.prepare('SELECT * FROM assets WHERE owner_type = ? AND owner_id = ?').all(owner, ownerId) as AssetRow[];
   ctx.db.prepare('DELETE FROM assets WHERE owner_type = ? AND owner_id = ?').run(owner, ownerId);
   for (const r of rows) if (r.storage_kind === 'upload') removeStoredFile(ctx, r.stored_rel_path);
-  try { fs.rmdirSync(path.join(ctx.assetsDir, owner === 'team' ? 'teams' : 'sailors', safeSegment(ownerId))); } catch { /* not empty or absent */ }
+  try { fs.rmdirSync(path.join(ctx.assetsDir, OWNER_TABLE[owner], safeSegment(ownerId))); } catch { /* not empty or absent */ }
 }
 
 /** Local file to stream for a preview, or null. */

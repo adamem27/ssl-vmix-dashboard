@@ -173,4 +173,64 @@ CREATE INDEX sync_runs_started_idx ON sync_runs(started_at);
 ALTER TABLE fleets ADD COLUMN placeholders TEXT NOT NULL DEFAULT '[]';
 `,
   },
+  {
+    version: 3,
+    name: 'captains_people_schedule',
+    sql: `
+ALTER TABLE sailors ADD COLUMN is_captain INTEGER NOT NULL DEFAULT 0;
+
+-- Rebuild assets so people (lowerthirds) can own a photo too.
+CREATE TABLE assets_v3 (
+  id TEXT PRIMARY KEY,
+  owner_type TEXT NOT NULL CHECK (owner_type IN ('team','sailor','person')),
+  owner_id TEXT NOT NULL,
+  slot TEXT NOT NULL,
+  storage_kind TEXT NOT NULL CHECK (storage_kind IN ('upload','path')),
+  stored_rel_path TEXT,
+  entered_path TEXT,
+  original_filename TEXT NOT NULL DEFAULT '',
+  mime TEXT,
+  width INTEGER,
+  height INTEGER,
+  size_bytes INTEGER,
+  checked_at TEXT,
+  check_status TEXT NOT NULL DEFAULT 'unverified',
+  check_message TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (owner_type, owner_id, slot)
+);
+INSERT INTO assets_v3 SELECT * FROM assets;
+DROP TABLE assets;
+ALTER TABLE assets_v3 RENAME TO assets;
+
+-- People shown in lowerthirds: commentators per language and anyone else.
+CREATE TABLE people (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT '',
+  language TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL DEFAULT '',
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Day schedule: one row per race or slot.
+CREATE TABLE schedule_items (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  time TEXT NOT NULL DEFAULT '',
+  race TEXT NOT NULL DEFAULT '',
+  fleet TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX schedule_items_date_idx ON schedule_items(event_id, date, time);
+`,
+  },
 ];

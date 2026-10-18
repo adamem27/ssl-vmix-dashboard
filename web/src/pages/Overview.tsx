@@ -1,9 +1,10 @@
-import { DragEvent, Fragment, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Fragment, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMeta } from '../App';
-import { api, Asset, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
-import { Badge, Button, cx, ErrorBox, Loading, Modal, todayIn, useToast } from '../components/ui';
+import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
+import { Badge, Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
+import { Cell, ImgCell } from '../components/cells';
 
 const SHORT: Record<string, string> = {
   background_1: 'BG1', background_2: 'BG2', emblem_dark: 'EM D', emblem_light: 'EM L', flag_small: 'FL S', flag_big: 'FL B',
@@ -30,7 +31,7 @@ export function OverviewPage() {
   const [setId, setSetId] = useState<string>(prefs.setId ?? '');
   const [open, setOpen] = useState<Set<string>>(new Set(prefs.open ?? []));
   const [q, setQ] = useState('');
-  const [jsonOpen, setJsonOpen] = useState(false);
+  const navigate = useNavigate();
   const day = date ?? todayIn(tz);
 
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
@@ -80,7 +81,7 @@ export function OverviewPage() {
         </select>
         <div className="ml-auto flex gap-2">
           <Button size="sm" onClick={() => setOpen(allOpen ? new Set() : new Set(rows.map((r) => r.t.id)))}>{allOpen ? 'Collapse all' : 'Expand all'}</Button>
-          <Button size="sm" onClick={() => setJsonOpen(true)}>JSON</Button>
+          <Button size="sm" onClick={() => navigate('/vmix/json')}>JSON</Button>
         </div>
       </div>
 
@@ -119,7 +120,6 @@ export function OverviewPage() {
           </table>
         </div>
       )}
-      <JsonModal open={jsonOpen} onClose={() => setJsonOpen(false)} />
     </div>
   );
 }
@@ -128,6 +128,7 @@ export function OverviewPage() {
 function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: OverviewTeam; isOpen: boolean; onToggle: () => void; set?: FleetSetDetail; onChanged: () => void }) {
   const toast = useToast();
   const meta = useMeta();
+  const captain = t.sailors.find((s) => s.isCaptain);
   const save = async (patch: Record<string, string>) => {
     try { await api.patch(`/api/teams/${t.id}`, patch); onChanged(); } catch (e) { toast.error(e); throw e; }
   };
@@ -145,6 +146,7 @@ function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: Overview
         <div className="flex items-center gap-1.5">
           <Cell value={t.name} onSave={(v) => save({ name: v })} className="font-medium text-ink-100" required label="Team name" />
           {t.isDemo && <Badge tone="demo">Demo</Badge>}
+          {captain && <span className="shrink-0 truncate text-xs text-amber-300" title="Captain">★ {fullName(captain)}</span>}
         </div>
       </td>
       <td className="px-1">{set ? <FleetPicker team={t} set={set} onChanged={onChanged} /> : <span className="px-1 text-ink-600">—</span>}</td>
@@ -225,6 +227,7 @@ function NewTeamRow({ cols, onCreated }: { cols: number; onCreated: () => void }
 function CrewTable({ team, hits, onChanged }: { team: OverviewTeam; hits: Set<string> | null; onChanged: () => void }) {
   const hasDecl = !!team.declaration;
   const sailors = [...team.sailors].sort((a, b) => {
+    if (a.isCaptain !== b.isCaptain) return a.isCaptain ? -1 : 1;
     if (a.declared && b.declared) return a.declared.sort - b.declared.sort;
     return a.declared ? -1 : b.declared ? 1 : 0;
   });
@@ -232,6 +235,7 @@ function CrewTable({ team, hits, onChanged }: { team: OverviewTeam; hits: Set<st
     <table className="w-full table-fixed text-sm">
       <thead className="text-left text-[10px] uppercase tracking-wide text-ink-500">
         <tr>
+          <th className="w-8 py-1" title="Captain">C</th>
           <th className="w-14 py-1">Photo</th>
           <th className="w-16 py-1">No.</th>
           <th className="w-40 py-1">First name</th>
@@ -248,6 +252,7 @@ function CrewTable({ team, hits, onChanged }: { team: OverviewTeam; hits: Set<st
         {sailors.map((s) => <SailorRow key={s.id} s={s} hasDecl={hasDecl} highlight={!!hits?.has(s.id)} onChanged={onChanged} />)}
         {team.declaration?.unmatched.map((m, i) => (
           <tr key={`u${i}`} className="border-t border-ink-800/60 text-amber-200">
+            <td />
             <td />
             <td className="px-1 tabular-nums">{m.number}</td>
             <td colSpan={5} className="px-1">{m.name} <Link to="/vmix/declarations" className="ml-1"><Badge tone="warn">Not in roster</Badge></Link></td>
@@ -271,10 +276,17 @@ function SailorRow({ s, hasDecl, highlight, onChanged }: { s: OverviewSailor; ha
     if (!confirm(`Delete ${fullName(s)}?`)) return;
     try { await api.del(`/api/sailors/${s.id}`); onChanged(); } catch (e) { toast.error(e); }
   };
+  const toggleCaptain = async () => {
+    try { await api.post(`/api/sailors/${s.id}/captain`, { value: !s.isCaptain }); onChanged(); } catch (e) { toast.error(e); }
+  };
   const dim = hasDecl && !s.declared;
   const differs = (a: string | undefined, b: string) => !!a && a !== b;
   return (
-    <tr className={cx('group border-t border-ink-800/60', dim && 'opacity-50', highlight && 'bg-accent-500/10')}>
+    <tr className={cx('group border-t border-ink-800/60', dim && 'opacity-50', highlight && 'bg-accent-500/10', s.isCaptain && 'bg-amber-500/10')}>
+      <td className="text-center">
+        <button onClick={toggleCaptain} title={s.isCaptain ? 'Captain' : 'Make captain'} aria-label={s.isCaptain ? `${fullName(s)} is captain` : `Make ${fullName(s)} captain`} aria-pressed={s.isCaptain}
+          className={cx('text-lg leading-none', s.isCaptain ? 'text-amber-400' : 'text-ink-700 hover:text-amber-300')}>★</button>
+      </td>
       <td className="py-0.5"><ImgCell kind="sailors" ownerId={s.id} slot="photo" label={`${fullName(s)} · Photo`} asset={s.photo} onChanged={onChanged} accept="png+jpg" /></td>
       <td><Cell value={s.defaultNumber} onSave={(v) => save({ defaultNumber: v })} className="tabular-nums" label="Number" /></td>
       <td><Cell value={s.firstName} onSave={(v) => save({ firstName: v })} className="text-ink-50" label="First name" /></td>
@@ -303,6 +315,7 @@ function NewSailorRow({ teamId, onCreated }: { teamId: string; onCreated: () => 
   );
   return (
     <tr className="border-t border-ink-800/60">
+      <td />
       <td className="text-center text-ink-500">+</td>
       <td className="py-1 pr-1">{input('defaultNumber', 'No.')}</td>
       <td className="py-1 pr-1">{input('firstName', 'First name')}</td>
@@ -311,98 +324,5 @@ function NewSailorRow({ teamId, onCreated }: { teamId: string; onCreated: () => 
       <td className="py-1"><Button size="sm" variant="primary" disabled={!ok} onClick={add}>Add</Button></td>
       <td colSpan={4} />
     </tr>
-  );
-}
-
-// ---------- inline editing ----------
-function Cell({ value, onSave, className, required, label }: { value: string; onSave: (v: string) => Promise<void>; className?: string; required?: boolean; label: string }) {
-  const [editing, setEditing] = useState(false);
-  const [v, setV] = useState(value);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => { if (!editing) setV(value); }, [value, editing]);
-  const commit = async () => {
-    const next = v.trim();
-    if (next === value || (required && !next)) { setEditing(false); setV(value); return; }
-    setBusy(true);
-    try { await onSave(next); setEditing(false); } catch { /* toast shown by caller; keep editing */ } finally { setBusy(false); }
-  };
-  if (editing) {
-    return (
-      <input autoFocus className={cx('input py-1 text-sm', className)} value={v} disabled={busy} aria-label={label}
-        onChange={(e) => setV(e.target.value)} onBlur={commit}
-        onKeyDown={(e) => { if (e.key === 'Enter') void commit(); if (e.key === 'Escape') { setV(value); setEditing(false); } }} />
-    );
-  }
-  return (
-    <button onClick={() => setEditing(true)} title={`Edit ${label.toLowerCase()}`} aria-label={`${label}: ${value || 'empty'}`}
-      className={cx('block min-h-[30px] w-full truncate rounded border border-transparent px-1 py-1 text-left hover:border-ink-700', className)}>
-      {value || <span className="text-ink-600">—</span>}
-    </button>
-  );
-}
-
-function ImgCell({ kind, ownerId, slot, label, asset, onChanged, accept = 'png' }: { kind: 'teams' | 'sailors'; ownerId: string; slot: string; label: string; asset: Asset | null | undefined; onChanged: () => void; accept?: 'png' | 'png+jpg' }) {
-  const toast = useToast();
-  const ref = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const base = `/api/${kind}/${ownerId}/assets/${slot}`;
-  const upload = async (file: File) => {
-    setBusy(true);
-    try { await api.upload(`${base}/upload`, file); onChanged(); } catch (e) { toast.error(e); } finally { setBusy(false); }
-  };
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault(); setOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) void upload(f);
-  };
-  const remove = async () => {
-    try { await api.del(base); onChanged(); } catch (e) { toast.error(e); }
-  };
-  const bad = asset && asset.checkStatus !== 'stored' && asset.checkStatus !== 'reachable';
-  const tip = asset ? `${label}\n${asset.originalFilename}${asset.width ? ` · ${asset.width}×${asset.height}` : ''}\n${asset.vmixPath ?? asset.storedPath ?? asset.enteredPath ?? ''}` : `${label}\nDrop a file or click`;
-  return (
-    <div className="group/img relative mx-auto h-8 w-11"
-      onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}>
-      <button title={tip} aria-label={asset ? `${label}: replace` : `${label}: add`} onClick={() => ref.current?.click()}
-        className={cx('flex h-full w-full items-center justify-center overflow-hidden rounded border',
-          asset ? 'checker border-ink-700' : 'border-dashed border-ink-700 text-ink-600 hover:border-ink-500 hover:text-ink-300',
-          bad && 'border-amber-500', over && 'border-accent-400 ring-2 ring-accent-400', busy && 'opacity-40')}>
-        {asset?.previewUrl ? <img src={asset.previewUrl} alt="" className="max-h-full max-w-full object-contain" /> : asset ? <span className="text-[10px] text-amber-300">?</span> : <span className="text-xs">+</span>}
-      </button>
-      {asset && (
-        <button onClick={remove} aria-label={`${label}: remove`}
-          className="absolute -right-1.5 -top-1.5 hidden h-4 w-4 items-center justify-center rounded-full bg-ink-700 text-[9px] text-ink-100 hover:bg-red-700 group-hover/img:flex">✕</button>
-      )}
-      <input ref={ref} type="file" className="hidden" accept={accept === 'png' ? 'image/png,.png' : 'image/png,image/jpeg,.png,.jpg,.jpeg'}
-        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />
-    </div>
-  );
-}
-
-// ---------- JSON ----------
-function JsonModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const toast = useToast();
-  const idx = useQuery({ queryKey: ['json-index'], queryFn: () => api.get<{ name: string; path: string }[]>('/api/json-index'), enabled: open });
-  const origin = window.location.origin;
-  return (
-    <Modal open={open} onClose={onClose} title="JSON for vMix" wide>
-      {idx.isLoading ? <Loading /> : (
-        <table className="w-full text-sm">
-          <tbody>
-            {(idx.data ?? []).map((j) => (
-              <tr key={j.path} className="border-b border-ink-800">
-                <td className="py-2 pr-3 font-medium">{j.name}</td>
-                <td className="py-2 font-mono text-xs text-ink-300">{origin}{j.path}</td>
-                <td className="py-2 text-right whitespace-nowrap">
-                  <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(origin + j.path).then(() => toast.info('URL copied'), () => {})}>Copy</Button>
-                  <a href={j.path} target="_blank" rel="noreferrer"><Button size="sm" variant="ghost">Open</Button></a>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Modal>
   );
 }

@@ -4,6 +4,8 @@ import { api, Meta } from './api';
 import { cx } from './components/ui';
 import { CommentatorPage } from './pages/Commentator';
 import { OverviewPage } from './pages/Overview';
+import { GeneralPage } from './pages/General';
+import { JsonPage } from './pages/Json';
 import { TeamDetailPage } from './pages/TeamDetail';
 import { SailorPage } from './pages/Sailor';
 import { FleetsPage } from './pages/Fleets';
@@ -48,6 +50,8 @@ function VmixLayout() {
           <li><NavLink to="/vmix/overview" className={item}>Teams & crews</NavLink></li>
           <li><NavLink to="/vmix/fleets" className={item}>Fleets</NavLink></li>
           <li><NavLink to="/vmix/declarations" className={item}>Declarations</NavLink></li>
+          <li><NavLink to="/vmix/general" className={item}>General graphics</NavLink></li>
+          <li><NavLink to="/vmix/json" className={item}>JSON</NavLink></li>
           <li><NavLink to="/vmix/settings" className={item}>Settings</NavLink></li>
         </ul>
       </nav>
@@ -71,6 +75,8 @@ export function App() {
           <Route path="fleets" element={<FleetsPage />} />
           <Route path="declarations" element={<DeclarationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="general" element={<GeneralPage />} />
+          <Route path="json" element={<JsonPage />} />
         </Route>
         <Route path="/commentator" element={<CommentatorPage />} />
         <Route path="*" element={<div className="p-10 text-center text-ink-400">Page not found.</div>} />

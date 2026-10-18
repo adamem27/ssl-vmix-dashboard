@@ -34,6 +34,16 @@ export function updateSailor(db: DB, id: string, input: SailorInput) {
       input.sourceRef !== undefined ? input.sourceRef : s.source_ref, nowIso(), id);
 }
 
+/** One captain per team: marking a sailor clears the mark on teammates. */
+export function setCaptain(db: DB, id: string, value: boolean) {
+  const s = db.prepare('SELECT team_id FROM sailors WHERE id = ?').get(id) as { team_id: string } | undefined;
+  if (!s) throw notFound('Sailor');
+  db.transaction(() => {
+    if (value) db.prepare('UPDATE sailors SET is_captain = 0 WHERE team_id = ? AND id <> ?').run(s.team_id, id);
+    db.prepare('UPDATE sailors SET is_captain = ?, updated_at = ? WHERE id = ?').run(value ? 1 : 0, nowIso(), id);
+  })();
+}
+
 export function deleteSailor(ctx: AssetCtx, id: string) {
   const r = ctx.db.prepare('DELETE FROM sailors WHERE id = ?').run(id);
   if (!r.changes) throw notFound('Sailor');
@@ -43,13 +53,13 @@ export function deleteSailor(ctx: AssetCtx, id: string) {
 export function sailorDto(ctx: AssetCtx, s: any) {
   return {
     id: s.id, teamId: s.team_id, firstName: s.first_name, lastName: s.last_name, defaultPosition: s.default_position, defaultNumber: s.default_number,
-    bestResult1: s.best_result_1, bestResult2: s.best_result_2, sourceRef: s.source_ref, isDemo: !!s.is_demo, updatedAt: s.updated_at,
+    bestResult1: s.best_result_1, bestResult2: s.best_result_2, sourceRef: s.source_ref, isDemo: !!s.is_demo, isCaptain: !!s.is_captain, updatedAt: s.updated_at,
     photo: listAssets(ctx, 'sailor', s.id).photo ?? null,
   };
 }
 
 export function listSailors(ctx: AssetCtx, teamId: string) {
-  const rows = ctx.db.prepare(`SELECT * FROM sailors WHERE team_id = ? ORDER BY
+  const rows = ctx.db.prepare(`SELECT * FROM sailors WHERE team_id = ? ORDER BY is_captain DESC,
     CASE WHEN default_number GLOB '[0-9]*' THEN CAST(default_number AS INTEGER) ELSE 100000 END, last_name COLLATE NOCASE, first_name COLLATE NOCASE`).all(teamId);
   return rows.map((s) => sailorDto(ctx, s));
 }

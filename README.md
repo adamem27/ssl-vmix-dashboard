@@ -126,6 +126,14 @@ Przycisk **JSON** na ekranie Teams & crews pokazuje adresy do wklejenia w vMix (
 - `/json/teams`: drużyny z 11 grafikami.
 - `/json/sailors`: żeglarze z deklaracji na dziś (bez deklaracji cały skład). Parametry: `?date=RRRR-MM-DD`, `?team=KOD`.
 - `/json/fleets/<id>`: floty zestawu, 4 miejsca na flotę; nierozstrzygnięte miejsca mają etykietę zamiast kodu.
+- `/json/captains`: kapitan każdej drużyny (imię, nazwisko, numer, pozycja, wyniki, zdjęcie) z flagą drużyny. Kapitana zaznacza się gwiazdką w składzie; `/json/teams` i `/json/sailors` też zawierają pola kapitana.
+- `/json/weather`: aktualna pogoda (jeden wiersz).
+- `/json/schedule`: harmonogram na dziś, `?date=RRRR-MM-DD` na inny dzień.
+- `/json/people`: osoby do lowerthirdów, filtry `?role=Host commentator`, `?language=Polish`.
+
+Ekran **JSON** pokazuje każde źródło jak arkusz: numery wierszy i numery kolumn z nazwą pola. Kliknięcie komórki pokazuje jej wiersz, kolumnę, nazwę pola i wartość.
+
+Ekran **General graphics** zawiera pogodę, harmonogram dnia i osoby. Przycisk „+ 3 commentators” dodaje host, guest i on-water commentator dla wpisanego języka.
 
 Jeśli vMix działa na innym komputerze, uruchom dashboard z `HOST=0.0.0.0` (patrz sekcja o sieci lokalnej).
 
