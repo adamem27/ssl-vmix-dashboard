@@ -11,6 +11,13 @@ Ekran startowy **Overview** to jedna tabela wszystkich drużyn: flaga, kod, nazw
 - Node.js **22.12 lub nowszy** (albo 20.19+), npm. Starsze wersje (np. 22.11) nie instalują natywnego modułu narzędzia budującego (Vite/rolldown) i `npm run build` kończy się błędem „Cannot find native binding”. Sprawdź: `node -v`.
 - Windows, macOS lub Linux. `better-sqlite3` ma gotowe binaria dla popularnych platform, więc zwykle nie trzeba kompilatora.
 
+## Uruchamianie jednym kliknięciem (z automatyczną aktualizacją)
+
+- **macOS:** kliknij dwukrotnie `start.command` w folderze projektu (za pierwszym razem: prawy przycisk → Otwórz).
+- **Windows:** kliknij dwukrotnie `start.bat`.
+
+Skrypt pobiera najnowszą wersję z GitHuba, a gdy coś się zmieniło, sam robi `npm install` i `npm run build`. Potem uruchamia dashboard i otwiera go w przeglądarce. Bez internetu startuje bieżącą wersję. Zamknięcie okna terminala zatrzymuje dashboard.
+
 ## Uruchomienie
 
 ```bash
