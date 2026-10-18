@@ -19,7 +19,7 @@ import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
 import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './services/jsonExport.js';
 import { todayIn } from './services/dates.js';
-import { applyGoldCup2026, PRESETS } from './services/presets.js';
+import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 
 export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number }
@@ -60,7 +60,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   }));
 
   // ---------- teams ----------
-  const teamBody = z.object({ name: str(120).min(1, 'Name is required'), code: str(20).min(1, 'Code is required'), aliases: z.array(str(120)).max(50).optional(), notes: str(2000).optional() });
+  const teamBody = z.object({ name: str(120).min(1, 'Name is required'), code: str(20).min(1, 'Code is required'), nickname: str(120).optional(), aliases: z.array(str(120)).max(50).optional(), notes: str(2000).optional() });
   app.get('/api/teams', async () => listTeams(ctx));
   app.post('/api/teams', async (req) => getTeam(ctx, createTeam(db, teamBody.parse(req.body))));
   app.get<{ Params: { id: string } }>('/api/teams/:id', async (req) => getTeam(ctx, req.params.id));
@@ -330,7 +330,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get<{ Querystring: { role?: string; language?: string } }>('/json/people', async (req) => jsonPeople(ctx, ev().id, req.query.role, req.query.language));
   app.get('/json/captains', async () => jsonCaptains(ctx));
   app.get('/api/presets', async () => PRESETS);
-  app.post('/api/presets/ssl-gold-cup-2026', async () => applyGoldCup2026(db));
+  app.post('/api/presets/ssl-gold-cup-2026', async () => applyGoldCupAll(ctx));
 
   // ---------- web UI ----------
   if (deps.webDist && fs.existsSync(deps.webDist)) {

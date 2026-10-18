@@ -32,7 +32,7 @@ export function overview(ctx: AssetCtx, eventId: string, date: string, fleetSetI
       return { ...s, declared: m ? { position: m.position, number: m.number, manual: !!m.manual, sort: m.sort } : null };
     });
     return {
-      id: t.id, code: t.code, name: t.name, isDemo: t.isDemo, thumb: t.thumb, assets: t.assets,
+      id: t.id, code: t.code, name: t.name, nickname: t.nickname, isDemo: t.isDemo, thumb: t.thumb, assets: t.assets,
       slots: TEAM_SLOTS.map((s) => ({ key: s.key, label: s.label, status: t.assets[s.key]?.checkStatus ?? 'missing' })),
       assetsFilled: t.assetsFilled, assetsTotal: t.assetsTotal,
       place: places.get(t.id) ?? null,

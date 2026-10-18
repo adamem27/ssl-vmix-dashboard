@@ -20,3 +20,23 @@ describe('SSL Gold Cup 2026 preset', () => {
     expect(again.setsSkipped).toHaveLength(7);
   });
 });
+
+describe('team pages', () => {
+  it('adds nicknames, crews and captains once, without duplicates', async () => {
+    const { applyTeamPages, loadTeamPages } = await import('../src/services/presets.js');
+    const db = openDb(':memory:');
+    applyGoldCup2026(db);
+    const pages = loadTeamPages();
+    expect(pages.length).toBe(61);
+    const r = applyTeamPages(db, pages);
+    expect(r.missingTeams).toEqual([]);
+    expect(r.nicknames).toBe(61);
+    expect(r.sailorsCreated).toBeGreaterThan(500);
+    expect(r.captains).toBeGreaterThan(55);
+    const bra = db.prepare("SELECT nickname, id FROM teams WHERE code = 'BRA'").get() as any;
+    expect(bra.nickname).toBe('Brazilian Storm');
+    const cap = db.prepare('SELECT first_name, last_name, default_number FROM sailors WHERE team_id = ? AND is_captain = 1').get(bra.id) as any;
+    expect(cap).toMatchObject({ first_name: 'Robert', last_name: 'Scheidt', default_number: '10' });
+    expect(applyTeamPages(db, pages).sailorsCreated).toBe(0);
+  });
+});

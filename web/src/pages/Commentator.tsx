@@ -97,6 +97,7 @@ function TeamCard({ place, team, onHover }: { place: number; team: OverviewTeam;
             <span className="font-mono text-xl font-black text-ink-50">{team.code}</span>
             <span className="truncate text-sm text-ink-300">{team.name}</span>
           </div>
+          {team.nickname && <div className="truncate text-xs font-semibold uppercase tracking-wide text-accent-300">{team.nickname}</div>}
           {captain && <div className="truncate text-xs text-amber-300">★ {fullName(captain)}</div>}
         </div>
         <span className={cx('ml-auto rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase', declared ? 'bg-emerald-950/70 text-emerald-300' : 'bg-ink-800 text-ink-400')}>{declared ? 'Today' : 'Roster'}</span>

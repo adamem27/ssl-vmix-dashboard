@@ -233,4 +233,9 @@ CREATE TABLE schedule_items (
 CREATE INDEX schedule_items_date_idx ON schedule_items(event_id, date, time);
 `,
   },
+  {
+    version: 4,
+    name: 'team_nickname',
+    sql: `ALTER TABLE teams ADD COLUMN nickname TEXT NOT NULL DEFAULT '';`,
+  },
 ];

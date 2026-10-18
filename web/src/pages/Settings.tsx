@@ -260,7 +260,7 @@ function PresetSection() {
   return (
     <Section id="presets" title="Matchboard">
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" busy={busy} onClick={load}>Load SSL Gold Cup 2026 matchboard</Button>
+        <Button variant="primary" busy={busy} onClick={load}>Load SSL Gold Cup 2026 data</Button>
       </div>
       {result && (
         <p className="mt-2 text-sm text-ink-300">

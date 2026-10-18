@@ -1,4 +1,11 @@
-import { activeEvent, DB, nowIso } from '../db/db.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { activeEvent, DB, getSetting, nowIso, setSetting } from '../db/db.js';
+import { AssetCtx } from './assets.js';
+import { removeDemo } from './demo.js';
+import { nameKey, splitName } from './normalize.js';
+import { createSailor, setCaptain } from './sailors.js';
 import { createTeam } from './teams.js';
 import { createFleet, createSet, setPlaceholders, FLEET_SIZE } from './fleets.js';
 
@@ -97,4 +104,68 @@ export function applyGoldCup2026(db: DB): PresetResult {
     }
   })();
   return r;
+}
+
+// ---------- team pages (<code>.sslgoldcup.com) ----------
+/** Crew data read from the team pages ("Potential Team Position"), names normalised, numbers from "Confirmed Athletes". */
+export interface TeamPage { code: string; url: string; nickname: string; captain: string; crew: { name: string; position: string; number: string }[] }
+
+export function loadTeamPages(): TeamPage[] {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const p of [path.join(here, '..', '..', 'fixtures', 'goldcup-team-pages.json'), path.join(here, '..', 'fixtures', 'goldcup-team-pages.json')]) {
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  }
+  return [];
+}
+
+export interface TeamPagesResult { teams: number; nicknames: number; sailorsCreated: number; captains: number; missingTeams: string[] }
+
+/**
+ * Applies data read from the team pages without overwriting operator edits:
+ * a nickname is set only when empty, sailors are added only when no sailor of that team has the same name,
+ * and the captain is marked only when the team has none yet.
+ * The crew is the "Potential Team Position" list plus confirmed athletes that list leaves out.
+ */
+export function applyTeamPages(db: DB, pages: TeamPage[] = loadTeamPages()): TeamPagesResult {
+  const r: TeamPagesResult = { teams: 0, nicknames: 0, sailorsCreated: 0, captains: 0, missingTeams: [] };
+  db.transaction(() => {
+    for (const pg of pages) {
+      const team = db.prepare('SELECT id, nickname FROM teams WHERE code = ? COLLATE NOCASE').get(pg.code) as { id: string; nickname: string } | undefined;
+      if (!team) { r.missingTeams.push(pg.code); continue; }
+      r.teams++;
+      if (pg.nickname && !team.nickname) {
+        db.prepare('UPDATE teams SET nickname = ?, updated_at = ? WHERE id = ?').run(pg.nickname, nowIso(), team.id);
+        r.nicknames++;
+      }
+      for (const m of pg.crew) {
+        if (db.prepare('SELECT 1 FROM sailors WHERE team_id = ? AND name_key = ?').get(team.id, nameKey(m.name))) continue;
+        const { first, last } = splitName(m.name);
+        createSailor(db, team.id, { firstName: first, lastName: last, defaultPosition: m.position, defaultNumber: m.number });
+        r.sailorsCreated++;
+      }
+      if (pg.captain && !db.prepare('SELECT 1 FROM sailors WHERE team_id = ? AND is_captain = 1').get(team.id)) {
+        const cap = db.prepare('SELECT id FROM sailors WHERE team_id = ? AND name_key = ?').get(team.id, nameKey(pg.captain)) as { id: string } | undefined;
+        if (cap) { setCaptain(db, cap.id, true); r.captains++; }
+      }
+    }
+  })();
+  return r;
+}
+
+/** Bump when the bundled matchboard or team-page data changes, so existing installs pick it up on next start. */
+export const GOLDCUP_DATA_VERSION = '2026-10-18';
+
+/** Full Gold Cup setup: DEMO data out, matchboard teams and fleets, then team-page crews. Safe to repeat. */
+export function applyGoldCupAll(ctx: AssetCtx) {
+  const removed = removeDemo(ctx);
+  const matchboard = applyGoldCup2026(ctx.db);
+  const teamPages = applyTeamPages(ctx.db);
+  setSetting(ctx.db, 'preset.goldcup.version', GOLDCUP_DATA_VERSION);
+  return { removedDemoTeams: removed.removedTeams, ...matchboard, teamPages };
+}
+
+/** Runs once per data version at server start. */
+export function applyGoldCupOnStart(ctx: AssetCtx) {
+  if (getSetting(ctx.db, 'preset.goldcup.version') === GOLDCUP_DATA_VERSION) return null;
+  return applyGoldCupAll(ctx);
 }

@@ -3,7 +3,7 @@ import { AssetCtx, listAssets, removeAllForOwner } from './assets.js';
 import { conflict, notFound } from './errors.js';
 import { TEAM_SLOTS } from './slots.js';
 
-export interface TeamInput { name?: string; code?: string; aliases?: string[]; notes?: string }
+export interface TeamInput { name?: string; code?: string; nickname?: string; aliases?: string[]; notes?: string }
 
 function cleanAliases(a: string[] | undefined) {
   return JSON.stringify([...new Set((a ?? []).map((x) => x.trim()).filter(Boolean))]);
@@ -19,8 +19,8 @@ export function createTeam(db: DB, input: Required<Pick<TeamInput, 'name' | 'cod
   assertCodeFree(db, code);
   const id = newId();
   const t = nowIso();
-  db.prepare('INSERT INTO teams (id, name, code, aliases, notes, is_demo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, input.name.trim(), code, cleanAliases(input.aliases), input.notes ?? '', isDemo ? 1 : 0, t, t);
+  db.prepare('INSERT INTO teams (id, name, code, nickname, aliases, notes, is_demo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, input.name.trim(), code, (input.nickname ?? '').trim(), cleanAliases(input.aliases), input.notes ?? '', isDemo ? 1 : 0, t, t);
   return id;
 }
 
@@ -29,8 +29,9 @@ export function updateTeam(db: DB, id: string, input: TeamInput) {
   if (!cur) throw notFound('Team');
   const code = input.code !== undefined ? input.code.trim() : cur.code;
   if (code !== cur.code) assertCodeFree(db, code, id);
-  db.prepare('UPDATE teams SET name = ?, code = ?, aliases = ?, notes = ?, updated_at = ? WHERE id = ?').run(
+  db.prepare('UPDATE teams SET name = ?, code = ?, nickname = ?, aliases = ?, notes = ?, updated_at = ? WHERE id = ?').run(
     input.name !== undefined ? input.name.trim() : cur.name, code,
+    input.nickname !== undefined ? input.nickname.trim() : cur.nickname,
     input.aliases !== undefined ? cleanAliases(input.aliases) : cur.aliases,
     input.notes ?? cur.notes, nowIso(), id);
 }
@@ -51,7 +52,7 @@ export function teamDto(ctx: AssetCtx, t: any) {
   let aliases: string[] = [];
   try { aliases = JSON.parse(t.aliases); } catch { /* keep empty */ }
   return {
-    id: t.id, name: t.name, code: t.code, aliases, notes: t.notes, isDemo: !!t.is_demo, updatedAt: t.updated_at,
+    id: t.id, name: t.name, code: t.code, nickname: t.nickname ?? '', aliases, notes: t.notes, isDemo: !!t.is_demo, updatedAt: t.updated_at,
     assets, assetsFilled: filled, assetsTotal: TEAM_SLOTS.length,
     thumb: thumb ? { slot: thumb.slot, previewUrl: thumb.previewUrl, checkStatus: thumb.checkStatus } : null,
     sailorCount,

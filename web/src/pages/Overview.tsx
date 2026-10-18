@@ -64,7 +64,7 @@ export function OverviewPage() {
 
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allOpen = rows.length > 0 && rows.every((r) => open.has(r.t.id));
-  const cols = 7 + (meta.data?.teamSlots.length ?? 11);
+  const cols = 8 + (meta.data?.teamSlots.length ?? 11);
 
   return (
     <div className="space-y-3">
@@ -93,6 +93,7 @@ export function OverviewPage() {
                 <th className="w-7 px-1 py-2" />
                 <th className="w-20 px-2 py-2">Code</th>
                 <th className="px-2 py-2">Team</th>
+                <th className="px-2 py-2">Nickname</th>
                 <th className="w-40 px-2 py-2">Fleet</th>
                 {meta.data!.teamSlots.map((s) => <th key={s.key} className="w-12 px-0.5 py-2 text-center" title={s.label}>{SHORT[s.key] ?? s.label}</th>)}
                 <th className="w-14 px-2 py-2 text-right">Crew</th>
@@ -149,6 +150,7 @@ function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: Overview
           {captain && <span className="shrink-0 truncate text-xs text-amber-300" title="Captain">★ {fullName(captain)}</span>}
         </div>
       </td>
+      <td className="px-1"><Cell value={t.nickname} onSave={(v) => save({ nickname: v })} className="text-ink-300" label="Nickname" /></td>
       <td className="px-1">{set ? <FleetPicker team={t} set={set} onChanged={onChanged} /> : <span className="px-1 text-ink-600">—</span>}</td>
       {meta.data!.teamSlots.map((s) => (
         <td key={s.key} className="px-0.5 py-1"><ImgCell kind="teams" ownerId={t.id} slot={s.key} label={`${t.code} · ${s.label}`} asset={t.assets[s.key]} onChanged={onChanged} /></td>
@@ -217,8 +219,9 @@ function NewTeamRow({ cols, onCreated }: { cols: number; onCreated: () => void }
       <td className="px-1 text-center text-ink-500">+</td>
       <td className="px-1 py-1"><input className="input py-1 font-mono text-sm uppercase" placeholder="CODE" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} onKeyDown={onKey} aria-label="New team code" /></td>
       <td className="px-1 py-1"><input className="input py-1 text-sm" placeholder="New team" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onKey} aria-label="New team name" /></td>
+      <td />
       <td className="px-1 py-1"><Button size="sm" variant="primary" disabled={!code.trim() || !name.trim()} onClick={add}>Add</Button></td>
-      <td colSpan={cols - 4} />
+      <td colSpan={cols - 5} />
     </tr>
   );
 }

@@ -14,7 +14,7 @@ type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: 
 const img = (a: Asset) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 
 function teamFields(t: ReturnType<typeof listTeams>[number]) {
-  const o: Record<string, string> = { code: t.code, name: t.name };
+  const o: Record<string, string> = { code: t.code, name: t.name, nickname: t.nickname };
   for (const s of TEAM_SLOTS) o[s.key] = img(t.assets[s.key]);
   return o;
 }
@@ -36,7 +36,7 @@ export function jsonTeams(ctx: AssetCtx) {
 
 /** One row per team with its captain, for comparison graphics. */
 export function jsonCaptains(ctx: AssetCtx) {
-  return listTeams(ctx).map((t) => ({ code: t.code, name: t.name, flag_small: img(t.assets.flag_small), flag_big: img(t.assets.flag_big), ...captainFields(ctx, t.id) }));
+  return listTeams(ctx).map((t) => ({ code: t.code, name: t.name, nickname: t.nickname, flag_small: img(t.assets.flag_small), flag_big: img(t.assets.flag_big), ...captainFields(ctx, t.id) }));
 }
 
 export function jsonWeather(db: DB) {
@@ -61,7 +61,7 @@ export function jsonSailors(ctx: AssetCtx, eventId: string, date: string, teamCo
     const sailors = t.declaration ? t.sailors.filter((s) => s.declared).sort((a, b) => a.declared!.sort - b.declared!.sort) : t.sailors;
     for (const s of sailors) {
       rows.push({
-        team_code: t.code, team_name: t.name,
+        team_code: t.code, team_name: t.name, team_nickname: t.nickname,
         captain: s.isCaptain ? '1' : '',
         first_name: s.firstName, last_name: s.lastName, full_name: `${s.firstName} ${s.lastName}`.trim(),
         number: s.declared?.number || s.defaultNumber, position: s.declared?.position || s.defaultPosition,
@@ -85,7 +85,7 @@ export function jsonFleetSet(ctx: AssetCtx, setId: string) {
     for (let p = 1; p <= 4; p++) {
       const t = teams.get(slots.find((s) => s.fleet_id === f.id && s.position === p)?.team_id);
       const empty: Record<string, string> = Object.fromEntries(TEAM_SLOTS.map((s) => [s.key, '']));
-      rows.push({ fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', ...empty }) });
+      rows.push({ fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', nickname: '', ...empty }) });
     }
   }
   return rows;
