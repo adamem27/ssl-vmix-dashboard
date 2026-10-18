@@ -27,6 +27,10 @@ else
   echo "== Already up to date"
 fi
 
+# Stop a dashboard left running from an earlier start, so the new version can take the port.
+old=$(lsof -ti tcp:4310 2>/dev/null)
+[ -n "$old" ] && { echo "== Stopping the previous dashboard"; kill $old; sleep 1; }
+
 echo "== Starting on http://localhost:4310 (close this window to stop)"
 (sleep 3; open "http://localhost:4310" 2>/dev/null || xdg-open "http://localhost:4310" 2>/dev/null) &
 npm start

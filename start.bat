@@ -18,6 +18,7 @@ if "%REBUILD%"=="1" (
 ) else (
   echo == Already up to date
 )
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":4310 " ^| findstr LISTENING') do taskkill /PID %%p /F >nul 2>&1
 echo == Starting on http://localhost:4310 (close this window to stop)
 start "" http://localhost:4310
 call npm start
