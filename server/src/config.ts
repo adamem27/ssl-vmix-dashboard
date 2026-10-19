@@ -17,6 +17,8 @@ export const config = {
   get workbookFile() {
     return process.env.WORKBOOK_FILE ? path.resolve(process.env.WORKBOOK_FILE) : path.join(this.assetsDir, 'ssl-vmix.xlsx');
   },
+  /** Set when the dashboard is reachable from the internet. */
+  password: process.env.DASHBOARD_PASSWORD ?? '',
   host: process.env.HOST ?? '127.0.0.1',
   port: Number(process.env.PORT ?? 4310),
   webDist: path.join(ROOT_DIR, 'web', 'dist'),

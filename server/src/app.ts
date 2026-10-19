@@ -21,8 +21,9 @@ import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSch
 import { todayIn } from './services/dates.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
+import { listMirrorFiles, mirrorFilePath, passwordOk } from './services/mirror.js';
 
-export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number }
+export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string }
 
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -47,6 +48,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     app.log.error(err);
     return reply.status(err.statusCode ?? 500).send({ error: err.statusCode && err.statusCode < 500 ? err.message : 'Internal server error.' });
   });
+
+  // Online hosting: one shared password for the dashboard and the vMix sync (HTTP Basic auth).
+  if (deps.password) {
+    const password = deps.password;
+    app.addHook('onRequest', async (req, reply) => {
+      if (req.url === '/api/health' || passwordOk(req.headers.authorization, password)) return;
+      return reply.status(401).header('WWW-Authenticate', 'Basic realm="SSL vMix", charset="UTF-8"').send({ error: 'Password required.' });
+    });
+  }
 
   const ev = () => activeEvent(db);
 
@@ -329,6 +339,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get<{ Querystring: { date?: string } }>('/json/schedule', async (req) => jsonSchedule(db, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone)));
   app.get<{ Querystring: { role?: string; language?: string } }>('/json/people', async (req) => jsonPeople(ctx, ev().id, req.query.role, req.query.language));
   app.get('/json/captains', async () => jsonCaptains(ctx));
+  // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
+  app.get('/api/mirror/manifest', async () => ({ vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'), files: listMirrorFiles(deps.assetsDir) }));
+  app.get<{ Querystring: { path?: string } }>('/api/mirror/file', async (req, reply) => {
+    const full = mirrorFilePath(deps.assetsDir, String(req.query.path ?? ''));
+    if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) throw notFound('File');
+    return reply.type('application/octet-stream').send(fs.createReadStream(full));
+  });
   app.get('/api/presets', async () => PRESETS);
   app.post('/api/presets/ssl-gold-cup-2026', async () => applyGoldCupAll(ctx));
 

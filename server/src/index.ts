@@ -8,7 +8,7 @@ import { applyGoldCupOnStart } from './services/presets.js';
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
 const workbook = new WorkbookWriter({ db, assetsDir: config.assetsDir }, config.workbookFile, (m) => app.log.warn(m));
-const app = await buildApp({ db, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes });
+const app = await buildApp({ db, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);

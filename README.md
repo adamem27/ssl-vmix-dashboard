@@ -64,6 +64,24 @@ npm run restore -- backups/2026-06-11-08-30-00
 
 Bieżąca baza i katalog plików są przed odtworzeniem zachowywane z sufiksem `.before-restore-<data>`. Ręcznie wystarczy też skopiować plik `ssl-vmix.sqlite` i katalog `assets` przy zatrzymanym serwerze.
 
+## Dashboard online, pliki na komputerze z vMixem
+
+Dashboard może działać na serwerze w internecie (obsługa z dowolnego komputera), a obrazy, `ssl-vmix.xlsx` i `ssl-vmix.json` i tak lądują lokalnie na komputerze z vMixem. vMix czyta tylko lokalne pliki, więc chwilowy brak internetu nie psuje grafik: zostają ostatnie dane.
+
+**1. Serwer.** W repo jest `Dockerfile`. Działa na każdym hostingu z Dockerem i trwałym dyskiem (np. Railway, Render, Fly.io albo własny VPS):
+- dysk (volume) podpięty pod `/data` – tam jest baza, obrazy i xlsx,
+- zmienna `DASHBOARD_PASSWORD` – hasło do dashboardu (przeglądarka zapyta o nie raz; nazwa użytkownika dowolna),
+- port `4310` (albo `PORT` ustawiony przez hosting).
+
+Na własnym VPS: `docker build -t ssl-vmix . && docker run -d -p 4310:4310 -v ssl-data:/data -e DASHBOARD_PASSWORD=... ssl-vmix`, a przed tym HTTPS (np. Caddy).
+
+**2. Komputer z vMixem.** Wystarczy Node i to repo. Dwuklik w `sync-vmix.bat` (Windows). Przy pierwszym uruchomieniu pyta o adres dashboardu, hasło i lokalny folder (domyślnie `C:\SSL-vMix`) i zapisuje to w `vmix-sync/config.json`. Potem co 2 sekundy:
+- kopiuje nowe i zmienione obrazy oraz `ssl-vmix.xlsx`, usuwa skasowane,
+- zapisuje `ssl-vmix.json` (to samo co `/json/all`),
+- ustawia w dashboardzie folder vMix na ten lokalny folder, więc ścieżki obrazów w xlsx/JSON wskazują pliki na komputerze z vMixem.
+
+W vMix: Data Sources → Excel → `C:\SSL-vMix\ssl-vmix.xlsx` (lub JSON → `C:\SSL-vMix\ssl-vmix.json`). Okno synchronizacji musi być otwarte.
+
 ## Dashboard i vMix na różnych komputerach (sieć lokalna)
 
 1. Uruchom serwer z dostępem z sieci:
