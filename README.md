@@ -75,6 +75,8 @@ Dashboard może działać na serwerze w internecie (obsługa z dowolnego kompute
 
 Na własnym VPS: `docker build -t ssl-vmix . && docker run -d -p 4310:4310 -v ssl-data:/data -e DASHBOARD_PASSWORD=... ssl-vmix`, a przed tym HTTPS (np. Caddy).
 
+**Hosting współdzielony z DirectAdmin (np. seohost.pl), bez Dockera.** W panelu: Node.js App → wersja Node 22 (min. 22.12), katalog aplikacji = folder z repo (nie `public_html`), plik startowy `app.cjs`, zmienne `DASHBOARD_PASSWORD` i `DATA_DIR` (folder poza `public_html`). Przez SSH, w środowisku Node pokazanym przez panel: `git clone ...`, `npm install`, `npm run build`, potem restart aplikacji w panelu.
+
 **2. Komputer z vMixem.** Wystarczy Node i to repo. Dwuklik w `sync-vmix.bat` (Windows). Przy pierwszym uruchomieniu pyta o adres dashboardu, hasło i lokalny folder (domyślnie `C:\SSL-vMix`) i zapisuje to w `vmix-sync/config.json`. Potem co 2 sekundy:
 - kopiuje nowe i zmienione obrazy oraz `ssl-vmix.xlsx`, usuwa skasowane,
 - zapisuje `ssl-vmix.json` (to samo co `/json/all`),
