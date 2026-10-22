@@ -461,7 +461,7 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
     });
   });
   const th = 'px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500';
-  const num = (t: Template, k: keyof Template, w = 'w-14', min = 0, max = 4096) => (
+  const num = (t: Template, k: keyof Template, w = 'w-16', min = 0, max = 4096) => (
     <NumInput className={w} min={min} max={max} value={t[k] as number} label={String(k)} onChange={(n) => patch(t.id, { [k]: n })} />
   );
   return (
@@ -491,19 +491,19 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
                 <td className="px-1.5">{num(t, 'width', 'w-[4.5rem]', 1)}</td>
                 <td className="px-1.5">{num(t, 'height', 'w-[4.5rem]', 1)}</td>
                 <td className="px-1.5">{num(t, 'radius')}</td>
-                <td className="px-1.5">{num(t, 'opacity', 'w-14', 0, 100)}</td>
+                <td className="px-1.5">{num(t, 'opacity', 'w-16', 0, 100)}</td>
                 <td className="px-1.5"><input type="checkbox" checked={t.flip} onChange={(e) => patch(t.id, { flip: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Flip" /></td>
-                <td className="px-1.5">{num(t, 'angleOffset', 'w-14', -360, 360)}</td>
-                <td className="px-1.5">{num(t, 'strokeWidth', 'w-14', 0, 200)}</td>
+                <td className="px-1.5">{num(t, 'angleOffset', 'w-16', -360, 360)}</td>
+                <td className="px-1.5">{num(t, 'strokeWidth', 'w-16', 0, 200)}</td>
                 <td className="px-1.5">
                   <div className="flex items-center gap-1">
                     <input type="color" value={t.strokeColor} onChange={(e) => patch(t.id, { strokeColor: e.target.value })} className="h-7 w-8 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stroke colour" />
-                    {num(t, 'strokeOpacity', 'w-14', 0, 100)}
+                    {num(t, 'strokeOpacity', 'w-16', 0, 100)}
                   </div>
                 </td>
                 <td className="px-1.5"><input type="checkbox" checked={t.pattern} onChange={(e) => patch(t.id, { pattern: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Waves" /></td>
-                <td className="px-1.5">{num(t, 'patternOpacity', 'w-14', 0, 100)}</td>
-                <td className="px-1.5">{num(t, 'patternScale', 'w-14', 5, 1000)}</td>
+                <td className="px-1.5">{num(t, 'patternOpacity', 'w-16', 0, 100)}</td>
+                <td className="px-1.5">{num(t, 'patternScale', 'w-16', 5, 1000)}</td>
                 <td className="whitespace-nowrap px-1.5 text-right">
                   <button className="px-1 text-ink-400 hover:text-ink-100 disabled:opacity-30" disabled={i === 0} onClick={() => act(() => api.post(`/api/generator/templates/${t.id}/move`, { direction: -1 }))} aria-label="Move up">↑</button>
                   <button className="px-1 text-ink-400 hover:text-ink-100 disabled:opacity-30" disabled={i === templates.length - 1} onClick={() => act(() => api.post(`/api/generator/templates/${t.id}/move`, { direction: 1 }))} aria-label="Move down">↓</button>
