@@ -34,7 +34,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db, sync } = deps;
   const ctx: AssetCtx = { db, assetsDir: deps.assetsDir };
   fs.mkdirSync(deps.assetsDir, { recursive: true });
-  const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir, dataDir: path.dirname(deps.assetsDir) });
+  const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir });
 
   const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 5 * 1024 * 1024 });
   await app.register(multipart, { limits: { fileSize: deps.maxUploadBytes ?? 40 * 1024 * 1024, files: 1 } });
@@ -347,8 +347,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const genState = () => ({
     templates: pngGen.listTemplates(db),
     teams: pngGen.listGradients(db),
-    pattern: pngGen.getPattern(db),
-    tile: pngGen.tilePath(generator.ctx) ? { url: `/api/generator/pattern-tile?v=${fs.statSync(pngGen.tilePath(generator.ctx)!).mtimeMs}` } : null,
     status: generator.status(),
     outputs: pngGen.listOutputs(db),
     vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'),
@@ -373,18 +371,6 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     pngGen.setGradientsFromColors(db, req.params.teamId, b.colors, b.angle);
     return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
   });
-  app.put('/api/generator/pattern', async (req) => pngGen.setPattern(db, pngGen.patternSchema.partial().parse(req.body)));
-  app.get('/api/generator/pattern-tile', async (_req, reply) => {
-    const f = pngGen.tilePath(generator.ctx);
-    if (!f) throw notFound('Pattern image');
-    return reply.type('image/png').header('Cache-Control', 'no-cache').send(fs.createReadStream(f));
-  });
-  app.post('/api/generator/pattern-tile', async (req) => {
-    const file = await req.file();
-    if (!file) throw badRequest('No file was uploaded.');
-    try { return pngGen.saveTile(generator.ctx, await file.toBuffer()); } catch (e: any) { throw e instanceof HttpError ? e : badRequest(e.message); }
-  });
-  app.delete('/api/generator/pattern-tile', async () => { pngGen.removeTile(generator.ctx); return { ok: true }; });
   app.put('/api/generator/settings', async (req) => {
     setSetting(db, 'generator.autoExport', String(z.object({ autoExport: z.boolean() }).parse(req.body).autoExport));
     return generator.status();
