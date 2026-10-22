@@ -1,4 +1,4 @@
-import { PointerEvent as RPointerEvent, ReactNode, useEffect, useRef, useState } from 'react';
+import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
@@ -8,7 +8,10 @@ interface Template extends ElementSpec { id: string; sort: number; name: string;
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
 interface GenStatus { autoExport: boolean; folder: string; pending: number; files: number; lastWriteAt: string | null; error: string | null }
 interface Output { rel: string; teamId: string; templateId: string; updatedAt: string }
-interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string }
+interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string; strokeGradient: Gradient }
+
+/** The shared gradient that elements with a gradient stroke are painted with. */
+const StrokeGradientCtx = createContext<Gradient | null>(null);
 
 const VARIANTS = [1, 2, 3];
 type Bg = 'checker' | 'dark' | 'light';
@@ -57,8 +60,10 @@ function Generator({ state }: { state: GenState }) {
   // Local drafts so sliders redraw instantly; the server gets debounced saves.
   const [teams, setTeams] = useState(state.teams);
   const [templates, setTemplates] = useState(state.templates);
+  const [strokeGradient, setStrokeDraft] = useState(state.strokeGradient);
   useEffect(() => setTeams(state.teams), [state.teams]);
   useEffect(() => setTemplates(state.templates), [state.templates]);
+  useEffect(() => setStrokeDraft(state.strokeGradient), [state.strokeGradient]);
 
   const team = teams.find((t) => t.teamId === teamId) ?? null;
   const refresh = () => qc.invalidateQueries({ queryKey: ['generator'] });
@@ -67,6 +72,12 @@ function Generator({ state }: { state: GenState }) {
     setTeams((ts) => ts.map((t) => (t.teamId === tid ? { ...t, gradients: { ...t.gradients, [v]: g } } : t)));
     const save = () => api.put(`/api/generator/gradients/${tid}/${v}`, { gradient: g }).catch((e) => { toast.error(e); refresh(); });
     if (immediate) void save(); else debounce(`g:${tid}:${v}`, save);
+  };
+  const setStrokeGradient = (g: Gradient | null) => {
+    if (g) setStrokeDraft(g);
+    const save = () => api.put<{ strokeGradient: Gradient }>('/api/generator/stroke-gradient', { gradient: g })
+      .then((r) => { if (!g) setStrokeDraft(r.strokeGradient); }).catch((e) => { toast.error(e); refresh(); });
+    if (g) debounce('stroke', save); else void save();
   };
   const patchTemplate = (id: string, patch: Partial<Template>) => {
     setTemplates((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -80,6 +91,7 @@ function Generator({ state }: { state: GenState }) {
   const templatesRef = useRef(templates);
   templatesRef.current = templates;
   return (
+    <StrokeGradientCtx.Provider value={strokeGradient}>
     <div className="space-y-3">
       <ExportBar state={state} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
@@ -101,9 +113,11 @@ function Generator({ state }: { state: GenState }) {
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={teams} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
+          <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
         </div>
       </div>
     </div>
+    </StrokeGradientCtx.Provider>
   );
 }
 
@@ -197,10 +211,6 @@ function GradientPanel({ team, teams, variant, setVariant, onChange, onReload }:
     const s = team.gradients[1]?.stops.filter((x) => x.opacity > 0) ?? [];
     return s.length ? [s[0].color, s[s.length - 1].color] : ['#e30820', '#f6a010'];
   });
-  const stop = g?.stops[sel] ?? g?.stops[0];
-  const update = (patch: Partial<Gradient>) => g && onChange({ ...g, ...patch });
-  const updateStop = (patch: Partial<GradientStop>) => g && stop && update({ stops: g.stops.map((s, i) => (s === stop ? { ...s, ...patch } : s)) });
-
   const fromColors = async () => {
     try { await api.post(`/api/generator/gradients/${team.teamId}/from-colors`, { colors: base.filter(Boolean), angle: g?.angle ?? 0 }); onReload(); toast.ok(`${team.code}: V1–V3 set`); } catch (e) { toast.error(e); }
   };
@@ -240,40 +250,58 @@ function GradientPanel({ team, teams, variant, setVariant, onChange, onReload }:
           V{variant} not set.
           <Button size="sm" onClick={() => onChange({ angle: 0, stops: [{ pos: 0, color: base[0], opacity: 100 }, { pos: 100, color: base[base.length - 1], opacity: 100 }] }, true)}>Create</Button>
         </div>
-      ) : (
-        <>
-          <GradientBar g={g} sel={g.stops.indexOf(stop!)} onSelect={setSel} onChange={(stops) => update({ stops })} />
-          <div className="mt-4 grid gap-x-4 gap-y-2 sm:grid-cols-2 xl:grid-cols-[auto_auto_auto_minmax(160px,1fr)_auto_minmax(160px,1fr)]">
-            {stop && <>
-              <Labeled label="Colour">
-                <div className="flex items-center gap-1">
-                  <input type="color" value={stop.color} onChange={(e) => updateStop({ color: e.target.value })} className="h-8 w-10 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stop colour" />
-                  <HexInput value={stop.color} onChange={(color) => updateStop({ color })} />
-                </div>
-              </Labeled>
-              <Labeled label="R G B">
-                <div className="flex gap-1">
-                  {[0, 1, 2].map((k) => (
-                    <NumInput key={k} className="w-16" min={0} max={255} value={parseHex(stop.color)[k]} label={'RGB'[k]}
-                      onChange={(n) => { const c = parseHex(stop.color); c[k] = n; updateStop({ color: toHex(c) }); }} />
-                  ))}
-                </div>
-              </Labeled>
-              <Labeled label="Position %"><NumInput className="w-16" min={0} max={100} value={stop.pos} label="Position" onChange={(pos) => updateStop({ pos })} /></Labeled>
-              <Labeled label={`Opacity ${stop.opacity}%`}><Slider min={0} max={100} value={stop.opacity} onChange={(opacity) => updateStop({ opacity })} label="Stop opacity" /></Labeled>
-              <Labeled label="">
-                <Button size="sm" variant="ghost" disabled={g.stops.length <= 2} onClick={() => { update({ stops: g.stops.filter((s) => s !== stop) }); setSel(0); }}>Delete stop</Button>
-              </Labeled>
-            </>}
-            <Labeled label={`Angle ${g.angle}°`}>
-              <div className="flex items-center gap-2">
-                <Slider min={-180} max={180} value={g.angle} onChange={(angle) => update({ angle })} label="Angle" />
-                <button className="text-xs text-ink-400 hover:text-ink-100" title="Reverse" onClick={() => update({ stops: g.stops.map((s) => ({ ...s, pos: 100 - s.pos })).sort((a, b) => a.pos - b.pos) })}>⇄</button>
-              </div>
-            </Labeled>
+      ) : <GradientEditor g={g} sel={sel} setSel={setSel} onChange={onChange} />}
+    </Panel>
+  );
+}
+
+/** Stop bar plus the fields of the selected stop; `angle` false hides the angle (the stroke takes it per element). */
+function GradientEditor({ g, sel, setSel, onChange, angle = true }: { g: Gradient; sel: number; setSel: (i: number) => void; onChange: (g: Gradient) => void; angle?: boolean }) {
+  const stop = g.stops[sel] ?? g.stops[0];
+  const update = (patch: Partial<Gradient>) => onChange({ ...g, ...patch });
+  const updateStop = (patch: Partial<GradientStop>) => update({ stops: g.stops.map((s) => (s === stop ? { ...s, ...patch } : s)) });
+  return (
+    <>
+      <GradientBar g={g} sel={g.stops.indexOf(stop)} onSelect={setSel} onChange={(stops) => update({ stops })} />
+      <div className="mt-4 grid gap-x-4 gap-y-2 sm:grid-cols-2 xl:grid-cols-[auto_auto_auto_minmax(160px,1fr)_auto_minmax(160px,1fr)]">
+        <Labeled label="Colour">
+          <div className="flex items-center gap-1">
+            <input type="color" value={stop.color} onChange={(e) => updateStop({ color: e.target.value })} className="h-8 w-10 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stop colour" />
+            <HexInput value={stop.color} onChange={(color) => updateStop({ color })} />
           </div>
-        </>
-      )}
+        </Labeled>
+        <Labeled label="R G B">
+          <div className="flex gap-1">
+            {[0, 1, 2].map((k) => (
+              <NumInput key={k} className="w-16" min={0} max={255} value={parseHex(stop.color)[k]} label={'RGB'[k]}
+                onChange={(n) => { const c = parseHex(stop.color); c[k] = n; updateStop({ color: toHex(c) }); }} />
+            ))}
+          </div>
+        </Labeled>
+        <Labeled label="Position %"><NumInput className="w-16" min={0} max={100} value={stop.pos} label="Position" onChange={(pos) => updateStop({ pos })} /></Labeled>
+        <Labeled label={`Opacity ${stop.opacity}%`}><Slider min={0} max={100} value={stop.opacity} onChange={(opacity) => updateStop({ opacity })} label="Stop opacity" /></Labeled>
+        <Labeled label="">
+          <Button size="sm" variant="ghost" disabled={g.stops.length <= 2} onClick={() => { update({ stops: g.stops.filter((s) => s !== stop) }); setSel(0); }}>Delete stop</Button>
+        </Labeled>
+        <Labeled label={angle ? `Angle ${g.angle}°` : ''}>
+          <div className="flex items-center gap-2">
+            {angle && <Slider min={-180} max={180} value={g.angle} onChange={(a) => update({ angle: a })} label="Angle" />}
+            <button className="text-xs text-ink-400 hover:text-ink-100" title="Reverse" onClick={() => update({ stops: g.stops.map((s) => ({ ...s, pos: 100 - s.pos })).sort((a, b) => a.pos - b.pos) })}>⇄</button>
+          </div>
+        </Labeled>
+      </div>
+    </>
+  );
+}
+
+function StrokeGradientPanel({ g, onChange, used }: { g: Gradient; onChange: (g: Gradient | null) => void; used: number }) {
+  const [sel, setSel] = useState(0);
+  return (
+    <Panel title="Stroke gradient" right={<>
+      <span className="text-xs text-ink-500">{used ? `${used} element${used === 1 ? '' : 's'} · angle per element` : 'Tick “Gradient” at an element’s stroke to use it'}</span>
+      <Button size="sm" variant="ghost" onClick={() => { onChange(null); setSel(0); }}>Reset to gradienty.ai</Button>
+    </>}>
+      <GradientEditor g={g} sel={sel} setSel={setSel} onChange={onChange} angle={false} />
     </Panel>
   );
 }
@@ -356,14 +384,15 @@ function HexInput({ value, onChange }: { value: string; onChange: (hex: string) 
 // ---------- previews ----------
 function Canvas({ spec, gradient, maxW, maxH }: { spec: ElementSpec; gradient: Gradient; maxW: number; maxH: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const strokeGradient = useContext(StrokeGradientCtx);
   const scale = Math.min(1, maxW / spec.width, maxH / spec.height);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const r = renderElement(spec, gradient, scale);
+    const r = renderElement(spec, gradient, scale, spec.strokeGradient ? strokeGradient : null);
     c.width = r.width; c.height = r.height;
     c.getContext('2d')!.putImageData(new ImageData(r.data, r.width, r.height), 0, 0);
-  }, [spec, gradient, scale]);
+  }, [spec, gradient, scale, spec.strokeGradient && strokeGradient]);
   return <canvas ref={ref} className="block max-w-full" />;
 }
 
@@ -425,7 +454,7 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
       name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, opacity: 100, flip: false, angleOffset: 0,
-      strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
+      strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
   const th = 'px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500';
@@ -441,7 +470,7 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
             <tr className="border-b border-ink-800">
               <th className={th}>On</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
               <th className={th}>W</th><th className={th}>H</th><th className={th}>Radius</th><th className={th}>Opacity %</th>
-              <th className={th}>Flip</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th>
+              <th className={th}>Flip</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th><th className={th}>Gradient</th><th className={th}>Stroke ∠</th>
               <th className={th}>Waves</th><th className={th}>Waves %</th><th className={th}>Waves size %</th><th className={th} />
             </tr>
           </thead>
@@ -465,10 +494,12 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
                 <td className="px-1.5">{num(t, 'strokeWidth', 'w-16', 0, 200)}</td>
                 <td className="px-1.5">
                   <div className="flex items-center gap-1">
-                    <input type="color" value={t.strokeColor} onChange={(e) => patch(t.id, { strokeColor: e.target.value })} className="h-7 w-8 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stroke colour" />
+                    <input type="color" value={t.strokeColor} disabled={t.strokeGradient} onChange={(e) => patch(t.id, { strokeColor: e.target.value })} className="h-7 w-8 cursor-pointer rounded border border-ink-700 bg-transparent disabled:cursor-default disabled:opacity-30" aria-label="Stroke colour" />
                     {num(t, 'strokeOpacity', 'w-16', 0, 100)}
                   </div>
                 </td>
+                <td className="px-1.5"><input type="checkbox" checked={t.strokeGradient} onChange={(e) => patch(t.id, { strokeGradient: e.target.checked, ...(e.target.checked && !t.strokeWidth ? { strokeWidth: 1 } : {}) })} className="h-4 w-4 accent-sky-500" aria-label="Gradient stroke" title="Paint the stroke with the stroke gradient (below)" /></td>
+                <td className={cx('px-1.5', !t.strokeGradient && 'opacity-40')}>{num(t, 'strokeAngle', 'w-16', -360, 360)}</td>
                 <td className="px-1.5"><input type="checkbox" checked={t.pattern} onChange={(e) => patch(t.id, { pattern: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Waves" /></td>
                 <td className="px-1.5">{num(t, 'patternOpacity', 'w-16', 0, 100)}</td>
                 <td className="px-1.5">{num(t, 'patternScale', 'w-16', 5, 1000)}</td>

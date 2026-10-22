@@ -350,11 +350,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     status: generator.status(),
     outputs: pngGen.listOutputs(db),
     vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'),
+    strokeGradient: pngGen.getStrokeGradient(db),
   });
   app.get('/api/generator', async () => genState());
   app.get('/api/generator/status', async () => ({ status: generator.status(), outputs: pngGen.listOutputs(db) }));
   app.post('/api/generator/templates', async (req) => pngGen.createTemplate(db, pngGen.templateSchema.parse(req.body)));
-  app.patch<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => pngGen.updateTemplate(db, req.params.id, pngGen.templateSchema.partial().parse(req.body)));
+  app.patch<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => pngGen.updateTemplate(db, req.params.id, pngGen.templatePatchSchema.parse(req.body)));
   app.post<{ Params: { id: string } }>('/api/generator/templates/:id/duplicate', async (req) => pngGen.duplicateTemplate(db, req.params.id));
   app.post<{ Params: { id: string } }>('/api/generator/templates/:id/move', async (req) => {
     pngGen.moveTemplate(db, req.params.id, z.object({ direction: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body).direction);
@@ -371,6 +372,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     pngGen.setGradientsFromColors(db, req.params.teamId, b.colors, b.angle);
     return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
   });
+  app.put('/api/generator/stroke-gradient', async (req) => ({
+    strokeGradient: pngGen.setStrokeGradient(db, z.object({ gradient: pngGen.gradientSchema.nullable() }).parse(req.body).gradient),
+  }));
   app.put('/api/generator/settings', async (req) => {
     setSetting(db, 'generator.autoExport', String(z.object({ autoExport: z.boolean() }).parse(req.body).autoExport));
     return generator.status();
