@@ -58,7 +58,7 @@ function crc32(b: Buffer) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function zipStore(entries: [string, Buffer][]): Buffer {
+export function zipStore(entries: [string, Buffer][]): Buffer {
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;

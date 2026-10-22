@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance, FastifyReply } from 'fastify';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import fs from 'node:fs';
+import path from 'node:path';
 import { z, ZodError } from 'zod';
 import { activeEvent, DB, getSetting, nowIso, setSetting } from './db/db.js';
 import { AssetCtx, listAssets, previewFile, recheckAsset, removeAsset, saveUpload, savePath } from './services/assets.js';
@@ -13,7 +14,8 @@ import * as fleets from './services/fleets.js';
 import * as decl from './services/declarations.js';
 import { SyncService } from './services/sync.js';
 import { allSheets, WorkbookWriter } from './services/workbook.js';
-import { buildXlsx } from './services/xlsx.js';
+import { buildXlsx, zipStore } from './services/xlsx.js';
+import * as pngGen from './services/generator/generator.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
@@ -23,7 +25,7 @@ import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { listMirrorFiles, mirrorFilePath, passwordOk } from './services/mirror.js';
 
-export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string }
+export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter }
 
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -32,6 +34,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db, sync } = deps;
   const ctx: AssetCtx = { db, assetsDir: deps.assetsDir };
   fs.mkdirSync(deps.assetsDir, { recursive: true });
+  const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir, dataDir: path.dirname(deps.assetsDir) });
 
   const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 5 * 1024 * 1024 });
   await app.register(multipart, { limits: { fileSize: deps.maxUploadBytes ?? 40 * 1024 * 1024, files: 1 } });
@@ -339,6 +342,67 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get<{ Querystring: { date?: string } }>('/json/schedule', async (req) => jsonSchedule(db, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone)));
   app.get<{ Querystring: { role?: string; language?: string } }>('/json/people', async (req) => jsonPeople(ctx, ev().id, req.query.role, req.query.language));
   app.get('/json/captains', async () => jsonCaptains(ctx));
+
+  // ---------- PNG generator ----------
+  const genState = () => ({
+    templates: pngGen.listTemplates(db),
+    teams: pngGen.listGradients(db),
+    pattern: pngGen.getPattern(db),
+    tile: pngGen.tilePath(generator.ctx) ? { url: `/api/generator/pattern-tile?v=${fs.statSync(pngGen.tilePath(generator.ctx)!).mtimeMs}` } : null,
+    status: generator.status(),
+    outputs: pngGen.listOutputs(db),
+    vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'),
+  });
+  app.get('/api/generator', async () => genState());
+  app.get('/api/generator/status', async () => ({ status: generator.status(), outputs: pngGen.listOutputs(db) }));
+  app.post('/api/generator/templates', async (req) => pngGen.createTemplate(db, pngGen.templateSchema.parse(req.body)));
+  app.patch<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => pngGen.updateTemplate(db, req.params.id, pngGen.templateSchema.partial().parse(req.body)));
+  app.post<{ Params: { id: string } }>('/api/generator/templates/:id/duplicate', async (req) => pngGen.duplicateTemplate(db, req.params.id));
+  app.post<{ Params: { id: string } }>('/api/generator/templates/:id/move', async (req) => {
+    pngGen.moveTemplate(db, req.params.id, z.object({ direction: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body).direction);
+    return pngGen.listTemplates(db);
+  });
+  app.delete<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => { pngGen.deleteTemplate(db, req.params.id); return { ok: true }; });
+  app.put<{ Params: { teamId: string; variant: string } }>('/api/generator/gradients/:teamId/:variant', async (req) => {
+    const g = z.object({ gradient: pngGen.gradientSchema.nullable() }).parse(req.body).gradient;
+    pngGen.setGradient(db, req.params.teamId, Number(req.params.variant), g);
+    return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
+  });
+  app.post<{ Params: { teamId: string } }>('/api/generator/gradients/:teamId/from-colors', async (req) => {
+    const b = z.object({ colors: z.array(z.string()).min(1).max(5), angle: z.number().min(-360).max(360).default(0) }).parse(req.body);
+    pngGen.setGradientsFromColors(db, req.params.teamId, b.colors, b.angle);
+    return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
+  });
+  app.put('/api/generator/pattern', async (req) => pngGen.setPattern(db, pngGen.patternSchema.partial().parse(req.body)));
+  app.get('/api/generator/pattern-tile', async (_req, reply) => {
+    const f = pngGen.tilePath(generator.ctx);
+    if (!f) throw notFound('Pattern image');
+    return reply.type('image/png').header('Cache-Control', 'no-cache').send(fs.createReadStream(f));
+  });
+  app.post('/api/generator/pattern-tile', async (req) => {
+    const file = await req.file();
+    if (!file) throw badRequest('No file was uploaded.');
+    try { return pngGen.saveTile(generator.ctx, await file.toBuffer()); } catch (e: any) { throw e instanceof HttpError ? e : badRequest(e.message); }
+  });
+  app.delete('/api/generator/pattern-tile', async () => { pngGen.removeTile(generator.ctx); return { ok: true }; });
+  app.put('/api/generator/settings', async (req) => {
+    setSetting(db, 'generator.autoExport', String(z.object({ autoExport: z.boolean() }).parse(req.body).autoExport));
+    return generator.status();
+  });
+  app.post('/api/generator/export', async (req) => {
+    if (z.object({ all: z.boolean().default(false) }).parse(req.body ?? {}).all) generator.rerenderAll();
+    return generator.flush();
+  });
+  app.get<{ Querystring: { team?: string; template?: string } }>('/api/generator/png', async (req, reply) => {
+    const { buf, fileName } = pngGen.renderOne(generator.ctx, String(req.query.team ?? ''), String(req.query.template ?? ''));
+    return reply.type('image/png').header('Content-Disposition', `attachment; filename="${fileName}"`).send(buf);
+  });
+  app.get('/api/generator/zip', async (_req, reply) => {
+    generator.flush();
+    const entries = pngGen.listOutputs(db).map((o) => [o.rel.slice(pngGen.GENERATED_DIR.length + 1), fs.readFileSync(path.join(deps.assetsDir, ...o.rel.split('/')))] as [string, Buffer]);
+    return reply.type('application/zip').header('Content-Disposition', 'attachment; filename="ssl-generated-png.zip"').send(zipStore(entries));
+  });
+  app.get('/json/graphics', async () => pngGen.jsonGraphics(db, deps.assetsDir));
   // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
   app.get('/api/mirror/manifest', async () => ({ vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'), files: listMirrorFiles(deps.assetsDir) }));
   app.get<{ Querystring: { path?: string } }>('/api/mirror/file', async (req, reply) => {
