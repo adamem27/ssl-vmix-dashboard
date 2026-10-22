@@ -1,16 +1,14 @@
-import { PointerEvent as RPointerEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { PointerEvent as RPointerEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
-import {
-  DEFAULT_PATTERN, ElementSpec, Gradient, GradientStop, parseHex, PatternSpec, renderElement, Tile, toHex,
-} from '../../../server/src/services/generator/render';
+import { ElementSpec, Gradient, GradientStop, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
 
 interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean }
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
 interface GenStatus { autoExport: boolean; folder: string; pending: number; files: number; lastWriteAt: string | null; error: string | null }
 interface Output { rel: string; teamId: string; templateId: string; updatedAt: string }
-interface GenState { templates: Template[]; teams: TeamGradients[]; pattern: PatternSpec; tile: { url: string } | null; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string }
+interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string }
 
 const VARIANTS = [1, 2, 3];
 type Bg = 'checker' | 'dark' | 'light';
@@ -40,25 +38,6 @@ function colorAt(g: Gradient, pos: number): GradientStop {
   return { pos, color: toHex([0, 1, 2].map((k) => ca[k] + (cb[k] - ca[k]) * f) as [number, number, number]), opacity: Math.round(a.opacity + (b.opacity - a.opacity) * f) };
 }
 
-function useTile(url: string | undefined) {
-  const [tile, setTile] = useState<Tile | null>(null);
-  useEffect(() => {
-    if (!url) { setTile(null); return; }
-    let live = true;
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.naturalWidth; c.height = img.naturalHeight;
-      const ctx = c.getContext('2d')!;
-      ctx.drawImage(img, 0, 0);
-      if (live) setTile({ width: c.width, height: c.height, data: ctx.getImageData(0, 0, c.width, c.height).data });
-    };
-    img.src = url;
-    return () => { live = false; };
-  }, [url]);
-  return tile;
-}
-
 export function GeneratorPage() {
   const q = useQuery({ queryKey: ['generator'], queryFn: () => api.get<GenState>('/api/generator'), refetchOnWindowFocus: false });
   if (q.isLoading) return <Loading />;
@@ -78,11 +57,8 @@ function Generator({ state }: { state: GenState }) {
   // Local drafts so sliders redraw instantly; the server gets debounced saves.
   const [teams, setTeams] = useState(state.teams);
   const [templates, setTemplates] = useState(state.templates);
-  const [pattern, setPatternDraft] = useState(state.pattern);
   useEffect(() => setTeams(state.teams), [state.teams]);
   useEffect(() => setTemplates(state.templates), [state.templates]);
-  useEffect(() => setPatternDraft(state.pattern), [state.pattern]);
-  const tile = useTile(state.tile?.url);
 
   const team = teams.find((t) => t.teamId === teamId) ?? null;
   const refresh = () => qc.invalidateQueries({ queryKey: ['generator'] });
@@ -103,13 +79,6 @@ function Generator({ state }: { state: GenState }) {
   };
   const templatesRef = useRef(templates);
   templatesRef.current = templates;
-  const setPattern = (patch: Partial<PatternSpec>) => {
-    setPatternDraft((p) => ({ ...p, ...patch }));
-    debounce('pattern', () => api.put('/api/generator/pattern', patternRef.current).catch((e) => { toast.error(e); refresh(); }));
-  };
-  const patternRef = useRef(pattern);
-  patternRef.current = { ...pattern };
-
   return (
     <div className="space-y-3">
       <ExportBar state={state} />
@@ -128,11 +97,10 @@ function Generator({ state }: { state: GenState }) {
             <BgToggle bg={bg} setBg={setBg} />
           </>}>
             {view === 'team'
-              ? <TeamPreview team={team} templates={templates} pattern={pattern} tile={tile} bg={bg} variant={variant} />
-              : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={teams} pattern={pattern} tile={tile} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
+              ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} />
+              : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={teams} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
-          <PatternPanel pattern={pattern} setPattern={setPattern} tile={state.tile} onReload={refresh} />
         </div>
       </div>
     </div>
@@ -386,22 +354,22 @@ function HexInput({ value, onChange }: { value: string; onChange: (hex: string) 
 }
 
 // ---------- previews ----------
-function Canvas({ spec, gradient, pattern, tile, maxW, maxH }: { spec: ElementSpec; gradient: Gradient; pattern: PatternSpec; tile: Tile | null; maxW: number; maxH: number }) {
+function Canvas({ spec, gradient, maxW, maxH }: { spec: ElementSpec; gradient: Gradient; maxW: number; maxH: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const scale = Math.min(1, maxW / spec.width, maxH / spec.height);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const r = renderElement(spec, gradient, pattern, spec.pattern ? tile : null, scale);
+    const r = renderElement(spec, gradient, scale);
     c.width = r.width; c.height = r.height;
     c.getContext('2d')!.putImageData(new ImageData(r.data, r.width, r.height), 0, 0);
-  }, [spec, gradient, pattern, tile, scale]);
+  }, [spec, gradient, scale]);
   return <canvas ref={ref} className="block max-w-full" />;
 }
 
 const specOf = (t: Template): ElementSpec => t;
 
-function TeamPreview({ team, templates, pattern, tile, bg, variant }: { team: TeamGradients | null; templates: Template[]; pattern: PatternSpec; tile: Tile | null; bg: Bg; variant: number }) {
+function TeamPreview({ team, templates, bg, variant }: { team: TeamGradients | null; templates: Template[]; bg: Bg; variant: number }) {
   if (!team) return null;
   if (!templates.length) return <p className="text-sm text-ink-400">Add an element below.</p>;
   return (
@@ -411,7 +379,7 @@ function TeamPreview({ team, templates, pattern, tile, bg, variant }: { team: Te
         return (
           <figure key={t.id} className={cx('min-w-[120px]', !t.enabled && 'opacity-40')}>
             <div className={cx('grid min-h-[48px] place-items-center rounded p-2 ring-1', bgClass(bg), t.variant === variant ? 'ring-accent-500/70' : 'ring-ink-700')}>
-              {g ? <Canvas spec={specOf(t)} gradient={g} pattern={pattern} tile={tile} maxW={420} maxH={220} /> : <span className="px-3 py-2 text-xs text-ink-500">V{t.variant} not set</span>}
+              {g ? <Canvas spec={specOf(t)} gradient={g} maxW={420} maxH={220} /> : <span className="px-3 py-2 text-xs text-ink-500">V{t.variant} not set</span>}
             </div>
             <figcaption className="mt-1 flex items-center gap-2 text-xs">
               <span className="font-semibold text-ink-200">{t.name}</span>
@@ -425,7 +393,7 @@ function TeamPreview({ team, templates, pattern, tile, bg, variant }: { team: Te
   );
 }
 
-function TemplateAcrossTeams({ template, teams, pattern, tile, bg, onPick }: { template: Template | undefined; teams: TeamGradients[]; pattern: PatternSpec; tile: Tile | null; bg: Bg; onPick: (teamId: string) => void }) {
+function TemplateAcrossTeams({ template, teams, bg, onPick }: { template: Template | undefined; teams: TeamGradients[]; bg: Bg; onPick: (teamId: string) => void }) {
   if (!template) return null;
   const list = teams.filter((t) => t.gradients[template.variant]);
   const missing = teams.length - list.length;
@@ -435,7 +403,7 @@ function TemplateAcrossTeams({ template, teams, pattern, tile, bg, onPick }: { t
         {list.map((t) => (
           <button key={t.teamId} onClick={() => onPick(t.teamId)} className="text-left">
             <div className={cx('grid h-24 place-items-center rounded p-2 ring-1 ring-ink-700 hover:ring-accent-400', bgClass(bg))}>
-              <Canvas spec={specOf(template)} gradient={t.gradients[template.variant]!} pattern={pattern} tile={tile} maxW={164} maxH={80} />
+              <Canvas spec={specOf(template)} gradient={t.gradients[template.variant]!} maxW={164} maxH={80} />
             </div>
             <div className="mt-1 font-mono text-xs font-bold text-ink-300">{t.code}</div>
           </button>
@@ -457,7 +425,7 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
       name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, opacity: 100, flip: false, angleOffset: 0,
-      strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: false, patternOpacity: 22, patternScale: 100, enabled: true,
+      strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
   const th = 'px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500';
@@ -524,43 +492,4 @@ function TextInput({ value, onChange, className, label }: { value: string; onCha
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return <input className={cx('input px-2 py-1', className)} value={v} aria-label={label} onChange={(e) => { setV(e.target.value); onChange(e.target.value); }} onBlur={() => setV(value)} />;
-}
-
-// ---------- pattern ----------
-function PatternPanel({ pattern, setPattern, tile, onReload }: { pattern: PatternSpec; setPattern: (p: Partial<PatternSpec>) => void; tile: { url: string } | null; onReload: () => void }) {
-  const toast = useToast();
-  const file = useRef<HTMLInputElement>(null);
-  const upload = async (f: File) => { try { await api.upload('/api/generator/pattern-tile', f); onReload(); toast.ok('Pattern image set'); } catch (e) { toast.error(e); } };
-  const remove = async () => { try { await api.del('/api/generator/pattern-tile'); onReload(); } catch (e) { toast.error(e); } };
-  const preview = useMemo<ElementSpec>(() => ({ width: 360, height: 90, radius: 6, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#000000', strokeOpacity: 0, pattern: true, patternOpacity: 60, patternScale: 100 }), []);
-  const previewTile = useTile(tile?.url);
-  const field = (k: keyof PatternSpec, label: string, min: number, max: number, step = 1) => (
-    <Labeled label={`${label} ${pattern[k]}`}><Slider min={min} max={max} step={step} value={pattern[k] as number} onChange={(n) => setPattern({ [k]: n })} label={label} /></Labeled>
-  );
-  return (
-    <Panel title="Copacabana waves" right={<>
-      {tile ? <Button size="sm" variant="ghost" onClick={remove}>Use drawn waves</Button> : null}
-      <Button size="sm" onClick={() => file.current?.click()}>{tile ? 'Replace pattern PNG' : 'Use own pattern PNG'}</Button>
-      <input ref={file} type="file" accept="image/png,.png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void upload(f); }} />
-      <Button size="sm" variant="ghost" onClick={() => setPattern(DEFAULT_PATTERN)}>Reset</Button>
-    </>}>
-      <div className="grid items-center gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="checker w-fit rounded p-1 ring-1 ring-ink-700">
-          <Canvas spec={preview} gradient={{ angle: 0, stops: [{ pos: 0, color: '#1b3250', opacity: 100 }, { pos: 100, color: '#70bae8', opacity: 100 }] }} pattern={pattern} tile={previewTile} maxW={360} maxH={90} />
-        </div>
-        {tile ? (
-          <p className="text-sm text-ink-400">Tiled from the uploaded PNG at 100% element waves size. Opacity per element.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-            <Labeled label="Colour"><div className="flex items-center gap-1"><input type="color" value={pattern.color} onChange={(e) => setPattern({ color: e.target.value })} className="h-8 w-10 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Waves colour" /><HexInput value={pattern.color} onChange={(color) => setPattern({ color })} /></div></Labeled>
-            {field('wavelength', 'Wave length px', 4, 300)}
-            {field('period', 'Row height px', 4, 200)}
-            {field('amplitude', 'Wave height', 0, 1, 0.01)}
-            {field('band', 'Line thickness', 0.05, 0.95, 0.01)}
-            {field('angle', 'Angle °', -90, 90)}
-          </div>
-        )}
-      </div>
-    </Panel>
-  );
 }

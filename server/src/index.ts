@@ -9,7 +9,7 @@ import { GeneratorExporter, seedGenerator } from './services/generator/generator
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
 const workbook = new WorkbookWriter({ db, assetsDir: config.assetsDir }, config.workbookFile, (m) => app.log.warn(m));
-const generator = new GeneratorExporter({ db, assetsDir: config.assetsDir, dataDir: config.dataDir }, (m) => app.log.warn(m));
+const generator = new GeneratorExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
 const app = await buildApp({ db, generator, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });

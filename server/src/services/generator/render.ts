@@ -3,15 +3,13 @@
  * Pure TypeScript with no Node or DOM APIs, so both sides draw exactly the same pixels.
  *
  * An element is a (rounded) rectangle filled with a team gradient, optionally overlaid with the
- * semi-transparent "Copacabana waves" pattern and an inside stroke, then faded by its own opacity.
+ * semi-transparent black "Copacabana waves" from the Illustrator artwork and an inside stroke, then faded by its own opacity.
  */
 
 export interface GradientStop { pos: number; color: string; opacity: number }
 /** angle in degrees like Illustrator: 0 = left → right, 90 = bottom → top. */
 export interface Gradient { angle: number; stops: GradientStop[] }
 
-/** Copacabana waves: light bands whose edges follow a sine; sizes in px at scale 1. */
-export interface PatternSpec { color: string; wavelength: number; period: number; amplitude: number; band: number; angle: number }
 
 export interface ElementSpec {
   width: number;
@@ -31,12 +29,50 @@ export interface ElementSpec {
   patternScale: number;
 }
 
-/** RGBA tile used instead of the drawn waves when the operator uploads their own pattern. */
-export interface Tile { width: number; height: number; data: Uint8Array | Uint8ClampedArray }
-
 export interface Raster { width: number; height: number; data: Uint8ClampedArray<ArrayBuffer> }
 
-export const DEFAULT_PATTERN: PatternSpec = { color: '#ffffff', wavelength: 48, period: 36, amplitude: 0.28, band: 0.5, angle: 0 };
+/**
+ * Copacabana waves exactly as in the Illustrator file (gradienty.ai, PATTERN artwork): black bands,
+ * 81.111 px wave length, a band every 60.833 px, each band 30.417 px tall. One period of the band's
+ * top edge is six cubic Béziers (x grows to the right, y up, as in the file).
+ */
+const WAVE_LENGTH = 81.111;
+const WAVE_ROW = 60.8332;
+const WAVE_BAND = 30.417;
+/** Where the artwork sits relative to the element's top-left corner (taken from the 851 × 390 panel). */
+const WAVE_PHASE_X = 986.3008;
+const WAVE_PHASE_Y = 390.399 - 368.1095;
+const WAVE_EDGE: number[][] = [
+  [0, 0, 3.24, 4.461, 5.029, 11.117, 5.789, 19.887],
+  [5.789, 19.887, 6.925, 31.076, 11.254, 46.502, 26.067, 46.502],
+  [26.067, 46.502, 40.885, 46.502, 45.214, 31.076, 46.345, 19.887],
+  [46.345, 19.887, 47.105, 11.117, 48.895, 4.461, 52.134, 0],
+  [52.134, 0, 55.373, -4.461, 60.063, -6.727, 66.623, -6.727],
+  [66.623, -6.727, 73.188, -6.727, 77.872, -4.461, 81.111, 0],
+];
+
+/** Height of the band's top edge (y up) over one wave length, sampled every 1/WAVE_LUT of it. */
+const WAVE_LUT = 2048;
+const waveLut = (() => {
+  const pts: [number, number][] = [];
+  for (const [x0, y0, x1, y1, x2, y2, x3, y3] of WAVE_EDGE) {
+    for (let i = 0; i < 400; i++) {
+      const t = i / 400, m = 1 - t;
+      const a = m * m * m, b = 3 * m * m * t, c = 3 * m * t * t, d = t * t * t;
+      pts.push([a * x0 + b * x1 + c * x2 + d * x3, a * y0 + b * y1 + c * y2 + d * y3]);
+    }
+  }
+  pts.push([WAVE_LENGTH, 0]);
+  const lut = new Float64Array(WAVE_LUT + 1);
+  let k = 0;
+  for (let i = 0; i <= WAVE_LUT; i++) {
+    const x = (i / WAVE_LUT) * WAVE_LENGTH;
+    while (k < pts.length - 2 && pts[k + 1][0] < x) k++;
+    const [xa, ya] = pts[k], [xb, yb] = pts[k + 1];
+    lut[i] = xb > xa ? ya + ((yb - ya) * (x - xa)) / (xb - xa) : ya;
+  }
+  return lut;
+})();
 
 export function parseHex(hex: string): [number, number, number] {
   const m = /^#?([0-9a-f]{6}|[0-9a-f]{3})$/i.exec(hex.trim());
@@ -88,7 +124,7 @@ function roundedRectSdf(px: number, py: number, hw: number, hh: number, r: numbe
  * Draw an element. `scale` shrinks everything (sizes, radius, stroke, pattern) for quick previews;
  * the export always uses scale 1.
  */
-export function renderElement(el: ElementSpec, gradient: Gradient, pattern: PatternSpec, tile: Tile | null = null, scale = 1): Raster {
+export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1): Raster {
   const W = Math.max(1, Math.round(el.width * scale));
   const H = Math.max(1, Math.round(el.height * scale));
   const data = new Uint8ClampedArray(W * H * 4);
@@ -108,15 +144,7 @@ export function renderElement(el: ElementSpec, gradient: Gradient, pattern: Patt
 
   const usePattern = el.pattern && el.patternOpacity > 0;
   const patA = clamp01(el.patternOpacity / 100);
-  const [pr, pg, pb] = parseHex(pattern.color);
   const ps = Math.max(0.05, el.patternScale / 100) * scale;
-  const wl = Math.max(1, pattern.wavelength * ps);
-  const per = Math.max(1, pattern.period * ps);
-  const amp = pattern.amplitude * per;
-  const band = clamp01(pattern.band);
-  const pAng = (pattern.angle * Math.PI) / 180;
-  const pc = Math.cos(pAng), pSin = Math.sin(pAng);
-  const k = (2 * Math.PI) / wl;
 
   for (let y = 0; y < H; y++) {
     const cy = y + 0.5 - hh;
@@ -133,32 +161,25 @@ export function renderElement(el: ElementSpec, gradient: Gradient, pattern: Patt
 
       // pattern over the gradient (source-over)
       if (usePattern) {
-        let pa = 0, qr = pr, qg = pg, qb = pb;
-        const u = cx * pc + cy * pSin + hw, v = -cx * pSin + cy * pc + hh;
-        if (tile && tile.width > 0 && tile.height > 0) {
-          const tx = ((Math.floor(u / (ps || 1)) % tile.width) + tile.width) % tile.width;
-          const ty = ((Math.floor(v / (ps || 1)) % tile.height) + tile.height) % tile.height;
-          const ti = (ty * tile.width + tx) * 4;
-          qr = tile.data[ti]; qg = tile.data[ti + 1]; qb = tile.data[ti + 2];
-          pa = (tile.data[ti + 3] / 255) * patA;
-        } else {
-          // vertical distance (in px) to the nearest band edge, corrected for the wave slope
-          const shifted = v + amp * Math.sin(k * u);
-          const f = ((shifted / per) % 1 + 1) % 1;
-          const toStart = f * per, toEnd = (band - f) * per, toNext = (1 - f) * per;
-          const inside = f < band;
-          const dist = inside ? Math.min(toStart, toEnd) : Math.min(-toEnd, toNext);
-          const slope = amp * k * Math.cos(k * u);
-          const px = dist / Math.sqrt(1 + slope * slope);
-          const m = inside ? clamp01(0.5 + px) : clamp01(0.5 - px);
-          pa = m * patA;
-        }
+        // Position in the artwork's own units; the file draws the edge leftwards from WAVE_PHASE_X.
+        const u = (x + 0.5) / ps, v = (y + 0.5) / ps;
+        const f = ((WAVE_PHASE_X - u) % WAVE_LENGTH + WAVE_LENGTH) % WAVE_LENGTH;
+        const fi = (f / WAVE_LENGTH) * WAVE_LUT;
+        const i0 = Math.min(WAVE_LUT - 1, Math.floor(fi));
+        const top = waveLut[i0] + (waveLut[i0 + 1] - waveLut[i0]) * (fi - i0);
+        const slope = ((waveLut[i0 + 1] - waveLut[i0]) * WAVE_LUT) / WAVE_LENGTH;
+        // depth below the band's top edge (image y grows down), folded into one row
+        const depth = (((v - (WAVE_PHASE_Y - top)) % WAVE_ROW) + WAVE_ROW) % WAVE_ROW;
+        const inside = depth < WAVE_BAND;
+        const edge = inside ? Math.min(depth, WAVE_BAND - depth) : Math.min(depth - WAVE_BAND, WAVE_ROW - depth);
+        const dist = (edge * ps) / Math.sqrt(1 + slope * slope);
+        const pa = (inside ? clamp01(0.5 + dist) : clamp01(0.5 - dist)) * patA;
         if (pa > 0) {
           const oa = pa + a * (1 - pa);
           if (oa > 0) {
-            r = (qr * pa + r * a * (1 - pa)) / oa;
-            g = (qg * pa + g * a * (1 - pa)) / oa;
-            b = (qb * pa + b * a * (1 - pa)) / oa;
+            r = (r * a * (1 - pa)) / oa;
+            g = (g * a * (1 - pa)) / oa;
+            b = (b * a * (1 - pa)) / oa;
           }
           a = oa;
         }

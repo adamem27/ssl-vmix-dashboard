@@ -6,8 +6,7 @@ import { DB, getSetting, newId, nowIso, setSetting } from '../../db/db.js';
 import { badRequest, notFound } from '../errors.js';
 import { encodePng } from '../png.js';
 import { joinVmixPath } from '../paths.js';
-import { decodePng } from './pngDecode.js';
-import { DEFAULT_PATTERN, ElementSpec, Gradient, gradientVersions, PatternSpec, renderElement, Tile } from './render.js';
+import { ElementSpec, Gradient, gradientVersions, renderElement } from './render.js';
 
 export const VARIANTS = [1, 2, 3] as const;
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
@@ -18,10 +17,6 @@ const pct = z.number().min(0).max(100);
 export const gradientSchema = z.object({
   angle: z.number().min(-360).max(360),
   stops: z.array(z.object({ pos: pct, color: hex, opacity: pct })).min(2).max(8),
-});
-export const patternSchema = z.object({
-  color: hex, wavelength: z.number().min(2).max(2000), period: z.number().min(2).max(2000),
-  amplitude: z.number().min(0).max(2), band: z.number().min(0.05).max(0.95), angle: z.number().min(-360).max(360),
 });
 export const templateSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -43,9 +38,8 @@ export const templateSchema = z.object({
 });
 export type Template = z.infer<typeof templateSchema> & { id: string; sort: number };
 
-export interface GenCtx { db: DB; assetsDir: string; dataDir: string }
+export interface GenCtx { db: DB; assetsDir: string }
 
-const tileFile = (ctx: GenCtx) => path.join(ctx.dataDir, 'generator', 'pattern-tile.png');
 const nameKey = (s: string) => s.replace(/[^\w.-]+/g, '_');
 
 // ---------- templates ----------
@@ -139,37 +133,10 @@ export function setGradientsFromColors(db: DB, teamId: string, colors: string[],
   db.transaction(() => gradientVersions(cs, angle).forEach((g, i) => setGradient(db, teamId, i + 1, g)))();
 }
 
-// ---------- pattern ----------
-export function getPattern(db: DB): PatternSpec {
-  try { return patternSchema.parse({ ...DEFAULT_PATTERN, ...JSON.parse(getSetting(db, 'generator.pattern') || '{}') }); } catch { return DEFAULT_PATTERN; }
-}
-export function setPattern(db: DB, patch: Partial<PatternSpec>) {
-  const p = patternSchema.parse({ ...getPattern(db), ...patch });
-  setSetting(db, 'generator.pattern', JSON.stringify(p));
-  return p;
-}
-
-let tileCache: { mtime: number; tile: Tile; hash: string } | null = null;
-export function loadTile(ctx: GenCtx): { tile: Tile; hash: string } | null {
-  const f = tileFile(ctx);
-  let st: fs.Stats;
-  try { st = fs.statSync(f); } catch { tileCache = null; return null; }
-  if (tileCache && tileCache.mtime === st.mtimeMs) return tileCache;
-  const buf = fs.readFileSync(f);
-  tileCache = { mtime: st.mtimeMs, tile: decodePng(buf), hash: createHash('sha1').update(buf).digest('hex') };
-  return tileCache;
-}
-export function saveTile(ctx: GenCtx, buf: Buffer) {
-  const tile = decodePng(buf); // validates
-  if (tile.width > 1024 || tile.height > 1024) throw badRequest('The pattern tile can be at most 1024 × 1024 px.');
-  fs.mkdirSync(path.dirname(tileFile(ctx)), { recursive: true });
-  fs.writeFileSync(tileFile(ctx), buf);
-  return { width: tile.width, height: tile.height };
-}
-export function removeTile(ctx: GenCtx) { fs.rmSync(tileFile(ctx), { force: true }); tileCache = null; }
-export const tilePath = (ctx: GenCtx) => (fs.existsSync(tileFile(ctx)) ? tileFile(ctx) : null);
-
 // ---------- outputs ----------
+/** Bump when the waves drawing changes so every file with waves is rendered again. */
+const WAVES_VERSION = 'gradienty.ai-1';
+
 export interface Job { rel: string; teamId: string; code: string; templateId: string; spec: ElementSpec; gradient: Gradient; hash: string }
 
 export const outputRel = (code: string, fileName: string) => `${GENERATED_DIR}/${nameKey(code)}/${nameKey(code)}_${fileName}.png`;
@@ -177,8 +144,6 @@ export const outputRel = (code: string, fileName: string) => `${GENERATED_DIR}/$
 /** Every file the current settings should produce, with a hash of everything that affects its pixels. */
 export function plannedJobs(ctx: GenCtx): Job[] {
   const templates = listTemplates(ctx.db).filter((t) => t.enabled);
-  const pattern = getPattern(ctx.db);
-  const tile = loadTile(ctx);
   const jobs: Job[] = [];
   for (const team of listGradients(ctx.db)) {
     if (!team.code.trim()) continue;
@@ -186,7 +151,7 @@ export function plannedJobs(ctx: GenCtx): Job[] {
       const g = team.gradients[t.variant];
       if (!g) continue;
       const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...spec } = t;
-      const hash = createHash('sha1').update(JSON.stringify([spec, g, t.pattern ? [pattern, tile?.hash ?? null] : null])).digest('hex');
+      const hash = createHash('sha1').update(JSON.stringify([spec, g, t.pattern ? WAVES_VERSION : null])).digest('hex');
       jobs.push({ rel: outputRel(team.code, t.fileName), teamId: team.teamId, code: team.code, templateId: t.id, spec, gradient: g, hash });
     }
   }
@@ -194,7 +159,7 @@ export function plannedJobs(ctx: GenCtx): Job[] {
 }
 
 export function renderJob(ctx: GenCtx, job: Job): Buffer {
-  const r = renderElement(job.spec, job.gradient, getPattern(ctx.db), job.spec.pattern ? loadTile(ctx)?.tile ?? null : null);
+  const r = renderElement(job.spec, job.gradient);
   return encodePng(r.width, r.height, (x, y) => {
     const o = (y * r.width + x) * 4;
     return [r.data[o], r.data[o + 1], r.data[o + 2], r.data[o + 3]];
@@ -324,18 +289,40 @@ export class GeneratorExporter {
 }
 
 // ---------- defaults ----------
-const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: false, patternOpacity: 22, patternScale: 100, enabled: true };
+const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
 
-/** Starting elements modelled on the Illustrator board (sizes are a guess to adjust). */
+/** Starting elements: artboard sizes, corner radii and waves (10% black; 53.3% size on the small ones) from gradienty.ai. */
 export const STARTER_TEMPLATES: z.infer<typeof templateSchema>[] = [
-  { ...ELEMENT_DEFAULTS, name: 'Bar', fileName: 'bar', variant: 1, width: 1040, height: 72 },
-  { ...ELEMENT_DEFAULTS, name: 'Panel left', fileName: 'panel_left', variant: 2, width: 944, height: 432, pattern: true },
-  { ...ELEMENT_DEFAULTS, name: 'Panel right', fileName: 'panel_right', variant: 2, width: 944, height: 432, pattern: true, flip: true },
-  { ...ELEMENT_DEFAULTS, name: 'Bar waves', fileName: 'bar_waves', variant: 3, width: 888, height: 104, pattern: true },
-  { ...ELEMENT_DEFAULTS, name: 'Bar long', fileName: 'bar_long', variant: 1, width: 1264, height: 80 },
-  { ...ELEMENT_DEFAULTS, name: 'Bar small', fileName: 'bar_small', variant: 1, width: 320, height: 40 },
-  { ...ELEMENT_DEFAULTS, name: 'Square', fileName: 'square', variant: 2, width: 240, height: 144, flip: true, pattern: true },
+  { ...ELEMENT_DEFAULTS, name: 'Bar', fileName: 'bar', variant: 1, width: 929, height: 75 },
+  { ...ELEMENT_DEFAULTS, name: 'Panel left', fileName: 'panel_left', variant: 2, width: 851, height: 390, radius: 35 },
+  { ...ELEMENT_DEFAULTS, name: 'Panel right', fileName: 'panel_right', variant: 2, width: 851, height: 390, radius: 35, flip: true },
+  { ...ELEMENT_DEFAULTS, name: 'Bar waves', fileName: 'bar_waves', variant: 3, width: 802, height: 102, radius: 27 },
+  { ...ELEMENT_DEFAULTS, name: 'Bar long', fileName: 'bar_long', variant: 1, width: 1130, height: 75 },
+  { ...ELEMENT_DEFAULTS, name: 'Bar small', fileName: 'bar_small', variant: 1, width: 289, height: 40, patternScale: 53.3 },
+  { ...ELEMENT_DEFAULTS, name: 'Square', fileName: 'square', variant: 2, width: 210, height: 134, radius: 12, flip: true, patternScale: 53.3 },
 ];
+
+/** Starter sizes before the Illustrator file arrived; elements still at these get the file's values. */
+const FIRST_GUESS: Record<string, [number, number]> = {
+  bar: [1040, 72], panel_left: [944, 432], panel_right: [944, 432], bar_waves: [888, 104], bar_long: [1264, 80], bar_small: [320, 40], square: [240, 144],
+};
+
+/** One-time update of the first-guess starter elements to the sizes and waves of gradienty.ai. */
+export function upgradeStarterTemplates(db: DB) {
+  if (getSetting(db, 'generator.templatesFromAi') === 'true') return;
+  db.transaction(() => {
+    for (const t of listTemplates(db)) {
+      const guess = FIRST_GUESS[t.fileName];
+      const starter = STARTER_TEMPLATES.find((s) => s.fileName === t.fileName);
+      if (!guess || !starter || t.width !== guess[0] || t.height !== guess[1]) continue;
+      updateTemplate(db, t.id, {
+        width: starter.width, height: starter.height, radius: t.radius || starter.radius,
+        pattern: starter.pattern, patternScale: starter.patternScale, patternOpacity: t.patternOpacity === 22 ? starter.patternOpacity : t.patternOpacity,
+      });
+    }
+    setSetting(db, 'generator.templatesFromAi', 'true');
+  })();
+}
 
 /** Gradients read off the Illustrator board (two colours each); applied only to teams without one. */
 export const STARTER_GRADIENTS: Record<string, string[]> = {
@@ -346,6 +333,7 @@ export const STARTER_GRADIENTS: Record<string, string[]> = {
 
 /** First start of the generator: starter elements, and gradients for teams that match the board. */
 export function seedGenerator(db: DB) {
+  upgradeStarterTemplates(db);
   if (getSetting(db, 'generator.seeded') === 'true') return;
   if (!db.prepare('SELECT 1 FROM teams LIMIT 1').get()) return;
   db.transaction(() => {
@@ -356,5 +344,6 @@ export function seedGenerator(db: DB) {
       if (team && !has.has(team.id)) setGradientsFromColors(db, team.id, colors);
     }
     setSetting(db, 'generator.seeded', 'true');
+    setSetting(db, 'generator.templatesFromAi', 'true');
   })();
 }

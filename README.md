@@ -174,12 +174,12 @@ Ekran **PNG generator** zastępuje ręczne eksporty z Illustratora. Każda druż
 - **Gradient:** suwak z punktami (klik w pasek dodaje punkt, przeciąganie przesuwa, strzałki ←/→ przesuwają o 1%, z Shift o 10%). Każdy punkt ma kolor (próbnik, HEX, R G B), przezroczystość i pozycję. Do tego kąt i odwrócenie ⇄.
 - **Szybko:** dwa lub trzy kolory → „→ V1 V2 V3” tworzy wszystkie trzy wersje naraz (V1 pełny, V2 z przezroczystym początkiem, V3 przezroczysty na obu końcach). „Copy V…” i „Copy from team…” kopiują gotowy gradient.
 - **Element PNG:** nazwa, nazwa pliku, wersja gradientu, szerokość × wysokość, zaokrąglenie rogów (px), dodatkowa przezroczystość, lustrzane odbicie, korekta kąta, obwoluta (grubość, kolor, przezroczystość; rysowana do środka, więc wymiar się nie zmienia) i fale Copacabana (wł./wył., przezroczystość, skala).
-- **Fale Copacabana:** rysowane przez generator (kolor, długość fali, wysokość rzędu, wysokość fali, grubość linii, kąt) albo z własnego PNG (kafelek do 1024 × 1024 px, powtarzany).
+- **Fale Copacabana:** zawsze ten sam kształt, przeniesiony 1:1 z `gradienty.ai` (czarne pasy, długość fali 81,111 px, rząd co 60,833 px). Element ustala tylko, czy ma fale, ich krycie (w pliku 10%) i skalę (100%, na małych elementach 53,3%).
 - **Podgląd:** wszystkie elementy wybranej drużyny albo jeden element dla wszystkich drużyn, na szachownicy, ciemnym lub jasnym tle. Podgląd liczy ten sam kod co eksport, więc piksele są te same.
 
 Eksport: przy włączonym **Auto export** pliki zapisują się w ciągu kilku sekund po zmianie do `data/assets/generated/<KOD>/<KOD>_<plik>.png` (renderowane są tylko zmienione pliki, a pliki usuniętych elementów i zmienionych kodów są kasowane). Ponieważ to katalog `assets`, `sync-vmix` kopiuje je na komputer z vMixem, np. `C:\SSL-vMix\generated\POL\POL_bar.png`. Arkusz **Graphics** w `ssl-vmix.xlsx` (i `/json/graphics`) ma jeden wiersz na drużynę i kolumnę ze ścieżką dla każdego elementu. „Export now” renderuje wszystko od nowa, „ZIP” pobiera komplet.
 
-Na start generator dodaje 7 przykładowych elementów wzorowanych na tablicy z Illustratora (wymiary do poprawienia) i gradienty 11 drużyn odczytane z tej tablicy (MAR, MOZ, SEY, TAH, AUT, EST, SLO, BEL, LTU, NOR, SRB). Pozostałe drużyny czekają na swoje kolory.
+Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów z `gradienty.ai` (929×75, 851×390 ×2, 802×102, 1130×75, 289×40, 210×134) i gradienty 11 drużyn odczytane z tej tablicy (MAR, MOZ, SEY, TAH, AUT, EST, SLO, BEL, LTU, NOR, SRB). Pozostałe drużyny czekają na swoje kolory.
 
 ## Floty
 
