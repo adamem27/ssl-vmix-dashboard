@@ -167,6 +167,20 @@ Jeśli vMix działa na innym komputerze, uruchom dashboard z `HOST=0.0.0.0` (pat
 
 **Settings → Matchboard → Load SSL Gold Cup 2026 matchboard** (albo `npm run seed:goldcup`) tworzy 61 drużyn z kodami z matchboardu i po jednym zestawie flot na etap: Qualifying Series, 1/32, 1/16, 1/8, ćwierćfinały, półfinały i finał. Miejsca jeszcze nierozstrzygnięte (losowanie, wyniki wcześniejszych rund) zostają puste z etykietą, np. „R1 C1” albo „DRAW 3”. Ponowne uruchomienie niczego nie dubluje: drużyny z istniejącym kodem i zestawy o istniejącej nazwie są pomijane.
 
+## Generator PNG (gradienty krajów)
+
+Ekran **PNG generator** zastępuje ręczne eksporty z Illustratora. Każda drużyna ma do trzech wersji gradientu (V1, V2, V3), a każdy **element PNG** (prostokąt) mówi, której wersji używa.
+
+- **Gradient:** suwak z punktami (klik w pasek dodaje punkt, przeciąganie przesuwa, strzałki ←/→ przesuwają o 1%, z Shift o 10%). Każdy punkt ma kolor (próbnik, HEX, R G B), przezroczystość i pozycję. Do tego kąt i odwrócenie ⇄.
+- **Szybko:** dwa lub trzy kolory → „→ V1 V2 V3” tworzy wszystkie trzy wersje naraz (V1 pełny, V2 z przezroczystym początkiem, V3 przezroczysty na obu końcach). „Copy V…” i „Copy from team…” kopiują gotowy gradient.
+- **Element PNG:** nazwa, nazwa pliku, wersja gradientu, szerokość × wysokość, zaokrąglenie rogów (px), dodatkowa przezroczystość, lustrzane odbicie, korekta kąta, obwoluta (grubość, kolor, przezroczystość; rysowana do środka, więc wymiar się nie zmienia) i fale Copacabana (wł./wył., przezroczystość, skala).
+- **Fale Copacabana:** rysowane przez generator (kolor, długość fali, wysokość rzędu, wysokość fali, grubość linii, kąt) albo z własnego PNG (kafelek do 1024 × 1024 px, powtarzany).
+- **Podgląd:** wszystkie elementy wybranej drużyny albo jeden element dla wszystkich drużyn, na szachownicy, ciemnym lub jasnym tle. Podgląd liczy ten sam kod co eksport, więc piksele są te same.
+
+Eksport: przy włączonym **Auto export** pliki zapisują się w ciągu kilku sekund po zmianie do `data/assets/generated/<KOD>/<KOD>_<plik>.png` (renderowane są tylko zmienione pliki, a pliki usuniętych elementów i zmienionych kodów są kasowane). Ponieważ to katalog `assets`, `sync-vmix` kopiuje je na komputer z vMixem, np. `C:\SSL-vMix\generated\POL\POL_bar.png`. Arkusz **Graphics** w `ssl-vmix.xlsx` (i `/json/graphics`) ma jeden wiersz na drużynę i kolumnę ze ścieżką dla każdego elementu. „Export now” renderuje wszystko od nowa, „ZIP” pobiera komplet.
+
+Na start generator dodaje 7 przykładowych elementów wzorowanych na tablicy z Illustratora (wymiary do poprawienia) i gradienty 11 drużyn odczytane z tej tablicy (MAR, MOZ, SEY, TAH, AUT, EST, SLO, BEL, LTU, NOR, SRB). Pozostałe drużyny czekają na swoje kolory.
+
 ## Floty
 
 Zestaw flot (runda) należy do wydarzenia; drużyna może być w jednym miejscu danego zestawu, a różne zestawy dzielą te same drużyny inaczej. Flota ma cztery uporządkowane miejsca (ograniczenie także w bazie). Niepełna flota jest oznaczona jako niekompletna. Upuszczenie na zajęte miejsce otwiera wybór: jawna zamiana albo wolne miejsce. Alternatywy dla przeciągania: listy wyboru w pustych miejscach, ↑ ↓, przeniesienie do innej floty, ✕. Przeciąganie działa też z klawiatury (Tab do drużyny, spacja, strzałki, spacja).

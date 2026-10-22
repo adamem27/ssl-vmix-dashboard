@@ -238,4 +238,36 @@ CREATE INDEX schedule_items_date_idx ON schedule_items(event_id, date, time);
     name: 'team_nickname',
     sql: `ALTER TABLE teams ADD COLUMN nickname TEXT NOT NULL DEFAULT '';`,
   },
+  {
+    version: 5,
+    name: 'png_generator',
+    sql: `
+-- Up to three gradient versions per team for generated PNG elements (spec: JSON {angle, stops}).
+CREATE TABLE gen_gradients (
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  variant INTEGER NOT NULL CHECK (variant BETWEEN 1 AND 3),
+  spec TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (team_id, variant)
+);
+
+-- PNG elements rendered for every team (spec: JSON size, radius, opacity, stroke, pattern...).
+CREATE TABLE gen_templates (
+  id TEXT PRIMARY KEY,
+  sort INTEGER NOT NULL DEFAULT 0,
+  spec TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Files written to assets/generated, with a hash of what produced them.
+CREATE TABLE gen_outputs (
+  rel_path TEXT PRIMARY KEY,
+  team_id TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`,
+  },
 ];

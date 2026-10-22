@@ -6,6 +6,7 @@ import { AssetCtx } from './assets.js';
 import { todayIn } from './dates.js';
 import { jsonCaptains, jsonFleetSet, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './jsonExport.js';
 import { buildXlsx, sheetNames } from './xlsx.js';
+import { jsonGraphics } from './generator/generator.js';
 
 export interface WorkbookSheet { name: string; path: string; rows: Record<string, string>[] }
 
@@ -21,6 +22,7 @@ export function allSheets(ctx: AssetCtx): WorkbookSheet[] {
     { name: 'Weather', path: '/json/weather', rows: jsonWeather(ctx.db) },
     { name: 'Schedule', path: '/json/schedule', rows: jsonSchedule(ctx.db, ev.id, today) },
     { name: 'People', path: '/json/people', rows: jsonPeople(ctx, ev.id) },
+    { name: 'Graphics', path: '/json/graphics', rows: jsonGraphics(ctx.db, ctx.assetsDir) },
     ...sets.map((s) => ({ name: s.name, path: `/json/fleets/${s.id}`, rows: jsonFleetSet(ctx, s.id) })),
   ];
   const names = sheetNames(list.map((s) => s.name));
