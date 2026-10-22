@@ -23,6 +23,10 @@ export interface ElementSpec {
   angleOffset: number;
   strokeWidth: number;
   strokeColor: string;
+  /** paint the stroke with the shared stroke gradient instead of strokeColor */
+  strokeGradient: boolean;
+  /** angle of the stroke gradient, same convention as Gradient.angle */
+  strokeAngle: number;
   strokeOpacity: number;
   pattern: boolean;
   patternOpacity: number;
@@ -124,7 +128,7 @@ function roundedRectSdf(px: number, py: number, hw: number, hh: number, r: numbe
  * Draw an element. `scale` shrinks everything (sizes, radius, stroke, pattern) for quick previews;
  * the export always uses scale 1.
  */
-export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1): Raster {
+export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1, strokeGradient: Gradient | null = null): Raster {
   const W = Math.max(1, Math.round(el.width * scale));
   const H = Math.max(1, Math.round(el.height * scale));
   const data = new Uint8ClampedArray(W * H * 4);
@@ -141,6 +145,12 @@ export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1): R
   if (el.flip) dx = -dx;
   const len = Math.abs(W * dx) + Math.abs(H * dy) || 1;
   const lut = gradientLut(gradient);
+
+  // Gradient stroke: its own axis and angle, mirrored with the element.
+  const sLut = el.strokeGradient && strokeGradient ? gradientLut(strokeGradient) : null;
+  const sAng = (el.strokeAngle * Math.PI) / 180;
+  const sdx = (el.flip ? -1 : 1) * Math.cos(sAng), sdy = -Math.sin(sAng);
+  const sLen = Math.abs(W * sdx) + Math.abs(H * sdy) || 1;
 
   const usePattern = el.pattern && el.patternOpacity > 0;
   const patA = clamp01(el.patternOpacity / 100);
@@ -188,13 +198,18 @@ export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1): R
       // inside stroke
       if (strokeW > 0 && strokeA > 0) {
         const inner = clamp01(0.5 - (d + strokeW));
-        const sa = clamp01(cover - inner) / (cover || 1) * strokeA;
+        let sa = clamp01(cover - inner) / (cover || 1) * strokeA;
+        let qr = sr, qg = sg, qb = sb;
+        if (sLut && sa > 0) {
+          const si = Math.round(clamp01((cx * sdx + cy * sdy) / sLen + 0.5) * 255) * 4;
+          qr = sLut[si]; qg = sLut[si + 1]; qb = sLut[si + 2]; sa *= sLut[si + 3];
+        }
         if (sa > 0) {
           const oa = sa + a * (1 - sa);
           if (oa > 0) {
-            r = (sr * sa + r * a * (1 - sa)) / oa;
-            g = (sg * sa + g * a * (1 - sa)) / oa;
-            b = (sb * sa + b * a * (1 - sa)) / oa;
+            r = (qr * sa + r * a * (1 - sa)) / oa;
+            g = (qg * sa + g * a * (1 - sa)) / oa;
+            b = (qb * sa + b * a * (1 - sa)) / oa;
           }
           a = oa;
         }
@@ -207,6 +222,17 @@ export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1): R
   }
   return { width: W, height: H, data };
 }
+
+/** The stroke (obwoluta) gradient from gradienty.ai: SSL green → blue at −45°, fading out at the end. */
+export const DEFAULT_STROKE_GRADIENT: Gradient = {
+  angle: -45,
+  stops: [
+    { pos: 0, color: '#00b15e', opacity: 10 },
+    { pos: 30, color: '#00b15e', opacity: 100 },
+    { pos: 70, color: '#0085e6', opacity: 100 },
+    { pos: 100, color: '#0085e6', opacity: 0 },
+  ],
+};
 
 /** Two or three base colours → the three standard versions seen in the Illustrator files. */
 export function gradientVersions(colors: string[], angle = 0): Gradient[] {

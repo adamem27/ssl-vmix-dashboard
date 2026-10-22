@@ -6,7 +6,7 @@ import { DB, getSetting, newId, nowIso, setSetting } from '../../db/db.js';
 import { badRequest, notFound } from '../errors.js';
 import { encodePng } from '../png.js';
 import { joinVmixPath } from '../paths.js';
-import { ElementSpec, Gradient, gradientVersions, renderElement } from './render.js';
+import { DEFAULT_STROKE_GRADIENT, ElementSpec, Gradient, gradientVersions, renderElement } from './render.js';
 
 export const VARIANTS = [1, 2, 3] as const;
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
@@ -18,7 +18,7 @@ export const gradientSchema = z.object({
   angle: z.number().min(-360).max(360),
   stops: z.array(z.object({ pos: pct, color: hex, opacity: pct })).min(2).max(8),
 });
-export const templateSchema = z.object({
+const templateFields = {
   name: z.string().trim().min(1).max(80),
   fileName: z.string().trim().min(1).max(80).regex(/^[\w.-]+$/, 'File name: letters, digits, - _ . only'),
   variant: z.number().int().min(1).max(3),
@@ -31,11 +31,16 @@ export const templateSchema = z.object({
   strokeWidth: z.number().min(0).max(200),
   strokeColor: hex,
   strokeOpacity: pct,
+  strokeGradient: z.boolean(),
+  strokeAngle: z.number().min(-360).max(360),
   pattern: z.boolean(),
   patternOpacity: pct,
   patternScale: z.number().min(5).max(1000),
   enabled: z.boolean(),
-});
+};
+/** Stored elements from before the gradient stroke get its defaults. */
+export const templateSchema = z.object({ ...templateFields, strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
+export const templatePatchSchema = z.object(templateFields).partial();
 export type Template = z.infer<typeof templateSchema> & { id: string; sort: number };
 
 export interface GenCtx { db: DB; assetsDir: string }
@@ -69,7 +74,7 @@ export function createTemplate(db: DB, input: z.infer<typeof templateSchema>) {
   return getTemplate(db, id);
 }
 
-export function updateTemplate(db: DB, id: string, patch: Partial<z.infer<typeof templateSchema>>) {
+export function updateTemplate(db: DB, id: string, patch: z.infer<typeof templatePatchSchema>) {
   const { id: _i, sort: _s, ...cur } = getTemplate(db, id);
   const spec = templateSchema.parse({ ...cur, ...patch });
   assertFileNameFree(db, spec.fileName, id);
@@ -133,6 +138,18 @@ export function setGradientsFromColors(db: DB, teamId: string, colors: string[],
   db.transaction(() => gradientVersions(cs, angle).forEach((g, i) => setGradient(db, teamId, i + 1, g)))();
 }
 
+// ---------- stroke gradient (shared by every element with a gradient stroke) ----------
+export function getStrokeGradient(db: DB): Gradient {
+  try { return gradientSchema.parse(JSON.parse(getSetting(db, 'generator.strokeGradient'))); } catch { return DEFAULT_STROKE_GRADIENT; }
+}
+export function setStrokeGradient(db: DB, g: Gradient | null) {
+  if (g === null) { db.prepare("DELETE FROM settings WHERE key = 'generator.strokeGradient'").run(); return getStrokeGradient(db); }
+  const spec = gradientSchema.parse(g);
+  spec.stops.sort((a, b) => a.pos - b.pos);
+  setSetting(db, 'generator.strokeGradient', JSON.stringify(spec));
+  return spec;
+}
+
 // ---------- outputs ----------
 /** Bump when the waves drawing changes so every file with waves is rendered again. */
 const WAVES_VERSION = 'gradienty.ai-1';
@@ -144,6 +161,7 @@ export const outputRel = (code: string, fileName: string) => `${GENERATED_DIR}/$
 /** Every file the current settings should produce, with a hash of everything that affects its pixels. */
 export function plannedJobs(ctx: GenCtx): Job[] {
   const templates = listTemplates(ctx.db).filter((t) => t.enabled);
+  const strokeGradient = getStrokeGradient(ctx.db);
   const jobs: Job[] = [];
   for (const team of listGradients(ctx.db)) {
     if (!team.code.trim()) continue;
@@ -151,7 +169,8 @@ export function plannedJobs(ctx: GenCtx): Job[] {
       const g = team.gradients[t.variant];
       if (!g) continue;
       const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...spec } = t;
-      const hash = createHash('sha1').update(JSON.stringify([spec, g, t.pattern ? WAVES_VERSION : null])).digest('hex');
+      const stroke = t.strokeGradient && t.strokeWidth > 0 ? strokeGradient : null;
+      const hash = createHash('sha1').update(JSON.stringify([spec, g, t.pattern ? WAVES_VERSION : null, stroke])).digest('hex');
       jobs.push({ rel: outputRel(team.code, t.fileName), teamId: team.teamId, code: team.code, templateId: t.id, spec, gradient: g, hash });
     }
   }
@@ -159,7 +178,7 @@ export function plannedJobs(ctx: GenCtx): Job[] {
 }
 
 export function renderJob(ctx: GenCtx, job: Job): Buffer {
-  const r = renderElement(job.spec, job.gradient);
+  const r = renderElement(job.spec, job.gradient, 1, job.spec.strokeGradient ? getStrokeGradient(ctx.db) : null);
   return encodePng(r.width, r.height, (x, y) => {
     const o = (y * r.width + x) * 4;
     return [r.data[o], r.data[o + 1], r.data[o + 2], r.data[o + 3]];
@@ -289,14 +308,16 @@ export class GeneratorExporter {
 }
 
 // ---------- defaults ----------
-const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
+const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
+/** The 1px green→blue gradient ring the panels and the waves bar have in gradienty.ai. */
+const AI_STROKE = { strokeWidth: 1, strokeGradient: true };
 
 /** Starting elements: artboard sizes, corner radii and waves (10% black; 53.3% size on the small ones) from gradienty.ai. */
 export const STARTER_TEMPLATES: z.infer<typeof templateSchema>[] = [
   { ...ELEMENT_DEFAULTS, name: 'Bar', fileName: 'bar', variant: 1, width: 929, height: 75 },
-  { ...ELEMENT_DEFAULTS, name: 'Panel left', fileName: 'panel_left', variant: 2, width: 851, height: 390, radius: 35 },
-  { ...ELEMENT_DEFAULTS, name: 'Panel right', fileName: 'panel_right', variant: 2, width: 851, height: 390, radius: 35, flip: true },
-  { ...ELEMENT_DEFAULTS, name: 'Bar waves', fileName: 'bar_waves', variant: 3, width: 802, height: 102, radius: 27 },
+  { ...ELEMENT_DEFAULTS, name: 'Panel left', fileName: 'panel_left', variant: 2, width: 851, height: 390, radius: 35, ...AI_STROKE },
+  { ...ELEMENT_DEFAULTS, name: 'Panel right', fileName: 'panel_right', variant: 2, width: 851, height: 390, radius: 35, flip: true, ...AI_STROKE },
+  { ...ELEMENT_DEFAULTS, name: 'Bar waves', fileName: 'bar_waves', variant: 3, width: 802, height: 102, radius: 27, ...AI_STROKE },
   { ...ELEMENT_DEFAULTS, name: 'Bar long', fileName: 'bar_long', variant: 1, width: 1130, height: 75 },
   { ...ELEMENT_DEFAULTS, name: 'Bar small', fileName: 'bar_small', variant: 1, width: 289, height: 40, patternScale: 53.3 },
   { ...ELEMENT_DEFAULTS, name: 'Square', fileName: 'square', variant: 2, width: 210, height: 134, radius: 12, flip: true, patternScale: 53.3 },
@@ -307,10 +328,9 @@ const FIRST_GUESS: Record<string, [number, number]> = {
   bar: [1040, 72], panel_left: [944, 432], panel_right: [944, 432], bar_waves: [888, 104], bar_long: [1264, 80], bar_small: [320, 40], square: [240, 144],
 };
 
-/** One-time update of the first-guess starter elements to the sizes and waves of gradienty.ai. */
+/** One-time updates of the first-guess starter elements to the sizes, waves and stroke of gradienty.ai. */
 export function upgradeStarterTemplates(db: DB) {
-  if (getSetting(db, 'generator.templatesFromAi') === 'true') return;
-  db.transaction(() => {
+  if (getSetting(db, 'generator.templatesFromAi') !== 'true') db.transaction(() => {
     for (const t of listTemplates(db)) {
       const guess = FIRST_GUESS[t.fileName];
       const starter = STARTER_TEMPLATES.find((s) => s.fileName === t.fileName);
@@ -321,6 +341,14 @@ export function upgradeStarterTemplates(db: DB) {
       });
     }
     setSetting(db, 'generator.templatesFromAi', 'true');
+  })();
+  // the gradient stroke came later: give it to starter elements that still have no stroke
+  if (getSetting(db, 'generator.strokeFromAi') !== 'true') db.transaction(() => {
+    for (const t of listTemplates(db)) {
+      const starter = STARTER_TEMPLATES.find((s) => s.fileName === t.fileName);
+      if (starter?.strokeGradient && t.strokeWidth === 0) updateTemplate(db, t.id, { strokeWidth: starter.strokeWidth, strokeGradient: true, strokeAngle: starter.strokeAngle });
+    }
+    setSetting(db, 'generator.strokeFromAi', 'true');
   })();
 }
 
@@ -345,5 +373,6 @@ export function seedGenerator(db: DB) {
     }
     setSetting(db, 'generator.seeded', 'true');
     setSetting(db, 'generator.templatesFromAi', 'true');
+    setSetting(db, 'generator.strokeFromAi', 'true');
   })();
 }

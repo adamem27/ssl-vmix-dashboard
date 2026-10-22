@@ -5,13 +5,13 @@ import { setup } from './helpers.js';
 import { createTeam, updateTeam } from '../src/services/teams.js';
 import { encodePng } from '../src/services/png.js';
 import { inspectImage } from '../src/services/images.js';
-import { ElementSpec, renderElement } from '../src/services/generator/render.js';
+import { DEFAULT_STROKE_GRADIENT, ElementSpec, renderElement } from '../src/services/generator/render.js';
 import {
-  createTemplate, GeneratorExporter, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate,
+  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate,
 } from '../src/services/generator/generator.js';
 
 const el = (p: Partial<ElementSpec> = {}): ElementSpec => ({
-  width: 40, height: 20, radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#000000', strokeOpacity: 100,
+  width: 40, height: 20, radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#000000', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45,
   pattern: false, patternOpacity: 0, patternScale: 100, ...p,
 });
 const px = (r: { width: number; data: Uint8ClampedArray }, x: number, y: number) => Array.from(r.data.subarray((y * r.width + x) * 4, (y * r.width + x) * 4 + 4));
@@ -45,6 +45,25 @@ describe('PNG renderer', () => {
     expect(px(r, 0, 0)[3]).toBe(0);
     expect(px(r, 20, 0)).toEqual([0, 255, 0, 255]);
     expect(px(r, 20, 10)[1]).toBeLessThan(50);
+  });
+
+  it('paints the stroke with the stroke gradient along its own angle', () => {
+    const greenBlue = { angle: 0, stops: [{ pos: 0, color: '#00ff00', opacity: 100 }, { pos: 100, color: '#0000ff', opacity: 100 }] };
+    const spec = el({ width: 100, height: 20, strokeWidth: 2, strokeColor: '#ffffff', strokeGradient: true, strokeAngle: 0 });
+    const r = renderElement(spec, redBlue, 1, greenBlue);
+    expect(px(r, 1, 10)[1]).toBeGreaterThan(240);
+    expect(px(r, 98, 10)[2]).toBeGreaterThan(240);
+    expect(px(r, 50, 10)[0]).toBeGreaterThan(100); // the fill inside is untouched
+    const turned = renderElement({ ...spec, strokeAngle: 180 }, redBlue, 1, greenBlue);
+    expect(px(turned, 1, 10)[2]).toBeGreaterThan(240);
+    // without the checkbox the plain stroke colour is used
+    expect(px(renderElement({ ...spec, strokeGradient: false }, redBlue, 1, greenBlue), 1, 10)).toEqual([255, 255, 255, 255]);
+    // stop opacity fades the stroke
+    const fade = { angle: 0, stops: [{ pos: 0, color: '#00ff00', opacity: 0 }, { pos: 100, color: '#00ff00', opacity: 100 }] };
+    const clear = { angle: 0, stops: [{ pos: 0, color: '#ff0000', opacity: 0 }, { pos: 100, color: '#ff0000', opacity: 0 }] };
+    const f = renderElement(spec, clear, 1, fade);
+    expect(px(f, 0, 10)[3]).toBeLessThan(10);
+    expect(px(f, 99, 10)[3]).toBeGreaterThan(240);
   });
 
   it('darkens half the area with the Illustrator waves, repeating every 81.111 × 60.833 px', () => {
@@ -145,5 +164,34 @@ describe('PNG generator export', () => {
     updateTemplate(db, by.panel_left.id, { width: 900 });
     upgradeStarterTemplates(db);
     expect(listTemplates(db).find((t) => t.fileName === 'panel_left')!.width).toBe(900);
+  });
+
+  it('gives the starter panels the gradient stroke once, and re-renders when the stroke gradient changes', () => {
+    const { db, ctx, exporter } = gen();
+    const pol = createTeam(db, { name: 'Poland', code: 'POL' });
+    setGradientsFromColors(db, pol, ['#ff0000', '#ffffff']);
+    const panel = createTemplate(db, { ...STARTER_TEMPLATES[1], strokeWidth: 0, strokeGradient: false, width: 40, height: 20 });
+    createTemplate(db, { ...STARTER_TEMPLATES[0], width: 10, height: 10 });
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('generator.templatesFromAi', 'true')").run();
+    upgradeStarterTemplates(db);
+    const by = Object.fromEntries(listTemplates(db).map((t) => [t.fileName, t]));
+    expect(by.panel_left).toMatchObject({ strokeWidth: 1, strokeGradient: true, strokeAngle: -45 });
+    expect(by.bar).toMatchObject({ strokeWidth: 0, strokeGradient: false });
+    updateTemplate(db, panel.id, { strokeWidth: 0 });
+    upgradeStarterTemplates(db);
+    expect(listTemplates(db).find((t) => t.id === panel.id)!.strokeWidth).toBe(0);
+
+    updateTemplate(db, panel.id, { strokeWidth: 2 });
+    exporter.flush();
+    const file = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_panel_left.png');
+    const bar = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_bar.png');
+    const [before, barBefore] = [fs.readFileSync(file), fs.statSync(bar).mtimeMs];
+    expect(getStrokeGradient(db)).toEqual(DEFAULT_STROKE_GRADIENT);
+    setStrokeGradient(db, { angle: 0, stops: [{ pos: 0, color: '#ff00ff', opacity: 100 }, { pos: 100, color: '#ff00ff', opacity: 100 }] });
+    exporter.flush();
+    expect(fs.readFileSync(file).equals(before)).toBe(false);
+    expect(fs.statSync(bar).mtimeMs).toBe(barBefore);
+    setStrokeGradient(db, null);
+    expect(getStrokeGradient(db)).toEqual(DEFAULT_STROKE_GRADIENT);
   });
 });
