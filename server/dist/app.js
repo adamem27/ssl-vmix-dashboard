@@ -22,7 +22,7 @@ import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSch
 import { todayIn } from './services/dates.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
-import { listMirrorFiles, mirrorFilePath, passwordOk } from './services/mirror.js';
+import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
 export async function buildApp(deps) {
@@ -46,13 +46,29 @@ export async function buildApp(deps) {
         app.log.error(err);
         return reply.status(err.statusCode ?? 500).send({ error: err.statusCode && err.statusCode < 500 ? err.message : 'Internal server error.' });
     });
-    // Online hosting: one shared password for the dashboard and the vMix sync (HTTP Basic auth).
+    // Online hosting: one shared password. Browsers log in with a form (cookie); the vMix sync sends HTTP Basic auth.
+    // Unauthenticated requests never get a WWW-Authenticate challenge, so no browser popup and no 401 bursts.
     if (deps.password) {
         const password = deps.password;
+        app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) => done(null, Object.fromEntries(new URLSearchParams(body))));
         app.addHook('onRequest', async (req, reply) => {
-            if (req.url === '/api/health' || passwordOk(req.headers.authorization, password))
+            const url = req.url.split('?')[0];
+            if (url === '/api/health' || url === '/login')
                 return;
-            return reply.status(401).header('WWW-Authenticate', 'Basic realm="SSL vMix", charset="UTF-8"').send({ error: 'Password required.' });
+            if (cookieOk(req.headers.cookie, password) || passwordOk(req.headers.authorization, password))
+                return;
+            if (req.method === 'GET' && !url.startsWith('/api/') && !url.startsWith('/json/') && !url.startsWith('/xml/'))
+                return reply.redirect('/login');
+            return reply.status(401).send({ error: 'Log in first.' });
+        });
+        app.get('/login', async (_req, reply) => reply.type('text/html').send(loginPage(false)));
+        app.post('/login', async (req, reply) => {
+            const given = String(req.body?.password ?? '');
+            if (given !== password)
+                return reply.status(200).type('text/html').send(loginPage(true));
+            const secure = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https' ? '; Secure' : '';
+            reply.header('Set-Cookie', `ssl_auth=${authToken(password)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 90}${secure}`);
+            return reply.redirect('/');
         });
     }
     const ev = () => activeEvent(db);
