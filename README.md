@@ -77,10 +77,12 @@ Na własnym VPS: `docker build -t ssl-vmix . && docker run -d -p 4310:4310 -v ss
 
 **Hosting współdzielony z DirectAdmin (np. seohost.pl), bez Dockera.** W panelu: Node.js App → wersja Node 22 (min. 22.12), katalog aplikacji = folder z repo (nie `public_html`), plik startowy `app.cjs`, zmienne `DASHBOARD_PASSWORD` i `DATA_DIR` (folder poza `public_html`). Przez SSH, w środowisku Node pokazanym przez panel: `git clone ...`, `npm install`, `npm run build`, potem restart aplikacji w panelu.
 
-**2. Komputer z vMixem.** Wystarczy Node i to repo. Dwuklik w `sync-vmix.bat` (Windows). Przy pierwszym uruchomieniu pyta o adres dashboardu, hasło i lokalny folder (domyślnie `C:\SSL-vMix`) i zapisuje to w `vmix-sync/config.json`. Potem co 2 sekundy:
+**2. Komputer z vMixem (Windows).** Potrzebny Node.js i to repo. Raz uruchom `install-vmix-sync.bat`: pyta o adres dashboardu, hasło i lokalny folder (domyślnie `C:\SSL-vMix`), startuje synchronizację i dodaje ją do autostartu Windows (zminimalizowane okno "SSL vMix sync", samo się restartuje). `uninstall-vmix-sync.bat` usuwa autostart. Co 2 sekundy:
 - kopiuje nowe i zmienione obrazy oraz `ssl-vmix.xlsx`, usuwa skasowane,
 - zapisuje `ssl-vmix.json` (to samo co `/json/all`),
 - ustawia w dashboardzie folder vMix na ten lokalny folder, więc ścieżki obrazów w xlsx/JSON wskazują pliki na komputerze z vMixem.
+
+W prawym górnym rogu dashboardu jest znacznik "vMix PC": zielony = synchronizacja działa, czerwony = komputer z vMixem nie łączy się albo jest błąd zapisu.
 
 W vMix: Data Sources → Excel → `C:\SSL-vMix\ssl-vmix.xlsx` (lub JSON → `C:\SSL-vMix\ssl-vmix.json`). Okno synchronizacji musi być otwarte.
 

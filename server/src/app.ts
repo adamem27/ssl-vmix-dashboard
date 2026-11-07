@@ -394,7 +394,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.get('/json/graphics', async () => pngGen.jsonGraphics(db, deps.assetsDir));
   // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
-  app.get('/api/mirror/manifest', async () => ({ vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'), files: listMirrorFiles(deps.assetsDir) }));
+  // The sync program polls the manifest every few seconds; its last visit is the vMix machine's heartbeat.
+  let mirrorSeen: { at: string; host: string; folder: string; error: string } | null = null;
+  app.get<{ Querystring: { host?: string; folder?: string; error?: string } }>('/api/mirror/manifest', async (req) => {
+    const q = req.query;
+    if (q.host || q.folder) mirrorSeen = { at: nowIso(), host: String(q.host ?? '').slice(0, 100), folder: String(q.folder ?? '').slice(0, 500), error: String(q.error ?? '').slice(0, 300) };
+    return { vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'), files: listMirrorFiles(deps.assetsDir) };
+  });
+  app.get('/api/mirror/status', async () => ({ seen: mirrorSeen, now: nowIso() }));
   app.get<{ Querystring: { path?: string } }>('/api/mirror/file', async (req, reply) => {
     const full = mirrorFilePath(deps.assetsDir, String(req.query.path ?? ''));
     if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) throw notFound('File');

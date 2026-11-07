@@ -2,6 +2,7 @@
 // (images, ssl-vmix.xlsx) plus ssl-vmix.json, so vMix only ever reads local paths.
 // No dependencies; needs Node 18+.  Usage: node vmix-sync/vmix-sync.mjs [--once]
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,7 @@ const STATE_NAME = '.vmix-sync-state.json';
 const JSON_NAME = 'ssl-vmix.json';
 const INTERVAL_MS = Number(process.env.SYNC_INTERVAL_MS ?? 2000);
 const once = process.argv.includes('--once');
+const setupOnly = process.argv.includes('--setup');
 
 const time = () => new Date().toTimeString().slice(0, 8);
 const log = (msg) => console.log(`${time()}  ${msg}`);
@@ -21,7 +23,7 @@ async function loadConfig() {
   let cfg = {};
   try { cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch { /* first run */ }
   cfg = { ...cfg, ...Object.fromEntries(Object.entries(env).filter(([, v]) => v)) };
-  if (cfg.server && cfg.folder) return cfg;
+  if (cfg.server && cfg.folder && !setupOnly) return cfg;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const ask = async (q, def) => (await rl.question(def ? `${q} [${def}]: ` : `${q}: `)).trim() || def || '';
   cfg.server = await ask('Dashboard address (e.g. https://ssl-dashboard.example.com)', cfg.server);
@@ -35,6 +37,7 @@ async function loadConfig() {
 }
 
 const cfg = await loadConfig();
+if (setupOnly) process.exit(0);
 const base = cfg.server.replace(/\/+$/, '');
 const folder = path.resolve(cfg.folder);
 const headers = cfg.password ? { authorization: 'Basic ' + Buffer.from(`vmix:${cfg.password}`).toString('base64') } : {};
@@ -67,13 +70,15 @@ const localPath = (rel) => {
 };
 const samePath = (a, b) => a.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase() === b.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase();
 
+let lastError = '';
 let lastJson = '';
 try { lastJson = fs.readFileSync(path.join(folder, JSON_NAME), 'utf8'); } catch { /* not written yet */ }
 let failing = false;
 let rootChecked = false;
 
 async function round() {
-  const manifest = await (await get('/api/mirror/manifest')).json();
+  const hb = new URLSearchParams({ host: os.hostname(), folder, error: lastError });
+  const manifest = await (await get(`/api/mirror/manifest?${hb}`)).json();
 
   // Image paths in the xlsx/JSON must point at this folder.
   if (!rootChecked) {
@@ -97,7 +102,7 @@ async function round() {
       state[f.path] = version;
       changed++;
       log(`↓ ${f.path}`);
-    } catch (e) { errors++; log(`! ${f.path}: ${e.message}`); }
+    } catch (e) { errors++; lastError = `${f.path}: ${e.message}`; log(`! ${lastError}`); }
   }
   for (const rel of Object.keys(state)) {
     if (wanted.has(rel)) continue;
@@ -110,7 +115,7 @@ async function round() {
 
   const json = await (await get('/json/all')).text();
   if (json !== lastJson) {
-    try { writeAtomic(path.join(folder, JSON_NAME), json); lastJson = json; log(`↓ ${JSON_NAME}`); } catch (e) { errors++; log(`! ${JSON_NAME}: ${e.message}`); }
+    try { writeAtomic(path.join(folder, JSON_NAME), json); lastJson = json; log(`↓ ${JSON_NAME}`); } catch (e) { errors++; lastError = `${JSON_NAME}: ${e.message}`; log(`! ${lastError}`); }
   }
   return errors;
 }
@@ -118,7 +123,7 @@ async function round() {
 log(`Syncing ${base} → ${folder}`);
 for (;;) {
   try {
-    await round();
+    if (!(await round())) lastError = '';
     if (failing) log('Connection back.');
     failing = false;
   } catch (e) {

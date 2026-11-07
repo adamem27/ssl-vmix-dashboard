@@ -17,6 +17,27 @@ export function useMeta() {
   return useQuery({ queryKey: ['meta'], queryFn: () => api.get<Meta>('/api/meta'), staleTime: 60_000 });
 }
 
+interface MirrorStatus { seen: { at: string; host: string; folder: string; error: string } | null; now: string }
+
+/** Whether the vMix PC's sync program is checking in (it polls every 2 s). */
+function VmixPcBadge() {
+  const q = useQuery({ queryKey: ['mirror-status'], queryFn: () => api.get<MirrorStatus>('/api/mirror/status'), refetchInterval: 5000 });
+  const seen = q.data?.seen;
+  if (!q.data) return null;
+  const ago = seen ? Math.max(0, Math.round((Date.parse(q.data.now) - Date.parse(seen.at)) / 1000)) : null;
+  const online = ago !== null && ago < 20;
+  const state = !seen ? 'none' : !online ? 'offline' : seen.error ? 'error' : 'ok';
+  const label = { none: 'vMix PC: not connected', offline: `vMix PC: offline ${ago! < 120 ? `${ago}s` : `${Math.round(ago! / 60)} min`}`, error: 'vMix PC: sync error', ok: 'vMix PC: synced' }[state];
+  const title = seen ? `${seen.host} → ${seen.folder}${seen.error ? `\n${seen.error}` : ''}` : 'Run install-vmix-sync.bat on the vMix PC';
+  return (
+    <span title={title} className={cx('flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold',
+      state === 'ok' ? 'bg-emerald-950/60 text-emerald-300' : state === 'none' ? 'bg-ink-900 text-ink-400' : 'bg-red-950/70 text-red-300')}>
+      <span className={cx('h-2 w-2 rounded-full', state === 'ok' ? 'bg-emerald-400' : state === 'none' ? 'bg-ink-600' : 'bg-red-400')} />
+      {label}
+    </span>
+  );
+}
+
 function TopBar() {
   const meta = useMeta();
   const tab = ({ isActive }: { isActive: boolean }) =>
@@ -36,6 +57,7 @@ function TopBar() {
         <div className="ml-auto truncate text-xs text-ink-400" title="Active event">
           {meta.data && <>Event: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
         </div>
+        <VmixPcBadge />
       </div>
     </header>
   );
