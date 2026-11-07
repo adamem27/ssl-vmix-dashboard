@@ -89,6 +89,14 @@ $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Wher
 Say "Dashboard: http://localhost:$Port   (other computers: http://${ip}:$Port)"
 Say "vMix Excel file: $Data\assets\ssl-vmix.xlsx"
 Say 'Keep this window open (you can minimize it).'
+# CI check: start once, confirm it answers, stop.
+if ($env:SSL_LAUNCHER_TEST) {
+  $p = Start-Process (Join-Path $App 'node\node.exe') -ArgumentList "`"$(Join-Path $App 'app.cjs')`"" -PassThru -NoNewWindow
+  $ok = $false
+  foreach ($i in 1..30) { Start-Sleep 1; try { if ((Invoke-RestMethod "http://127.0.0.1:$Port/api/health").ok) { $ok = $true; break } } catch { } }
+  Stop-Process $p -Force
+  if ($ok) { exit 0 } else { exit 1 }
+}
 Start-Job { Start-Sleep 4; Start-Process "http://localhost:$using:Port" } | Out-Null
 while ($true) {
   & (Join-Path $App 'node\node.exe') (Join-Path $App 'app.cjs') 2>&1 | Out-File $Log -Append -Encoding utf8

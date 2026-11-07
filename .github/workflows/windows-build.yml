@@ -52,3 +52,14 @@ jobs:
           gh release view windows-latest *> $null
           if ($LASTEXITCODE -ne 0) { gh release create windows-latest --title 'Windows package (latest)' --notes 'Built automatically from main. Download ssl-dashboard-windows.zip, unzip, run "SSL Dashboard.bat".' --latest }
           gh release upload windows-latest ssl-dashboard-windows.zip --clobber
+      - name: Test the launcher (download from the release, start, stop)
+        run: |
+          $d = "$env:RUNNER_TEMP/launcher"
+          New-Item -ItemType Directory $d | Out-Null
+          Copy-Item out/launcher.ps1 $d
+          @{ token = '${{ github.token }}' } | ConvertTo-Json | Set-Content "$d/config.json"
+          $env:SSL_LAUNCHER_TEST = '1'
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$d/launcher.ps1"
+          if ($LASTEXITCODE -ne 0) { throw "launcher test failed ($LASTEXITCODE)" }
+          if (-not (Test-Path "$d/app/version.txt")) { throw 'launcher did not install the app' }
+          Get-ChildItem $d
