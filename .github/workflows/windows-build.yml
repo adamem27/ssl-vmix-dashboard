@@ -10,7 +10,8 @@ permissions:
 concurrency: windows-package
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-2022: node-gyp does not recognise the newer Visual Studio on windows-latest yet.
+    runs-on: windows-2022
     defaults:
       run:
         shell: pwsh
