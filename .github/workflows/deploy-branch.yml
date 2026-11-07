@@ -1,0 +1,29 @@
+# Rebuilds the "deploy" branch (prebuilt app, no workspaces) after every push to main.
+# The hosting server updates with: git pull && npm install, then a restart in the panel.
+name: deploy branch
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: deploy-branch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Publish to the deploy branch
+        run: |
+          git fetch origin deploy || true
+          git worktree add -B deploy out origin/deploy 2>/dev/null || git worktree add --orphan -b deploy out
+          node scripts/build-deploy.mjs out
+          cd out
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Build ${GITHUB_SHA::7}" || exit 0
+          git push origin deploy
