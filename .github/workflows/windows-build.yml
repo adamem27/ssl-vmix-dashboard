@@ -79,3 +79,19 @@ jobs:
           if ($code -ne 0) { throw "sync test failed ($code)" }
           if (-not (Test-Path "$d/data/assets/ssl-vmix.xlsx")) { throw 'no xlsx synced' }
           if (-not (Test-Path "$d/data/assets/ssl-vmix.json")) { throw 'no json synced' }
+      - name: Test the real start (local mode, no test shortcuts)
+        run: |
+          $d = "$env:RUNNER_TEMP/launcher"
+          @{ token = '${{ github.token }}'; server = '' } | ConvertTo-Json | Set-Content "$d/config.json"
+          Remove-Item env:SSL_LAUNCHER_TEST -ErrorAction SilentlyContinue
+          $p = Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',"$d/launcher.ps1" -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/launcher-out.txt"
+          $ok = $false
+          foreach ($i in 1..60) { Start-Sleep 1; try { if ((Invoke-RestMethod http://127.0.0.1:4310/api/health).ok) { $ok = $true; break } } catch { } }
+          Start-Sleep 8
+          $alive = -not $p.HasExited
+          Get-Content "$env:RUNNER_TEMP/launcher-out.txt"
+          Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $p.HasExited) { Stop-Process $p -Force }
+          if (-not $ok) { throw 'dashboard did not answer' }
+          if (-not $alive) { throw 'launcher exited' }
+          if (-not (Test-Path "$d/data/assets/ssl-vmix.xlsx")) { throw 'no workbook' }

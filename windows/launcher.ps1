@@ -2,6 +2,14 @@
 # 1) downloads the newest build from GitHub (when online), 2) runs the dashboard and restarts it if it stops.
 # Data (database, images, ssl-vmix.xlsx) lives in .\data and is never touched by updates.
 $ErrorActionPreference = 'Stop'
+# Never close silently: show what went wrong and wait.
+trap {
+  Write-Host ''
+  Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+  Write-Host ($_.InvocationInfo.PositionMessage) -ForegroundColor DarkGray
+  if (-not $env:SSL_LAUNCHER_TEST) { Read-Host 'Take a photo of this window, then press Enter to close' }
+  exit 1
+}
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $Root = $PSScriptRoot
@@ -87,6 +95,7 @@ Update-App
 if (-not (Test-Path (Join-Path $App 'app.cjs'))) { Say 'The app is missing and could not be downloaded. Check the internet connection and the update key.'; Read-Host 'Press Enter to close'; exit 1 }
 
 New-Item -ItemType Directory $Data -Force | Out-Null
+$ErrorActionPreference = 'Continue'
 $Node = Join-Path $App 'node\node.exe'
 
 if ($config.server) {
