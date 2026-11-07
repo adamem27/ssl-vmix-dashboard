@@ -1,0 +1,53 @@
+# Builds the self-updating Windows package (portable Node + prebuilt app) after every push to main
+# and publishes it as the asset of the "windows-latest" release, where the launcher looks for updates.
+name: windows package
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: windows-package
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Assemble package
+        run: |
+          node scripts/build-deploy.mjs out/app
+          Push-Location out/app
+          npm install --omit=dev --no-audit --no-fund
+          Pop-Location
+          New-Item -ItemType Directory out/app/node | Out-Null
+          Copy-Item (Get-Command node).Source out/app/node/node.exe
+          Copy-Item windows/* out/
+      - name: Check the launcher parses
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/out/launcher.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors; exit 1 }
+      - name: Smoke test
+        run: |
+          $env:DATA_DIR = "$env:RUNNER_TEMP/data"; $env:PORT = '4310'
+          $p = Start-Process out/app/node/node.exe -ArgumentList 'out/app/app.cjs' -PassThru -NoNewWindow
+          $ok = $false
+          foreach ($i in 1..30) { Start-Sleep 1; try { if ((Invoke-RestMethod http://127.0.0.1:4310/api/health).ok) { $ok = $true; break } } catch { } }
+          Stop-Process $p -Force
+          if (-not $ok) { throw 'The dashboard did not start.' }
+          if (-not (Test-Path "$env:RUNNER_TEMP/data/assets/ssl-vmix.xlsx")) { throw 'No workbook written.' }
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Compress-Archive -Path out/* -DestinationPath ssl-dashboard-windows.zip
+          gh release view windows-latest *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create windows-latest --title 'Windows package (latest)' --notes 'Built automatically from main. Download ssl-dashboard-windows.zip, unzip, run "SSL Dashboard.bat".' --latest }
+          gh release upload windows-latest ssl-dashboard-windows.zip --clobber
