@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { activeEvent, getSetting, nowIso, setSetting } from '../db/db.js';
 import { removeDemo } from './demo.js';
 import { nameKey, splitName } from './normalize.js';
-import { createSailor, setCaptain } from './sailors.js';
+import { createSailor, deleteSailor, setCaptain } from './sailors.js';
 import { createTeam } from './teams.js';
 import { createFleet, createSet, deleteFleet, setPlaceholders, FLEET_SIZE } from './fleets.js';
 /**
@@ -138,7 +138,7 @@ export function loadTeamPages() {
  * and the captain is marked only when the team has none yet.
  * The crew is the "Potential Team Position" list plus confirmed athletes that list leaves out.
  */
-export function applyTeamPages(db, pages = loadTeamPages()) {
+export function applyTeamPages(db, pages = loadTeamPages(), skipCrew = new Set()) {
     const r = { teams: 0, nicknames: 0, sailorsCreated: 0, captains: 0, missingTeams: [] };
     db.transaction(() => {
         for (const pg of pages) {
@@ -152,6 +152,9 @@ export function applyTeamPages(db, pages = loadTeamPages()) {
                 db.prepare('UPDATE teams SET nickname = ?, updated_at = ? WHERE id = ?').run(pg.nickname, nowIso(), team.id);
                 r.nicknames++;
             }
+            // Crews of teams on the official rooming list come from that list only.
+            if (skipCrew.has(pg.code.toUpperCase()))
+                continue;
             for (const m of pg.crew) {
                 if (db.prepare('SELECT 1 FROM sailors WHERE team_id = ? AND name_key = ?').get(team.id, nameKey(m.name)))
                     continue;
@@ -170,8 +173,80 @@ export function applyTeamPages(db, pages = loadTeamPages()) {
     })();
     return r;
 }
+export function loadRooming() {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    for (const p of [path.join(here, '..', '..', 'fixtures', 'goldcup-rooming.json'), path.join(here, '..', 'fixtures', 'goldcup-rooming.json')]) {
+        if (fs.existsSync(p))
+            return JSON.parse(fs.readFileSync(p, 'utf8'));
+    }
+    return [];
+}
+/**
+ * Makes each listed team's roster match the rooming list: matching sailors stay (an empty position or
+ * number is filled in), missing ones are added, the rest are removed unless they carry operator work
+ * (a photo or best results), which is reported instead. A captain marked on the list replaces the current one.
+ */
+export function applyRooming(ctx, teams = loadRooming()) {
+    const { db } = ctx;
+    const r = { teams: 0, added: 0, updated: 0, removed: 0, kept: [], captains: 0, missingTeams: [] };
+    db.transaction(() => {
+        for (const t of teams) {
+            const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(t.code);
+            if (!team) {
+                r.missingTeams.push(t.code);
+                continue;
+            }
+            r.teams++;
+            const current = db.prepare('SELECT * FROM sailors WHERE team_id = ?').all(team.id);
+            const used = new Set();
+            const lastKey = (s) => nameKey(s).split(' ').filter(Boolean);
+            for (const m of t.crew) {
+                const full = nameKey(`${m.firstName} ${m.lastName}`);
+                const last = nameKey(m.lastName), first = nameKey(m.firstName).split(' ')[0];
+                const free = current.filter((c) => !used.has(c.id));
+                let hit = free.find((c) => c.name_key === full)
+                    ?? free.find((c) => last && nameKey(c.last_name) === last && nameKey(c.first_name).split(' ')[0] === first);
+                if (!hit && last) {
+                    const byLast = free.filter((c) => lastKey(c.last_name).join(' ') === last || lastKey(`${c.first_name} ${c.last_name}`).includes(last));
+                    if (byLast.length === 1 && nameKey(byLast[0].first_name)[0] === first[0])
+                        hit = byLast[0];
+                }
+                let id;
+                if (hit) {
+                    id = hit.id;
+                    const pos = hit.default_position || m.position, num = hit.default_number || m.number;
+                    if (pos !== hit.default_position || num !== hit.default_number) {
+                        db.prepare('UPDATE sailors SET default_position = ?, default_number = ?, updated_at = ? WHERE id = ?').run(pos, num, nowIso(), id);
+                        r.updated++;
+                    }
+                }
+                else {
+                    id = createSailor(db, team.id, { firstName: m.firstName, lastName: m.lastName, defaultPosition: m.position, defaultNumber: m.number });
+                    r.added++;
+                }
+                used.add(id);
+                if (m.captain) {
+                    setCaptain(db, id, true);
+                    r.captains++;
+                }
+            }
+            for (const c of current) {
+                if (used.has(c.id))
+                    continue;
+                const hasPhoto = db.prepare("SELECT 1 FROM assets WHERE owner_type = 'sailor' AND owner_id = ?").get(c.id);
+                if (hasPhoto || c.best_result_1 || c.best_result_2) {
+                    r.kept.push(`${t.code} ${c.first_name} ${c.last_name}`);
+                    continue;
+                }
+                deleteSailor(ctx, c.id);
+                r.removed++;
+            }
+        }
+    })();
+    return r;
+}
 /** Bump when the bundled matchboard or team-page data changes, so existing installs pick it up on next start. */
-export const GOLDCUP_DATA_VERSION = '2026-11-07';
+export const GOLDCUP_DATA_VERSION = '2026-11-07.2';
 /** Fleet sets the matchboard changed in each data version; reset to the matchboard when upgrading past it. */
 const MATCHBOARD_CHANGES = [
     ['2026-11-07', ['Qualifying Series', '1/32 Finals (19–22 Nov)']],
@@ -182,9 +257,12 @@ export function applyGoldCupAll(ctx) {
     const from = getSetting(ctx.db, 'preset.goldcup.version') ?? '';
     const resync = MATCHBOARD_CHANGES.filter(([v]) => from && from < v).flatMap(([, sets]) => sets);
     const matchboard = applyGoldCup2026(ctx.db, resync);
-    const teamPages = applyTeamPages(ctx.db);
+    const roomingTeams = loadRooming();
+    const teamPages = applyTeamPages(ctx.db, loadTeamPages(), new Set(roomingTeams.map((t) => t.code.toUpperCase())));
+    // The rooming list is applied once per data version, so later roster edits in the panel are not undone.
+    const rooming = from < GOLDCUP_DATA_VERSION || !from ? applyRooming(ctx, roomingTeams) : null;
     setSetting(ctx.db, 'preset.goldcup.version', GOLDCUP_DATA_VERSION);
-    return { removedDemoTeams: removed.removedTeams, ...matchboard, teamPages };
+    return { removedDemoTeams: removed.removedTeams, ...matchboard, teamPages, rooming };
 }
 /** Runs once per data version at server start. */
 export function applyGoldCupOnStart(ctx) {
