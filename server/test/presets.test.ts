@@ -11,13 +11,30 @@ describe('SSL Gold Cup 2026 preset', () => {
     expect(r.setsCreated).toBe(7);
     const sets = listSets(db, (db.prepare('SELECT id FROM events').get() as any).id) as any[];
     const qs = getSetDetail(db, sets[0].id);
-    expect(qs.fleets).toHaveLength(10);
+    expect(qs.fleets).toHaveLength(9);
     expect(qs.fleets[1].filled).toBe(3);
     const r1 = getSetDetail(db, sets[1].id);
     expect(r1.fleets[0].placeholders).toEqual([null, 'DRAW 1', 'DRAW 2', 'DRAW 3']);
     const again = applyGoldCup2026(db);
     expect(again).toMatchObject({ teamsCreated: 0, teamsExisting: 61, setsCreated: 0 });
     expect(again.setsSkipped).toHaveLength(7);
+  });
+
+  it('resets only the sets the matchboard changed, keeping their ids', () => {
+    const db = openDb(':memory:');
+    applyGoldCup2026(db);
+    const ev = (db.prepare('SELECT id FROM events').get() as any).id;
+    const sets = listSets(db, ev) as any[];
+    // Simulate an older install: an extra fleet in QS and a manual change in R1 B.
+    db.prepare("INSERT INTO fleets (id, fleet_set_id, name, sort, placeholders, created_at, updated_at) SELECT 'old', fleet_set_id, 'QS J', 99, placeholders, created_at, updated_at FROM fleets WHERE fleet_set_id = ? LIMIT 1").run(sets[0].id);
+    const r = applyGoldCup2026(db, ['Qualifying Series', '1/32 Finals (19–22 Nov)']);
+    expect(r.setsUpdated).toEqual(['Qualifying Series', '1/32 Finals (19–22 Nov)']);
+    expect(r.setsSkipped).toHaveLength(5);
+    const qs = getSetDetail(db, sets[0].id);
+    expect(qs.fleets.map((f: any) => f.name)).not.toContain('QS J');
+    expect(qs.fleets.find((f: any) => f.name === 'QS H').filled).toBe(4);
+    const r1b = getSetDetail(db, sets[1].id).fleets.find((f: any) => f.name === 'R1 B');
+    expect(r1b.placeholders).toEqual([null, null, 'DRAW 5', 'DRAW 6']);
   });
 });
 

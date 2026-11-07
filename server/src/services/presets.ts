@@ -7,7 +7,7 @@ import { removeDemo } from './demo.js';
 import { nameKey, splitName } from './normalize.js';
 import { createSailor, setCaptain } from './sailors.js';
 import { createTeam } from './teams.js';
-import { createFleet, createSet, setPlaceholders, FLEET_SIZE } from './fleets.js';
+import { createFleet, createSet, deleteFleet, setPlaceholders, FLEET_SIZE } from './fleets.js';
 
 /**
  * SSL Gold Cup 2026 matchboard. Fleet places hold a team code, or a placeholder label
@@ -38,12 +38,11 @@ const STAGES: [setName: string, fleets: FleetDef[]][] = [
   ['Qualifying Series', [
     ['QS A', ['PHI', 'MYA', 'KOR', 'VIE']], ['QS B', ['OMA', 'UAE', 'KAZ']], ['QS C', ['TAH', 'SEY', 'MAR', 'MOZ']],
     ['QS D', ['EST', 'AUT', 'SLO']], ['QS E', ['LTU', 'NOR', 'BEL', 'SRB']], ['QS F', ['UKR', 'FIN', 'GRE']],
-    ['QS G', ['POR', 'TUR', 'BUL']], ['QS H', ['URU', 'VEN', 'CUB']], ['QS I', ['BER', 'GUA', 'ANT']],
-    ['QS J', ['MEX', 'PUR', 'ESA']],
+    ['QS G', ['POR', 'TUR', 'BUL']], ['QS H', ['URU', 'PUR', 'VEN', 'ANT']], ['QS I', ['BER', 'MEX', 'CUB', 'ESA']],
   ]],
   ['1/32 Finals (19–22 Nov)', [
-    ['R1 A', ['COL', 'DRAW 1', 'DRAW 2', 'DRAW 3']], ['R1 B', ['IND', 'UAE', 'DRAW 4', 'DRAW 5']],
-    ['R1 C', ['DRAW 6', 'DRAW 7', 'DRAW 8', 'MAS']], ['R1 D', ['DRAW 9', 'DRAW 10', 'DRAW 11', 'SGP']],
+    ['R1 A', ['COL', 'DRAW 1', 'DRAW 2', 'DRAW 3']], ['R1 B', ['KOR', 'GRE', 'DRAW 5', 'DRAW 6']],
+    ['R1 C', ['DRAW 7', 'DRAW 8', 'DRAW 9', 'MAS']], ['R1 D', ['DRAW 10', 'DRAW 11', 'DRAW 12', 'SGP']],
   ]],
   ['1/16 Finals (26–29 Nov)', [
     ['R2 A', ['HUN', 'ECU', 'R1 C1', 'R1 B2']], ['R2 B', ['CHI', 'RSA', 'R1 A1', 'R1 C2']],
@@ -67,11 +66,37 @@ const STAGES: [setName: string, fleets: FleetDef[]][] = [
 
 export const PRESETS = [{ id: 'ssl-gold-cup-2026', label: 'SSL Gold Cup 2026 matchboard', teams: TEAMS.length, fleetSets: STAGES.length }];
 
-export interface PresetResult { teamsCreated: number; teamsExisting: number; setsCreated: number; setsSkipped: string[] }
+export interface PresetResult { teamsCreated: number; teamsExisting: number; setsCreated: number; setsUpdated: string[]; setsSkipped: string[] }
 
-/** Idempotent: teams are matched by code, fleet sets by name; existing ones are left untouched. */
-export function applyGoldCup2026(db: DB): PresetResult {
-  const r: PresetResult = { teamsCreated: 0, teamsExisting: 0, setsCreated: 0, setsSkipped: [] };
+/**
+ * Sets the fleets and places of a fleet set to the matchboard definition: fleets matched by name,
+ * missing ones created, ones no longer on the matchboard removed, all places replaced.
+ */
+function fillSet(db: DB, setId: string, fleets: FleetDef[], idByCode: Map<string, string>) {
+  const current = db.prepare('SELECT id, name FROM fleets WHERE fleet_set_id = ?').all(setId) as { id: string; name: string }[];
+  for (const f of current) if (!fleets.some(([name]) => name === f.name)) deleteFleet(db, f.id);
+  db.prepare('DELETE FROM fleet_slots WHERE fleet_set_id = ?').run(setId);
+  for (const [fleetName, places] of fleets) {
+    const fleetId = current.find((f) => f.name === fleetName)?.id ?? createFleet(db, setId, fleetName);
+    const labels: (string | null)[] = [];
+    for (let i = 0; i < FLEET_SIZE; i++) {
+      const p = places[i];
+      const teamId = p ? idByCode.get(p) : undefined;
+      if (teamId) {
+        db.prepare('INSERT INTO fleet_slots (fleet_set_id, fleet_id, position, team_id) VALUES (?, ?, ?, ?)').run(setId, fleetId, i + 1, teamId);
+        labels.push(null);
+      } else labels.push(p ?? null);
+    }
+    setPlaceholders(db, fleetId, labels);
+  }
+}
+
+/**
+ * Idempotent: teams are matched by code, fleet sets by name. Existing sets are left untouched
+ * unless named in `resync`, which resets them to the matchboard (used when the matchboard changes).
+ */
+export function applyGoldCup2026(db: DB, resync: string[] = []): PresetResult {
+  const r: PresetResult = { teamsCreated: 0, teamsExisting: 0, setsCreated: 0, setsUpdated: [], setsSkipped: [] };
   db.transaction(() => {
     const ev = activeEvent(db);
     if (ev.name === 'Event' || ev.name === 'Wydarzenie') {
@@ -85,22 +110,11 @@ export function applyGoldCup2026(db: DB): PresetResult {
       r.teamsCreated++;
     }
     for (const [setName, fleets] of STAGES) {
-      if (db.prepare('SELECT 1 FROM fleet_sets WHERE event_id = ? AND name = ?').get(ev.id, setName)) { r.setsSkipped.push(setName); continue; }
-      const setId = createSet(db, ev.id, setName);
-      for (const [fleetName, places] of fleets) {
-        const fleetId = createFleet(db, setId, fleetName);
-        const labels: (string | null)[] = [];
-        for (let i = 0; i < FLEET_SIZE; i++) {
-          const p = places[i];
-          const teamId = p ? idByCode.get(p) : undefined;
-          if (teamId) {
-            db.prepare('INSERT INTO fleet_slots (fleet_set_id, fleet_id, position, team_id) VALUES (?, ?, ?, ?)').run(setId, fleetId, i + 1, teamId);
-            labels.push(null);
-          } else labels.push(p ?? null);
-        }
-        setPlaceholders(db, fleetId, labels);
-      }
-      r.setsCreated++;
+      const existing = db.prepare('SELECT id FROM fleet_sets WHERE event_id = ? AND name = ?').get(ev.id, setName) as { id: string } | undefined;
+      if (existing && !resync.includes(setName)) { r.setsSkipped.push(setName); continue; }
+      const setId = existing?.id ?? createSet(db, ev.id, setName);
+      fillSet(db, setId, fleets, idByCode);
+      if (existing) r.setsUpdated.push(setName); else r.setsCreated++;
     }
   })();
   return r;
@@ -153,12 +167,18 @@ export function applyTeamPages(db: DB, pages: TeamPage[] = loadTeamPages()): Tea
 }
 
 /** Bump when the bundled matchboard or team-page data changes, so existing installs pick it up on next start. */
-export const GOLDCUP_DATA_VERSION = '2026-10-18';
+export const GOLDCUP_DATA_VERSION = '2026-11-07';
+/** Fleet sets the matchboard changed in each data version; reset to the matchboard when upgrading past it. */
+const MATCHBOARD_CHANGES: [version: string, sets: string[]][] = [
+  ['2026-11-07', ['Qualifying Series', '1/32 Finals (19–22 Nov)']],
+];
 
 /** Full Gold Cup setup: DEMO data out, matchboard teams and fleets, then team-page crews. Safe to repeat. */
 export function applyGoldCupAll(ctx: AssetCtx) {
   const removed = removeDemo(ctx);
-  const matchboard = applyGoldCup2026(ctx.db);
+  const from = getSetting(ctx.db, 'preset.goldcup.version') ?? '';
+  const resync = MATCHBOARD_CHANGES.filter(([v]) => from && from < v).flatMap(([, sets]) => sets);
+  const matchboard = applyGoldCup2026(ctx.db, resync);
   const teamPages = applyTeamPages(ctx.db);
   setSetting(ctx.db, 'preset.goldcup.version', GOLDCUP_DATA_VERSION);
   return { removedDemoTeams: removed.removedTeams, ...matchboard, teamPages };
