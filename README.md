@@ -64,6 +64,17 @@ npm run restore -- backups/2026-06-11-08-30-00
 
 Bieżąca baza i katalog plików są przed odtworzeniem zachowywane z sufiksem `.before-restore-<data>`. Ręcznie wystarczy też skopiować plik `ssl-vmix.sqlite` i katalog `assets` przy zatrzymanym serwerze.
 
+## Komputer z vMixem (Windows) bez instalowania czegokolwiek
+
+Paczka `ssl-dashboard-windows.zip` (GitHub → Releases → "Windows package (latest)") ma w środku przenośny Node i gotową aplikację. GitHub Actions buduje ją i testuje na Windows po każdej zmianie na `main`.
+
+1. Rozpakuj do np. `C:\SSL-Dashboard` i uruchom `SSL Dashboard.bat`.
+2. Przy pierwszym starcie pyta o klucz aktualizacji (GitHub fine-grained token: tylko to repo, Contents: Read-only) i gdzie jest baza:
+   - adres panelu online (np. `https://sslgfx.em27code.com`) + hasło: dane edytujesz z dowolnego komputera, a ten PC tylko zapisuje lokalnie obrazy, `ssl-vmix.xlsx` i `ssl-vmix.json`,
+   - Enter: panel i baza działają na tym PC (inne komputery w tej samej sieci: `http://<IP tego PC>:4310`).
+3. Przy każdym starcie sprawdza i pobiera nową wersję; dane w `data\` zostają. Plik dla vMix: `C:\SSL-Dashboard\data\assets\ssl-vmix.xlsx`.
+4. `Autostart ON.bat` / `Autostart OFF.bat` – start razem z Windows. Ustawienia (klucz, adres, hasło) są w `config.json`; usuń go, żeby odpowiedzieć na pytania od nowa.
+
 ## Dashboard online, pliki na komputerze z vMixem
 
 Dashboard może działać na serwerze w internecie (obsługa z dowolnego komputera), a obrazy, `ssl-vmix.xlsx` i `ssl-vmix.json` i tak lądują lokalnie na komputerze z vMixem. vMix czyta tylko lokalne pliki, więc chwilowy brak internetu nie psuje grafik: zostają ostatnie dane.
