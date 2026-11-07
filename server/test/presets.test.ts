@@ -57,3 +57,30 @@ describe('team pages', () => {
     expect(applyTeamPages(db, pages).sailorsCreated).toBe(0);
   });
 });
+
+describe('rooming list', () => {
+  it('makes the roster match the list, keeps operator work, fills empty fields', async () => {
+    const { applyRooming } = await import('../src/services/presets.js');
+    const { createTeam } = await import('../src/services/teams.js');
+    const { createSailor, setCaptain } = await import('../src/services/sailors.js');
+    const db = openDb(':memory:');
+    const ctx = { db, assetsDir: '/tmp/ssl-rooming-test' };
+    const team = createTeam(db, { name: 'Brazil', code: 'BRA' });
+    const keep = createSailor(db, team, { firstName: 'Martine', lastName: 'Grael', defaultPosition: 'Helm' });
+    const gone = createSailor(db, team, { firstName: 'Henry', lastName: 'Boening' });
+    const worked = createSailor(db, team, { firstName: 'Kahena', lastName: 'Kunze', bestResult1: 'Olympic gold' });
+    setCaptain(db, gone, true);
+    const r = applyRooming(ctx, [{ code: 'BRA', crew: [
+      { firstName: 'MARTINE', lastName: 'GRAEL', position: 'Trimmer', number: '3', captain: false },
+      { firstName: 'Bruna', lastName: 'Di Croce', position: '', number: '', captain: true },
+    ] }, { code: 'XXX', crew: [] }]);
+    expect(r).toMatchObject({ teams: 1, added: 1, updated: 1, removed: 1, captains: 1, missingTeams: ['XXX'] });
+    expect(r.kept).toEqual(['BRA Kahena Kunze']);
+    const rows = db.prepare('SELECT * FROM sailors WHERE team_id = ? ORDER BY last_name').all(team) as any[];
+    expect(rows.map((s) => s.last_name)).toEqual(['Di Croce', 'Grael', 'Kunze']);
+    const grael = rows.find((s) => s.id === keep);
+    expect([grael.default_position, grael.default_number]).toEqual(['Helm', '3']);
+    expect(rows.find((s) => s.last_name === 'Di Croce').is_captain).toBe(1);
+    expect(rows.find((s) => s.id === worked)).toBeTruthy();
+  });
+});
