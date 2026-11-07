@@ -1,0 +1,3560 @@
+[
+ {
+  "code": "ANT",
+  "url": "https://ant.sslgoldcup.com/",
+  "nickname": "The Rum Runners",
+  "captain": "Shannon Falcone",
+  "crew": [
+   {
+    "name": "Louis Bavay",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Shannoy Malone",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Junella King",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Tristan Louwrens",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Vincent Anfi",
+    "position": "Grinder",
+    "number": "3"
+   },
+   {
+    "name": "Rhone Kirby",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Jalese Gordon",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Tyrique Adams",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Rocco Falcone",
+    "position": "Helm",
+    "number": "9"
+   },
+   {
+    "name": "Jules Mitchell",
+    "position": "Tactician",
+    "number": "8"
+   },
+   {
+    "name": "Shannon Falcone",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Alex Sinclair",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "ARG",
+  "url": "https://arg.sslgoldcup.com/",
+  "nickname": "Condores",
+  "captain": "Santiago Lange",
+  "crew": [
+   {
+    "name": "Diego Garay",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Jordan Rivas",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Cecilia Carranza Saroli",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Lucía Falasca",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Mariano Caputo",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Alejandro Colla",
+    "position": "Grinder",
+    "number": "3"
+   },
+   {
+    "name": "Germán Panei",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Cruz González Smith",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Pablo Despontin",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Maciel Cichetti",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Gabriel Marino",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Guillermo Parada",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Mariano Parada",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Santiago Lange",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Julia Pantin",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "AUS",
+  "url": "https://aus.sslgoldcup.com/",
+  "nickname": "Team Boxing Kangaroo",
+  "captain": "John Bertrand",
+  "crew": [
+   {
+    "name": "Hamish Vass",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Nathan Gulliksen",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Paul Mckenzie",
+    "position": "Grinder",
+    "number": "2"
+   },
+   {
+    "name": "George Richardson",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Zoe Drainsfield",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jess Angus",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Cole Tapper",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "John Bertrand",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Ben Lamb",
+    "position": "Tactician",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "AUT",
+  "url": "https://aut.sslgoldcup.com/",
+  "nickname": "Storm Is Only When the Sheep Have No More Curls",
+  "captain": "Thomas Zajac",
+  "crew": [
+   {
+    "name": "Richard Hilbert",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Simona Höllermann",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Laura Farese",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "David Hussl",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Matthäus Zöchling",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Thomas Czajka",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Lukas Haberl",
+    "position": "Trimmer",
+    "number": "1"
+   },
+   {
+    "name": "Christian Binder",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Thomas Zajac",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Keanu Prettner",
+    "position": "Tactician",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "BEL",
+  "url": "https://bel.sslgoldcup.com/",
+  "nickname": "The Belgian Sea Devils",
+  "captain": "Sebastien Godefroid",
+  "crew": [
+   {
+    "name": "Aline Pierrard",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Yanic Darquenne",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Timothee Deplasse",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Vito Feremans",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Noah De Prest",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Celestin Goubau",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "William De Smet",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Yannick Lefebvre",
+    "position": "Helm",
+    "number": "6"
+   },
+   {
+    "name": "Emma Plasschaert",
+    "position": "Tactician",
+    "number": "10"
+   },
+   {
+    "name": "Wannes van Laer",
+    "position": "Floater",
+    "number": "11"
+   },
+   {
+    "name": "Sebastien Godefroid",
+    "position": "Captain",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "BER",
+  "url": "https://ber.sslgoldcup.com/",
+  "nickname": "The Privateers",
+  "captain": "Rockal Evans",
+  "crew": [
+   {
+    "name": "Peter Dill",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Adriana Penruddocke",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Emily Nagel",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Will Lorimer-Turner",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Joshua Greenslade",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Julia Lines",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Somers Kempe",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Jesse Kirkland",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Rockal Evans",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Thomas Penruddocke",
+    "position": "Floater",
+    "number": "11"
+   }
+  ]
+ },
+ {
+  "code": "BRA",
+  "url": "https://bra.sslgoldcup.com/",
+  "nickname": "Brazilian Storm",
+  "captain": "Robert Scheidt",
+  "crew": [
+   {
+    "name": "Alfredo Rovere",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Bruna Patricio",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Guilherme Hamelmann",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Andres Azambuya",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Mario Sergio de Jesus Junior",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Mario Tinoco",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Andre Fonseca",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Giovanna Prada",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Joao Lysandro Signorini",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Robert Scheidt",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "BUL",
+  "url": "https://bul.sslgoldcup.com/",
+  "nickname": "The Lions",
+  "captain": "Yavor Kolev",
+  "crew": [
+   {
+    "name": "Lyuben Todorov",
+    "position": "Bow",
+    "number": "11"
+   },
+   {
+    "name": "Boris Minkov",
+    "position": "Mid-Bow",
+    "number": "1"
+   },
+   {
+    "name": "Radoslav Gavrailov",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Ina Ilieva",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Krasimir Naumov",
+    "position": "Grinder",
+    "number": "14"
+   },
+   {
+    "name": "Mihaela Alexandrova",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Mihail Berberov",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Viktor Kateliev",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Ivo Todorov",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Lyuben Tenekedzhiev",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Yavor Kolev",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "CAN",
+  "url": "https://can.sslgoldcup.com/",
+  "nickname": "The Enforcers",
+  "captain": "Robert Hemming",
+  "crew": [
+   {
+    "name": "Tavish Minielly",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Tate Howell",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Alex Levkovskiy",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Baabii’o Flower",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Julia Mamen",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Drew Mitchell",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Benjamin Mumford",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Ross MacDonald",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Alec Coleman",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Robert Hemming",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Jackson Macaulay",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "CHI",
+  "url": "https://chi.sslgoldcup.com/",
+  "nickname": "Finis Terrae Sailors",
+  "captain": "Pablo Lorca",
+  "crew": [
+   {
+    "name": "Tomas Middleton",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Nicolas Robertson",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Andrés Ducasse",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Rodrigo Ducasse",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Rodrigo Robles",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Rodrigo Amunátegui",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Felipe Robles",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Felipe Echenique",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Pablo Lorca",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Juan Esteban Sanchez",
+    "position": "Floater",
+    "number": "11"
+   }
+  ]
+ },
+ {
+  "code": "COL",
+  "url": "https://col.sslgoldcup.com/",
+  "nickname": "Golden Coffee",
+  "captain": "Simón Gomez",
+  "crew": [
+   {
+    "name": "James Medina",
+    "position": "Bow",
+    "number": "8"
+   },
+   {
+    "name": "Samuel Hormiga",
+    "position": "Mid-Bow",
+    "number": "3"
+   },
+   {
+    "name": "Juan Camilo Bustos",
+    "position": "Pit",
+    "number": "15"
+   },
+   {
+    "name": "Andrey Quintero",
+    "position": "Grinder",
+    "number": "9"
+   },
+   {
+    "name": "Julian Ramirez",
+    "position": "Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Juan Esteban Restrepo",
+    "position": "Trimmer",
+    "number": "13"
+   },
+   {
+    "name": "Esteban Echavarria",
+    "position": "Main Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Simón Gomez",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Ana Sofia Bermudez",
+    "position": "Tactician",
+    "number": "21"
+   },
+   {
+    "name": "Paula Sanchez",
+    "position": "Floater",
+    "number": "22"
+   }
+  ]
+ },
+ {
+  "code": "CUB",
+  "url": "https://cub.sslgoldcup.com/",
+  "nickname": "Pirates of the Caribbean",
+  "captain": "Nelido Manso Lopez",
+  "crew": [
+   {
+    "name": "Pedro Hernández Cabrera",
+    "position": "Bow",
+    "number": "7"
+   },
+   {
+    "name": "Sanlay Castro de le Cruz",
+    "position": "Mid-Bow",
+    "number": "8"
+   },
+   {
+    "name": "Dennier Infante Pupo",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Luis Mario Suarez Manso",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Darien Martinez Pimentel",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Reinier Manso Garcia",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Alejandro de la Guardia Pérez",
+    "position": "Main Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Nelido Manso Lopez",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Vicente de la Guardia Llanso",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Mary Rosi DIAZ Urbay",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "CZE",
+  "url": "https://cze.sslgoldcup.com/",
+  "nickname": "Czech Lakers!",
+  "captain": "Ondra Teply",
+  "crew": [
+   {
+    "name": "David Kovarik",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Vojtech Lambl",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Jakub Dobry",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Stepan Novotny",
+    "position": "Grinder",
+    "number": "13"
+   },
+   {
+    "name": "Sara Tkadlecova",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Honza Daněk",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Tomas Vika",
+    "position": "Main Trimmer",
+    "number": "16"
+   },
+   {
+    "name": "Petr Fiala",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Ondra Teply",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "DEN",
+  "url": "https://den.sslgoldcup.com/",
+  "nickname": "Danish Dynamite",
+  "captain": "Jonas Høgh-Christensen",
+  "crew": [
+   {
+    "name": "Frederik Sparvath",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Joachim Aschenbrenner",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Jonas Hviid",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Sebastian Wright Olsen",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Katja Salskov Iversen",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Christian Kamp",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jonas Warrer",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Anne-Marie Rindom",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Jonas Høgh-Christensen",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "ECU",
+  "url": "https://ecu.sslgoldcup.com/",
+  "nickname": "La Tri",
+  "captain": "Julio Velez",
+  "crew": [
+   {
+    "name": "Samuel Herrera",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Tadas Koreiva",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Irene Suarez",
+    "position": "Mid-Bow",
+    "number": "11"
+   },
+   {
+    "name": "Juan Andres Santos",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "JohnJohn Birkett",
+    "position": "Grinder",
+    "number": "5"
+   },
+   {
+    "name": "Matias Dyck",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Julio Velez",
+    "position": "Trimmer",
+    "number": "10"
+   },
+   {
+    "name": "Sebastian Herrera",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Alfredo Ochoa",
+    "position": "Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "John Wiener",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Jonathan Martinetti",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Alisson Haon",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Daniela Rodriguez",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "ESA",
+  "url": "https://esa.sslgoldcup.com/",
+  "nickname": "The Torogoz",
+  "captain": "Enrique Arathoon",
+  "crew": [
+   {
+    "name": "Christian Andres Steigelmann Urrutia",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Henry Alexander Hernández Benítez",
+    "position": "Mid-Bow",
+    "number": "11"
+   },
+   {
+    "name": "Roberto Antonio Quezada Abrego",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Javier Alejandro Chavarría Colorado",
+    "position": "Grinder",
+    "number": "18"
+   },
+   {
+    "name": "Mauricio A. Gallardo Velásquez",
+    "position": "Trimmer",
+    "number": "16"
+   },
+   {
+    "name": "Steven Adriano Sánchez Arevalo",
+    "position": "Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Jorge Ernesto Guevara Castillo",
+    "position": "Main Trimmer",
+    "number": "2"
+   },
+   {
+    "name": "Enrique Jose Arathoon Pacas",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Marta Roxana Chávez Crisonino",
+    "position": "Floater",
+    "number": "21"
+   },
+   {
+    "name": "Enrique Arathoon",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "ESP",
+  "url": "https://esp.sslgoldcup.com/",
+  "nickname": "La Armada",
+  "captain": "Luis Doreste",
+  "crew": [
+   {
+    "name": "Pedro Mas",
+    "position": "Bow",
+    "number": "11"
+   },
+   {
+    "name": "Julia Miñana Delhom",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Alex Muscat",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Matthew Barber",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Juan Meseguer",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Javier de la Plaza",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Nacho Braqueais",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Luis Doreste",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Tamara Echegoyen",
+    "position": "Helm",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "EST",
+  "url": "https://est.sslgoldcup.com/",
+  "nickname": "The Icebreakers",
+  "captain": "Tõnu Tõniste",
+  "crew": [
+   {
+    "name": "Karl Kolk",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Kevin Melvin Aasav",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Taavi Valter Taveter",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Janno Hool",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jasper Rufus Rytövaara",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Karl-Hannes Tagu",
+    "position": "Main Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Mati Sepp",
+    "position": "Helm",
+    "number": "9"
+   },
+   {
+    "name": "Tõnu Tõniste",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "FIN",
+  "url": "https://fin.sslgoldcup.com/",
+  "nickname": "Northern Magic",
+  "captain": "Oskari Seeslinna",
+  "crew": [
+   {
+    "name": "Simon Karlemo",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Martin Gahmberg",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Akseli Keskinen",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Ari Kokko",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Mikaela Wulff",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Thomas Tennström",
+    "position": "Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Edvard Bremer",
+    "position": "Main Trimmer",
+    "number": "29"
+   },
+   {
+    "name": "Lucas Karlemo",
+    "position": "Helm",
+    "number": "16"
+   },
+   {
+    "name": "Oskari Seeslinna",
+    "position": "Tactician",
+    "number": "10"
+   },
+   {
+    "name": "Julia Björkestam",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "FRA",
+  "url": "https://fra.sslgoldcup.com/",
+  "nickname": "Les Bleus",
+  "captain": "Loïck Peyron",
+  "crew": [
+   {
+    "name": "Edouard Masse",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Ange Delerce",
+    "position": "Mid-Bow",
+    "number": "11"
+   },
+   {
+    "name": "Jules Bidegaray",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Antony Munos",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Emeric Michel",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Timothee Rossi",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Xavier Rohart",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Jean-Baptiste Bernaz",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Mathieu Richard",
+    "position": "Tactician",
+    "number": "8"
+   },
+   {
+    "name": "Loïck Peyron",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Calixte Benoit",
+    "position": "Floater",
+    "number": "14"
+   }
+  ]
+ },
+ {
+  "code": "GBR",
+  "url": "https://gbr.sslgoldcup.com/",
+  "nickname": "The Spitfires",
+  "captain": "Ian Williams",
+  "crew": [
+   {
+    "name": "Matt Cornwell",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Freya Black",
+    "position": "Floater",
+    "number": "6"
+   },
+   {
+    "name": "James Dodd",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Phil Clapp",
+    "position": "Grinder",
+    "number": "32"
+   },
+   {
+    "name": "Pete Cumming",
+    "position": "Trimmer",
+    "number": "12"
+   },
+   {
+    "name": "Aaron Cooper",
+    "position": "Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Luke Patience",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Ian Williams",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Nic Asher",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "James Peters",
+    "position": "Floater",
+    "number": "4"
+   }
+  ]
+ },
+ {
+  "code": "GER",
+  "url": "https://ger.sslgoldcup.com/",
+  "nickname": "The Unbreakables",
+  "captain": "Frithjof Kleen",
+  "crew": [
+   {
+    "name": "Fabian Rieger",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Michael Müller",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Matti Paschen",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Alica Stuhlemmer",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Philip Buhl",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Markus Wieser",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Frithjof Kleen",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "GRE",
+  "url": "https://gre.sslgoldcup.com/",
+  "nickname": "Odysseus",
+  "captain": "Emilios Papathanasiou",
+  "crew": [
+   {
+    "name": "Afrodite Zegers- De Kleine",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Chrysa Marinou",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "George Karadimas",
+    "position": "Pit",
+    "number": "6"
+   },
+   {
+    "name": "George Tsigkoulis",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Adonis Bougiouris",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Tsarouchis Akis",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Stylianos Noutsos",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Simos Kambouridis",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Emilios Papathanasiou",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Dimitris Deligiannis",
+    "position": "Tactician",
+    "number": "9"
+   }
+  ]
+ },
+ {
+  "code": "GUA",
+  "url": "https://gua.sslgoldcup.com/",
+  "nickname": "Guatemalan Jaguars",
+  "captain": "Juan Ignacio Maegli",
+  "crew": [
+   {
+    "name": "Juan Ignacio Maegli",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Matias Rosenberg",
+    "position": "Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Jason Hess",
+    "position": "Main Trimmer",
+    "number": "9"
+   },
+   {
+    "name": "Isabella Maegli Aguero",
+    "position": "Tactician",
+    "number": "14"
+   },
+   {
+    "name": "Katya Castellanos",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Mario Samperio",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Juan Jose Delgado",
+    "position": "Pit",
+    "number": "17"
+   },
+   {
+    "name": "Xavier Castillo",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Erikson Perez",
+    "position": "Floater",
+    "number": "12"
+   },
+   {
+    "name": "Juan Carlos Canizalez",
+    "position": "Mid-Bow",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "HUN",
+  "url": "https://hun.sslgoldcup.com/",
+  "nickname": "The Shamans",
+  "captain": "Zsombor Berecz",
+  "crew": [
+   {
+    "name": "Aron Nemeth",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Varjas Sándor",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Róbert Bakóczy",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Domonkos Németh",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Zsombor Gyapjas",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Marcell Goszleth",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Szabolcs Majthenyi",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Zsombor Berecz",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Tomai Balazs",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "IND",
+  "url": "https://ind.sslgoldcup.com/",
+  "nickname": "Indian Tigers",
+  "captain": "Nachhatar Johal",
+  "crew": [
+   {
+    "name": "Sakthivel Sekar",
+    "position": "Bow",
+    "number": "12"
+   },
+   {
+    "name": "Vishal Singh",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Vishnu Sarvanan",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Siddeshwar Indar Doiphode",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Prince Noble",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Sandip Jain",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Pushparajan Muttu",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Nachhatar Johal",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Ramya Saravanan",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "ITA",
+  "url": "https://ita.sslgoldcup.com/",
+  "nickname": "The Gladiators",
+  "captain": "Vasco Vascotto",
+  "crew": [
+   {
+    "name": "Matteo Auguadro",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Diego Negri",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Michele Cannoni",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Umberto Molineris",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Pierluigi De Felice",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Federico Colaninno",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Michele Ivaldi",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Francesco Bruni",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Vasco Vascotto",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Enrico Voltolini",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "JPN",
+  "url": "https://jpn.sslgoldcup.com/",
+  "nickname": "Rising Sun Japan",
+  "captain": "Eiichiro Hamazaki",
+  "crew": [
+   {
+    "name": "Okada Keijyu",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Wakayama Hideki",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Furuya Shingen",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Kimura Naoya",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Kamisonoda Shintaro",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Yoshida Al",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Mizuta Ryumon",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Igei Norio",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Morita Einosuke",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Hamazaki Eiichiro",
+    "position": "Captain",
+    "number": ""
+   },
+   {
+    "name": "Tanaka Misaki",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Eiichiro Hamazaki",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "KAZ",
+  "url": "https://kaz.sslgoldcup.com/",
+  "nickname": "Nomad Force",
+  "captain": "Murat Abdrakhmanov",
+  "crew": [
+   {
+    "name": "Darkhan Kussainov",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Milana Mamedova",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Vladimir Rybalka",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Yana Belozerova",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Danat Abdrakhmanov",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Yerzhan Janzakov",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Vladimir Chshankin",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Yevgeniy Galberg",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Murat Abdrakhmanov",
+    "position": "Tactician",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "KOR",
+  "url": "https://kor.sslgoldcup.com/",
+  "nickname": "Red Fury",
+  "captain": "Jeemi̇n Ha",
+  "crew": [
+   {
+    "name": "Jeemi̇n Ha",
+    "position": "Captain",
+    "number": ""
+   },
+   {
+    "name": "Sungmin Cho",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Dajeong Kim",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Sungbin Son",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Jia Kim",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jihoon Kim",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Seung Kim",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Hyeon Su Yoon",
+    "position": "Bow",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "LTU",
+  "url": "https://ltu.sslgoldcup.com/",
+  "nickname": "The Ambers",
+  "captain": "Rokas Milevičius",
+  "crew": [
+   {
+    "name": "Martin Volkovicki",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Eglė Abramauskaitė - Kivisikk",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Kotryna Kašėtaitė-Nadzeikė",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Rita Klybė",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Kristoforas Akromas",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Andrius Ramonaitis",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Simonas Jeršovas",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Emilis Valentinaitis",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Domantas Juškevičius",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Klaudio Kliučinskas",
+    "position": "Floater",
+    "number": "6"
+   },
+   {
+    "name": "Juozas Gordevičius",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Karolis Janulionis",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Raimondas Siugzdinis",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Gintarè Scheidt",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Rokas Milevičius",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "MAR",
+  "url": "https://mar.sslgoldcup.com/",
+  "nickname": "Atlas Lion Sailors",
+  "captain": "Hakim Hasni",
+  "crew": [
+   {
+    "name": "Zineb Hariss",
+    "position": "Bow",
+    "number": "22"
+   },
+   {
+    "name": "Kautar Ben Jamaa",
+    "position": "Mid-Bow",
+    "number": "21"
+   },
+   {
+    "name": "Abdessamad Saoud",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Moustapha Amzil",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Walid Moudni",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Khalid Ezzaid",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Abderahim Cherraj",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Youssef Goura",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Marouane Moussa",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Redouane El Hafer",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Hakim Hasni",
+    "position": "Tactician",
+    "number": "8"
+   }
+  ]
+ },
+ {
+  "code": "MAS",
+  "url": "https://mas.sslgoldcup.com/",
+  "nickname": "The Monsoon",
+  "captain": "Khairulnizam Mohd Afendy",
+  "crew": [
+   {
+    "name": "Nasrul Syazwi Hanami",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Muhamad Asnawi Iqbal Adam",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Asmawi Azman",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Ahmad Faizul Aswad Mohamed",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Abdul Latif Mansor",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Mohd Akiyuddin Mat Zaki",
+    "position": "Trimmer",
+    "number": "12"
+   },
+   {
+    "name": "Muhamad Uzair Mohd Yusof",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Khairulnizam Mohd Afendy",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Nur Amirah Hamid",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Khairunnisa Mohd Afendy",
+    "position": "Floater",
+    "number": "11"
+   }
+  ]
+ },
+ {
+  "code": "MEX",
+  "url": "https://mex.sslgoldcup.com/",
+  "nickname": "Las Catrinas",
+  "captain": "Yanic Gentry",
+  "crew": [
+   {
+    "name": "Yanic Gentry",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Agustín Tapia",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Ander Gentry",
+    "position": "Floater",
+    "number": "3"
+   },
+   {
+    "name": "Juan Luis Medina",
+    "position": "Pit",
+    "number": "5"
+   },
+   {
+    "name": "Erik Brockmann",
+    "position": "Tactician",
+    "number": "8"
+   },
+   {
+    "name": "Francisco Cabildo",
+    "position": "Mid-Bow",
+    "number": "1"
+   },
+   {
+    "name": "Ander Belausteguigoitia",
+    "position": "Trimmer",
+    "number": "15"
+   },
+   {
+    "name": "Eduardo Oetling",
+    "position": "Main Trimmer",
+    "number": "9"
+   },
+   {
+    "name": "Juan Varela",
+    "position": "Bow",
+    "number": "2"
+   },
+   {
+    "name": "Diego Reyes",
+    "position": "Floater",
+    "number": "19"
+   }
+  ]
+ },
+ {
+  "code": "MOZ",
+  "url": "https://moz.sslgoldcup.com/",
+  "nickname": "Gala-Gala",
+  "captain": "",
+  "crew": [
+   {
+    "name": "Alcídio Lino",
+    "position": "Bow",
+    "number": "15"
+   },
+   {
+    "name": "Denise Parruque",
+    "position": "Mid-Bow",
+    "number": "11"
+   },
+   {
+    "name": "Myriam Beck",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Leonel Estêvão",
+    "position": "Grinder",
+    "number": "7"
+   },
+   {
+    "name": "Carlos Junior",
+    "position": "Trimmer",
+    "number": "8"
+   },
+   {
+    "name": "Guy De Rosario",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Estaline Sofiano",
+    "position": "Main Trimmer",
+    "number": "1"
+   },
+   {
+    "name": "Batolomeu Ernesto",
+    "position": "Helm",
+    "number": "6"
+   },
+   {
+    "name": "Deizy Nhaquile",
+    "position": "Tactician",
+    "number": "10"
+   },
+   {
+    "name": "Doncaro Bira José Meque Massaze",
+    "position": "Floater",
+    "number": "2"
+   }
+  ]
+ },
+ {
+  "code": "MYA",
+  "url": "https://mya.sslgoldcup.com/",
+  "nickname": "Inya",
+  "captain": "Sithu Moe Myint",
+  "crew": [
+   {
+    "name": "Min Thaw Kaung",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Saw Thaw Thi Htoo",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Nan Kham Say",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Sithu Hein",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Min Min",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Sai Pyae Sone Hein",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Aung Myin Thu",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Sithu Moe Myint",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Su Myat Soe",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Thant Zaw Oo",
+    "position": "Floater",
+    "number": "4"
+   }
+  ]
+ },
+ {
+  "code": "NED",
+  "url": "https://ned.sslgoldcup.com/",
+  "nickname": "The Dutch Lions",
+  "captain": "Roy Heiner",
+  "crew": [
+   {
+    "name": "Jorden van Rooijen",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Odile van Aanholt",
+    "position": "Floater",
+    "number": "19"
+   },
+   {
+    "name": "Ivan Peute",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Carlo Huisman",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Peter van Niekerk",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Rutger Vos",
+    "position": "Main Trimmer",
+    "number": "3"
+   },
+   {
+    "name": "Jelmer van Beek",
+    "position": "Helm",
+    "number": "3"
+   },
+   {
+    "name": "Nicholas Heiner",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Roy Heiner",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Mariit Bouwmeester",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "NOR",
+  "url": "https://nor.sslgoldcup.com/",
+  "nickname": "Norsteam",
+  "captain": "Eivind Melleby",
+  "crew": [
+   {
+    "name": "Stein-Aage Blakstad",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Jeanette Lunder",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Jacob Undrum",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Anders Pedersen",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Theodor Middlethon",
+    "position": "Grinder",
+    "number": "7"
+   },
+   {
+    "name": "Arve Roaas",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Lars Horn Johannessen",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Eivind Melleby",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Helene Naess",
+    "position": "Tactician",
+    "number": "9"
+   }
+  ]
+ },
+ {
+  "code": "NZL",
+  "url": "https://nzl.sslgoldcup.com/",
+  "nickname": "The Guardians",
+  "captain": "Leslie Egnot",
+  "crew": [
+   {
+    "name": "Celia Willison",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Oliver Lloyd",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Andrew Roy",
+    "position": "Grinder",
+    "number": "7"
+   },
+   {
+    "name": "Jack Frewin",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Robbie McCutcheon",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Sam Barnett",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Nick Egnot-Johnson",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Chris Main",
+    "position": "Tactician",
+    "number": "7"
+   },
+   {
+    "name": "Leslie Egnot",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Megan Thomson",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "OMA",
+  "url": "https://oma.sslgoldcup.com/",
+  "nickname": "Lions of the Sea",
+  "captain": "Nasser Al Mashari",
+  "crew": [
+   {
+    "name": "Ali Al Balushi",
+    "position": "Bow",
+    "number": "4"
+   },
+   {
+    "name": "Abdul Rahman Al Mashari",
+    "position": "Pit",
+    "number": "7"
+   },
+   {
+    "name": "Waleed Al Kindi",
+    "position": "Grinder",
+    "number": "2"
+   },
+   {
+    "name": "Ahmed Al Hasani",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Haitham Al Wahaibi",
+    "position": "Main Trimmer",
+    "number": "1"
+   },
+   {
+    "name": "Musab Al Hadi",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Hussain Al Jabri",
+    "position": "Tactician",
+    "number": "11"
+   },
+   {
+    "name": "Nasser Al Mashari",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "PER",
+  "url": "https://per.sslgoldcup.com/",
+  "nickname": "Paracas Warriors",
+  "captain": "Stefano Peschiera",
+  "crew": [
+   {
+    "name": "Fernando Alegre",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Adriana Barrón",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Eduardo Cano",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Orestes Reyes",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Augusto Nicolini",
+    "position": "Trimmer",
+    "number": "2"
+   },
+   {
+    "name": "Jean Paul de Trazegnies",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Javier Arribas Harten",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Stefano Peschiera",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Alonso Collantes",
+    "position": "Tactician",
+    "number": "1"
+   }
+  ]
+ },
+ {
+  "code": "PHI",
+  "url": "https://phi.sslgoldcup.com/",
+  "nickname": "Centennial Sailing Team",
+  "captain": "Ridgely Magsanay Balladares",
+  "crew": [
+   {
+    "name": "Joel Mondoy Mejarito",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Whok Berongoy Dimapilis",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Bernard Elle Floren",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Lester Troy Serapion Tayong",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Richly Arquino Magsanay",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Alaiza Mae Belmonte Hernandez",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Rubin Barola Cruz",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Ridgely Magsanay Balladares",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Emerson Ronquillo Villena",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Coleen Jem Malvar Ferrer",
+    "position": "Floater",
+    "number": "11"
+   }
+  ]
+ },
+ {
+  "code": "POL",
+  "url": "https://pol.sslgoldcup.com/",
+  "nickname": "Sea Wolves",
+  "captain": "Mateusz Kusznierewicz",
+  "crew": [
+   {
+    "name": "Kacper Gwóżdź",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Dominik Janowczyk",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Tymoteusz Bendyk",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Paweł Gardasiewicz",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Mikołaj Gielniak",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Maja Micińska",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jakub Surowiec",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Mateusz Kusznierewicz",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Igor Tarasiuk",
+    "position": "Tactician",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "POR",
+  "url": "https://por.sslgoldcup.com/",
+  "nickname": "The Navigators",
+  "captain": "Joao Rodrigues",
+  "crew": [
+   {
+    "name": "Manuel Dantas",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Tomás Barreto",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Tomás Pires de Lima",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Filipe Silva",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Nuno Barreto",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Diana Neves",
+    "position": "Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Mariana Lobato",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Renato Conde",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Afonso Domingos",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Hugo Rocha",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Joao Rodrigues",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "PUR",
+  "url": "https://pur.sslgoldcup.com/",
+  "nickname": "Los Boricuas",
+  "captain": "Ramón González Bennazar",
+  "crew": [
+   {
+    "name": "Gretchen Ortiz",
+    "position": "Bow",
+    "number": "12"
+   },
+   {
+    "name": "Efrain Fraito Lugo",
+    "position": "Mid-Bow",
+    "number": "5"
+   },
+   {
+    "name": "Virginia Carrero",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Sebastian Medina",
+    "position": "Pit",
+    "number": "23"
+   },
+   {
+    "name": "Agustin Lázaro",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Manuel González",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Melvin González",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Pedro Fernández",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Marco Teixidor",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Ramón González",
+    "position": "Tactician",
+    "number": "6"
+   },
+   {
+    "name": "Ramón González Bennazar",
+    "position": "Captain",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "RSA",
+  "url": "https://rsa.sslgoldcup.com/",
+  "nickname": "Team Ubuntu",
+  "captain": "Ian Ainslie",
+  "crew": [
+   {
+    "name": "Joweal Klaase",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Michaela Robinson",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Marco Tobin",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Arin Long",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Charles Nankin",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Gareth Blanckenberg",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "David Rae",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Mark Sadler",
+    "position": "Tactician",
+    "number": "0"
+   },
+   {
+    "name": "Ian Ainslie",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Howard Leoto",
+    "position": "Floater",
+    "number": "3"
+   }
+  ]
+ },
+ {
+  "code": "SEY",
+  "url": "https://sey.sslgoldcup.com/",
+  "nickname": "Vann Swet",
+  "captain": "Allan Julie",
+  "crew": [
+   {
+    "name": "Joshua Allcorn",
+    "position": "Bow",
+    "number": "17"
+   },
+   {
+    "name": "Brian Tousaint",
+    "position": "Mid-Bow",
+    "number": "16"
+   },
+   {
+    "name": "Eston Dubel",
+    "position": "Pit",
+    "number": "12"
+   },
+   {
+    "name": "Connor Haworth",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Jayden Vidot",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Maryse Marie",
+    "position": "Trimmer",
+    "number": "22"
+   },
+   {
+    "name": "Roy Govinden Govinden",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Allan Julie",
+    "position": "Helm",
+    "number": "3"
+   },
+   {
+    "name": "Curtis Allcorn",
+    "position": "Tactician",
+    "number": "15"
+   },
+   {
+    "name": "Maria Dewea",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "SGP",
+  "url": "https://sgp.sslgoldcup.com/",
+  "nickname": "Guardians Of The Bay",
+  "captain": "Jovina Choo",
+  "crew": [
+   {
+    "name": "Terena Lam",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Bin Mohamed Farid Abdullah",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Wilson Weicheng Cai",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Umar Bin Moiz",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Yong Soon Lee",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Ethan Wei Ming Leong",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Savannah Kiah Hui Siew",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jia Yi Loh",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Faith Ning Koy",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Jovina Choo",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Kyle Koon Leng Lim",
+    "position": "Floater",
+    "number": "6"
+   }
+  ]
+ },
+ {
+  "code": "SLO",
+  "url": "https://slo.sslgoldcup.com/",
+  "nickname": "Krpani 1860",
+  "captain": "Vasilij Zbogar",
+  "crew": [
+   {
+    "name": "Gašper Strahovnik",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Vid Jeranko",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Iztok Knafelc",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Veronika Macarol",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Mitja Margon",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Mitja Beltram",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Igor Lah",
+    "position": "Helm",
+    "number": "8"
+   },
+   {
+    "name": "Branko Brčin",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Vasilij Zbogar",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Tina Mrak",
+    "position": "Floater",
+    "number": "11"
+   },
+   {
+    "name": "Lah Tine",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "SRB",
+  "url": "https://srb.sslgoldcup.com/",
+  "nickname": "The Eagles",
+  "captain": "Goran Stevanovic",
+  "crew": [
+   {
+    "name": "Vladimir Švab",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Aleksandar Jovanovic",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Milos Dobrosavljev",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Luka Minic",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Arsa Stevanov",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Dragan Petrovic",
+    "position": "Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Tihomir Zakic",
+    "position": "Main Trimmer",
+    "number": "10"
+   },
+   {
+    "name": "Nikola Marjanovic",
+    "position": "Tactician",
+    "number": "5"
+   },
+   {
+    "name": "Goran Stevanovic",
+    "position": "Captain",
+    "number": "8"
+   }
+  ]
+ },
+ {
+  "code": "SUI",
+  "url": "https://sui.sslgoldcup.com/",
+  "nickname": "The Helvetic Lakers",
+  "captain": "Eric Monnin",
+  "crew": [
+   {
+    "name": "Laurane Mettraux",
+    "position": "Bow",
+    "number": "4"
+   },
+   {
+    "name": "Axel Grandjean",
+    "position": "Mid-Bow",
+    "number": ""
+   },
+   {
+    "name": "Morgan Lauber",
+    "position": "Pit",
+    "number": "13"
+   },
+   {
+    "name": "Nelson Mettraux",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Simon Brügger",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Jessica Berthoud",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Kilian Wagen",
+    "position": "Main Trimmer",
+    "number": "9"
+   },
+   {
+    "name": "Eric Monnin",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Matias Bühler",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Cyril Schüpbach",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "SWE",
+  "url": "https://swe.sslgoldcup.com/",
+  "nickname": "The Vikings",
+  "captain": "Max Salminen",
+  "crew": [
+   {
+    "name": "Jakob Wilson",
+    "position": "Mid-Bow",
+    "number": "3"
+   },
+   {
+    "name": "Fredrik Aurell",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Fredrik Bergström",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Jesper Stålheim",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Mattias Rahm",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Max Salminen",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Lovisa Karlsson",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "TAH",
+  "url": "https://tah.sslgoldcup.com/",
+  "nickname": "The Black Pearls",
+  "captain": "Teva Plichart",
+  "crew": [
+   {
+    "name": "Yann Rigal",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Heiniti Maiarii",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Manutea Mahai",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Teriimana Degage",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Hervé Cunningham",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Moana HUGONOT",
+    "position": "Trimmer",
+    "number": "9"
+   },
+   {
+    "name": "Tom Lamotte",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Teva Plichart",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Teiki Hacheche",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Vaimiti RIGAL",
+    "position": "Floater",
+    "number": "1"
+   }
+  ]
+ },
+ {
+  "code": "THA",
+  "url": "https://tha.sslgoldcup.com/",
+  "nickname": "Chang Thai (Elephant Or Elephas Maximas)",
+  "captain": "Noppakao Nai Poonpat",
+  "crew": [
+   {
+    "name": "Anusorn Ngamrit",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Alexander Amarit Frefel",
+    "position": "Pit",
+    "number": "8"
+   },
+   {
+    "name": "Nut Butmarasri",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Nichapa Waiwai",
+    "position": "Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Dylan Whitcraft",
+    "position": "Trimmer",
+    "number": "12"
+   },
+   {
+    "name": "Navee Thamsoontorn",
+    "position": "Main Trimmer",
+    "number": "2"
+   },
+   {
+    "name": "Chusitt Punjamala",
+    "position": "Main Trimmer",
+    "number": "15"
+   },
+   {
+    "name": "Noppakao Poonpat",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Don Whitcraft",
+    "position": "Tactician",
+    "number": "7"
+   },
+   {
+    "name": "Noppakao Nai Poonpat",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Sanont Khaisaeng",
+    "position": "Floater",
+    "number": "3"
+   }
+  ]
+ },
+ {
+  "code": "TUR",
+  "url": "https://tur.sslgoldcup.com/",
+  "nickname": "Young Turks",
+  "captain": "Alican Kaynar",
+  "crew": [
+   {
+    "name": "Kıvanç Sevinç",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Ekin Büyükyılmaz",
+    "position": "Pit",
+    "number": "7"
+   },
+   {
+    "name": "Berkay Abay",
+    "position": "Grinder",
+    "number": "2"
+   },
+   {
+    "name": "Cem Gözen",
+    "position": "Trimmer",
+    "number": "6"
+   },
+   {
+    "name": "Baykan Melis",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Anıl Berk",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Onur Bilgen",
+    "position": "Helm",
+    "number": "7"
+   },
+   {
+    "name": "Alican Kaynar",
+    "position": "Tactician",
+    "number": "10"
+   },
+   {
+    "name": "Umut Eyriparmak",
+    "position": "Floater",
+    "number": "11"
+   }
+  ]
+ },
+ {
+  "code": "UAE",
+  "url": "https://uae.sslgoldcup.com/",
+  "nickname": "The Falcons",
+  "captain": "Adil Khalid",
+  "crew": [
+   {
+    "name": "Saif Al Nuaimi",
+    "position": "Bow",
+    "number": "11"
+   },
+   {
+    "name": "Ahmed Al Taher",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Ali Younus",
+    "position": "Pit",
+    "number": "3"
+   },
+   {
+    "name": "Yousuf Khalid Al Bastaki",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Ahmed Al Marzooqi",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Ahmed Younus",
+    "position": "Trimmer",
+    "number": "8"
+   },
+   {
+    "name": "Aljazi Al Mehairbi",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Adil Khalid Al Bastaki",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Othman Al Hamadd",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Salama Al Mansoori",
+    "position": "Floater",
+    "number": "8"
+   },
+   {
+    "name": "Adil Khalid",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "UKR",
+  "url": "https://ukr.sslgoldcup.com/",
+  "nickname": "United",
+  "captain": "Rodion Luka",
+  "crew": [
+   {
+    "name": "Stanislav Mulko",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Yurii Liudorovskyi",
+    "position": "Mid-Bow",
+    "number": "7"
+   },
+   {
+    "name": "Semen Khashchyna",
+    "position": "Pit",
+    "number": "7"
+   },
+   {
+    "name": "Valerii Kudriashov",
+    "position": "Grinder",
+    "number": "4"
+   },
+   {
+    "name": "Volodymyr Bogomolkin",
+    "position": "Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Yuliya Freespirit",
+    "position": "Trimmer",
+    "number": "11"
+   },
+   {
+    "name": "Georgiy Paches",
+    "position": "Main Trimmer",
+    "number": "8"
+   },
+   {
+    "name": "Oscar Madonich",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Rodion Luka",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Anastasia Kolesnichenko",
+    "position": "Floater",
+    "number": "15"
+   }
+  ]
+ },
+ {
+  "code": "URU",
+  "url": "https://uru.sslgoldcup.com/",
+  "nickname": "La Celeste",
+  "captain": "Ricardo Fabini",
+  "crew": [
+   {
+    "name": "Dominique Knupell",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Federico Caballero",
+    "position": "Mid-Bow",
+    "number": "3"
+   },
+   {
+    "name": "Hernán Umpierre",
+    "position": "Pit",
+    "number": "2"
+   },
+   {
+    "name": "Roberto Fabini",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Diego Stefani",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Fernando Díz",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "Santiago Silveira",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Pablo Defazio Abella",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Ricardo Fabini",
+    "position": "Captain",
+    "number": "10"
+   }
+  ]
+ },
+ {
+  "code": "USA",
+  "url": "https://usa.sslgoldcup.com/",
+  "nickname": "The Golden Eagles",
+  "captain": "Paul Cayard",
+  "crew": [
+   {
+    "name": "Erik Shampain",
+    "position": "Bow",
+    "number": ""
+   },
+   {
+    "name": "Nikole Barnes",
+    "position": "Floater",
+    "number": ""
+   },
+   {
+    "name": "Mac Agnese",
+    "position": "Pit",
+    "number": ""
+   },
+   {
+    "name": "Chris Poole",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Ian Liberty",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Eric Doyle",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Victor Diaz De Leon",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Taylor Canfield",
+    "position": "Helm",
+    "number": ""
+   },
+   {
+    "name": "Mike Buckley",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Paul Cayard",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "Matt Cassidy",
+    "position": "",
+    "number": ""
+   }
+  ]
+ },
+ {
+  "code": "VEN",
+  "url": "https://ven.sslgoldcup.com/",
+  "nickname": "Los Caciques",
+  "captain": "Andrés Lage",
+  "crew": [
+   {
+    "name": "Andrés Lage",
+    "position": "Captain",
+    "number": "10"
+   },
+   {
+    "name": "José Ruiz",
+    "position": "Trimmer",
+    "number": "5"
+   },
+   {
+    "name": "Johny Bilbao",
+    "position": "Grinder",
+    "number": "6"
+   },
+   {
+    "name": "Yamil Saba",
+    "position": "Tactician",
+    "number": "9"
+   },
+   {
+    "name": "Jose Bilbao",
+    "position": "Trimmer",
+    "number": "4"
+   },
+   {
+    "name": "José Gutiérrez",
+    "position": "Main Trimmer",
+    "number": "7"
+   },
+   {
+    "name": "Gonzalo Cendra",
+    "position": "Mid-Bow",
+    "number": "2"
+   },
+   {
+    "name": "Ricardo Martos",
+    "position": "Bow",
+    "number": "1"
+   },
+   {
+    "name": "Martin Nespereira",
+    "position": "Floater",
+    "number": "11"
+   },
+   {
+    "name": "Rodrigo Favela",
+    "position": "Pit",
+    "number": "3"
+   }
+  ]
+ },
+ {
+  "code": "VIE",
+  "url": "https://vie.sslgoldcup.com/",
+  "nickname": "One Team - One Dream",
+  "captain": "Le Tien Dung",
+  "crew": [
+   {
+    "name": "Pham Van Mach",
+    "position": "Bow",
+    "number": "11"
+   },
+   {
+    "name": "Ta Ba Trong",
+    "position": "Mid-Bow",
+    "number": "15"
+   },
+   {
+    "name": "Nguyen Viet Ha",
+    "position": "Pit",
+    "number": "8"
+   },
+   {
+    "name": "Phan Ngoc Minh",
+    "position": "Grinder",
+    "number": ""
+   },
+   {
+    "name": "Thi Hong Nhung Tran",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Tran Quoc Tuan",
+    "position": "Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Nguyen Trang Dai",
+    "position": "Main Trimmer",
+    "number": ""
+   },
+   {
+    "name": "Le Tien Dung",
+    "position": "Helm",
+    "number": "10"
+   },
+   {
+    "name": "Bui Anh Tuan",
+    "position": "Tactician",
+    "number": ""
+   },
+   {
+    "name": "Vu Tuan Anh",
+    "position": "Floater",
+    "number": ""
+   }
+  ]
+ }
+]
