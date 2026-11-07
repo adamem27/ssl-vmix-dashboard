@@ -4,6 +4,8 @@
 
 @layer base {
   html { color-scheme: dark; }
+  /* Windows draws native dropdown lists white unless the options get their own colours. */
+  option, optgroup { @apply bg-ink-900 text-ink-50; }
   body { @apply bg-ink-950 text-ink-100; font-feature-settings: 'tnum' 1, 'cv11' 1; }
   :focus-visible { @apply outline-none ring-2 ring-accent-400 ring-offset-2 ring-offset-ink-950; }
 }

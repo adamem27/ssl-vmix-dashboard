@@ -4,7 +4,10 @@ import { useLocation } from 'react-router-dom';
 import { api, EventInfo, ImportSummary, RunOutcome, SettingsInfo, SyncRun, SyncStatus } from '../api';
 import { Badge, Button, cx, ErrorBox, Field, fmtDateTime, Loading, Modal, useConfirm, useToast } from '../components/ui';
 
-const TIMEZONES = ['Europe/Warsaw', 'Europe/London', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Athens', 'Europe/Helsinki', 'Atlantic/Canary', 'UTC'];
+const COMMON_TIMEZONES = ['Europe/Warsaw', 'America/Sao_Paulo', 'Europe/London', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Athens', 'Atlantic/Canary', 'UTC'];
+const ALL_TIMEZONES: string[] = (() => { try { return (Intl as any).supportedValuesOf('timeZone'); } catch { return COMMON_TIMEZONES; } })();
+const CITY_HINT: Record<string, string> = { 'America/Sao_Paulo': 'Rio de Janeiro, São Paulo', 'Europe/Warsaw': 'Poland', 'Atlantic/Canary': 'Canary Islands' };
+const tzLabel = (t: string) => `${t.replace(/_/g, ' ')}${CITY_HINT[t] ? ` (${CITY_HINT[t]})` : ''}`;
 
 function Section({ id, title, children, desc }: { id: string; title: string; desc?: ReactNode; children: ReactNode }) {
   return (
@@ -58,8 +61,10 @@ function EventSection({ event }: { event: EventInfo }) {
       <form onSubmit={save} className="grid gap-3 md:grid-cols-[1fr_240px_120px_auto] md:items-end">
         <Field label="Name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
         <Field label="Event time zone">
-          <input className="input" list="tz-list" value={f.timezone} onChange={(e) => setF({ ...f, timezone: e.target.value })} required />
-          <datalist id="tz-list">{TIMEZONES.map((t) => <option key={t} value={t} />)}</datalist>
+          <select className="input" value={f.timezone} onChange={(e) => setF({ ...f, timezone: e.target.value })} required>
+            <optgroup label="Common">{COMMON_TIMEZONES.map((t) => <option key={t} value={t}>{tzLabel(t)}</option>)}</optgroup>
+            <optgroup label="All">{ALL_TIMEZONES.filter((t) => !COMMON_TIMEZONES.includes(t)).map((t) => <option key={t} value={t}>{tzLabel(t)}</option>)}</optgroup>
+          </select>
         </Field>
         <Field label="Year"><input className="input tabular-nums" type="number" min={2000} max={2100} value={f.year} onChange={(e) => setF({ ...f, year: Number(e.target.value) })} required /></Field>
         <Button type="submit" variant="primary" busy={busy}>Save</Button>
