@@ -18,6 +18,8 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   const text = await res.text();
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
+  // Logged out (online mode): back to the login form.
+  if (res.status === 401) window.location.href = '/login';
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `Server error (HTTP ${res.status}).`, data?.details);
   return data as T;
 }

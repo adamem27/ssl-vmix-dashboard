@@ -29,6 +29,7 @@ jobs:
           Pop-Location
           New-Item -ItemType Directory out/app/node | Out-Null
           Copy-Item (Get-Command node).Source out/app/node/node.exe
+          Copy-Item vmix-sync/vmix-sync.mjs out/app/
           Copy-Item windows/* out/
       - name: Check the launcher parses
         run: |
@@ -57,9 +58,24 @@ jobs:
           $d = "$env:RUNNER_TEMP/launcher"
           New-Item -ItemType Directory $d | Out-Null
           Copy-Item out/launcher.ps1 $d
-          @{ token = '${{ github.token }}' } | ConvertTo-Json | Set-Content "$d/config.json"
+          @{ token = '${{ github.token }}'; server = '' } | ConvertTo-Json | Set-Content "$d/config.json"
           $env:SSL_LAUNCHER_TEST = '1'
           powershell -NoProfile -ExecutionPolicy Bypass -File "$d/launcher.ps1"
           if ($LASTEXITCODE -ne 0) { throw "launcher test failed ($LASTEXITCODE)" }
           if (-not (Test-Path "$d/app/version.txt")) { throw 'launcher did not install the app' }
           Get-ChildItem $d
+      - name: Test online mode (sync from a dashboard with a password)
+        run: |
+          $env:DATA_DIR = "$env:RUNNER_TEMP/server"; $env:PORT = '4320'; $env:DASHBOARD_PASSWORD = 'pw'
+          $srv = Start-Process out/app/node/node.exe -ArgumentList 'out/app/app.cjs' -PassThru -NoNewWindow
+          Start-Sleep 6
+          Remove-Item env:DATA_DIR, env:PORT, env:DASHBOARD_PASSWORD
+          $d = "$env:RUNNER_TEMP/launcher"
+          @{ token = '${{ github.token }}'; server = 'http://127.0.0.1:4320'; password = 'pw' } | ConvertTo-Json | Set-Content "$d/config.json"
+          $env:SSL_LAUNCHER_TEST = '1'
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$d/launcher.ps1"
+          $code = $LASTEXITCODE
+          Stop-Process $srv -Force
+          if ($code -ne 0) { throw "sync test failed ($code)" }
+          if (-not (Test-Path "$d/data/assets/ssl-vmix.xlsx")) { throw 'no xlsx synced' }
+          if (-not (Test-Path "$d/data/assets/ssl-vmix.json")) { throw 'no json synced' }

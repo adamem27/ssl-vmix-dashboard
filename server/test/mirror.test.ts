@@ -14,6 +14,20 @@ describe('online mode', () => {
     expect((await app.inject({ url: '/api/teams', headers: auth('wrong') })).statusCode).toBe(401);
     expect((await app.inject({ url: '/api/teams', headers: auth('regatta') })).statusCode).toBe(200);
     expect((await app.inject({ url: '/api/health' })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/api/teams' })).headers['www-authenticate']).toBeUndefined();
+  });
+
+  it('logs browsers in with a form and a cookie', async () => {
+    const { db, ctx, sync } = setup();
+    const app = await buildApp({ db, assetsDir: ctx.assetsDir, sync, password: 'regatta' });
+    expect((await app.inject({ url: '/vmix/overview' })).headers.location).toBe('/login');
+    const bad = await app.inject({ method: 'POST', url: '/login', payload: 'password=nope', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+    expect(bad.body).toContain('Wrong password');
+    const ok = await app.inject({ method: 'POST', url: '/login', payload: 'password=regatta', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+    const cookie = String(ok.headers['set-cookie']).split(';')[0];
+    expect(ok.headers.location).toBe('/');
+    expect((await app.inject({ url: '/api/teams', headers: { cookie } })).statusCode).toBe(200);
+    expect((await app.inject({ url: '/api/teams', headers: { cookie: 'ssl_auth=abc' } })).statusCode).toBe(401);
   });
 
   it('lists and serves the assets folder for the vMix sync', async () => {

@@ -23,6 +23,15 @@ if (-not $config.token) {
   $config.token = (Read-Host 'Update key').Trim()
   $config | ConvertTo-Json | Set-Content $ConfigFile -Encoding UTF8
 }
+if ($null -eq $config.server) {
+  Write-Host ''
+  Write-Host 'Where is the database?'
+  Write-Host '  - online dashboard: type its address, e.g. https://sslgfx.em27code.com'
+  Write-Host '  - on this PC only: just press Enter'
+  $config.server = (Read-Host 'Online address').Trim().TrimEnd('/')
+  if ($config.server) { $config.password = (Read-Host 'Online dashboard password').Trim() }
+  $config | ConvertTo-Json | Set-Content $ConfigFile -Encoding UTF8
+}
 
 function Update-App {
   if (-not $config.token) { return }
@@ -77,21 +86,41 @@ Say 'Checking for updates...'
 Update-App
 if (-not (Test-Path (Join-Path $App 'app.cjs'))) { Say 'The app is missing and could not be downloaded. Check the internet connection and the update key.'; Read-Host 'Press Enter to close'; exit 1 }
 
+New-Item -ItemType Directory $Data -Force | Out-Null
+$Node = Join-Path $App 'node\node.exe'
+
+if ($config.server) {
+  # Online mode: the database lives on the server; this PC keeps a local copy of the files for vMix.
+  $env:SYNC_SERVER = $config.server
+  $env:SYNC_PASSWORD = "$($config.password)"
+  $env:SYNC_FOLDER = Join-Path $Data 'assets'
+  Say "Online dashboard: $($config.server)"
+  Say "vMix Excel file: $Data\assets\ssl-vmix.xlsx"
+  Say 'Keep this window open (you can minimize it).'
+  if ($env:SSL_LAUNCHER_TEST) { & $Node (Join-Path $App 'vmix-sync.mjs') --once; exit $LASTEXITCODE }
+  Start-Process $config.server
+  while ($true) {
+    & $Node (Join-Path $App 'vmix-sync.mjs')
+    Say 'Sync stopped. Restarting in 5 s...'
+    Start-Sleep 5
+  }
+}
+
+# Local mode: the dashboard and its database run on this PC.
 Stop-Dashboard
 $env:DATA_DIR = $Data
 $env:HOST = '0.0.0.0'
 $env:PORT = "$Port"
 $env:LOG_LEVEL = 'warn'
-New-Item -ItemType Directory $Data -Force | Out-Null
+if ($config.localPassword) { $env:DASHBOARD_PASSWORD = $config.localPassword }
 $Log = Join-Path $Data 'dashboard.log'
-if ($config.password) { $env:DASHBOARD_PASSWORD = $config.password }
 $ip = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1).IPAddress
-Say "Dashboard: http://localhost:$Port   (other computers: http://${ip}:$Port)"
+Say "Dashboard: http://localhost:$Port   (other computers in this network: http://${ip}:$Port)"
 Say "vMix Excel file: $Data\assets\ssl-vmix.xlsx"
 Say 'Keep this window open (you can minimize it).'
 # CI check: start once, confirm it answers, stop.
 if ($env:SSL_LAUNCHER_TEST) {
-  $p = Start-Process (Join-Path $App 'node\node.exe') -ArgumentList "`"$(Join-Path $App 'app.cjs')`"" -PassThru -NoNewWindow
+  $p = Start-Process $Node -ArgumentList "`"$(Join-Path $App 'app.cjs')`"" -PassThru -NoNewWindow
   $ok = $false
   foreach ($i in 1..30) { Start-Sleep 1; try { if ((Invoke-RestMethod "http://127.0.0.1:$Port/api/health").ok) { $ok = $true; break } } catch { } }
   Stop-Process $p -Force
@@ -99,7 +128,7 @@ if ($env:SSL_LAUNCHER_TEST) {
 }
 Start-Job { Start-Sleep 4; Start-Process "http://localhost:$using:Port" } | Out-Null
 while ($true) {
-  & (Join-Path $App 'node\node.exe') (Join-Path $App 'app.cjs') 2>&1 | Out-File $Log -Append -Encoding utf8
+  & $Node (Join-Path $App 'app.cjs') 2>&1 | Out-File $Log -Append -Encoding utf8
   Say 'The dashboard stopped. Restarting in 5 s...'
   Start-Sleep 5
 }
