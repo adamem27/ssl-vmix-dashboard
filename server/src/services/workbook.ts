@@ -57,7 +57,12 @@ export class WorkbookWriter {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = `${this.file}.tmp`;
       fs.writeFileSync(tmp, buildXlsx(sheets));
-      fs.renameSync(tmp, this.file);
+      try {
+        fs.renameSync(tmp, this.file);
+      } catch (e) {
+        // Windows refuses to replace a file another program (vMix) holds open; overwriting in place may still work.
+        try { fs.copyFileSync(tmp, this.file); } catch { throw e; } finally { fs.rmSync(tmp, { force: true }); }
+      }
       this.lastHash = hash;
       this.updatedAt = new Date().toISOString();
       if (this.lastError) this.log('Workbook written again after an error');
