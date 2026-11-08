@@ -51,7 +51,7 @@ describe('assets folder', () => {
 });
 
 describe('workbook sheets', () => {
-  it('follows the current stage, keeps data in rows and each value in one sheet', () => {
+  it('follows the current stage, keeps data in rows and each value in one sheet', async () => {
     const { db, ctx, eventId } = setup();
     const a = seedTeam(db, 'BRN', ['Ali Hassan', 'Omar Said']);
     const b = seedTeam(db, 'IND', ['Raj Kumar']);
@@ -91,6 +91,10 @@ describe('workbook sheets', () => {
     const col = Object.entries(general[t + 1]).find(([, v]) => v === 'Extra')![0];
     expect(general.find((r, i) => i > t && r.A === 'Ticker text')![col]).toBe('A I B I ');
     expect(general[t - 1].A).toBe(''); // an empty row between blocks
+    expect(general.some((r) => r.A === 'ANNOUNCEMENTS' || r.A === 'PEOPLE')).toBe(false); // own sheets
+    const { announcementsSheet, peopleSheet } = await import('../src/services/workbookSheets.js');
+    expect(announcementsSheet(ctx, eventId).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
+    expect(peopleSheet(ctx, eventId)).toEqual([]);
   });
 });
 

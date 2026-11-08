@@ -24,7 +24,7 @@ describe('general graphics versions', () => {
     gs.seedGraphicSets(db, eventId);
     expect(gs.listGraphicSets(db, eventId, 'welcome')).toHaveLength(0); // deleting is respected
     const names = allSheets(ctx).map((s) => s.name);
-    expect(names).toEqual(['General', 'Teams', 'Sailors', 'Results']);
+    expect(names).toEqual(['General', 'Teams', 'Sailors', 'Results', 'Announcements', 'People']);
   });
 });
 

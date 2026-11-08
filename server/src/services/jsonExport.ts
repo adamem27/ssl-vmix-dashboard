@@ -98,5 +98,7 @@ export function jsonIndex(_db: DB, _eventId: string) {
     { name: 'Teams', path: '/json/sheet/teams' },
     { name: 'Sailors', path: '/json/sheet/sailors' },
     { name: 'Results', path: '/json/sheet/results' },
+    { name: 'Announcements', path: '/json/sheet/announcements' },
+    { name: 'People', path: '/json/sheet/people' },
   ];
 }

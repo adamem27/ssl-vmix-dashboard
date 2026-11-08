@@ -15,7 +15,7 @@ const LAYOUT_VERSION = 2;
 
 export interface WorkbookSheet { name: string; path: string; rows: Record<string, string>[] }
 
-/** The four sheets of the vMix workbook (see workbookSheets.ts). */
+/** The six sheets of the vMix workbook (see workbookSheets.ts). */
 export function allSheets(ctx: AssetCtx): WorkbookSheet[] {
   const ev = activeEvent(ctx.db);
   const today = todayIn(ev.timezone);

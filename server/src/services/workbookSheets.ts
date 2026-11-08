@@ -14,7 +14,7 @@ import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 
 /**
- * The vMix workbook: four sheets, data in rows, every value in one place only.
+ * The vMix workbook: six sheets, data in rows, every value in one place only.
  *  - General: every general graphic, one row per value (Graphic · Version · Field · Value).
  *  - Teams:   one row per team of the current stage (its group and place, names, ranking, graphics).
  *  - Sailors: one row per sailor of those teams (captain, line-up place, today's declaration, photo).
@@ -70,7 +70,7 @@ const letter = (i: number) => { let s = ''; for (let n = i + 1; n > 0; n = Math.
  * General: a grid of titled blocks, read like a page. Columns are named by their letter (row 1), so a vMix field
  * maps to column + row exactly as the cell in Excel (e.g. B3). Blocks keep their place: Event and Matchboard beside
  * Weather at the top, then each general graphic with its versions in columns, then People, and today's
- * schedule last (it is the only block whose height changes). An empty row separates the blocks.
+ * schedule last (it is the only block whose height changes). Announcements and People have sheets of their own. An empty row separates the blocks.
  */
 export function generalSheet(ctx: AssetCtx, eventId: string, today: string): SheetRows {
   const { db } = ctx;
@@ -104,6 +104,7 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
   // general graphics: one block per kind, versions side by side
   const sets = listGraphicSets(db, eventId);
   for (const k of GRAPHIC_KINDS) {
+    if (k.kind === 'announcement') continue; // own sheet: adding one shifts nothing here
     const vs = sets.filter((x) => x.kind === k.kind);
     const lines: [string, ...string[]][] = k.fields.map((f) => [f.label, ...vs.map((s) => {
       const v = s.data[f.key] ?? '';
@@ -114,10 +115,6 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
   }
 
   // people: one column per person
-  const people = listPeople(ctx, eventId);
-  row += block(row, 0, 'PEOPLE', people.map((p) => [p.role || 'Person', p.language].filter(Boolean).join(' · ')),
-    [['Name', ...people.map((p) => p.name)], ['Title', ...people.map((p) => p.title)], ['Photo', ...people.map((p) => img(p.photo))]]) + 1;
-
   // today's schedule last: one race per row
   block(row, 0, "TODAY'S SCHEDULE", ['Time', 'Race', 'Group', 'Status', 'Note'],
     listSchedule(db, eventId, today).map((s, i) => [`Race ${i + 1}`, s.time, s.race, s.fleet, s.status, s.note]));
@@ -129,6 +126,17 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
   out.styles = styles;
   out.widths = cols.map((_, i) => (i === 0 ? 20 : 30));
   return out;
+}
+
+// ---------- Announcements and People: their own sheets, one row each, so adding one moves nothing else ----------
+export function announcementsSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {
+  const k = GRAPHIC_KINDS.find((x) => x.kind === 'announcement')!;
+  return listGraphicSets(ctx.db, eventId).filter((s) => s.kind === 'announcement')
+    .map((s) => ({ Version: s.name, ...Object.fromEntries(k.fields.map((f) => [f.label, s.data[f.key] ?? ''])) }));
+}
+
+export function peopleSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {
+  return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Title: p.title, Photo: img(p.photo) }));
 }
 
 // ---------- Teams ----------
@@ -243,6 +251,8 @@ export const SHEETS = [
   { name: 'Teams', key: 'teams' },
   { name: 'Sailors', key: 'sailors' },
   { name: 'Results', key: 'results' },
+  { name: 'Announcements', key: 'announcements' },
+  { name: 'People', key: 'people' },
 ] as const;
 
 export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: string): SheetRows {
@@ -250,6 +260,8 @@ export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: st
   if (key === 'teams') return teamsSheet(ctx, eventId, today);
   if (key === 'sailors') return sailorsSheet(ctx, eventId, today);
   if (key === 'results') return resultsSheet(ctx, eventId);
+  if (key === 'announcements') return announcementsSheet(ctx, eventId);
+  if (key === 'people') return peopleSheet(ctx, eventId);
   throw badRequest(`Unknown sheet: ${key}`);
 }
 
