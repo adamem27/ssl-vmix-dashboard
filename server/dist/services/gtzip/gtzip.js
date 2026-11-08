@@ -224,6 +224,29 @@ export class GtzipService {
         fs.writeFileSync(this.metaPath(id), JSON.stringify(meta, null, 2));
         return meta;
     }
+    /** Every .gtzip inside a .zip (folders ignored); a file that is not a GT title is skipped and reported. */
+    addTemplatePack(buf) {
+        let entries;
+        try {
+            entries = readZip(buf);
+        }
+        catch {
+            throw badRequest('This is not a .zip archive.');
+        }
+        const added = [], skipped = [];
+        for (const e of entries.filter((x) => /\.gtzip$/i.test(x.name) && !x.name.split('/').some((p) => p.startsWith('__MACOSX') || p.startsWith('.')))) {
+            const file = e.name.split('/').pop();
+            try {
+                added.push(this.addTemplate(e.data(), file));
+            }
+            catch {
+                skipped.push(file);
+            }
+        }
+        if (!added.length && !skipped.length)
+            throw badRequest('There is no .gtzip file in this .zip.');
+        return { added, skipped };
+    }
     meta(id) {
         const f = this.metaPath(id);
         if (!fs.existsSync(this.tplPath(id)) || !fs.existsSync(f))

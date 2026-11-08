@@ -16,6 +16,15 @@ export function registerGtzipRoutes(app, svc) {
             throw badRequest('Upload a .gtzip file saved by GT Title Designer.');
         return svc.addTemplate(await file.toBuffer(), file.filename);
     });
+    // a .zip with many titles (a whole set of scenes) adds each .gtzip in it
+    app.post('/api/gtzip/templates/pack', async (req) => {
+        const file = await req.file();
+        if (!file)
+            throw badRequest('No file was uploaded.');
+        if (!/\.zip$/i.test(file.filename))
+            throw badRequest('Upload a .zip with .gtzip files.');
+        return svc.addTemplatePack(await file.toBuffer());
+    });
     app.get('/api/gtzip/templates/:id', async (req) => svc.template(req.params.id));
     app.patch('/api/gtzip/templates/:id', async (req) => svc.updateTemplate(req.params.id, z.object({ name: z.string().min(1).max(120).optional(), scene: z.string().max(60).nullable().optional(), variant: z.string().max(60).nullable().optional() }).parse(req.body)));
     app.delete('/api/gtzip/templates/:id', async (req) => { svc.deleteTemplate(req.params.id); return { ok: true }; });
