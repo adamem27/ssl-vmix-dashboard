@@ -87,6 +87,13 @@ export function jsonIndex(db, eventId) {
         { name: 'Weather', path: '/json/weather' },
         { name: 'Schedule (today)', path: '/json/schedule' },
         { name: 'People (lowerthirds)', path: '/json/people' },
+        { name: 'Welcome', path: '/json/graphics-sets/welcome' },
+        { name: 'Follow us', path: '/json/graphics-sets/socials' },
+        { name: 'Tickers', path: '/json/graphics-sets/ticker' },
+        { name: 'Race officials', path: '/json/graphics-sets/officials' },
+        { name: 'Announcements', path: '/json/graphics-sets/announcement' },
+        { name: 'Line-ups', path: '/json/lineups' },
+        { name: 'Results (one row per group)', path: '/json/results' },
         ...sets.map((s) => ({ name: `Fleets · ${s.name}`, path: `/json/fleets/${s.id}` })),
     ];
 }

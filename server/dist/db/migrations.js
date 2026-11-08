@@ -302,4 +302,40 @@ ALTER TABLE declaration_members ADD COLUMN ovr_weight TEXT;
 ALTER TABLE declarations ADD COLUMN src_total_weight TEXT;
 `,
     },
+    {
+        version: 7,
+        name: 'graphic sets, line-ups, results',
+        sql: `
+-- General graphics with several versions (welcome, follow us, tickers, race officials, announcements): one row per version.
+CREATE TABLE graphic_sets (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  data TEXT NOT NULL DEFAULT '{}',
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX graphic_sets_kind ON graphic_sets (event_id, kind, sort);
+
+-- Line-up graphic of a team: slots (Helm, Tactician, ...) as JSON; filled by hand or by the sync-from-declaration command.
+CREATE TABLE lineups (
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  data TEXT NOT NULL DEFAULT '{}',
+  synced_at TEXT,
+  synced_date TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (event_id, team_id)
+);
+
+-- Overall results of a group (fleet): race scores per team, points and order as JSON.
+CREATE TABLE results (
+  fleet_id TEXT PRIMARY KEY REFERENCES fleets(id) ON DELETE CASCADE,
+  data TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+`,
+    },
 ];

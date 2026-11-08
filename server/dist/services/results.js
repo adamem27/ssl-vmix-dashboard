@@ -1,0 +1,115 @@
+import { nowIso } from '../db/db.js';
+import { notFound } from './errors.js';
+import { listTeams } from './teams.js';
+export const MAX_RACES = 12;
+const num = (v) => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
+export const autoPoints = (races) => {
+    const vals = races.filter((r) => r.trim() !== '');
+    if (!vals.length)
+        return '';
+    const s = vals.reduce((a, r) => a + num(r), 0);
+    return String(Math.round(s * 100) / 100);
+};
+export const pointsOf = (r) => (r.points.trim() !== '' ? r.points : autoPoints(r.races));
+function fleetInfo(db, fleetId) {
+    const f = db.prepare('SELECT f.id, f.name, f.size, f.fleet_set_id AS setId, s.name AS setName FROM fleets f JOIN fleet_sets s ON s.id = f.fleet_set_id WHERE f.id = ?').get(fleetId);
+    if (!f)
+        throw notFound('Group');
+    const teamIds = db.prepare('SELECT team_id FROM fleet_slots WHERE fleet_id = ? ORDER BY position').all(fleetId).map((r) => r.team_id);
+    return { ...f, teamIds };
+}
+function load(db, fleetId) {
+    const f = fleetInfo(db, fleetId);
+    const r = db.prepare('SELECT * FROM results WHERE fleet_id = ?').get(fleetId);
+    let raw = {};
+    try {
+        raw = r ? JSON.parse(r.data) : {};
+    }
+    catch { /* reset */ }
+    const races = Math.max(1, Math.min(MAX_RACES, Number(raw.races) || 6));
+    // keep the stored order for teams still in the group, then add new teams in fleet order
+    const stored = (raw.rows ?? []).filter((x) => f.teamIds.includes(x.teamId));
+    const seen = new Set(stored.map((x) => x.teamId));
+    const rows = [...stored, ...f.teamIds.filter((id) => !seen.has(id)).map((teamId) => ({ teamId, races: [], points: '' }))]
+        .map((x) => ({ teamId: x.teamId, races: Array.from({ length: races }, (_, i) => String(x.races?.[i] ?? '')), points: String(x.points ?? '') }));
+    return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows }, updatedAt: r?.updated_at ?? null };
+}
+export function getResults(db, fleetId) {
+    const f = fleetInfo(db, fleetId);
+    const { data, updatedAt } = load(db, fleetId);
+    return { fleetId, fleetName: f.name, setId: f.setId, setName: f.setName, ...data, rows: data.rows.map((r) => ({ ...r, autoPoints: autoPoints(r.races), total: pointsOf(r) })), updatedAt };
+}
+export function listResults(db, setId) {
+    const fleets = db.prepare('SELECT id FROM fleets WHERE fleet_set_id = ? ORDER BY sort, created_at').all(setId);
+    return fleets.map((f) => getResults(db, f.id));
+}
+export function saveResults(db, fleetId, patch) {
+    const { data } = load(db, fleetId);
+    if (patch.title !== undefined)
+        data.title = patch.title.slice(0, 120);
+    if (patch.subtitle !== undefined)
+        data.subtitle = patch.subtitle.slice(0, 120);
+    if (patch.races !== undefined)
+        data.races = Math.max(1, Math.min(MAX_RACES, Math.round(patch.races)));
+    for (const p of patch.rows ?? []) {
+        const r = data.rows.find((x) => x.teamId === p.teamId);
+        if (!r)
+            continue;
+        if (p.races)
+            p.races.forEach((v, i) => { if (i < MAX_RACES)
+                r.races[i] = String(v).slice(0, 12); });
+        if (p.points !== undefined)
+            r.points = String(p.points).slice(0, 12);
+    }
+    if (patch.order) {
+        const pos = new Map(patch.order.map((id, i) => [id, i]));
+        data.rows.sort((a, b) => (pos.get(a.teamId) ?? 99) - (pos.get(b.teamId) ?? 99));
+    }
+    data.rows = data.rows.map((r) => ({ ...r, races: Array.from({ length: data.races }, (_, i) => r.races[i] ?? '') }));
+    db.prepare('INSERT INTO results (fleet_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT (fleet_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at')
+        .run(fleetId, JSON.stringify(data), nowIso());
+    return getResults(db, fleetId);
+}
+/** Sorts the standing by points (highest first); ties keep their order. */
+export function sortResults(db, fleetId) {
+    const { data } = load(db, fleetId);
+    const order = data.rows.map((r, i) => ({ id: r.teamId, p: num(pointsOf(r)), has: pointsOf(r) !== '', i }))
+        .sort((a, b) => Number(b.has) - Number(a.has) || b.p - a.p || a.i - b.i).map((x) => x.id);
+    return saveResults(db, fleetId, { order });
+}
+export function clearResults(db, fleetId) {
+    fleetInfo(db, fleetId);
+    db.prepare('DELETE FROM results WHERE fleet_id = ?').run(fleetId);
+    return getResults(db, fleetId);
+}
+const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
+/**
+ * Results sheet: one row per group so one title shows a whole table. Per team n (in standing order):
+ * T{n}Rank, T{n}Code, T{n}Name, T{n}Ranking, T{n}Flag, T{n}R1…, T{n}Points.
+ */
+export function resultSheetRows(ctx, eventId) {
+    const { db } = ctx;
+    const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
+    const sets = db.prepare('SELECT id FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(eventId);
+    const out = [];
+    for (const s of sets) {
+        for (const g of listResults(db, s.id)) {
+            const row = { set: g.setName, group: g.fleetName, Title: g.title, Subtitle: g.subtitle, Races: String(g.races) };
+            for (let i = 1; i <= g.races; i++)
+                row[`R${i}Label`] = `R${i}`;
+            g.rows.forEach((r, i) => {
+                const t = teams.get(r.teamId);
+                const p = `T${i + 1}`;
+                row[`${p}Rank`] = String(i + 1);
+                row[`${p}Code`] = t?.code ?? '';
+                row[`${p}Name`] = (t?.name ?? '').toUpperCase();
+                row[`${p}Ranking`] = t?.ranking ? `[${t.ranking}]` : '';
+                row[`${p}Flag`] = img(t?.assets.flag_small);
+                r.races.forEach((v, j) => { row[`${p}R${j + 1}`] = v; });
+                row[`${p}Points`] = r.total;
+            });
+            out.push(row);
+        }
+    }
+    return out;
+}
