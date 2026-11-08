@@ -7,7 +7,7 @@ import { encodePng } from '../src/services/png.js';
 import { inspectImage } from '../src/services/images.js';
 import { DEFAULT_STROKE_GRADIENT, ElementSpec, renderElement } from '../src/services/generator/render.js';
 import {
-  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate,
+  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate,
 } from '../src/services/generator/generator.js';
 
 const el = (p: Partial<ElementSpec> = {}): ElementSpec => ({
@@ -193,5 +193,25 @@ describe('PNG generator export', () => {
     expect(fs.statSync(bar).mtimeMs).toBe(barBefore);
     setStrokeGradient(db, null);
     expect(getStrokeGradient(db)).toEqual(DEFAULT_STROKE_GRADIENT);
+  });
+
+  it('applies the SSL26 team colours and orange stroke once, replacing the old green stroke', () => {
+    const { db } = gen();
+    const pol = createTeam(db, { name: 'Poland', code: 'POL' });
+    const mar = createTeam(db, { name: 'Morocco', code: 'MAR' });
+    setGradient(db, pol, 1, redBlue);
+    setStrokeGradient(db, { angle: -45, stops: [{ pos: 0, color: '#00b15e', opacity: 100 }, { pos: 100, color: '#0085e6', opacity: 100 }] });
+    seedGenerator(db);
+    const g = listGradients(db).find((x) => x.teamId === pol)!.gradients;
+    expect(g[1]).toEqual({ angle: -20, stops: TEAM_GRADIENTS_SSL26.POL.map(([pos, color]) => ({ pos, color, opacity: 100 })) });
+    expect(g[2]!.stops[0]).toEqual({ pos: 0, color: '#dbdbdb', opacity: 0 });
+    expect(g[3]!.stops.at(-1)).toEqual({ pos: 100, color: '#da153d', opacity: 0 });
+    expect(listGradients(db).find((x) => x.teamId === mar)!.gradients[1]).not.toBeNull(); // board starter colours still apply
+    expect(getStrokeGradient(db)).toEqual(DEFAULT_STROKE_GRADIENT);
+
+    // later edits are kept on the next start
+    setGradient(db, pol, 1, redBlue);
+    seedGenerator(db);
+    expect(listGradients(db).find((x) => x.teamId === pol)!.gradients[1]).toEqual(redBlue);
   });
 });

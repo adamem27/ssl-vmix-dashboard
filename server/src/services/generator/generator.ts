@@ -6,7 +6,7 @@ import { DB, getSetting, newId, nowIso, setSetting } from '../../db/db.js';
 import { badRequest, notFound } from '../errors.js';
 import { encodePng } from '../png.js';
 import { joinVmixPath } from '../paths.js';
-import { DEFAULT_STROKE_GRADIENT, ElementSpec, Gradient, gradientVersions, renderElement } from './render.js';
+import { DEFAULT_STROKE_GRADIENT, ElementSpec, Gradient, gradientVersions, gradientVersionsFrom, renderElement } from './render.js';
 
 export const VARIANTS = [1, 2, 3] as const;
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
@@ -309,7 +309,7 @@ export class GeneratorExporter {
 
 // ---------- defaults ----------
 const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
-/** The 1px green→blue gradient ring the panels and the waves bar have in gradienty.ai. */
+/** The 1px gradient ring the panels and the waves bar have (orange→yellow since finals-broadcast_ssl26_v2). */
 const AI_STROKE = { strokeWidth: 1, strokeGradient: true };
 
 /** Starting elements: artboard sizes, corner radii and waves (10% black; 53.3% size on the small ones) from gradienty.ai. */
@@ -359,10 +359,72 @@ export const STARTER_GRADIENTS: Record<string, string[]> = {
   LTU: ['#066c43', '#eeb416'], NOR: ['#c41519', '#0b1f57'], SRB: ['#c42a33', '#233c6e'],
 };
 
+/** Team colours from team-gradients_ssl26.ai: the full bar (version 1) as [position, colour] stops, all at −20°. */
+export const TEAM_GRADIENTS_SSL26: Record<string, [number, string][]> = {
+  ARG: [[0, '#74aadd'], [100, '#ffcd40']],
+  AUS: [[0, '#064f51'], [100, '#f2e632']],
+  BRA: [[0, '#049240'], [100, '#fdc900']],
+  CAN: [[0, '#d32b1f'], [50, '#1d1d1b'], [100, '#d32b1f']],
+  CHI: [[0, '#00329e'], [100, '#d72a1c']],
+  COL: [[0, '#fdcb02'], [50, '#c5112f'], [100, '#171933']],
+  CZE: [[0, '#0a338e'], [100, '#e20516']],
+  DEN: [[0, '#c5112f'], [57.3, '#f8b133'], [100, '#c5112f']],
+  ECU: [[0, '#fdcb02'], [100, '#072249']],
+  EST: [[0, '#00c9ff'], [100, '#0064a8']],
+  FRA: [[0, '#002654'], [5, '#002654'], [50, '#dddddd'], [95, '#cc1226'], [100, '#cc1226']],
+  MYA: [[0, '#c82a31'], [100, '#193d72']],
+  HUN: [[0, '#c8102e'], [50, '#d3a553'], [100, '#00843d']],
+  IND: [[0, '#fd671f'], [49.5, '#bf9432'], [100, '#036a38']],
+  JPN: [[0, '#d51217'], [100, '#cccccc']],
+  LTU: [[0, '#006a44'], [100, '#fdb913']],
+  MAS: [[0, '#fbbc0b'], [10, '#fbbc0b'], [49.5, '#9b6224'], [100, '#1717a0']],
+  NED: [[0, '#ff5224'], [100, '#ac1c28']],
+  NZL: [[0, '#002877'], [57.3, '#1d1d1b'], [100, '#002877']],
+  OMA: [[0, '#c82a31'], [100, '#193d72']],
+  PER: [[0, '#d71223'], [50, '#e2a8b1'], [100, '#d71223']],
+  POL: [[0, '#dbdbdb'], [100, '#da153d']],
+  POR: [[0, '#006600'], [100, '#ff0000']],
+  SEY: [[0, '#72bdec'], [100, '#162946']],
+  SGP: [[0, '#a5112d'], [100, '#ea495d']],
+  RSA: [[0, '#037246'], [100, '#f9b410']],
+  ESP: [[0, '#c40c1f'], [50, '#fdc205'], [100, '#c40c1f']],
+  SWE: [[0, '#fcc900'], [100, '#0e447d']],
+  SUI: [[0, '#d90e16'], [50, '#ea7180'], [100, '#d90f16']],
+  TAH: [[0, '#e30520'], [100, '#f7aa0f']],
+  THA: [[0, '#a21a32'], [50, '#9e285e'], [100, '#1b1b49']],
+  UKR: [[0, '#0057b7'], [100, '#ffd700']],
+  GBR: [[0, '#c5112f'], [50, '#dddddd'], [100, '#022169']],
+};
+export const TEAM_GRADIENTS_VERSION = 'team-gradients_ssl26';
+
+/**
+ * The SSL26 broadcast design, applied once: team colours from team-gradients_ssl26.ai replace all three
+ * versions of the teams in that file, and the old green→blue stroke becomes the orange→yellow one.
+ */
+export function applySsl26Design(db: DB) {
+  if (getSetting(db, 'generator.design') === TEAM_GRADIENTS_VERSION) return;
+  if (!db.prepare('SELECT 1 FROM teams LIMIT 1').get()) return;
+  db.transaction(() => {
+    for (const [code, stops] of Object.entries(TEAM_GRADIENTS_SSL26)) {
+      const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(code) as { id: string } | undefined;
+      if (!team) continue;
+      const g: Gradient = { angle: -20, stops: stops.map(([pos, color]) => ({ pos, color, opacity: 100 })) };
+      gradientVersionsFrom(g).forEach((v, i) => setGradient(db, team.id, i + 1, v));
+    }
+    // a stroke still in the old SSL green is the old default: let the new default take over
+    if (getStrokeGradient(db).stops.some((st) => st.color.toLowerCase() === '#00b15e')) setStrokeGradient(db, null);
+    setSetting(db, 'generator.design', TEAM_GRADIENTS_VERSION);
+  })();
+}
+
 /** First start of the generator: starter elements, and gradients for teams that match the board. */
 export function seedGenerator(db: DB) {
   upgradeStarterTemplates(db);
-  if (getSetting(db, 'generator.seeded') === 'true') return;
+  if (getSetting(db, 'generator.seeded') !== 'true') seedStarters(db);
+  applySsl26Design(db);
+}
+
+function seedStarters(db: DB) {
   if (!db.prepare('SELECT 1 FROM teams LIMIT 1').get()) return;
   db.transaction(() => {
     if (!listTemplates(db).length) for (const t of STARTER_TEMPLATES) createTemplate(db, t);
