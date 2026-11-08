@@ -233,6 +233,9 @@ export const sourceName = (s) => s.split('\\').pop() ?? s;
 /** Names referenced through child holders such as Image.Mask > Mask Object="…". */
 function refHolders(n) {
     const out = [];
+    // a storyboard's animations are pruned one by one (in remove), never as a whole list
+    if (n.tag === 'Storyboard')
+        return out;
     for (const h of n.children)
         if (h.tag.startsWith(n.tag + '.'))
             for (const r of h.children)
