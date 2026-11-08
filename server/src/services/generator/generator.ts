@@ -397,6 +397,40 @@ export const TEAM_GRADIENTS_SSL26: Record<string, [number, string][]> = {
 };
 export const TEAM_GRADIENTS_VERSION = 'team-gradients_ssl26';
 
+/** Team colours from color_panam.ai (Panam qualifiers), read off its gradients: version 1 as [position, colour] stops. */
+export const TEAM_GRADIENTS_PANAM: Record<string, [number, string][]> = {
+  CUB: [[0, '#253981'], [100, '#e00c19']],
+  ESA: [[0, '#013366'], [100, '#038afd']],
+  VEN: [[0, '#5c1b38'], [100, '#e44390']],
+  ANT: [[0, '#001f57'], [50, '#e4332a'], [100, '#f8b400']],
+  BER: [[0, '#f173b8'], [100, '#009cdb']],
+  MEX: [[0, '#118d48'], [100, '#00533c']],
+  PUR: [[0, '#1a2340'], [100, '#bc242b']],
+};
+export const TEAM_GRADIENTS_PANAM_VERSION = 'color_panam-1';
+
+/**
+ * Panam colours replace all three versions of each of these teams once (per team, so a team added or renamed
+ * later still gets them). Angle −20° like the SSL26 colours. Changes made afterwards in the generator stay.
+ * Returns how many teams were coloured.
+ */
+export function applyPanamColours(db: DB): number {
+  let n = 0;
+  for (const [code, stops] of Object.entries(TEAM_GRADIENTS_PANAM)) {
+    const key = `generator.colours.${code}`;
+    if (getSetting(db, key) === TEAM_GRADIENTS_PANAM_VERSION) continue;
+    const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(code) as { id: string } | undefined;
+    if (!team) continue;
+    const g: Gradient = { angle: -20, stops: stops.map(([pos, color]) => ({ pos, color, opacity: 100 })) };
+    db.transaction(() => {
+      gradientVersionsFrom(g).forEach((v, i) => setGradient(db, team.id, i + 1, v));
+      setSetting(db, key, TEAM_GRADIENTS_PANAM_VERSION);
+    })();
+    n++;
+  }
+  return n;
+}
+
 /**
  * The SSL26 broadcast design, applied once: team colours from team-gradients_ssl26.ai replace all three
  * versions of the teams in that file, and the old green→blue stroke becomes the orange→yellow one.
@@ -422,6 +456,7 @@ export function seedGenerator(db: DB) {
   upgradeStarterTemplates(db);
   if (getSetting(db, 'generator.seeded') !== 'true') seedStarters(db);
   applySsl26Design(db);
+  applyPanamColours(db);
 }
 
 function seedStarters(db: DB) {

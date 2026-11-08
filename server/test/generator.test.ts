@@ -135,6 +135,22 @@ describe('PNG generator export', () => {
     expect(jsonGraphics(db, ctx.assetsDir)).toEqual([{ code: 'POL', name: 'Poland', bar: 'C:\\SSL-vMix\\PNG generator\\POL\\POL_bar.png' }]);
   });
 
+  it('colours the Panam teams once, also when they are added later', async () => {
+    const { applyPanamColours, TEAM_GRADIENTS_PANAM } = await import('../src/services/generator/generator.js');
+    const { db } = gen();
+    const cub = createTeam(db, { name: 'Cuba', code: 'CUB' });
+    setGradient(db, cub, 1, redBlue);
+    expect(applyPanamColours(db)).toBe(1);
+    const g = listGradients(db).find((x) => x.teamId === cub)!.gradients;
+    expect(g[1]).toEqual({ angle: -20, stops: TEAM_GRADIENTS_PANAM.CUB.map(([pos, color]) => ({ pos, color, opacity: 100 })) });
+    expect(g[2]).not.toBeNull(); expect(g[3]).not.toBeNull();
+    setGradient(db, cub, 1, redBlue); // an edit afterwards stays
+    const ant = createTeam(db, { name: 'Antigua and Barbuda', code: 'ANT' });
+    expect(applyPanamColours(db)).toBe(1);
+    expect(listGradients(db).find((x) => x.teamId === cub)!.gradients[1]).toEqual(redBlue);
+    expect(listGradients(db).find((x) => x.teamId === ant)!.gradients[1]!.stops.map((s) => s.color)).toEqual(['#001f57', '#e4332a', '#f8b400']);
+  });
+
   it('fills empty team graphic places from the generated PNGs and leaves choices of the operator alone', async () => {
     const { fillTeamSlotsFromGenerator } = await import('../src/services/generatedSlots.js');
     const { listAssets, removeAsset, saveUpload } = await import('../src/services/assets.js');
