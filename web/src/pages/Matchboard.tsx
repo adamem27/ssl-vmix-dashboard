@@ -256,7 +256,7 @@ function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange, 
           {teams.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
         </select>
         {picked
-          ? <span className="flex min-w-0 flex-1 items-center"><span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={picked.name}>{picked.name}</span><TeamProfileLink teamId={picked.id} name={picked.name} /></span>
+          ? <span className="flex min-w-0 flex-1 items-center"><TeamProfileLink teamId={picked.id} name={picked.name} /><span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={picked.name}>{picked.name}</span></span>
           : <input className="input min-w-0 flex-1 py-1 text-xs" value={v.text} maxLength={40} placeholder="e.g. R1 C1" onChange={(e) => onChange({ ...v, text: e.target.value })} aria-label="Row text"
               title="Text shown in the row. A box and place such as “R1 C1” fills in the team that finishes there once it is starred." />}
         <div className="flex shrink-0 flex-col">

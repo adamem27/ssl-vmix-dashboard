@@ -242,7 +242,7 @@ function GradientPanel({ team, teams, variant, setVariant, onChange, onReload }:
   const copyTeam = (tid: string) => { const src = teams.find((t) => t.teamId === tid)?.gradients[variant]; if (src) onChange(structuredClone(src), true); };
 
   return (
-    <Panel title={`${team.code} · ${team.name}`} titleExtra={<TeamProfileLink teamId={team.teamId} name={team.name} />} right={
+    <Panel title={team.code} titleExtra={<><TeamProfileLink teamId={team.teamId} name={team.name} /><span className="text-sm font-bold uppercase tracking-wide text-ink-200">{team.name}</span></>} right={
       <div className="flex overflow-hidden rounded border border-ink-700 text-xs">
         {VARIANTS.map((v) => (
           <button key={v} onClick={() => { setVariant(v); setSel(0); }} className={cx('flex items-center gap-1.5 px-3 py-1', variant === v ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>

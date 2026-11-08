@@ -144,11 +144,10 @@ function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: Overview
       <td className="px-1 text-center">
         <button className="h-8 w-6 text-ink-400 hover:text-ink-50" aria-expanded={isOpen} aria-label={`${isOpen ? 'Hide' : 'Show'} crew of ${t.name}`} onClick={onToggle}>{isOpen ? '▾' : '▸'}</button>
       </td>
-      <td className="px-1"><Cell value={t.code} onSave={(v) => save({ code: v })} className="font-mono font-bold text-ink-50" required label="Code" /></td>
+      <td className="px-1"><div className="flex items-center gap-1"><div className="min-w-0 flex-1"><Cell value={t.code} onSave={(v) => save({ code: v })} className="font-mono font-bold text-ink-50" required label="Code" /></div><TeamProfileLink teamId={t.id} name={t.name} /></div></td>
       <td className="px-1">
         <div className="flex items-center gap-1.5">
           <Cell value={t.name} onSave={(v) => save({ name: v })} className="font-medium text-ink-100" required label="Team name" />
-          <TeamProfileLink teamId={t.id} name={t.name} />
           {t.isDemo && <Badge tone="demo">Demo</Badge>}
           {captain && <span className="shrink-0 truncate text-xs text-amber-300" title="Captain">★ {fullName(captain)}</span>}
         </div>
