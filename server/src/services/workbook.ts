@@ -6,6 +6,7 @@ import { AssetCtx, organizeAssets } from './assets.js';
 import { todayIn } from './dates.js';
 import { buildXlsx } from './xlsx.js';
 import { seedGraphicSets } from './graphicSets.js';
+import { fillTeamSlotsFromGenerator } from './generatedSlots.js';
 import { SHEETS, sheetRows } from './workbookSheets.js';
 
 /** Bump when the file's look changes without its data, so the next tick rewrites it. */
@@ -44,6 +45,7 @@ export class WorkbookWriter {
   tick() {
     try {
       organizeAssets(this.ctx); // a renamed team or sailor moves its files before the paths are written
+      fillTeamSlotsFromGenerator(this.ctx); // empty backgrounds and lower thirds take the generated PNGs
       const sheets = allSheets(this.ctx);
       const hash = createHash('sha1').update(JSON.stringify(sheets.map((s) => [s.name, s.rows, (s.rows as { styles?: unknown }).styles ?? null, LAYOUT_VERSION]))).digest('hex');
       if (hash === this.lastHash && fs.existsSync(this.file)) return;

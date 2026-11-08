@@ -135,6 +135,33 @@ describe('PNG generator export', () => {
     expect(jsonGraphics(db, ctx.assetsDir)).toEqual([{ code: 'POL', name: 'Poland', bar: 'C:\\SSL-vMix\\PNG generator\\POL\\POL_bar.png' }]);
   });
 
+  it('fills empty team graphic places from the generated PNGs and leaves choices of the operator alone', async () => {
+    const { fillTeamSlotsFromGenerator } = await import('../src/services/generatedSlots.js');
+    const { listAssets, removeAsset, saveUpload } = await import('../src/services/assets.js');
+    const { PNG } = await import('pngjs');
+    const { db, ctx, exporter } = gen();
+    const t = createTeam(db, { name: 'Poland', code: 'POL' });
+    const u = createTeam(db, { name: 'Chile', code: 'CHI' });
+    for (const f of ['panel_left', 'square']) createTemplate(db, { ...STARTER_TEMPLATES.find((x) => x.fileName === f)!, width: 10, height: 10, variant: 1 });
+    setGradient(db, t, 1, redBlue); setGradient(db, u, 1, redBlue);
+    saveUpload(ctx, 'team', u, 'background_2', PNG.sync.write(new PNG({ width: 2, height: 2 })), 'own.png');
+    exporter.flush();
+    expect(fillTeamSlotsFromGenerator(ctx)).toBe(3);
+    const a = listAssets(ctx, 'team', t);
+    expect(a.background_1.enteredPath).toBe(path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_panel_left.png'));
+    expect(a.background_1.checkStatus).toBe('reachable');
+    expect(listAssets(ctx, 'team', u).background_2.storageKind).toBe('upload'); // the operator's own file stays
+    expect(fillTeamSlotsFromGenerator(ctx)).toBe(0);
+    // a vMix folder set later moves the filled paths to it
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('paths.vmixAssetsRoot', 'C:\\SSL-vMix')").run();
+    expect(fillTeamSlotsFromGenerator(ctx)).toBe(3);
+    expect(listAssets(ctx, 'team', t).background_1.vmixPath).toBe('C:\\SSL-vMix\\PNG generator\\POL\\POL_panel_left.png');
+    // a place the operator cleared stays empty
+    removeAsset(ctx, 'team', t, 'background_1');
+    expect(fillTeamSlotsFromGenerator(ctx)).toBe(0);
+    expect(listAssets(ctx, 'team', t).background_1).toBeUndefined();
+  });
+
   it('seeds starter elements and board gradients once, without touching existing gradients', () => {
     const { db } = gen();
     const mar = createTeam(db, { name: 'Morocco', code: 'MAR' });
