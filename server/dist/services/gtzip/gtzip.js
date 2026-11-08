@@ -10,6 +10,7 @@
  * (Bitmap Source "<folder guid>\\name.png" → part guid), [Content_Types].xml (BOM, one Override per part),
  * the image parts named by guid and thumbnail.png (640×360).
  */
+import { tidyLayers } from './tidy.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -344,6 +345,7 @@ export class GtzipService {
             throw badRequest('The title must start with a Composition.');
         const p = this.pkg(templateId);
         p.doc = clone(doc);
+        tidyLayers(p.doc); // readable layer names (fields keep theirs)
         // embed new pictures; the same picture used twice is stored once
         const added = new Map();
         for (const b of collect(p.doc, 'Bitmap')) {

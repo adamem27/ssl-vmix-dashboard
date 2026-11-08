@@ -325,7 +325,27 @@ function adjust(root, compPath, exclude, lo, hi, d, sign, o, bands) {
     if (!delta)
         return;
     const comp = compPath.length ? nodeAt(root, compPath) : root;
-    const { of } = boxIndex(root);
+    const { of, els } = boxIndex(root);
+    // “keep centred” keeps a graphic in the middle of the screen when it was there: the drawn things of the composition
+    // (not full-screen pictures) are centred on the frame along the step's axis
+    const frameLen = Number(axis === 0 ? root.attrs.Width ?? 1920 : root.attrs.Height ?? 1080);
+    const full = (b) => b[axis + 2] - b[axis] >= 0.98 * frameLen;
+    let centre = false;
+    if (o.center) {
+        const ck = pathKey(compPath);
+        let a = Infinity, z = -Infinity;
+        for (const e of els) {
+            const k = pathKey(e.path);
+            if (e.node.tag === 'Layer' || (ck && !k.startsWith(ck + '/')) || !isVisible(e.node))
+                continue;
+            const b = of([e.path]);
+            if (!b || full(b))
+                continue;
+            a = Math.min(a, b[axis]);
+            z = Math.max(z, b[axis + 2]);
+        }
+        centre = Number.isFinite(a) && Math.abs((a + z) / 2 - frameLen / 2) <= 0.04 * frameLen;
+    }
     const start = (b) => (fwd ? b[axis] : -b[axis + 2]);
     const end = (b) => (fwd ? b[axis + 2] : -b[axis]);
     const L = fwd ? lo : -hi, Hh = fwd ? hi : -lo;
@@ -367,9 +387,15 @@ function adjust(root, compPath, exclude, lo, hi, d, sign, o, bands) {
         }
     });
     walk(comp, compPath);
-    if (o.center)
-        comp.children.forEach((c) => { if (isElement(c))
-            move(c, -(fwd ? delta : -delta) / 2); });
+    if (centre)
+        comp.children.forEach((c, i) => {
+            if (!isElement(c))
+                return;
+            const b = c.tag === 'Layer' ? null : of([[...compPath, i]]);
+            if (b && full(b))
+                return; // a full-screen picture stays where it is
+            move(c, -(fwd ? delta : -delta) / 2);
+        });
 }
 function addOne(root, g, o, bands) {
     const { of } = boxIndex(root);
