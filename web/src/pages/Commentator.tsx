@@ -91,12 +91,13 @@ export function CommentatorPage() {
       {sets.isLoading || detail.isLoading || data.isLoading ? <Loading /> : sets.error || detail.error || data.error ? <ErrorBox error={sets.error ?? detail.error ?? data.error} /> : !fleet ? (
         <Empty title="No groups in this stage" />
       ) : (
-        <div className="grid items-start gap-3 xl:grid-cols-[minmax(340px,430px)_1fr]">
-          <div className="space-y-3 xl:sticky xl:top-[64px]">
+        <div className="space-y-3">
+          {/* the four teams side by side; the standing and talking points sit above them */}
+          <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
             <StandingCard standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={fleet.name} />
             <FactsCard teams={fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t)} />
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
             {fleet.positions.map((tid, i) => {
               const team = tid ? teamById.get(tid) : undefined;
               return team
