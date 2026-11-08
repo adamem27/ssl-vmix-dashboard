@@ -3,6 +3,8 @@ import { activeEvent } from '../db/db.js';
 import * as gs from './graphicSets.js';
 import * as lu from './lineups.js';
 import * as rs from './results.js';
+import * as wb from './workbookSheets.js';
+import { todayIn } from './dates.js';
 /** General graphics versions, team line-ups (Declarations and line-ups) and group results (Results tab). */
 export function registerBroadcastRoutes(app, ctx) {
     const { db } = ctx;
@@ -38,7 +40,12 @@ export function registerBroadcastRoutes(app, ctx) {
     }).partial().parse(req.body)));
     app.post('/api/results/:fleetId/sort', async (req) => rs.sortResults(db, req.params.fleetId));
     app.delete('/api/results/:fleetId', async (req) => rs.clearResults(db, req.params.fleetId));
+    // ---------- current stage (decides which teams and groups go to the workbook) ----------
+    const stageInfo = () => ({ current: wb.currentStage(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
+    app.get('/api/stage', async () => stageInfo());
+    app.put('/api/stage', async (req) => { wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId); return stageInfo(); });
     // ---------- JSON for vMix ----------
+    app.get('/json/sheet/:key', async (req) => wb.sheetRows(ctx, ev().id, todayIn(ev().timezone), req.params.key));
     app.get('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind));
     app.get('/json/lineups', async () => lu.lineupSheetRows(ctx, ev().id));
     app.get('/json/results', async () => rs.resultSheetRows(ctx, ev().id));

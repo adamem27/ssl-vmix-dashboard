@@ -34,7 +34,7 @@ function normalize(raw) {
         }),
     };
 }
-function load(db, eventId, teamId) {
+export function loadLineup(db, eventId, teamId) {
     const r = db.prepare('SELECT * FROM lineups WHERE event_id = ? AND team_id = ?').get(eventId, teamId);
     let data = {};
     try {
@@ -52,12 +52,12 @@ function store(db, eventId, teamId, data, synced) {
 }
 export function getLineup(ctx, eventId, teamId) {
     getTeam(ctx, teamId);
-    const l = load(ctx.db, eventId, teamId);
+    const l = loadLineup(ctx.db, eventId, teamId);
     return { teamId, ...l, slots: slotDefs(l.data.extra).map((d) => ({ key: d.key, label: d.label, position: d.position })) };
 }
 export function saveLineup(ctx, eventId, teamId, patch) {
     getTeam(ctx, teamId);
-    const cur = load(ctx.db, eventId, teamId).data;
+    const cur = loadLineup(ctx.db, eventId, teamId).data;
     const next = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }) };
     const rows = new Map(cur.rows.map((r) => [r.slot, r]));
     for (const p of patch.rows ?? []) {
@@ -116,7 +116,7 @@ export function syncLineupFromDeclaration(ctx, eventId, teamId, date) {
         throw notFound('Team');
     if (!t.declaration)
         return { synced: false, reason: 'No declaration for this day' };
-    const cur = load(ctx.db, eventId, teamId).data;
+    const cur = loadLineup(ctx.db, eventId, teamId).data;
     const crew = [
         ...t.sailors.filter((s) => s.declared).sort((a, b) => a.declared.sort - b.declared.sort)
             .map((s) => ({ sailorId: s.id, firstName: s.firstName, lastName: s.lastName, number: s.declared.number || s.defaultNumber, position: s.declared.position || s.defaultPosition, captain: s.isCaptain })),
@@ -168,7 +168,7 @@ export function lineupSheetRows(ctx, eventId) {
     for (const t of listTeams(ctx)) {
         if (!saved.has(t.id))
             continue;
-        const { data } = load(ctx.db, eventId, t.id);
+        const { data } = loadLineup(ctx.db, eventId, t.id);
         const row = {
             code: t.code, TeamName: (data.teamName || t.name).toUpperCase(), LineupText: data.title,
             Flag: img(t.assets.flag_big), Emblem: img(t.assets.emblem_light), CaptainSlot: data.rows.find((r) => r.captain)?.slot ?? '',

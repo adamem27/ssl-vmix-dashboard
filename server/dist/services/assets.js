@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
 import { getSetting, newId, nowIso } from '../db/db.js';
 import { inspectImage, kindLabel } from './images.js';
 import { allowedKinds, isSponsorSlot, slotsFor } from './slots.js';
@@ -39,6 +38,8 @@ export function assetDto(ctx, r) {
     };
 }
 const OWNER_TABLE = { team: 'teams', sailor: 'sailors', person: 'people' };
+/** Top-level folders in assets, one per kind of owner. */
+export const OWNER_DIR = { team: 'Teams', sailor: 'Sailors', person: 'People' };
 const OWNER_LABEL = { team: 'Team', sailor: 'Sailor', person: 'Person' };
 function ownerExists(db, owner, id) {
     const t = OWNER_TABLE[owner];
@@ -55,7 +56,90 @@ export function listAssets(ctx, owner, ownerId) {
 function getRow(db, owner, ownerId, slot) {
     return db.prepare('SELECT * FROM assets WHERE owner_type = ? AND owner_id = ? AND slot = ?').get(owner, ownerId, slot);
 }
-function safeSegment(s) { return s.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'x'; }
+/** A file or folder name that Windows accepts: no \\ / : * ? " < > |, no trailing dot or space. */
+export function cleanName(s, fallback = 'x') {
+    const v = s.normalize('NFC').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '').slice(0, 80);
+    return v || fallback;
+}
+const slotLabel = (owner, slot) => slotsFor(owner).find((s) => s.key === slot)?.label ?? slot;
+const teamFolder = (t) => (t ? cleanName(`${t.code} - ${t.name}`) : 'No team');
+/** Readable path without extension: Teams/ARG - Argentina/ARG - Flag big, Sailors/ARG - Argentina/LANGE Santiago - Photo, People/Jane Doe - Photo. */
+export function readableBase(db, owner, ownerId, slot) {
+    if (owner === 'team') {
+        const t = db.prepare('SELECT code, name FROM teams WHERE id = ?').get(ownerId);
+        return path.join(OWNER_DIR.team, teamFolder(t), cleanName(`${t?.code ?? 'Team'} - ${slotLabel(owner, slot)}`));
+    }
+    if (owner === 'sailor') {
+        const s = db.prepare('SELECT s.first_name, s.last_name, t.code, t.name FROM sailors s LEFT JOIN teams t ON t.id = s.team_id WHERE s.id = ?').get(ownerId);
+        const who = cleanName(`${(s?.last_name ?? '').toUpperCase()} ${s?.first_name ?? ''}`, 'Sailor');
+        return path.join(OWNER_DIR.sailor, teamFolder(s?.code ? s : undefined), cleanName(`${who} - ${slotLabel(owner, slot)}`));
+    }
+    const p = db.prepare('SELECT name, role, language FROM people WHERE id = ?').get(ownerId);
+    const who = cleanName([p?.name || p?.role || 'Person', p?.language].filter(Boolean).join(' - '), 'Person');
+    return path.join(OWNER_DIR.person, cleanName(`${who} - ${slotLabel(owner, slot)}`));
+}
+const escapeRe = (v) => v.replace(/[.*+?^$(){}|[\]\\]/g, '\\$&');
+const relKey = (rel) => rel.replace(/\\/g, '/').toLowerCase();
+/** First of base.ext, base v2.ext, … that no other asset uses and (when `fresh`) no file occupies. */
+function freeName(ctx, base, ext, selfId, fresh) {
+    const taken = new Set(ctx.db.prepare("SELECT stored_rel_path FROM assets WHERE storage_kind = 'upload' AND stored_rel_path IS NOT NULL AND id != ?").all(selfId ?? '')
+        .map((r) => relKey(r.stored_rel_path)));
+    for (let n = 1;; n++) {
+        const rel = `${base}${n > 1 ? ` v${n}` : ''}.${ext}`;
+        if (taken.has(relKey(rel)))
+            continue;
+        if (fresh && fs.existsSync(path.join(ctx.assetsDir, rel)))
+            continue;
+        return rel;
+    }
+}
+function removeEmptyDirs(ctx, relDir) {
+    const root = path.resolve(ctx.assetsDir);
+    let dir = path.resolve(root, relDir);
+    while (dir.startsWith(root + path.sep)) {
+        try {
+            if (fs.readdirSync(dir).length)
+                return;
+            fs.rmdirSync(dir);
+        }
+        catch {
+            return;
+        }
+        dir = path.dirname(dir);
+    }
+}
+/**
+ * Keeps uploaded files under readable names: moves a file when its team, sailor or person was renamed
+ * (and the files of older versions, stored as teams/<id>/flag_big_1a2b3c4d.png). Cheap when nothing changed.
+ */
+export function organizeAssets(ctx) {
+    const rows = ctx.db.prepare("SELECT * FROM assets WHERE storage_kind = 'upload' AND stored_rel_path IS NOT NULL").all();
+    let moved = 0;
+    for (const r of rows) {
+        const base = readableBase(ctx.db, r.owner_type, r.owner_id, r.slot);
+        const ext = path.extname(r.stored_rel_path).slice(1).toLowerCase() || 'png';
+        const cur = r.stored_rel_path;
+        const ok = new RegExp(`^${escapeRe(relKey(base))}( v\\d+)?\\.${ext}$`).test(relKey(cur));
+        if (ok)
+            continue;
+        const from = path.join(ctx.assetsDir, cur);
+        if (!fs.existsSync(from))
+            continue;
+        const rel = freeName(ctx, base, ext, r.id, true);
+        const to = path.join(ctx.assetsDir, rel);
+        try {
+            fs.mkdirSync(path.dirname(to), { recursive: true });
+            fs.renameSync(from, to);
+        }
+        catch {
+            continue;
+        } // locked (vMix has it open): try again later
+        ctx.db.prepare('UPDATE assets SET stored_rel_path = ?, updated_at = ? WHERE id = ?').run(rel, nowIso(), r.id);
+        removeEmptyDirs(ctx, path.dirname(cur));
+        moved++;
+    }
+    return moved;
+}
 function removeStoredFile(ctx, rel) {
     if (!rel)
         return;
@@ -81,9 +165,11 @@ export function saveUpload(ctx, owner, ownerId, slot, buf, filename) {
     if (!info || !kinds.includes(info.kind)) {
         throw badRequest(`Unsupported file format “${filename}”. Required format: ${kindLabel(kinds)}.`);
     }
-    // Unique name per owner + slot + random suffix: identical source filenames never collide.
+    // Readable name (Teams/ARG - Argentina/ARG - Flag big.png). A replaced file gets the next free name
+    // (… v2.png), so the path vMix reads changes and vMix does not keep showing the old picture.
     const ext = info.kind === 'png' ? 'png' : 'jpg';
-    const rel = path.join(OWNER_TABLE[owner], safeSegment(ownerId), `${safeSegment(slot)}_${randomBytes(4).toString('hex')}.${ext}`);
+    const prevRow = getRow(ctx.db, owner, ownerId, slot);
+    const rel = freeName(ctx, readableBase(ctx.db, owner, ownerId, slot), ext, prevRow?.id ?? null, true);
     const abs = path.join(ctx.assetsDir, rel);
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     const tmp = abs + '.part';
@@ -186,10 +272,9 @@ export function removeAllForOwner(ctx, owner, ownerId) {
     for (const r of rows)
         if (r.storage_kind === 'upload')
             removeStoredFile(ctx, r.stored_rel_path);
-    try {
-        fs.rmdirSync(path.join(ctx.assetsDir, OWNER_TABLE[owner], safeSegment(ownerId)));
-    }
-    catch { /* not empty or absent */ }
+    for (const r of rows)
+        if (r.stored_rel_path)
+            removeEmptyDirs(ctx, path.dirname(r.stored_rel_path));
 }
 /** Local file to stream for a preview, or null. */
 export function previewFile(ctx, id) {
@@ -211,4 +296,58 @@ export function previewFile(ctx, id) {
         return { path: p, mime: info.mime };
     }
     return null;
+}
+/**
+ * One-off at start: files of older versions move to the readable layout (Teams/…, Sailors/…, People/…,
+ * PNG generator/…, Matchboard/…) and the emptied old folders (teams/<id>, generated, matchboard) go away.
+ */
+export function tidyAssetsFolder(ctx) {
+    const old = path.join(ctx.assetsDir, 'matchboard', 'matchboard.png'), now = path.join(ctx.assetsDir, 'Matchboard', 'matchboard.png');
+    // on Windows both names are the same file: only move when the new one does not exist yet
+    try {
+        if (fs.existsSync(old) && !fs.existsSync(now)) {
+            fs.mkdirSync(path.dirname(now), { recursive: true });
+            fs.renameSync(old, now);
+        }
+    }
+    catch { /* in use */ }
+    organizeAssets(ctx);
+    const prune = (dir) => {
+        let entries;
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        }
+        catch {
+            return false;
+        }
+        let empty = true;
+        for (const e of entries) {
+            if (e.isDirectory() && prune(path.join(dir, e.name)))
+                continue;
+            empty = false;
+        }
+        if (empty) {
+            try {
+                fs.rmdirSync(dir);
+            }
+            catch {
+                return false;
+            }
+        }
+        return empty;
+    };
+    for (const d of ['teams', 'sailors', 'people', 'generated', 'matchboard']) {
+        const p = path.join(ctx.assetsDir, d);
+        // stale PNGs of the old generator folder are rebuilt under “PNG generator”
+        if (d === 'generated' && path.resolve(p).toLowerCase() !== path.resolve(ctx.assetsDir, 'PNG generator').toLowerCase()) {
+            try {
+                for (const t of fs.readdirSync(p))
+                    for (const f of fs.readdirSync(path.join(p, t)))
+                        if (f.endsWith('.png') || f.endsWith('.tmp'))
+                            fs.rmSync(path.join(p, t, f), { force: true });
+            }
+            catch { /* none */ }
+        }
+        prune(p);
+    }
 }

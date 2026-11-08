@@ -3,6 +3,7 @@ import { openDb } from './db/db.js';
 import { buildApp } from './app.js';
 import { SyncService } from './services/sync.js';
 import { WorkbookWriter } from './services/workbook.js';
+import { tidyAssetsFolder } from './services/assets.js';
 import { applyGoldCupOnStart } from './services/presets.js';
 import { GeneratorExporter, seedGenerator } from './services/generator/generator.js';
 import { applyTeamGraphicsOnStart } from './services/teamGraphics.js';
@@ -25,6 +26,7 @@ if (graphics)
     app.log.info(`Team flags and emblems applied: ${JSON.stringify(graphics)}`);
 sync.start();
 const stopRanking = rankingOnStart(db, (m) => app.log.info(m));
+tidyAssetsFolder({ db, assetsDir: config.assetsDir });
 workbook.start();
 generator.start();
 matchboard.schedule(2000);

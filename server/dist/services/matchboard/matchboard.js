@@ -11,7 +11,7 @@ import { getStrokeGradient, listGradients, listTemplates } from '../generator/ge
 import { defaultSlotState, drawMatchboard, resolveTeams } from './draw.js';
 export { resolveTeams, linkOf } from './draw.js';
 /** The exported board lives next to the other assets, so vmix-sync mirrors it to the vMix machine. */
-export const MATCHBOARD_REL = 'matchboard/matchboard.png';
+export const MATCHBOARD_REL = 'Matchboard/matchboard.png';
 /** Element added to the PNG generator for the highlight, sized like a matchboard row. */
 export const HIGHLIGHT_FILE = 'matchboard_team';
 /** Rows highlighted in MATCHBOARD-BROADCAST (teams through to the next stage). */

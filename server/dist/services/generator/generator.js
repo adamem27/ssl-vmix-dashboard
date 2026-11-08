@@ -9,7 +9,7 @@ import { joinVmixPath } from '../paths.js';
 import { DEFAULT_STROKE_GRADIENT, gradientVersions, gradientVersionsFrom, renderElement } from './render.js';
 export const VARIANTS = [1, 2, 3];
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
-export const GENERATED_DIR = 'generated';
+export const GENERATED_DIR = 'PNG generator';
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Colour must be #RRGGBB');
 const pct = z.number().min(0).max(100);
 export const gradientSchema = z.object({

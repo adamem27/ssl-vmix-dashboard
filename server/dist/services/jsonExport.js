@@ -78,22 +78,11 @@ export function jsonFleetSet(ctx, setId) {
     }
     return rows;
 }
-export function jsonIndex(db, eventId) {
-    const sets = db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(eventId);
+export function jsonIndex(_db, _eventId) {
     return [
-        { name: 'Teams', path: '/json/teams' },
-        { name: 'Sailors (today’s crews)', path: '/json/sailors' },
-        { name: 'Captains', path: '/json/captains' },
-        { name: 'Weather', path: '/json/weather' },
-        { name: 'Schedule (today)', path: '/json/schedule' },
-        { name: 'People (lowerthirds)', path: '/json/people' },
-        { name: 'Welcome', path: '/json/graphics-sets/welcome' },
-        { name: 'Follow us', path: '/json/graphics-sets/socials' },
-        { name: 'Tickers', path: '/json/graphics-sets/ticker' },
-        { name: 'Race officials', path: '/json/graphics-sets/officials' },
-        { name: 'Announcements', path: '/json/graphics-sets/announcement' },
-        { name: 'Line-ups', path: '/json/lineups' },
-        { name: 'Results (one row per group)', path: '/json/results' },
-        ...sets.map((s) => ({ name: `Fleets · ${s.name}`, path: `/json/fleets/${s.id}` })),
+        { name: 'General', path: '/json/sheet/general' },
+        { name: 'Teams', path: '/json/sheet/teams' },
+        { name: 'Sailors', path: '/json/sheet/sailors' },
+        { name: 'Results', path: '/json/sheet/results' },
     ];
 }
