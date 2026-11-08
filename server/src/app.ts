@@ -13,6 +13,7 @@ import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateS
 import * as fleets from './services/fleets.js';
 import * as decl from './services/declarations.js';
 import * as ranking from './services/ranking.js';
+import * as mb from './services/matchboard/matchboard.js';
 import { SyncService } from './services/sync.js';
 import { allSheets, WorkbookWriter } from './services/workbook.js';
 import { buildXlsx, zipStore } from './services/xlsx.js';
@@ -26,7 +27,7 @@ import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
 
-export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter }
+export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter; matchboard?: mb.MatchboardExporter }
 
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -36,6 +37,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const ctx: AssetCtx = { db, assetsDir: deps.assetsDir };
   fs.mkdirSync(deps.assetsDir, { recursive: true });
   const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir });
+  const matchboard = deps.matchboard ?? new mb.MatchboardExporter({ db, assetsDir: deps.assetsDir });
 
   const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 5 * 1024 * 1024 });
   await app.register(multipart, { limits: { fileSize: deps.maxUploadBytes ?? 40 * 1024 * 1024, files: 1 } });
@@ -375,7 +377,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get('/api/generator', async () => genState());
   app.get('/api/generator/status', async () => ({ status: generator.status(), outputs: pngGen.listOutputs(db) }));
   app.post('/api/generator/templates', async (req) => pngGen.createTemplate(db, pngGen.templateSchema.parse(req.body)));
-  app.patch<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => pngGen.updateTemplate(db, req.params.id, pngGen.templatePatchSchema.parse(req.body)));
+  app.patch<{ Params: { id: string } }>('/api/generator/templates/:id', async (req) => {
+    const t = pngGen.updateTemplate(db, req.params.id, pngGen.templatePatchSchema.parse(req.body));
+    matchboard.schedule(1500);
+    return t;
+  });
   app.post<{ Params: { id: string } }>('/api/generator/templates/:id/duplicate', async (req) => pngGen.duplicateTemplate(db, req.params.id));
   app.post<{ Params: { id: string } }>('/api/generator/templates/:id/move', async (req) => {
     pngGen.moveTemplate(db, req.params.id, z.object({ direction: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body).direction);
@@ -385,11 +391,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.put<{ Params: { teamId: string; variant: string } }>('/api/generator/gradients/:teamId/:variant', async (req) => {
     const g = z.object({ gradient: pngGen.gradientSchema.nullable() }).parse(req.body).gradient;
     pngGen.setGradient(db, req.params.teamId, Number(req.params.variant), g);
+    matchboard.schedule(1500);
     return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
   });
   app.post<{ Params: { teamId: string } }>('/api/generator/gradients/:teamId/from-colors', async (req) => {
     const b = z.object({ colors: z.array(z.string()).min(1).max(5), angle: z.number().min(-360).max(360).default(0) }).parse(req.body);
     pngGen.setGradientsFromColors(db, req.params.teamId, b.colors, b.angle);
+    matchboard.schedule(1500);
     return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
   });
   app.put('/api/generator/stroke-gradient', async (req) => ({
@@ -413,6 +421,32 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return reply.type('application/zip').header('Content-Disposition', 'attachment; filename="ssl-generated-png.zip"').send(zipStore(entries));
   });
   app.get('/json/graphics', async () => pngGen.jsonGraphics(db, deps.assetsDir));
+
+  // ---------- matchboard ----------
+  const mbState = async () => ({ layout: mb.loadLayout(), state: mb.getState(db), status: matchboard.status(), fonts: await matchboard.fonts() });
+  app.get('/api/matchboard', mbState);
+  app.put('/api/matchboard', async (req) => {
+    const state = mb.saveState(db, mb.statePatchSchema.parse(req.body));
+    matchboard.schedule();
+    return { state, status: matchboard.status() };
+  });
+  app.post('/api/matchboard/reset', async () => { mb.resetState(db); matchboard.schedule(0); return mbState(); });
+  app.post('/api/matchboard/export', async () => matchboard.render());
+  app.get('/api/matchboard/png', async (_req, reply) =>
+    reply.type('image/png').header('Content-Disposition', 'attachment; filename="matchboard.png"').send(await matchboard.renderBuffer()));
+  app.get('/api/matchboard/background.png', async (_req, reply) => reply.type('image/png').header('Cache-Control', 'max-age=3600').send(fs.createReadStream(mb.backgroundPath())));
+  app.get<{ Params: { name: string } }>('/api/matchboard/fonts/:name', async (req, reply) => {
+    const w = /^general-sans-(\d{3})$/.exec(req.params.name);
+    const f = req.params.name === 'space-grotesk' ? mb.groteskPath() : w ? mb.uploadedSansFiles(deps.assetsDir).find((x) => x.weight === Number(w[1]))?.file : null;
+    if (!f) throw notFound('Font');
+    const ext = path.extname(f).slice(1);
+    return reply.type(ext === 'otf' ? 'font/otf' : ext === 'ttf' ? 'font/ttf' : `font/${ext}`).header('Cache-Control', 'no-cache').send(fs.createReadStream(f));
+  });
+  app.post('/api/matchboard/font', async (req) => {
+    const file = await req.file();
+    if (!file) throw badRequest('No file was uploaded.');
+    return matchboard.saveFonts(await file.toBuffer(), file.filename);
+  });
   // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
   // The sync program polls the manifest every few seconds; its last visit is the vMix machine's heartbeat.
   let mirrorSeen: { at: string; host: string; folder: string; error: string } | null = null;

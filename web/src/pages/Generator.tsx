@@ -1,5 +1,7 @@
 import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import { MatchboardTab } from './Matchboard';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { ElementSpec, Gradient, GradientStop, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
@@ -41,14 +43,32 @@ function colorAt(g: Gradient, pos: number): GradientStop {
   return { pos, color: toHex([0, 1, 2].map((k) => ca[k] + (cb[k] - ca[k]) * f) as [number, number, number]), opacity: Math.round(a.opacity + (b.opacity - a.opacity) * f) };
 }
 
+type GenTab = 'colours' | 'elements' | 'matchboard';
+const TABS: [GenTab, string, string][] = [
+  ['colours', 'Team colours', 'Gradients V1–V3 of each team'],
+  ['elements', 'Elements', 'Sizes and look of the exported PNGs'],
+  ['matchboard', 'Matchboard', 'Bracket graphic with teams, texts and highlights'],
+];
+
 export function GeneratorPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = (TABS.find(([k]) => k === params.get('tab'))?.[0] ?? 'colours') as GenTab;
   const q = useQuery({ queryKey: ['generator'], queryFn: () => api.get<GenState>('/api/generator'), refetchOnWindowFocus: false });
-  if (q.isLoading) return <Loading />;
-  if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
-  return <Generator state={q.data!} />;
+  return (
+    <div className="space-y-3">
+      <nav className="flex flex-wrap gap-1 border-b border-ink-800" aria-label="PNG generator sections">
+        {TABS.map(([k, label, hint]) => (
+          <button key={k} title={hint} onClick={() => setParams(k === 'colours' ? {} : { tab: k }, { replace: true })}
+            className={cx('-mb-px border-b-2 px-4 py-2 text-sm font-semibold', tab === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{label}</button>
+        ))}
+      </nav>
+      {tab === 'matchboard' ? <MatchboardTab />
+        : q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : <Generator state={q.data!} tab={tab} />}
+    </div>
+  );
 }
 
-function Generator({ state }: { state: GenState }) {
+function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements' }) {
   const qc = useQueryClient();
   const toast = useToast();
   const debounce = useDebouncer(350);
@@ -97,10 +117,10 @@ function Generator({ state }: { state: GenState }) {
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
         <TeamList teams={teams} selected={teamId} onSelect={setTeamId} />
         <div className="min-w-0 space-y-3">
-          {team ? (
+          {tab === 'colours' && (team ? (
             <GradientPanel key={team.teamId} team={team} teams={teams} variant={variant} setVariant={setVariant}
               onChange={(g, immediate) => setGradient(team.teamId, variant, g, immediate)} onReload={refresh} />
-          ) : <section className="card p-6 text-sm text-ink-400">No teams yet.</section>}
+          ) : <section className="card p-6 text-sm text-ink-400">No teams yet.</section>)}
           <Panel title="Preview" right={<>
             <select className="input w-auto py-1 text-xs" value={view} onChange={(e) => setView(e.target.value)} aria-label="Preview">
               <option value="team">{team ? `${team.code}: all elements` : 'All elements'}</option>
@@ -112,8 +132,10 @@ function Generator({ state }: { state: GenState }) {
               ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} />
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={teams} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
-          <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
-          <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
+          {tab === 'elements' && <>
+            <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
+            <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
+          </>}
         </div>
       </div>
     </div>
