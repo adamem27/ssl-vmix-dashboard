@@ -10,6 +10,7 @@
  * (Bitmap Source "<folder guid>\\name.png" → part guid), [Content_Types].xml (BOM, one Override per part),
  * the image parts named by guid and thumbnail.png (640×360).
  */
+import { addField } from './fields.js';
 import { tidyLayers } from './tidy.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -471,11 +472,27 @@ export class GtzipService {
         catch (e) {
             throw badRequest(e.message);
         }
+        return { doc: await this.applyBands(body.template ?? null, r.root, r.bands) };
+    }
+    /** Adds a data field the template lacks (see fields.ts); a picture that grows with it gets a new bitmap. */
+    async addDataField(body) {
+        let r;
+        try {
+            r = addField(body.doc, { name: body.name, sample: body.sample, group: body.group });
+        }
+        catch (e) {
+            throw badRequest(e.message);
+        }
+        return { doc: await this.applyBands(body.template ?? null, r.root, r.bands), added: r.added };
+    }
+    /** Re-slices the bitmaps of stretched pictures (bands in the order they happened) and saves them as uploads. */
+    async applyBands(template, root, bands) {
+        const r = { root, bands };
         if (!r.bands.length)
-            return { doc: r.root };
+            return r.root;
         const c = await canvas();
         if (!c)
-            return { doc: r.root };
+            return r.root;
         const byName = new Map(collect(r.root, 'Image').map((n) => [n.attrs.Name, n]));
         const current = new Map();
         for (const b of r.bands) {
@@ -487,7 +504,7 @@ export class GtzipService {
             let buf = current.get(b.name);
             if (!buf) {
                 try {
-                    buf = this.image(body.template ?? null, src);
+                    buf = this.image(template, src);
                 }
                 catch {
                     continue;
@@ -505,7 +522,7 @@ export class GtzipService {
             const base = sourceName(bm.attrs.Source).replace(/^[0-9a-f]{12}-/, '').replace(/\.[^.]+$/, '');
             bm.attrs.Source = this.saveUpload(buf, `${base}.png`).source;
         }
-        return { doc: r.root };
+        return r.root;
     }
     /** Renders any document (editor state) to PNG with the template's pictures, for checks and tests. */
     async renderDoc(templateId, doc, width = 640) {
@@ -519,6 +536,13 @@ export class GtzipService {
         return this.renderThumbnail(p, width);
     }
 }
+export const addFieldSchema = z.object({
+    template: z.string().max(200).nullable().optional(),
+    doc: z.any().refine((d) => d && typeof d === 'object' && d.tag === 'Composition', 'A GT document is needed.'),
+    group: z.string().max(4000).nullable(),
+    name: z.string().trim().min(1).max(60),
+    sample: z.string().max(200).default(''),
+});
 export const countSchema = z.object({
     template: z.string().max(200).nullable().optional(),
     doc: z.any().refine((d) => d && typeof d === 'object' && d.tag === 'Composition', 'A GT document is needed.'),

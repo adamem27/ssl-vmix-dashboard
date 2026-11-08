@@ -30,7 +30,7 @@ function compositions(root) {
     return out;
 }
 /** Boxes of the visible, non-layer elements in absolute title coordinates. */
-function boxIndex(root) {
+export function boxIndex(root) {
     const els = elements(root);
     const W = Number(root.attrs.Width ?? 1920), H = Number(root.attrs.Height ?? 1080);
     const byKey = new Map(els.map((e) => [pathKey(e.path), e]));

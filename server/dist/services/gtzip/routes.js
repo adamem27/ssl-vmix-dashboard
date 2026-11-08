@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { z } from 'zod';
 import { badRequest } from '../errors.js';
-import { countSchema, generateSchema, saveTemplateSchema, sniffMime } from './gtzip.js';
+import { countSchema, addFieldSchema, generateSchema, saveTemplateSchema, sniffMime } from './gtzip.js';
 import { SCENES } from './scenes.js';
 /** /api/gtzip/… – the GTZIP generator tab. Nothing here modifies a template or an existing generated file. */
 export function registerGtzipRoutes(app, svc) {
@@ -43,6 +43,7 @@ export function registerGtzipRoutes(app, svc) {
     app.get('/api/gtzip/asset-images', async () => svc.assetImages());
     app.get('/api/gtzip/free-name', async (req) => ({ name: svc.freeName(String(req.query.name ?? 'title')) }));
     app.post('/api/gtzip/part-count', async (req) => svc.setPartCount(countSchema.parse(req.body)));
+    app.post('/api/gtzip/add-field', async (req) => svc.addDataField(addFieldSchema.parse(req.body)));
     app.post('/api/gtzip/generate', async (req) => svc.generate(generateSchema.parse(req.body)));
     app.get('/api/gtzip/outputs/:name', async (req, reply) => {
         const f = svc.outputFile(req.params.name);
