@@ -23,7 +23,7 @@ export const SCENES: Scene[] = [
   { id: 'individual-recall', name: 'Individual recall', group: 'Announcements', variants: one },
   { id: 'replay', name: 'Replay', group: 'Announcements', variants: one },
   { id: 'race-officials', name: 'Race officials', group: 'Full screen', variants: one },
-  { id: 'race-course', name: 'Race course', group: 'Full screen', variants: v('1x', '2x') },
+  { id: 'race-course', name: 'Race course', group: 'Full screen', variants: v('1x', '2x', 'Horizontal 1x', 'Horizontal 2x', 'Vertical 1x', 'Vertical 2x') },
   { id: 'team-comparison', name: 'Team comparison', group: 'Teams', variants: v('3 teams', '4 teams') },
   { id: 'group-results', name: 'Group overall results', group: 'Teams', variants: v('3 teams', '4 teams') },
   { id: 'l-bars', name: 'L-bars', group: 'L-bars', variants: one },
@@ -70,7 +70,7 @@ export function guessScene(filename: string): { scene: string; variant: string }
     [['postpone'], 'race-postponed'], [['abandon'], 'race-abandoned'], [['general recall'], 'general-recall'], [['individual recall'], 'individual-recall'],
     [['replay'], 'replay'], [['course'], 'race-course'], [['social', 'follow'], 'socials'], [['matchboard'], 'matchboard'], [['custom'], 'custom-text'],
     [['falstart', 'false start'], 'falstart'], [['penalty'], 'penalty']];
-  for (const [w, id] of simple) if (has(...w)) return pick(id, id === 'race-course' && has('2x') ? '2x' : null);
+  for (const [w, id] of simple) if (has(...w)) return pick(id, id === 'race-course' ? `${has('horizontal') ? 'horizontal-' : has('vertical') ? 'vertical-' : ''}${has('2x') ? '2x' : '1x'}` : null);
   if (has('l bar', 'lbar')) return pick('l-bars');
   return null;
 }
