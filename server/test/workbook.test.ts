@@ -95,6 +95,13 @@ describe('workbook sheets', () => {
     const { announcementsSheet, peopleSheet } = await import('../src/services/workbookSheets.js');
     expect(announcementsSheet(ctx, eventId).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
     expect(peopleSheet(ctx, eventId)).toEqual([]);
+    const { lineupSheet } = await import('../src/services/workbookSheets.js');
+    const lu = lineupSheet(ctx, eventId);
+    expect(lu.map((r) => r.Code)).toEqual(['BRN', 'IND']);
+    expect(Object.keys(lu[0]).slice(0, 4)).toEqual(['Group', 'Code', 'Team', 'Title']);
+    // places in the panel's order: bow first by default, the helm last
+    expect([lu[0]['1 Place'], lu[0]['9 Place'], lu[0]['9 Surname'], lu[0]['9 Number']]).toEqual(['Bow', 'Helm', 'HASSAN', '7']);
+    expect(lu[0]).toHaveProperty('Line-up background');
   });
 });
 
