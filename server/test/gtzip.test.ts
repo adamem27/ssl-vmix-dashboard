@@ -125,6 +125,16 @@ describe('gtzip generator API', () => {
     return { method: 'POST' as const, url, payload: body, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
   };
 
+  it('adds every title of a .zip set as a template', async () => {
+    const { app: a } = await app();
+    const pack = zipStore([['set/Day_schedule_3_races.gtzip', sampleGtzip()], ['set/Welcome.gtzip', sampleGtzip()], ['set/readme.txt', Buffer.from('x')], ['set/broken.gtzip', Buffer.from('nope')]]);
+    const r = await a.inject(upload('Finals.zip', pack, '/api/gtzip/templates/pack'));
+    expect(r.statusCode).toBe(200);
+    expect(r.json().added.map((t: any) => t.name)).toEqual(['Day_schedule_3_races', 'Welcome']);
+    expect(r.json().added[0].scene).toBe('day-schedule');
+    expect(r.json().skipped).toEqual(['broken.gtzip']);
+  });
+
   it('generates new single files and never overwrites', async () => {
     const { app: a, ctx } = await app();
     const tplBuf = sampleGtzip();

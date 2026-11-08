@@ -62,11 +62,18 @@ function Templates({ state, selected, onSelect }: { state: GtzipState; selected:
     if (!files?.length) return;
     setBusy(true);
     try {
-      let last: TemplateMeta | null = null;
-      for (const f of Array.from(files)) last = await api.upload<TemplateMeta>('/api/gtzip/templates', f);
+      let last: TemplateMeta | null = null, n = 0;
+      const skipped: string[] = [];
+      for (const f of Array.from(files)) {
+        if (/\.zip$/i.test(f.name)) {
+          const r = await api.upload<{ added: TemplateMeta[]; skipped: string[] }>('/api/gtzip/templates/pack', f);
+          n += r.added.length; skipped.push(...r.skipped);
+          if (r.added.length) last = r.added[r.added.length - 1];
+        } else { last = await api.upload<TemplateMeta>('/api/gtzip/templates', f); n++; }
+      }
       await qc.invalidateQueries({ queryKey: ['gtzip'] });
-      if (last) onSelect(last.id);
-      toast.ok(files.length > 1 ? `${files.length} templates added.` : 'Template added.');
+      if (last && n === 1) onSelect(last.id);
+      toast.ok(`${n === 1 ? 'Template added' : `${n} templates added`}${skipped.length ? ` (not GT titles: ${skipped.join(', ')})` : ''}.`);
     } catch (e) { toast.error(e); } finally { setBusy(false); if (input.current) input.current.value = ''; }
   };
   const del = async (t: TemplateMeta) => {
@@ -83,10 +90,10 @@ function Templates({ state, selected, onSelect }: { state: GtzipState; selected:
       {dialog}
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-semibold">Templates {selected && <button className="ml-1 text-[11px] font-normal text-accent-300 hover:underline" onClick={() => onSelect(null)}>all scenes</button>}</h2>
-        <Button size="sm" busy={busy} onClick={() => input.current?.click()}>+ Upload .gtzip</Button>
-        <input ref={input} type="file" accept=".gtzip" multiple hidden onChange={(e) => upload(e.target.files)} />
+        <Button size="sm" busy={busy} onClick={() => input.current?.click()} title="One or more .gtzip files, or a .zip with a whole set">+ Upload .gtzip / .zip</Button>
+        <input ref={input} type="file" accept=".gtzip,.zip" multiple hidden onChange={(e) => upload(e.target.files)} />
       </div>
-      {!state.templates.length && <p className="text-xs text-ink-500">No templates yet. Upload the .gtzip of a vMix scene.</p>}
+      {!state.templates.length && <p className="text-xs text-ink-500">No templates yet. Upload the .gtzip of a vMix scene, or a .zip with a whole set.</p>}
       <ul className="space-y-1">
         {state.templates.map((t) => (
           <li key={t.id} className={cx('group rounded-md border p-1.5', selected === t.id ? 'border-accent-500 bg-ink-800' : 'border-transparent hover:bg-ink-800/60')}>
