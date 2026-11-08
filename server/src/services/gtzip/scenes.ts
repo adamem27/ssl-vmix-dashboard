@@ -27,7 +27,7 @@ export const SCENES: Scene[] = [
   { id: 'l-bars', name: 'L-bars', group: 'L-bars', variants: one },
   { id: 'socials', name: 'Socials (follow us)', group: 'Full screen', variants: one },
   { id: 'team-lineup', name: 'Team line-up', group: 'Teams', variants: v('8 sailors', '9 sailors', '10 sailors') },
-  { id: 'lt-sailor', name: 'Lower third – sailor', group: 'Lower thirds', variants: v('Photo', 'No photo') },
+  { id: 'lt-sailor', name: 'Lower third – sailor', group: 'Lower thirds', variants: v('Photo', 'No photo', 'Photo + sponsor', 'No photo + sponsor') },
   { id: 'lt-team', name: 'Lower third – team', group: 'Lower thirds', variants: v('Normal', 'Qualified') },
   { id: 'lt-commentator', name: 'Lower third – commentator', group: 'Lower thirds', variants: v('Photo', 'No photo') },
   { id: 'matchboard', name: 'Matchboard', group: 'Teams', variants: one },
@@ -60,7 +60,9 @@ export function guessScene(filename: string): { scene: string; variant: string }
   if (has('commentator')) return pick('lt-commentator', has('no photo', 'nophoto') ? 'no-photo' : 'photo');
   if (has('official')) return pick('race-officials');
   if (has('lowerthird', 'lower third', 'lt ') && has('team')) return pick('lt-team', has('qualif') ? 'qualified' : 'normal');
-  if (has('lowerthird', 'lower third', 'lt ')) return pick('lt-sailor', has('no photo', 'nophoto') ? 'no-photo' : 'photo');
+  if (has('lowerthird', 'lower third', 'lt ')) return pick('lt-sailor', `${has('no photo', 'nophoto') ? 'no-photo' : 'photo'}${has('sponsor') ? '-sponsor' : ''}`);
+  if (has('delay')) return pick(has('weather', 'wind') ? 'delay-weather' : 'delay-other');
+  if (has('announcement', 'ticker')) return pick('announcement', has('ticker') ? (has('top') ? 'ticker-top' : 'ticker-bottom') : 'bug');
   const simple: [string[], string][] = [[['welcome'], 'welcome'], [['weather'], 'weather'], [['warning'], 'warning-signal'], [['thanks', 'thank you'], 'thanks'],
     [['postpone'], 'race-postponed'], [['abandon'], 'race-abandoned'], [['general recall'], 'general-recall'], [['individual recall'], 'individual-recall'],
     [['replay'], 'replay'], [['course'], 'race-course'], [['social', 'follow'], 'socials'], [['matchboard'], 'matchboard'], [['custom'], 'custom-text']];
