@@ -17,6 +17,8 @@ export const SCENES: Scene[] = [
   { id: 'custom-text', name: 'Custom text', group: 'Announcements', variants: one },
   { id: 'race-postponed', name: 'Race postponed', group: 'Announcements', variants: one },
   { id: 'race-abandoned', name: 'Race abandoned', group: 'Announcements', variants: one },
+  { id: 'falstart', name: 'Falstart', group: 'Announcements', variants: one },
+  { id: 'penalty', name: 'Penalty', group: 'Announcements', variants: one },
   { id: 'general-recall', name: 'General recall', group: 'Announcements', variants: one },
   { id: 'individual-recall', name: 'Individual recall', group: 'Announcements', variants: one },
   { id: 'replay', name: 'Replay', group: 'Announcements', variants: one },
@@ -50,6 +52,7 @@ export function guessScene(filename: string): { scene: string; variant: string }
     const s = SCENES.find((x) => x.id === scene)!;
     return { scene, variant: (s.variants.find((x) => x.id === variant) ?? s.variants[0]).id };
   };
+  if (has('l bar', 'lbar') && has('ticker', 'schedule', 'result', 'overall')) return pick('l-bars-combo', has('result', 'overall') ? 'overall-results' : 'schedule');
   if (has('schedule') && !has('l bar', 'lbar')) {
     const n = num(/(\d)\s*(?:rows?|races?)/) ?? num(/schedule\s*(\d)/);
     return pick('day-schedule', n ? `${n}-races${has('no time', 'notime') ? '-no-time' : ''}` : null);
@@ -65,7 +68,8 @@ export function guessScene(filename: string): { scene: string; variant: string }
   if (has('announcement', 'ticker')) return pick('announcement', has('ticker') ? (has('top') ? 'ticker-top' : 'ticker-bottom') : 'bug');
   const simple: [string[], string][] = [[['welcome'], 'welcome'], [['weather'], 'weather'], [['warning'], 'warning-signal'], [['thanks', 'thank you'], 'thanks'],
     [['postpone'], 'race-postponed'], [['abandon'], 'race-abandoned'], [['general recall'], 'general-recall'], [['individual recall'], 'individual-recall'],
-    [['replay'], 'replay'], [['course'], 'race-course'], [['social', 'follow'], 'socials'], [['matchboard'], 'matchboard'], [['custom'], 'custom-text']];
+    [['replay'], 'replay'], [['course'], 'race-course'], [['social', 'follow'], 'socials'], [['matchboard'], 'matchboard'], [['custom'], 'custom-text'],
+    [['falstart', 'false start'], 'falstart'], [['penalty'], 'penalty']];
   for (const [w, id] of simple) if (has(...w)) return pick(id, id === 'race-course' && has('2x') ? '2x' : null);
   if (has('l bar', 'lbar')) return pick('l-bars');
   return null;
