@@ -5,6 +5,7 @@ import { SyncService } from './services/sync.js';
 import { WorkbookWriter } from './services/workbook.js';
 import { applyGoldCupOnStart } from './services/presets.js';
 import { GeneratorExporter, seedGenerator } from './services/generator/generator.js';
+import { applyTeamGraphicsOnStart } from './services/teamGraphics.js';
 
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
@@ -15,6 +16,8 @@ const app = await buildApp({ db, generator, assetsDir: config.assetsDir, sync, w
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
 seedGenerator(db);
+const graphics = applyTeamGraphicsOnStart({ db, assetsDir: config.assetsDir });
+if (graphics) app.log.info(`Team flags and emblems applied: ${JSON.stringify(graphics)}`);
 sync.start();
 workbook.start();
 generator.start();
