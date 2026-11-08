@@ -6,6 +6,7 @@ import { useMeta } from '../App';
 import { SyncSummaryView } from './Settings';
 import { LineupPanel } from './Lineup';
 import { Badge, Button, cx, Empty, ErrorBox, fmtDate, fmtDateTime, Loading, Modal, todayIn, useConfirm, useToast } from '../components/ui';
+import { useStageTeams } from '../components/StagePicker';
 
 export function DeclarationsPage() {
   const meta = useMeta();
@@ -20,17 +21,21 @@ export function DeclarationsPage() {
   const overview = useQuery({ queryKey: ['decl-overview', date], queryFn: () => api.get<DateOverviewRow[]>(`/api/declarations/overview?date=${date}`), enabled: /^\d{4}-\d{2}-\d{2}$/.test(date) });
   const unmatched = useQuery({ queryKey: ['decl-unmatched'], queryFn: () => api.get<{ id: string; sourceName: string; matchStatus: string; date: string; teamId: string; code: string; name: string }[]>('/api/declarations/unmatched') });
   const [teamFilter, setTeamFilter] = useState('');
+  const stage = useStageTeams();
+  const stageRows = (overview.data ?? []).filter((r) => stage.inStage(r.teamId));
   const [showUnmatched, setShowUnmatched] = useState(false);
 
   useEffect(() => {
-    if (!teamId && overview.data?.length) {
-      const first = overview.data.find((r) => r.declarationId) ?? overview.data[0];
+    if ((!teamId || !stage.inStage(teamId)) && overview.data?.length) {
+      const list = overview.data.filter((r) => stage.inStage(r.teamId));
+      const first = list.find((r) => r.declarationId) ?? list[0];
+      if (!first) return;
       const p = new URLSearchParams(params); p.set('team', first.teamId); if (!p.has('date')) p.set('date', date); setParams(p, { replace: true });
     }
-  }, [teamId, overview.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [teamId, overview.data, stage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rows = (overview.data ?? []).filter((r) => !teamFilter || `${r.code} ${r.name}`.toLowerCase().includes(teamFilter.toLowerCase()));
-  const declaredCount = (overview.data ?? []).filter((r) => r.declarationId).length;
+  const rows = stageRows.filter((r) => !teamFilter || `${r.code} ${r.name}`.toLowerCase().includes(teamFilter.toLowerCase()));
+  const declaredCount = stageRows.filter((r) => r.declarationId).length;
 
   return (
     <div className="space-y-4">
@@ -67,7 +72,7 @@ export function DeclarationsPage() {
         <aside className="card h-fit overflow-hidden">
           <div className="border-b border-ink-800 p-3">
             <p className="text-sm font-semibold">{fmtDate(date)}</p>
-            <p className="text-xs text-ink-400">{declaredCount} of {overview.data?.length ?? 0} teams have a crew</p>
+            <p className="text-xs text-ink-400">{declaredCount} of {stageRows.length} teams have a crew{stage.stage ? ` · stage ${stage.stage.name}` : ''}</p>
             <input className="input mt-2" type="search" placeholder="Filter teams…" value={teamFilter} onChange={(e) => setTeamFilter(e.target.value)} aria-label="Filter teams" />
           </div>
           {overview.isLoading ? <Loading /> : overview.error ? <div className="p-3"><ErrorBox error={overview.error} /></div> : !overview.data?.length ? (

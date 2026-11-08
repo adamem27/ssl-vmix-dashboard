@@ -150,11 +150,12 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
   return { synced: true as const, sailors: crew.length };
 }
 
-/** Sync for every team with a declaration that day. */
-export function syncAllLineups(ctx: AssetCtx, eventId: string, date: string) {
+/** Sync for every team with a declaration that day (only the given teams when a list is passed, e.g. the current stage). */
+export function syncAllLineups(ctx: AssetCtx, eventId: string, date: string, only: string[] | null = null) {
   const ov = overview(ctx, eventId, date, null);
+  const keep = only ? new Set(only) : null;
   let teams = 0;
-  for (const t of ov.teams) if (t.declaration && syncLineupFromDeclaration(ctx, eventId, t.id, date).synced) teams++;
+  for (const t of ov.teams) if ((!keep || keep.has(t.id)) && t.declaration && syncLineupFromDeclaration(ctx, eventId, t.id, date).synced) teams++;
   return { teams };
 }
 

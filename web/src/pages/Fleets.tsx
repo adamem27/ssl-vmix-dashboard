@@ -4,6 +4,7 @@ import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core';
 import { api, ApiError, FleetSetDetail, FleetSetSummary, Team } from '../api';
+import { useStageTeams } from '../components/StagePicker';
 import { TeamProfileLink } from '../components/TeamProfileLink';
 import { Badge, Button, cx, Empty, ErrorBox, Field, Loading, Modal, useConfirm, useToast } from '../components/ui';
 
@@ -20,6 +21,8 @@ export function FleetsPage() {
   const [occupied, setOccupied] = useState<Occupied | null>(null);
   const [dragTeam, setDragTeam] = useState<string | null>(null);
   const [poolSearch, setPoolSearch] = useState('');
+  const stage = useStageTeams();
+  const [allTeams, setAllTeams] = useState(false);
 
   useEffect(() => {
     if (!sets.data) return;
@@ -31,7 +34,9 @@ export function FleetsPage() {
   const teamById = useMemo(() => new Map((teams.data ?? []).map((t) => [t.id, t])), [teams.data]);
   const d = detail.data;
   const assigned = new Set(d?.assignedTeamIds ?? []);
-  const pool = (teams.data ?? []).filter((t) => !assigned.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
+  // with a stage picked only its teams are offered, unless “all teams” is ticked (needed to build a stage)
+  const offered = (teams.data ?? []).filter((t) => allTeams || stage.inStage(t.id) || assigned.has(t.id));
+  const pool = offered.filter((t) => !assigned.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
   const locate = (teamId: string) => {
     for (const f of d?.fleets ?? []) { const i = f.positions.indexOf(teamId); if (i >= 0) return { fleetId: f.id, position: i + 1, fleetName: f.name }; }
     return null;
@@ -45,6 +50,7 @@ export function FleetsPage() {
     if (data) qc.setQueryData(['fleet-set', setId], data);
     else qc.invalidateQueries({ queryKey: ['fleet-set', setId] });
     qc.invalidateQueries({ queryKey: ['fleet-sets'] });
+    qc.invalidateQueries({ queryKey: ['stage'] });
   };
 
   const place = async (teamId: string, fleetId: string, position: number | undefined, onOccupied?: 'swap') => {
@@ -157,14 +163,19 @@ export function FleetsPage() {
             <Pool>
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">Available teams</h2>
-                <span className="text-xs text-ink-500">{(teams.data?.length ?? 0) - assigned.size}</span>
+                <span className="text-xs text-ink-500">{offered.filter((t) => !assigned.has(t.id)).length}</span>
               </div>
+              {stage.stage && (
+                <label className="mt-1 flex items-center gap-1.5 text-xs text-ink-400" title={`Only the teams of the stage ${stage.stage.name} are listed. Tick to add other teams.`}>
+                  <input type="checkbox" checked={allTeams} onChange={(e) => setAllTeams(e.target.checked)} /> Show teams outside stage {stage.stage.name}
+                </label>
+              )}
               <input className="input mt-2" type="search" placeholder="Filter…" value={poolSearch} onChange={(e) => setPoolSearch(e.target.value)} aria-label="Filter available teams" />
               <ul className="mt-2 max-h-[60vh] space-y-1 overflow-auto pr-1">
                 {pool.map((t) => (
                   <li key={t.id}><TeamChip team={t} /></li>
                 ))}
-                {!pool.length && <li className="py-6 text-center text-xs text-ink-500">{teams.data?.length ? 'All teams are assigned.' : 'No teams in the database.'}</li>}
+                {!pool.length && <li className="py-6 text-center text-xs text-ink-500">{!teams.data?.length ? 'No teams in the database.' : stage.stage && !allTeams ? `All teams of stage ${stage.stage.name} are assigned.` : 'All teams are assigned.'}</li>}
               </ul>
             </Pool>
 
@@ -217,7 +228,7 @@ export function FleetsPage() {
                                 onChange={(e) => { if (e.target.value) void place(e.target.value, f.id, i + 1); }}>
                                 <option value="">{f.placeholders?.[i] ? `${f.placeholders[i]}` : '—'}</option>
                                 <optgroup label="Available">
-                                  {(teams.data ?? []).filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
+                                  {offered.filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>
                                 <optgroup label="Move from another fleet">
                                   {(teams.data ?? []).filter((t) => assigned.has(t.id) && !f.positions.includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name} ({locate(t.id)?.fleetName})</option>)}

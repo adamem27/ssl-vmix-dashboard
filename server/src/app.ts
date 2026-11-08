@@ -16,6 +16,7 @@ import * as ranking from './services/ranking.js';
 import * as mb from './services/matchboard/matchboard.js';
 import { SyncService } from './services/sync.js';
 import { allSheets, WorkbookWriter } from './services/workbook.js';
+import { stageTeamIds } from './services/workbookSheets.js';
 import { buildXlsx, zipStore } from './services/xlsx.js';
 import * as pngGen from './services/generator/generator.js';
 import { GtzipService } from './services/gtzip/gtzip.js';
@@ -359,14 +360,21 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('Content-Disposition', 'attachment; filename="ssl-vmix.xlsx"');
     return reply.send(buildXlsx(allSheets(ctx)));
   });
-  app.get('/json/teams', async () => jsonTeams(ctx));
+  // the older per-topic JSON follows the current stage like the workbook: only its teams are listed
+  const inStage = <T,>(rows: T[], code: (r: T) => string) => {
+    const ids = stageTeamIds(db, ev().id);
+    if (!ids) return rows;
+    const codes = new Set(listTeams(ctx).filter((t) => ids.includes(t.id)).map((t) => t.code.toLowerCase()));
+    return rows.filter((r) => codes.has(code(r).toLowerCase()));
+  };
+  app.get('/json/teams', async () => inStage(jsonTeams(ctx), (r) => String((r as { code?: string }).code ?? '')));
   app.get<{ Querystring: { date?: string; team?: string } }>('/json/sailors', async (req) =>
-    jsonSailors(ctx, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone), req.query.team ? String(req.query.team) : undefined));
+    inStage(jsonSailors(ctx, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone), req.query.team ? String(req.query.team) : undefined), (r) => r.team_code));
   app.get<{ Params: { id: string } }>('/json/fleets/:id', async (req) => jsonFleetSet(ctx, req.params.id));
   app.get('/json/weather', async () => jsonWeather(db));
   app.get<{ Querystring: { date?: string } }>('/json/schedule', async (req) => jsonSchedule(db, ev().id, req.query.date ? String(req.query.date) : todayIn(ev().timezone)));
   app.get<{ Querystring: { role?: string; language?: string } }>('/json/people', async (req) => jsonPeople(ctx, ev().id, req.query.role, req.query.language));
-  app.get('/json/captains', async () => jsonCaptains(ctx));
+  app.get('/json/captains', async () => inStage(jsonCaptains(ctx), (r) => r.code));
 
   // ---------- PNG generator ----------
   const genState = () => ({
@@ -423,7 +431,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const entries = pngGen.listOutputs(db).map((o) => [o.rel.slice(pngGen.GENERATED_DIR.length + 1), fs.readFileSync(path.join(deps.assetsDir, ...o.rel.split('/')))] as [string, Buffer]);
     return reply.type('application/zip').header('Content-Disposition', 'attachment; filename="ssl-generated-png.zip"').send(zipStore(entries));
   });
-  app.get('/json/graphics', async () => pngGen.jsonGraphics(db, deps.assetsDir));
+  app.get('/json/graphics', async () => inStage(pngGen.jsonGraphics(db, deps.assetsDir), (r) => r.code));
 
   // ---------- matchboard ----------
   const mbState = async () => ({ layout: mb.loadLayout(), state: mb.getState(db), status: matchboard.status(), fonts: await matchboard.fonts() });

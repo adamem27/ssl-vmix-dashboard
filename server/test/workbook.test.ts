@@ -87,3 +87,22 @@ describe('workbook sheets', () => {
     expect(general.find((r) => r.Graphic === 'Tickers' && r.Version === 'Extra' && r.Field === 'Ticker text')!.Value).toBe('A I B I ');
   });
 });
+
+describe('current stage in the API', () => {
+  it('lists the stage teams and limits the JSON feeds to them', async () => {
+    const { buildApp } = await import('../src/app.js');
+    const s = setup();
+    const { db, eventId } = s;
+    const a = seedTeam(db, 'BRN', ['Ali Hassan']);
+    seedTeam(db, 'MYA', ['Aung San']);
+    const setId = createSet(db, eventId, 'Panam Qualifiers', 0);
+    const fleetId = createFleet(db, setId, 'Group A');
+    db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, ?, ?)').run(fleetId, setId, 1, a.teamId);
+    const app = await buildApp({ db, assetsDir: s.ctx.assetsDir, sync: s.sync });
+    expect((await app.inject({ url: '/json/teams' })).json().map((r: { code: string }) => r.code)).toEqual(['BRN', 'MYA']);
+    expect((await app.inject({ method: 'PUT', url: '/api/stage', payload: { setId } })).json().teamIds).toEqual([a.teamId]);
+    expect((await app.inject({ url: '/json/teams' })).json().map((r: { code: string }) => r.code)).toEqual(['BRN']);
+    expect((await app.inject({ url: '/json/sailors' })).json().map((r: { team_code: string }) => r.team_code)).toEqual(['BRN']);
+    await app.close();
+  });
+});

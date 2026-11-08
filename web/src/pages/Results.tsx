@@ -17,6 +17,7 @@ export function ResultsPage() {
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
   const teams = useQuery({ queryKey: ['teams'], queryFn: () => api.get<Team[]>('/api/teams') });
   const stage = useStage();
+  // with a stage picked the tab opens on its groups and the other sets' tabs are hidden
   const setId = params.get('set') ?? stage.data?.current?.id ?? sets.data?.[0]?.id ?? null;
   const groups = useQuery({ queryKey: ['results', setId], queryFn: () => api.get<Group[]>(`/api/results/set/${setId}`), enabled: !!setId });
 
@@ -37,7 +38,7 @@ export function ResultsPage() {
       ) : (
         <>
           <div className="flex flex-wrap gap-1" role="tablist" aria-label="Fleet set">
-            {sets.data.map((s) => (
+            {sets.data.filter((s) => !stage.data?.current || s.id === stage.data.current.id || s.id === params.get('set')).map((s) => (
               <button key={s.id} role="tab" aria-selected={s.id === setId} onClick={() => setParams({ set: s.id }, { replace: true })}
                 className={cx('rounded-md border px-3 py-1.5 text-sm', s.id === setId ? 'border-accent-500 bg-accent-500/15 text-accent-300' : 'border-ink-700 text-ink-300 hover:bg-ink-800')}>{s.name}</button>
             ))}

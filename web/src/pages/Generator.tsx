@@ -1,4 +1,4 @@
-import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { MatchboardTab } from './Matchboard';
@@ -6,6 +6,7 @@ import { TeamProfileLink } from '../components/TeamProfileLink';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { ElementSpec, Gradient, GradientStop, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
+import { useStageTeams } from '../components/StagePicker';
 
 interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean }
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
@@ -86,7 +87,10 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
   useEffect(() => setTemplates(state.templates), [state.templates]);
   useEffect(() => setStrokeDraft(state.strokeGradient), [state.strokeGradient]);
 
-  const team = teams.find((t) => t.teamId === teamId) ?? null;
+  const stage = useStageTeams();
+  const shown = useMemo(() => teams.filter((t) => stage.inStage(t.teamId)), [teams, stage]);
+  useEffect(() => { if (shown.length && !shown.some((t) => t.teamId === teamId)) setTeamId(shown[0].teamId); }, [shown, teamId]);
+  const team = shown.find((t) => t.teamId === teamId) ?? null;
   const refresh = () => qc.invalidateQueries({ queryKey: ['generator'] });
 
   const setGradient = (tid: string, v: number, g: Gradient | null, immediate = false) => {
@@ -116,10 +120,10 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
     <div className="space-y-3">
       <ExportBar state={state} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
-        <TeamList teams={teams} selected={teamId} onSelect={setTeamId} />
+        <TeamList teams={shown} selected={teamId} onSelect={setTeamId} />
         <div className="min-w-0 space-y-3">
           {tab === 'colours' && (team ? (
-            <GradientPanel key={team.teamId} team={team} teams={teams} variant={variant} setVariant={setVariant}
+            <GradientPanel key={team.teamId} team={team} teams={shown} variant={variant} setVariant={setVariant}
               onChange={(g, immediate) => setGradient(team.teamId, variant, g, immediate)} onReload={refresh} />
           ) : <section className="card p-6 text-sm text-ink-400">No teams yet.</section>)}
           <Panel title="Preview" right={<>
@@ -131,7 +135,7 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
           </>}>
             {view === 'team'
               ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} />
-              : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={teams} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
+              : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={shown} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           {tab === 'elements' && <>
             <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
