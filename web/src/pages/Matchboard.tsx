@@ -2,7 +2,7 @@ import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, Team } from '../api';
 import { Button, cx, ErrorBox, fmtDateTime, Loading, useConfirm, useToast } from '../components/ui';
-import { drawMatchboard, MbLayout, MbSlot, MbSlotState, MbState, MbTeam, MbText } from '../../../server/src/services/matchboard/draw';
+import { drawMatchboard, resolveTeams, MbLayout, MbSlot, MbSlotState, MbState, MbTeam, MbText } from '../../../server/src/services/matchboard/draw';
 import { Gradient, Raster } from '../../../server/src/services/generator/render';
 
 interface MbStatus { file: string; vmixPath: string | null; exists: boolean; lastWriteAt: string | null; error: string | null }
@@ -73,6 +73,20 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
   useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); void flush(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const setText = (id: string, v: string) => { setState((s) => ({ ...s, texts: { ...s.texts, [id]: v } })); pending.current.texts[id] = v; queue(); };
   const setSlot = (id: string, v: MbSlotState) => { setState((s) => ({ ...s, slots: { ...s.slots, [id]: v } })); pending.current.slots[id] = v; queue(); };
+  /** Moves a row inside its box (the rows are the box's standings); team, text and star move together. */
+  const moveRow = (groupId: string, from: number, to: number) => {
+    const g = L.groups.find((x) => x.id === groupId);
+    if (!g || from === to || to < 0 || to >= g.slots.length) return;
+    setState((s) => {
+      const rows = g.slots.map((id) => s.slots[id] ?? { teamId: null, text: slots.get(id)!.text, highlight: false });
+      const [r] = rows.splice(from, 1);
+      rows.splice(to, 0, r);
+      const next = { ...s.slots };
+      g.slots.forEach((id, i) => { next[id] = rows[i]; pending.current.slots[id] = rows[i]; });
+      return { ...s, slots: next };
+    });
+    queue();
+  };
   const setTemplate = (id: string | null) => { setState((s) => ({ ...s, highlightTemplateId: id })); pending.current.highlightTemplateId = id; queue(); };
 
   // export status follows the server
@@ -104,6 +118,20 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
   const slots = new Map(L.slots.map((s) => [s.id, s]));
   const sections = L.sections.filter((s) => (tab === 'titles' ? s.kind === 'titles' : s.kind === tab));
   const highlightTpl = gen?.templates.find((t) => t.id === state.highlightTemplateId) ?? null;
+  const resolved = useMemo(() => resolveTeams(L, state), [L, state]);
+  // where each row goes next: source row → labels of the boxes that take it
+  const goesTo = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const [sid, r] of resolved) {
+      if (!r.from) continue;
+      const src = r.from.group.slots[r.from.place - 1];
+      const g = L.groups.find((x) => x.slots.includes(sid));
+      const label = g ? state.texts[g.labelId] || texts.get(g.labelId)?.text || g.id : sid;
+      m.set(src, [...(m.get(src) ?? []), label]);
+    }
+    return m;
+  }, [resolved, L, state.texts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [drag, setDrag] = useState<{ group: string; index: number } | null>(null);
 
   const pick = (id: string) => {
     const slot = slots.get(id);
@@ -152,7 +180,7 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
             <button key={k} onClick={() => setTab(k)} className={cx('px-3 py-1.5', tab === k ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{label}</button>
           ))}
         </div>
-        <span className="text-xs text-ink-500">Click any field on the preview to jump to it. {highlightTpl ? `Highlights use “${highlightTpl.name}” from the Elements tab in the team's V${highlightTpl.variant} colours.` : 'Choose a highlight element above to show highlights.'}</span>
+        <span className="text-xs text-ink-500">Click any field on the preview to jump to it. Rows of a box are its standings (top = 1st): drag them or use ▲▼, and ★ a team to send it on to the row that waits for that place (e.g. “R1 C1”). {highlightTpl ? `Highlights use “${highlightTpl.name}” from the Elements tab in the team's V${highlightTpl.variant} colours.` : 'Choose a highlight element above to show highlights.'}</span>
       </div>
 
       {tab === 'titles' ? (
@@ -174,9 +202,14 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
                     <input className="input py-1 text-center text-sm font-semibold" value={state.texts[g.labelId] ?? ''} onChange={(e) => setText(g.labelId, e.target.value)} aria-label="Box label" />
                   </div>
                   <ol className="space-y-1">
-                    {g.slots.map((sid) => (
+                    {g.slots.map((sid, i) => (
                       <SlotRow key={sid} slot={slots.get(sid)!} value={state.slots[sid]} teams={sortedTeams} teamById={teamById} focus={focus === sid}
-                        canHighlight={!!highlightTpl} onChange={(v) => setSlot(sid, v)} />
+                        canHighlight={!!highlightTpl} onChange={(v) => setSlot(sid, v)} place={i + 1} last={i === g.slots.length - 1}
+                        linked={resolved.get(sid)?.from ? teamById.get(resolved.get(sid)!.teamId) ?? null : null} goesTo={goesTo.get(sid) ?? []}
+                        onMove={(d) => moveRow(g.id, i, i + d)}
+                        dragging={drag?.group === g.id && drag.index === i}
+                        onDragStart={() => setDrag({ group: g.id, index: i })} onDragEnd={() => setDrag(null)}
+                        onDrop={() => { if (drag?.group === g.id) moveRow(g.id, drag.index, i); setDrag(null); }} canDrop={drag?.group === g.id} />
                     ))}
                   </ol>
                 </div>
@@ -199,26 +232,46 @@ function TextField({ t, value, onChange, focus }: { t: MbText; value: string; on
   );
 }
 
-function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange }: {
+function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange, place, last, linked, goesTo, onMove, dragging, onDragStart, onDragEnd, onDrop, canDrop }: {
   slot: MbSlot; value: MbSlotState | undefined; teams: Team[]; teamById: Map<string, Team>; focus: boolean; canHighlight: boolean; onChange: (v: MbSlotState) => void;
+  place: number; last: boolean; linked: Team | null; goesTo: string[]; onMove: (d: number) => void;
+  dragging: boolean; onDragStart: () => void; onDragEnd: () => void; onDrop: () => void; canDrop: boolean;
 }) {
   const v = value ?? { teamId: null, text: slot.text, highlight: false };
-  const team = v.teamId ? teamById.get(v.teamId) : null;
+  const picked = v.teamId ? teamById.get(v.teamId) ?? null : null;
+  const team = picked ?? linked;
   const flag = team?.assets.flag_small?.previewUrl;
+  const [over, setOver] = useState(false);
   return (
-    <li id={`mb-${slot.id}`} className={cx('flex items-center gap-1 rounded', focus && 'ring-2 ring-accent-400', v.highlight && team && 'bg-accent-500/15')}>
-      <span className="grid h-5 w-7 shrink-0 place-items-center overflow-hidden rounded-sm bg-ink-900">{flag ? <img src={flag} alt="" className="h-full w-full object-cover" /> : null}</span>
-      <select className="input w-24 shrink-0 px-1 py-1 text-xs" value={v.teamId ?? ''} aria-label="Team or text"
-        onChange={(e) => onChange({ ...v, teamId: e.target.value || null, text: e.target.value ? v.text : v.text || slot.text, highlight: e.target.value ? v.highlight : false })}>
-        <option value="">Text</option>
-        {teams.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
-      </select>
-      {team
-        ? <span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={team.name}>{team.name}</span>
-        : <input className="input min-w-0 flex-1 py-1 text-xs" value={v.text} maxLength={40} placeholder="e.g. DRAW 1" onChange={(e) => onChange({ ...v, text: e.target.value })} aria-label="Row text" />}
-      <button disabled={!team || !canHighlight} onClick={() => onChange({ ...v, highlight: !v.highlight })} aria-pressed={v.highlight}
-        title={!team ? 'Pick a team to highlight it' : v.highlight ? 'Qualified: highlighted (click to turn off)' : 'Highlight as qualified'}
-        className={cx('h-7 w-7 shrink-0 rounded text-sm disabled:opacity-25', v.highlight && team ? 'bg-amber-500/25 text-amber-300' : 'text-ink-500 hover:bg-ink-800 hover:text-ink-100')}>★</button>
+    <li id={`mb-${slot.id}`} draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', slot.id); onDragStart(); }} onDragEnd={onDragEnd}
+      onDragOver={(e) => { if (canDrop) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)} onDrop={(e) => { e.preventDefault(); setOver(false); onDrop(); }}
+      className={cx('rounded', focus && 'ring-2 ring-accent-400', v.highlight && team && 'bg-accent-500/15', dragging && 'opacity-40', over && 'ring-2 ring-accent-500')}>
+      <div className="flex items-center gap-1">
+        <span className="w-4 shrink-0 cursor-grab select-none text-center text-[11px] font-semibold tabular-nums text-ink-500" title="Place in this box · drag to move">{place}</span>
+        <span className="grid h-5 w-7 shrink-0 place-items-center overflow-hidden rounded-sm bg-ink-900">{flag ? <img src={flag} alt="" className="h-full w-full object-cover" /> : null}</span>
+        <select className="input w-[4.5rem] shrink-0 px-1 py-1 text-xs" value={v.teamId ?? ''} aria-label="Team or text"
+          onChange={(e) => onChange({ ...v, teamId: e.target.value || null, text: e.target.value ? v.text : v.text || slot.text, highlight: e.target.value ? v.highlight : false })}>
+          <option value="">Text</option>
+          {teams.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
+        </select>
+        {picked
+          ? <span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={picked.name}>{picked.name}</span>
+          : <input className="input min-w-0 flex-1 py-1 text-xs" value={v.text} maxLength={40} placeholder="e.g. R1 C1" onChange={(e) => onChange({ ...v, text: e.target.value })} aria-label="Row text"
+              title="Text shown in the row. A box and place such as “R1 C1” fills in the team that finishes there once it is starred." />}
+        <div className="flex shrink-0 flex-col">
+          <button disabled={place === 1} onClick={() => onMove(-1)} className="h-3.5 w-5 text-[9px] leading-none text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move up">▲</button>
+          <button disabled={last} onClick={() => onMove(1)} className="h-3.5 w-5 text-[9px] leading-none text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move down">▼</button>
+        </div>
+        <button disabled={!team || !canHighlight} onClick={() => onChange({ ...v, highlight: !v.highlight })} aria-pressed={v.highlight}
+          title={!team ? 'Pick a team to highlight it' : v.highlight ? 'Qualified: highlighted (click to turn off)' : 'Highlight as qualified'}
+          className={cx('h-7 w-7 shrink-0 rounded text-sm disabled:opacity-25', v.highlight && team ? 'bg-amber-500/25 text-amber-300' : 'text-ink-500 hover:bg-ink-800 hover:text-ink-100')}>★</button>
+      </div>
+      {(linked && !picked) || goesTo.length ? (
+        <div className="flex gap-2 pb-0.5 pl-12 text-[11px] leading-tight">
+          {linked && !picked && <span className="text-emerald-300">= {linked.code}</span>}
+          {goesTo.length > 0 && <span className="text-amber-300">→ {goesTo.join(', ')}</span>}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -243,7 +296,7 @@ function Preview({ layout, state, teamById, gen, fonts, onPick }: {
   }, []);
 
   // flags of the teams on the board
-  const used = [...new Set(Object.values(state.slots).map((s) => s.teamId).filter(Boolean) as string[])];
+  const used = [...new Set([...resolveTeams(layout, state).values()].map((r) => r.teamId))];
   const flagKey = used.map((id) => teamById.get(id)?.assets.flag_small?.previewUrl ?? '').join('|');
   useEffect(() => {
     let live = true;

@@ -45,6 +45,27 @@ describe('matchboard', () => {
     expect(mb.resetState(db).texts['region-asia-name']).toBe('Asia');
   });
 
+  it('sends a starred team on to the row that waits for its place', () => {
+    const { db } = board();
+    const layout = mb.loadLayout();
+    const id = (c: string) => (db.prepare('SELECT id FROM teams WHERE code = ?').get(c) as { id: string }).id;
+    const T = (c: string, highlight = false) => ({ teamId: id(c), text: '', highlight });
+    // R1 C: MAS 1st and starred, POL 2nd not starred
+    mb.saveState(db, { slots: { 'r1-c-1': T('MAS', true), 'r1-c-2': T('POL'), 'r1-c-4': { teamId: null, text: 'DRAW 8', highlight: false } } });
+    let r = mb.resolveTeams(layout, mb.getState(db));
+    expect(r.get('r2-a-3')).toMatchObject({ teamId: id('MAS') }); // “R1 C1”
+    expect(r.get('r2-b-4')).toBeUndefined(); // “R1 C2”: POL has no star
+    // starred again in R2 A (moved to 1st): goes on to EF C 2nd row (“R2 A1”)
+    mb.saveState(db, { slots: { 'r2-a-1': { teamId: null, text: 'R1 C1', highlight: true }, 'r2-a-3': T('HUN') } });
+    r = mb.resolveTeams(layout, mb.getState(db));
+    expect(r.get('r2-a-1')?.teamId).toBe(id('MAS'));
+    expect(r.get('ef-c-2')?.teamId).toBe(id('MAS'));
+    // semifinal: 1st and 2nd starred go to the final, 3rd and 4th to the petit final
+    mb.saveState(db, { slots: { 'sf-a-1': T('GBR', true), 'sf-a-2': T('ESP', true), 'sf-a-3': T('USA'), 'sf-a-4': T('ITA') } });
+    r = mb.resolveTeams(layout, mb.getState(db));
+    expect(['final-1', 'final-2', 'petit-f-1', 'petit-f-2'].map((s) => r.get(s)?.teamId)).toEqual(['GBR', 'ESP', 'USA', 'ITA'].map(id));
+  });
+
   it('draws the 1920×1080 board with flags and team-coloured highlights', async () => {
     const { db, ctx } = board();
     const ex = new mb.MatchboardExporter(ctx);
