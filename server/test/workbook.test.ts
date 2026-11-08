@@ -82,9 +82,15 @@ describe('workbook sheets', () => {
     expect(results.map((r) => [r.Rank, r.Code, r.R1, r.R2, r.Points])).toEqual([['1', 'BRN', '4', '3', '7'], ['2', 'IND', '3', '4', '7']]);
 
     const general = generalSheet(ctx, eventId, today);
-    expect(Object.keys(general[0])).toEqual(['Graphic', 'Version', 'Field', 'Value']);
-    expect(general.find((r) => r.Graphic === 'Event' && r.Field === 'Stage')!.Value).toBe('Qualifying');
-    expect(general.find((r) => r.Graphic === 'Tickers' && r.Version === 'Extra' && r.Field === 'Ticker text')!.Value).toBe('A I B I ');
+    // titled blocks: Event then Matchboard in A/B, Weather in D/E; columns named by letter
+    expect(Object.keys(general[0]).slice(0, 3)).toEqual(['A', 'B', 'C']);
+    expect([general[0].A, general[0].D, general[5].A]).toEqual(['EVENT', 'WEATHER', 'MATCHBOARD']);
+    expect([general[2].A, general[2].B]).toEqual(['Stage', 'Qualifying']);
+    expect(general.styles!['0:0']).toBe('title');
+    const t = general.findIndex((r) => r.A === 'TICKERS');
+    const col = Object.entries(general[t + 1]).find(([, v]) => v === 'Extra')![0];
+    expect(general.find((r, i) => i > t && r.A === 'Ticker text')![col]).toBe('A I B I ');
+    expect(general[t - 1].A).toBe(''); // an empty row between blocks
   });
 });
 

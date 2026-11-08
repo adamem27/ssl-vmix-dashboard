@@ -61,43 +61,74 @@ function stageTeams(ctx: AssetCtx, eventId: string) {
 }
 
 // ---------- General ----------
-export function generalSheet(ctx: AssetCtx, eventId: string, today: string): Record<string, string>[] {
-  const { db } = ctx;
-  const rows: Record<string, string>[] = [];
-  const add = (graphic: string, version: string, field: string, value: string) => rows.push({ Graphic: graphic, Version: version, Field: field, Value: value });
-  const ev = db.prepare('SELECT name FROM events WHERE id = ?').get(eventId) as { name: string } | undefined;
-  add('Event', '', 'Name', ev?.name ?? '');
-  add('Event', '', 'Stage', currentStage(db, eventId)?.name ?? '');
-  add('Event', '', 'Date', today);
-  const root = getSetting(db, 'paths.vmixAssetsRoot');
-  add('Matchboard', '', 'Image', root ? joinVmixPath(root, MATCHBOARD_REL) : path.join(ctx.assetsDir, ...MATCHBOARD_REL.split('/')));
+/** Rows of a sheet; `styles` marks block titles and header rows for the .xlsx (by row index). */
+export type SheetRows = Record<string, string>[] & { styles?: Record<string, 'title' | 'head'>; widths?: number[] };
 
-  const w = getWeather(db);
+const letter = (i: number) => { let s = ''; for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s; return s; };
+
+/**
+ * General: a grid of titled blocks, read like a page. Columns are named by their letter (row 1), so a vMix field
+ * maps to column + row exactly as the cell in Excel (e.g. B3). Blocks keep their place: Event and Matchboard beside
+ * Weather at the top, then each general graphic with its versions in columns, then People, and today's
+ * schedule last (it is the only block whose height changes). An empty row separates the blocks.
+ */
+export function generalSheet(ctx: AssetCtx, eventId: string, today: string): SheetRows {
+  const { db } = ctx;
+  const grid: string[][] = [];
+  const styles: Record<string, 'title' | 'head'> = {}; // by `row:col`
+  const put = (r: number, c: number, v: string) => { while (grid.length <= r) grid.push([]); grid[r][c] = v; };
+  let row = 0;
+  /** A block at (row, col): title, optional header row, then label + values per line. Returns its height. */
+  const block = (r: number, c: number, title: string, head: string[] | null, lines: [string, ...string[]][]) => {
+    put(r, c, title);
+    for (let i = 0; i <= Math.max(1, head?.length ?? 0); i++) styles[`${r}:${c + i}`] = 'title'; // shaded band over the block
+    let y = r + 1;
+    if (head) { head.forEach((h, i) => { put(y, c + 1 + i, h); styles[`${y}:${c + 1 + i}`] = 'head'; }); y++; }
+    for (const [label, ...vals] of lines) { put(y, c, label); vals.forEach((v, i) => put(y, c + 1 + i, v)); y++; }
+    return y - r;
+  };
+
+  // top band: Event · Matchboard · Weather
+  const ev = db.prepare('SELECT name FROM events WHERE id = ?').get(eventId) as { name: string } | undefined;
+  const root = getSetting(db, 'paths.vmixAssetsRoot');
+  const w = getWeather(db) as unknown as Record<string, string>;
   const weather: [string, string][] = [['Location', 'location'], ['Conditions', 'conditions'], ['Air temperature', 'air_temp'], ['Water temperature', 'water_temp'],
     ['Wind speed', 'wind_speed'], ['Wind gusts', 'wind_gust'], ['Wind direction', 'wind_direction'], ['Wind unit', 'wind_unit'], ['Note', 'note']];
-  for (const [label, k] of weather) add('Weather', '', label, (w as Record<string, string>)[k] ?? '');
+  const left = block(row, 0, 'EVENT', null, [['Name', ev?.name ?? ''], ['Stage', currentStage(db, eventId)?.name ?? ''], ['Date', today]]) + 1;
+  const h = Math.max(
+    left + block(row + left, 0, 'MATCHBOARD', null, [['Image', root ? joinVmixPath(root, MATCHBOARD_REL) : path.join(ctx.assetsDir, ...MATCHBOARD_REL.split('/'))]]),
+    block(row, 3, 'WEATHER', null, weather.map(([label, k]) => [label, w[k] ?? ''] as [string, string])),
+  );
+  row += h + 1;
 
-  listSchedule(db, eventId, today).forEach((s, i) => {
-    const v = `Race ${i + 1}`;
-    add('Schedule', v, 'Time', s.time); add('Schedule', v, 'Race', s.race); add('Schedule', v, 'Group', s.fleet); add('Schedule', v, 'Status', s.status); add('Schedule', v, 'Note', s.note);
-  });
-
-  for (const p of listPeople(ctx, eventId)) {
-    const v = [p.role || 'Person', p.language].filter(Boolean).join(' · ');
-    add('People', v, 'Name', p.name); add('People', v, 'Title', p.title); add('People', v, 'Photo', img(p.photo));
-  }
-
+  // general graphics: one block per kind, versions side by side
   const sets = listGraphicSets(db, eventId);
   for (const k of GRAPHIC_KINDS) {
-    for (const s of sets.filter((x) => x.kind === k.kind)) {
-      for (const f of k.fields) {
-        const v = s.data[f.key] ?? '';
-        add(k.label, s.name, f.label, f.type === 'list' ? v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : v);
-      }
-      if (k.kind === 'ticker') add(k.label, s.name, 'Ticker text', tickerText(s.data));
-    }
+    const vs = sets.filter((x) => x.kind === k.kind);
+    const lines: [string, ...string[]][] = k.fields.map((f) => [f.label, ...vs.map((s) => {
+      const v = s.data[f.key] ?? '';
+      return f.type === 'list' ? v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : v;
+    })]);
+    if (k.kind === 'ticker') lines.push(['Ticker text', ...vs.map((s) => tickerText(s.data))]);
+    row += block(row, 0, k.label.toUpperCase(), vs.map((s) => s.name), lines) + 1;
   }
-  return rows;
+
+  // people: one column per person
+  const people = listPeople(ctx, eventId);
+  row += block(row, 0, 'PEOPLE', people.map((p) => [p.role || 'Person', p.language].filter(Boolean).join(' · ')),
+    [['Name', ...people.map((p) => p.name)], ['Title', ...people.map((p) => p.title)], ['Photo', ...people.map((p) => img(p.photo))]]) + 1;
+
+  // today's schedule last: one race per row
+  block(row, 0, "TODAY'S SCHEDULE", ['Time', 'Race', 'Group', 'Status', 'Note'],
+    listSchedule(db, eventId, today).map((s, i) => [`Race ${i + 1}`, s.time, s.race, s.fleet, s.status, s.note]));
+
+  const width = Math.max(...grid.map((r) => r.length), 2);
+  const cols = Array.from({ length: width }, (_, i) => letter(i));
+  // row 1 of the sheet names the columns by letter; data starts on row 2
+  const out = grid.map((r) => Object.fromEntries(cols.map((c, i) => [c, r[i] ?? '']))) as SheetRows;
+  out.styles = styles;
+  out.widths = cols.map((_, i) => (i === 0 ? 20 : 30));
+  return out;
 }
 
 // ---------- Teams ----------
@@ -214,7 +245,7 @@ export const SHEETS = [
   { name: 'Results', key: 'results' },
 ] as const;
 
-export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: string): Record<string, string>[] {
+export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: string): SheetRows {
   if (key === 'general') return generalSheet(ctx, eventId, today);
   if (key === 'teams') return teamsSheet(ctx, eventId, today);
   if (key === 'sailors') return sailorsSheet(ctx, eventId, today);
