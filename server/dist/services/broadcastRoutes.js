@@ -5,6 +5,8 @@ import * as lu from './lineups.js';
 import * as rs from './results.js';
 import * as wb from './workbookSheets.js';
 import { todayIn } from './dates.js';
+import { getWeather, listSchedule } from './general.js';
+import { listGradients } from './generator/generator.js';
 /** General graphics versions, team line-ups (Declarations and line-ups) and group results (Results tab). */
 export function registerBroadcastRoutes(app, ctx) {
     const { db } = ctx;
@@ -44,6 +46,36 @@ export function registerBroadcastRoutes(app, ctx) {
     const stageInfo = () => ({ current: wb.currentStage(db, ev().id), teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
     app.get('/api/stage', async () => stageInfo());
     app.put('/api/stage', async (req) => { wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId); return stageInfo(); });
+    // ---------- commentator: everything around one fleet set in one call ----------
+    app.get('/api/commentator', async (req) => {
+        const e = ev();
+        const date = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayIn(e.timezone);
+        const setId = req.query.set ? String(req.query.set) : wb.currentStage(db, e.id)?.id ?? null;
+        const results = setId ? rs.listResults(db, setId) : [];
+        const teamIds = new Set(results.flatMap((g) => g.rows.map((r) => r.teamId)));
+        const colours = {};
+        for (const g of listGradients(db))
+            if (teamIds.has(g.teamId))
+                colours[g.teamId] = g.gradients[1] ?? null;
+        const lineups = {};
+        for (const id of teamIds) {
+            const l = lu.loadLineup(db, e.id, id);
+            if (!l.exists)
+                continue;
+            const defs = lu.slotDefs(l.data.extra);
+            lineups[id] = l.data.rows.filter((r) => r.firstName || r.lastName).map((r) => ({
+                label: defs.find((d) => d.key === r.slot)?.label ?? r.slot, number: r.number, firstName: r.firstName, lastName: r.lastName,
+                position: r.position, captain: r.captain, sailorId: r.sailorId,
+            }));
+        }
+        return {
+            event: { name: db.prepare('SELECT name FROM events WHERE id = ?').get(e.id)?.name ?? '', timezone: e.timezone },
+            stage: wb.currentStage(db, e.id), setId, date,
+            weather: getWeather(db), schedule: listSchedule(db, e.id, date),
+            results: results.map((g) => ({ fleetId: g.fleetId, fleetName: g.fleetName, title: g.title, subtitle: g.subtitle, races: g.races, rows: g.rows.map((r) => ({ teamId: r.teamId, races: r.races, total: r.total })) })),
+            colours, lineups,
+        };
+    });
     // ---------- JSON for vMix ----------
     app.get('/json/sheet/:key', async (req) => wb.sheetRows(ctx, ev().id, todayIn(ev().timezone), req.params.key));
     app.get('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind));
