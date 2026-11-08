@@ -17,6 +17,8 @@ import * as mb from './services/matchboard/matchboard.js';
 import { allSheets } from './services/workbook.js';
 import { buildXlsx, zipStore } from './services/xlsx.js';
 import * as pngGen from './services/generator/generator.js';
+import { GtzipService } from './services/gtzip/gtzip.js';
+import { registerGtzipRoutes } from './services/gtzip/routes.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
@@ -457,6 +459,8 @@ export async function buildApp(deps) {
             throw badRequest('No file was uploaded.');
         return matchboard.saveFonts(await file.toBuffer(), file.filename);
     });
+    // ---------- GTZIP generator ----------
+    registerGtzipRoutes(app, new GtzipService(ctx, () => getSetting(db, 'paths.vmixAssetsRoot') || null, () => matchboard.fonts()));
     // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
     // The sync program polls the manifest every few seconds; its last visit is the vMix machine's heartbeat.
     let mirrorSeen = null;
