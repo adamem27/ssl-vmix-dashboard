@@ -409,6 +409,7 @@ export const TEAM_GRADIENTS_PANAM = {
     BER: [[0, '#f173b8'], [100, '#009cdb']],
     MEX: [[0, '#118d48'], [100, '#00533c']],
     PUR: [[0, '#1a2340'], [100, '#bc242b']],
+    URU: [[0, '#1f3989'], [100, '#83bbdf']],
 };
 export const TEAM_GRADIENTS_PANAM_VERSION = 'color_panam-1';
 /**
