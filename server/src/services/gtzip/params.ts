@@ -33,7 +33,7 @@ export interface CountOpts {
   shiftAfter?: boolean;
   /** Resize backgrounds that span the parts by the change. */
   stretch?: boolean;
-  /** Keep the whole title centred: move everything back by half of the change. */
+  /** Keep a centred title centred: when the graphic sat in the middle of the screen, everything moves back by half of the change. */
   center?: boolean;
 }
 
@@ -312,7 +312,24 @@ function adjust(root: GtNode, compPath: Path, exclude: Set<string>, lo: number, 
   const delta = Math.abs(d[axis]) * sign; // growth of the parts' extent
   if (!delta) return;
   const comp = compPath.length ? nodeAt(root, compPath)! : root;
-  const { of } = boxIndex(root);
+  const { of, els } = boxIndex(root);
+  // “keep centred” keeps a graphic in the middle of the screen when it was there: the drawn things of the composition
+  // (not full-screen pictures) are centred on the frame along the step's axis
+  const frameLen = Number(axis === 0 ? root.attrs.Width ?? 1920 : root.attrs.Height ?? 1080);
+  const full = (b: Box) => b[axis + 2] - b[axis] >= 0.98 * frameLen;
+  let centre = false;
+  if (o.center) {
+    const ck = pathKey(compPath);
+    let a = Infinity, z = -Infinity;
+    for (const e of els) {
+      const k = pathKey(e.path);
+      if (e.node.tag === 'Layer' || (ck && !k.startsWith(ck + '/')) || !isVisible(e.node)) continue;
+      const b = of([e.path]);
+      if (!b || full(b)) continue;
+      a = Math.min(a, b[axis]); z = Math.max(z, b[axis + 2]);
+    }
+    centre = Number.isFinite(a) && Math.abs((a + z) / 2 - frameLen / 2) <= 0.04 * frameLen;
+  }
   const start = (b: Box) => (fwd ? b[axis] : -b[axis + 2]);
   const end = (b: Box) => (fwd ? b[axis + 2] : -b[axis]);
   const L = fwd ? lo : -hi, Hh = fwd ? hi : -lo;
@@ -345,7 +362,12 @@ function adjust(root: GtNode, compPath: Path, exclude: Set<string>, lo: number, 
     }
   });
   walk(comp, compPath);
-  if (o.center) comp.children.forEach((c) => { if (isElement(c)) move(c, -(fwd ? delta : -delta) / 2); });
+  if (centre) comp.children.forEach((c, i) => {
+    if (!isElement(c)) return;
+    const b = c.tag === 'Layer' ? null : of([[...compPath, i]]);
+    if (b && full(b)) return; // a full-screen picture stays where it is
+    move(c, -(fwd ? delta : -delta) / 2);
+  });
 }
 
 function addOne(root: GtNode, g: RepeatGroup, o: CountOpts, bands: ImageBand[]): GtNode {
