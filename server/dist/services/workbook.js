@@ -7,6 +7,7 @@ import { todayIn } from './dates.js';
 import { buildXlsx } from './xlsx.js';
 import { seedGraphicSets } from './graphicSets.js';
 import { fillTeamSlotsFromGenerator } from './generatedSlots.js';
+import { applyPanamColours } from './generator/generator.js';
 import { SHEETS, sheetRows } from './workbookSheets.js';
 /** Bump when the file's look changes without its data, so the next tick rewrites it. */
 const LAYOUT_VERSION = 2;
@@ -46,6 +47,7 @@ export class WorkbookWriter {
     tick() {
         try {
             organizeAssets(this.ctx); // a renamed team or sailor moves its files before the paths are written
+            applyPanamColours(this.ctx.db); // Panam teams added after the start get their colours too
             fillTeamSlotsFromGenerator(this.ctx); // empty backgrounds and lower thirds take the generated PNGs
             const sheets = allSheets(this.ctx);
             const hash = createHash('sha1').update(JSON.stringify(sheets.map((s) => [s.name, s.rows, s.rows.styles ?? null, LAYOUT_VERSION]))).digest('hex');
