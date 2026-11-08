@@ -515,6 +515,8 @@ function QuickForm({ tpl, doc, commit, images, sel, setSel }: {
         </div>}
       </div>
 
+      <AddFieldCard tpl={tpl} doc={doc} groups={groups} commit={commit} />
+
       <div className="card space-y-1 p-3">
         <h2 className="text-sm font-semibold">Texts and pictures</h2>
         {general.map(field)}
@@ -532,6 +534,41 @@ function QuickForm({ tpl, doc, commit, images, sel, setSel }: {
         {!items.length && <p className="text-xs text-ink-500">No texts or pictures to fill in.</p>}
       </div>
       {pick && <PicturePicker onClose={() => setPick(null)} onPick={(s) => { edit(pick, (x) => setBitmapSource(x, s), 'pic'); setPick(null); }} />}
+    </div>
+  );
+}
+
+/** A field the template lacks (a race status in each row…), added in the style of the graphic. */
+function AddFieldCard({ tpl, doc, groups, commit }: { tpl: TemplateDoc; doc: GtNode; groups: RepeatGroup[]; commit: (r: GtNode, key?: string) => void }) {
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [sample, setSample] = useState('');
+  const [where, setWhere] = useState<string>('');
+  const [busy, setBusy] = useState(false);
+  const target = where === '' ? (groups[0]?.id ?? '-') : where;
+  const add = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    try {
+      const r = await api.post<{ doc: GtNode; added: string[] }>('/api/gtzip/add-field', { template: tpl.meta.id, doc, name: name.trim(), sample, group: target === '-' ? null : target });
+      commit(r.doc);
+      toast.ok(`Added ${r.added.length > 1 ? `${r.added[0]} … ${r.added[r.added.length - 1]}` : r.added[0]}`);
+      setName(''); setSample('');
+    } catch (e) { toast.error(e); } finally { setBusy(false); }
+  };
+  return (
+    <div className="card space-y-2 p-3">
+      <h2 className="text-sm font-semibold">Add a data field</h2>
+      <p className="text-[11px] text-ink-500">For data the template has no place for, e.g. a status in each schedule row. It takes the look of the texts next to it; when there is no free space the graphic grows to make room.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input className={cx(small, 'w-28')} placeholder="Name, e.g. STATUS" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className={cx(small, 'w-36')} placeholder="Sample text, e.g. LIVE" value={sample} onChange={(e) => setSample(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+        <select className={small} value={target} onChange={(e) => setWhere(e.target.value)}>
+          {groups.map((g) => <option key={g.id} value={g.id}>In each of {g.label}</option>)}
+          <option value="-">Once on the graphic</option>
+        </select>
+        <Button size="sm" disabled={!name.trim() || busy} onClick={add}>{busy ? 'Adding…' : 'Add'}</Button>
+      </div>
     </div>
   );
 }

@@ -337,3 +337,44 @@ describe('gtzip layer names', () => {
     expect(anims).toEqual(['Header', 'TITLE']);
   });
 });
+
+describe('gtzip data fields', () => {
+  const layer = (name: string, y: number, inner: string) =>
+    `<Layer Name="${name}" Dimensions="1920,1080,0" Location="0,${y},0"><Layer.Composition><Composition Width="1920" Height="1080">${inner}</Composition></Layer.Composition></Layer>`;
+  const row = (n: number, raceW: number) => layer(`BAR ${n}`, 75 * (n - 1), `<Image Name="ROWBG ${n}" Dimensions="800,60,0" Location="560,400,0"><Image.Bitmap><Bitmap Source="${FLAG}" /></Image.Bitmap></Image><TextBlock Name="POSITION ${n}" Dimensions="40,40,0" Location="570,410,0" Text="${n}" FontSize="25" /><TextBlock Name="RACE ${n}" Dimensions="${raceW},40,0" Location="700,410,0" Text="RACE ${n}${raceW > 200 ? ' – A LONG NAME THAT FILLS THE WHOLE ROW OF IT' : ''}" FontSize="25" />`);
+  const doc = (raceW: number) => parseXml(`<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="PANEL" Dimensions="900,300,0" Location="510,380,0"><Image.Bitmap><Bitmap Source="${FLAG}" /></Image.Bitmap></Image>${row(1, raceW)}${row(2, raceW)}<Rectangle Name="SPONSORS" Dimensions="900,60,0" Location="510,700,0" /><Storyboard><Storyboard.Animations><Fly Object="BAR 1" /></Storyboard.Animations></Storyboard></Composition>`).root;
+  const box = (r: GtNode, name: string) => { const e = elements(r).find((x) => x.node.attrs.Name === name)!; const [x, y] = e.node.attrs.Location.split(',').map(Number); const [w, h] = e.node.attrs.Dimensions.split(',').map(Number); return [e.origin[0] + x, e.origin[1] + y, w, h]; };
+
+  it('puts a field in the free space of each row, named and styled like the row', async () => {
+    const { addField } = await import('../src/services/gtzip/fields.js');
+    const root = doc(120);
+    const [g] = repeatGroups(root);
+    const r = addField(root, { name: 'STATUS', sample: 'LIVE', group: g.id });
+    expect(r.added).toEqual(['STATUS 1', 'STATUS 2']);
+    expect(r.bands).toEqual([]);
+    const s1 = box(r.root, 'STATUS 1');
+    expect(s1[0]).toBeGreaterThan(820); // after RACE 1
+    expect(s1[0] + s1[2]).toBeLessThanOrEqual(1360);
+    expect(box(r.root, 'STATUS 2')[1]).toBe(s1[1] + 75);
+    expect(elements(r.root).find((x) => x.node.attrs.Name === 'STATUS 1')!.node.attrs.FontSize).toBe('25');
+    // a new row copies the field with the next number
+    const more = setCount(r.root, g.id, 3, {});
+    expect(allNames(more.root).has('STATUS 3')).toBe(true);
+  });
+
+  it('grows the rows and the panel when there is no room, keeping a centred graphic centred', async () => {
+    const { addField } = await import('../src/services/gtzip/fields.js');
+    const root = doc(640);
+    const [g] = repeatGroups(root);
+    const r = addField(root, { name: 'STATUS', sample: 'FINISHED', group: g.id });
+    const grow = box(r.root, 'ROWBG 1')[2] - 800;
+    expect(grow).toBeGreaterThan(80);
+    expect(box(r.root, 'PANEL')[2]).toBe(900 + grow);
+    // centred: everything moved back by half the growth, the sponsor bar stays in the middle
+    expect(box(r.root, 'PANEL')[0]).toBeCloseTo(510 - grow / 2, 3);
+    expect(box(r.root, 'SPONSORS')[0]).toBeCloseTo(510, 3);
+    expect(r.bands.map((b) => b.name).sort()).toEqual(['PANEL', 'ROWBG 1', 'ROWBG 2']);
+    const s = box(r.root, 'STATUS 1');
+    expect(s[0]).toBeGreaterThan(box(r.root, 'RACE 1')[0] + 640);
+  });
+});

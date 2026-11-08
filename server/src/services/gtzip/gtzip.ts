@@ -10,6 +10,7 @@
  * (Bitmap Source "<folder guid>\\name.png" → part guid), [Content_Types].xml (BOM, one Override per part),
  * the image parts named by guid and thumbnail.png (640×360).
  */
+import { addField } from './fields.js';
 import { tidyLayers } from './tidy.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -422,9 +423,22 @@ export class GtzipService {
   async setPartCount(body: z.infer<typeof countSchema>): Promise<{ doc: GtNode }> {
     let r: { root: GtNode; bands: ImageBand[] };
     try { r = setCount(body.doc as GtNode, body.group, body.count, body.options as CountOpts); } catch (e) { throw badRequest((e as Error).message); }
-    if (!r.bands.length) return { doc: r.root };
+    return { doc: await this.applyBands(body.template ?? null, r.root, r.bands) };
+  }
+
+  /** Adds a data field the template lacks (see fields.ts); a picture that grows with it gets a new bitmap. */
+  async addDataField(body: z.infer<typeof addFieldSchema>): Promise<{ doc: GtNode; added: string[] }> {
+    let r: { root: GtNode; added: string[]; bands: ImageBand[] };
+    try { r = addField(body.doc as GtNode, { name: body.name, sample: body.sample, group: body.group }); } catch (e) { throw badRequest((e as Error).message); }
+    return { doc: await this.applyBands(body.template ?? null, r.root, r.bands), added: r.added };
+  }
+
+  /** Re-slices the bitmaps of stretched pictures (bands in the order they happened) and saves them as uploads. */
+  private async applyBands(template: string | null, root: GtNode, bands: ImageBand[]): Promise<GtNode> {
+    const r = { root, bands };
+    if (!r.bands.length) return r.root;
     const c = await canvas();
-    if (!c) return { doc: r.root };
+    if (!c) return r.root;
     const byName = new Map(collect(r.root, 'Image').map((n) => [n.attrs.Name, n]));
     const current = new Map<string, Buffer>();
     for (const b of r.bands) {
@@ -433,7 +447,7 @@ export class GtzipService {
       const src = bm?.attrs.Source;
       if (!bm || !src) continue;
       let buf = current.get(b.name);
-      if (!buf) { try { buf = this.image(body.template ?? null, src); } catch { continue; } }
+      if (!buf) { try { buf = this.image(template, src); } catch { continue; } }
       try {
         const im = await c.loadImage(buf);
         const out = sliceBand(c, im, b);
@@ -445,7 +459,7 @@ export class GtzipService {
       const base = sourceName(bm.attrs.Source).replace(/^[0-9a-f]{12}-/, '').replace(/\.[^.]+$/, '');
       bm.attrs.Source = this.saveUpload(buf, `${base}.png`).source;
     }
-    return { doc: r.root };
+    return r.root;
   }
 
   /** Renders any document (editor state) to PNG with the template's pictures, for checks and tests. */
@@ -459,6 +473,14 @@ export class GtzipService {
     return this.renderThumbnail(p, width);
   }
 }
+
+export const addFieldSchema = z.object({
+  template: z.string().max(200).nullable().optional(),
+  doc: z.any().refine((d) => d && typeof d === 'object' && d.tag === 'Composition', 'A GT document is needed.'),
+  group: z.string().max(4000).nullable(),
+  name: z.string().trim().min(1).max(60),
+  sample: z.string().max(200).default(''),
+});
 
 export const countSchema = z.object({
   template: z.string().max(200).nullable().optional(),
