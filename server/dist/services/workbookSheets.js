@@ -162,7 +162,7 @@ export function sailorsSheet(ctx, eventId, today) {
         const placeOf = new Map();
         if (lu.exists)
             lu.data.rows.forEach((r) => { if (r.sailorId)
-                placeOf.set(r.sailorId, { label: defs.find((d) => d.key === r.slot)?.label ?? r.slot, order: defs.findIndex((d) => d.key === r.slot) + 1, row: r }); });
+                placeOf.set(r.sailorId, { label: defs.find((d) => d.key === r.slot)?.label ?? r.slot, order: lu.data.rows.indexOf(r) + 1, row: r }); });
         const list = (o?.sailors ?? []).map((s) => {
             const p = placeOf.get(s.id);
             return {
@@ -184,9 +184,9 @@ export function sailorsSheet(ctx, eventId, today) {
             lu.data.rows.forEach((r) => {
                 if (r.sailorId || !(r.firstName || r.lastName))
                     return;
-                const order = defs.findIndex((d) => d.key === r.slot) + 1;
+                const order = lu.data.rows.indexOf(r) + 1;
                 list.push({ order, name: `${r.lastName} ${r.firstName}`, row: {
-                        'Team code': t.code, Team: t.name, Captain: yes(r.captain), 'Line-up place': defs[order - 1]?.label ?? r.slot, 'Line-up no.': String(order),
+                        'Team code': t.code, Team: t.name, Captain: yes(r.captain), 'Line-up place': defs.find((d) => d.key === r.slot)?.label ?? r.slot, 'Line-up no.': String(order),
                         Number: r.number, 'First name': r.firstName, 'Last name': r.lastName.toUpperCase(), Position: r.position,
                         'Declared today': '', Weight: '', 'Best result 1': '', 'Best result 2': '', 'Best result 3': '', Photo: '',
                     } });

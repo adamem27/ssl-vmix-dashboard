@@ -5,7 +5,6 @@ export const GRAPHIC_KINDS = [
         kind: 'welcome', label: 'Welcome', sheet: 'Welcome',
         description: 'Opening board: event name, place and dates.',
         fields: [
-            { key: 'heading', label: 'Heading', default: 'WELCOME TO' },
             { key: 'event', label: 'Event', default: 'SSL GOLD CUP 2026' },
             { key: 'stage', label: 'Stage', placeholder: 'FINAL SERIES' },
             { key: 'location', label: 'Location', default: 'RIO DE JANEIRO, BRAZIL' },
@@ -16,19 +15,12 @@ export const GRAPHIC_KINDS = [
         defaults: [{ name: 'Welcome', data: {} }],
     },
     {
-        kind: 'socials', label: 'Follow us', sheet: 'Follow us',
-        description: 'Social media bar and side panel.',
+        kind: 'announcement', label: 'Announcements', sheet: 'Announcements',
+        description: 'Short bars such as FALSE START or ANNOUNCEMENT.',
         fields: [
-            { key: 'heading', label: 'Heading', default: 'FOLLOW US' },
-            { key: 'website', label: 'Website', default: 'WWW.WORLDOFSAILORS.COM' },
-            { key: 'facebook', label: 'Facebook', default: '@SSLGOLDCUP' },
-            { key: 'youtube', label: 'YouTube', default: '@STARSAILORS' },
-            { key: 'instagram', label: 'Instagram', default: '@SSLGOLDCUP' },
-            { key: 'tiktok', label: 'TikTok' },
-            { key: 'x', label: 'X' },
-            { key: 'hashtag', label: 'Hashtag', placeholder: '#SSLGOLDCUP' },
+            { key: 'text', label: 'Text', wide: true, default: 'ANNOUNCEMENT' },
         ],
-        defaults: [{ name: 'Follow us', data: {} }],
+        defaults: [{ name: 'Announcement', data: {} }, { name: 'False start', data: { text: 'FALSE START' } }],
     },
     {
         kind: 'ticker', label: 'Tickers', sheet: 'Tickers',
@@ -63,13 +55,18 @@ export const GRAPHIC_KINDS = [
         defaults: [{ name: 'Race officials', data: {} }],
     },
     {
-        kind: 'announcement', label: 'Announcements', sheet: 'Announcements',
-        description: 'Short bars such as FALSE START or ANNOUNCEMENT.',
+        kind: 'socials', label: 'Follow us', sheet: 'Follow us',
+        description: 'Social media bar and side panel.',
         fields: [
-            { key: 'heading', label: 'Heading', default: 'ANNOUNCEMENT' },
-            { key: 'text', label: 'Text', wide: true },
+            { key: 'website', label: 'Website', default: 'WWW.WORLDOFSAILORS.COM' },
+            { key: 'facebook', label: 'Facebook', default: '@SSLGOLDCUP' },
+            { key: 'youtube', label: 'YouTube', default: '@STARSAILORS' },
+            { key: 'instagram', label: 'Instagram', default: '@SSLGOLDCUP' },
+            { key: 'tiktok', label: 'TikTok' },
+            { key: 'x', label: 'X' },
+            { key: 'hashtag', label: 'Hashtag', placeholder: '#SSLGOLDCUP' },
         ],
-        defaults: [{ name: 'Announcement', data: {} }, { name: 'False start', data: { heading: 'FALSE START' } }],
+        defaults: [{ name: 'Follow us', data: {} }],
     },
 ];
 const kindOf = (kind) => {
@@ -91,6 +88,9 @@ const fromRow = (r) => {
         data = JSON.parse(r.data);
     }
     catch { /* empty */ }
+    // announcements had a separate heading: an announcement with only a heading keeps it as its text
+    if (r.kind === 'announcement' && data.heading && !data.text)
+        data = { ...data, text: data.heading };
     return { id: r.id, kind: r.kind, name: r.name, data, sort: r.sort, updatedAt: r.updated_at };
 };
 /** Adds the default versions once per event (deleting them later is respected). */

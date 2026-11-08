@@ -8,16 +8,17 @@ const slot = (key, label, position, f = {}) => ({
     key, label, position,
     fields: { name: `${key}NAME`, surname: `${key}SURNAME`, number: `${key}NUMBER`, position: `${key}POSITION`, photo: `${key}PHOTO`, captain: `${key}CAPTAIN`, ...f },
 });
+/** In the default order, bow to helm; each team can reorder its places (LineupData.order). */
 export const LINEUP_SLOTS = [
-    slot('Helm', 'Helm', 'HELM'),
-    slot('Tactician', 'Tactician', 'TACTICIAN', { surname: 'TacticianSURNAM', position: 'TacticianPOSITI' }),
-    slot('Main', 'Main trimmer', 'MAIN TRIMMER'),
-    slot('Trimmer', 'Trimmer', 'TRIMMER', { position: 'TrimmerPosition' }),
-    slot('Trimmer1', 'Trimmer 2', 'TRIMMER', { position: 'Trimmer1POSITIO', photo: 'TrimmerPHOTO1' }),
-    slot('Grinder', 'Grinder', 'GRINDER'),
-    slot('Pit', 'Pit', 'PIT'),
-    slot('Midbow', 'Midbow', 'MIDBOW', { position: 'MidbowPosition' }),
     slot('Bow', 'Bow', 'BOW', { position: 'BowPosition' }),
+    slot('Midbow', 'Midbow', 'MIDBOW', { position: 'MidbowPosition' }),
+    slot('Pit', 'Pit', 'PIT'),
+    slot('Grinder', 'Grinder', 'GRINDER'),
+    slot('Trimmer', 'Trimmer 1', 'TRIMMER', { position: 'TrimmerPosition' }),
+    slot('Trimmer1', 'Trimmer 2', 'TRIMMER', { position: 'Trimmer1POSITIO', photo: 'TrimmerPHOTO1' }),
+    slot('Main', 'Main trimmer', 'MAIN TRIMMER'),
+    slot('Tactician', 'Tactician', 'TACTICIAN', { surname: 'TacticianSURNAM', position: 'TacticianPOSITI' }),
+    slot('Helm', 'Helm', 'HELM'),
 ];
 export const MAX_EXTRA = 6;
 const extraSlot = (n) => slot(`Sailor${n}`, `Sailor ${n}`, '');
@@ -26,12 +27,17 @@ const emptyRow = (d) => ({ slot: d.key, sailorId: null, firstName: '', lastName:
 function normalize(raw) {
     const extra = Math.max(0, Math.min(MAX_EXTRA, Number(raw.extra) || 0));
     const byKey = new Map((raw.rows ?? []).map((r) => [r.slot, r]));
+    const defs = slotDefs(extra);
+    // the team's own order of places first, then any place it does not name, in the default order
+    const order = (raw.order ?? []).filter((k, i, a) => defs.some((d) => d.key === k) && a.indexOf(k) === i);
+    const ordered = [...order.map((k) => defs.find((d) => d.key === k)), ...defs.filter((d) => !order.includes(d.key))];
     return {
         title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', extra,
-        rows: slotDefs(extra).map((d) => {
+        rows: ordered.map((d) => {
             const r = byKey.get(d.key);
             return r ? { ...emptyRow(d), ...r, slot: d.key, captain: !!r.captain } : emptyRow(d);
         }),
+        ...(raw.order?.length ? { order: raw.order.filter((k) => slotDefs(MAX_EXTRA).some((d) => d.key === k)) } : {}),
     };
 }
 export function loadLineup(db, eventId, teamId) {
@@ -58,7 +64,7 @@ export function getLineup(ctx, eventId, teamId) {
 export function saveLineup(ctx, eventId, teamId, patch) {
     getTeam(ctx, teamId);
     const cur = loadLineup(ctx.db, eventId, teamId).data;
-    const next = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }) };
+    const next = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
     const rows = new Map(cur.rows.map((r) => [r.slot, r]));
     for (const p of patch.rows ?? []) {
         if (!p.slot)
@@ -136,7 +142,8 @@ export function syncLineupFromDeclaration(ctx, eventId, teamId, date) {
         else
             rest.push(c);
     }
-    const free = LINEUP_SLOTS.filter((d) => !placed.has(d.key));
+    // free places in the team's own order of places
+    const free = cur.rows.map((r) => LINEUP_SLOTS.find((d) => d.key === r.slot)).filter((d) => !!d && !placed.has(d.key));
     let extra = 0;
     for (const c of rest) {
         const d = free.shift() ?? (extra < MAX_EXTRA ? extraSlot(10 + extra++) : null);
@@ -144,7 +151,7 @@ export function syncLineupFromDeclaration(ctx, eventId, teamId, date) {
             break;
         placed.set(d.key, { slot: d.key, ...c, position: (c.position || d.position).toUpperCase() });
     }
-    const data = normalize({ title: cur.title, teamName: cur.teamName, extra: Math.max(extra, 0), rows: [...placed.values()] });
+    const data = normalize({ title: cur.title, teamName: cur.teamName, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
     store(ctx.db, eventId, teamId, data, date);
     return { synced: true, sailors: crew.length };
 }
