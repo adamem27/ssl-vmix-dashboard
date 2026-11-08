@@ -3,7 +3,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { GtzipService, loadPackage, resourcePart, savePackage } from '../src/services/gtzip/gtzip.js';
-import { allNames, duplicate, elements, GtNode, parseXml, remove, renameElement, serializeXml, storyboards } from '../src/services/gtzip/model.js';
+import { allNames, animationsOf, duplicate, elements, GtNode, parseXml, remove, renameElement, serializeXml, storyboards } from '../src/services/gtzip/model.js';
+import { repeatGroups, setCount } from '../src/services/gtzip/params.js';
 import { zipStore } from '../src/services/xlsx.js';
 import { setup } from './helpers.js';
 
@@ -195,5 +196,112 @@ describe('gtzip rename pattern', () => {
     const { root: r } = duplicate(root, [[0], [1]], { count: 1, dx: 0, dy: 0, find: 'helm', replace: 'Sailor{n}', start: 10 });
     expect([...allNames(r)]).toEqual(['HelmBG', 'Sailor10BG', 'HELM', 'SAILOR10']);
     expect(storyboards(r)[0].animations.map((a) => a.attrs.Object)).toEqual(['HELM', 'SAILOR10']);
+  });
+});
+
+describe('gtzip scenes', () => {
+  it('recognises scenes from file names and saves variants as templates', async () => {
+    const s = setup();
+    const svc = new GtzipService(s.ctx);
+    const t = svc.addTemplate(sampleGtzip(), 'day_schedule_2_rows_NO_TIME.gtzip');
+    expect([t.scene, t.variant]).toEqual(['day-schedule', '2-races-no-time']);
+    const bar = elements(svc.template(t.id).doc).find((e) => e.node.attrs.Name === 'BAR 1')!;
+    const { root } = duplicate(svc.template(t.id).doc, [bar.path], { count: 2, dx: 0, dy: 70 });
+    const v = await svc.saveAsTemplate({ templateId: t.id, name: 'Day schedule – 3 races', doc: root, scene: 'day-schedule', variant: '3-races' });
+    expect([v.scene, v.variant, v.name]).toEqual(['day-schedule', '3-races', 'Day schedule – 3 races']);
+    expect(allNames(svc.template(v.id).doc).has('BAR 3')).toBe(true);
+    expect(allNames(svc.template(t.id).doc).has('BAR 3')).toBe(false);
+    expect(svc.updateTemplate(v.id, { scene: 'team-lineup', variant: 'nope' }).variant).toBe('8-sailors');
+    expect(() => svc.updateTemplate(v.id, { scene: 'nope' })).toThrow();
+  });
+});
+
+describe('gtzip part counts', () => {
+  const layer = (name: string, y: number, inner: string, extra = '') =>
+    `<Layer Name="${name}" Dimensions="1920,1080,0" Location="0,${y},0"${extra}><Layer.Composition><Composition Width="1920" Height="1080">${inner}</Composition></Layer.Composition></Layer>`;
+  const row = (n: number) => layer(`BAR ${n}`, 75 * (n - 1), `<Rectangle Name="ROWBG ${n}" Dimensions="800,60,0" Location="560,400,0" /><TextBlock Name="POSITION ${n}" Dimensions="40,40,0" Location="570,410,0" Text="${n}" /><TextBlock Name="RACE ${n}" Dimensions="120,40,0" Location="1200,410,0" Text="RACE ${n}" />`);
+  const doc = (body: string, anims = '') => parseXml(`<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080">${body}<Storyboard><Storyboard.Animations>${anims}</Storyboard.Animations></Storyboard></Composition>`).root;
+  const named = (root: GtNode, name: string) => elements(root).find((e) => e.node.attrs.Name === name)?.node;
+  const at = (root: GtNode, name: string) => { const e = elements(root).find((x) => x.node.attrs.Name === name)!; const [x, y] = (e.node.attrs.Location ?? '0,0').split(',').map(Number); return [e.origin[0] + x, e.origin[1] + y]; };
+  const schedule = () => doc(
+    `<Image Name="PANEL" Dimensions="900,400,0" Location="510,250,0"><Image.Bitmap><Bitmap Source="${FLAG}" /></Image.Bitmap></Image><TextBlock Name="TITLE" Dimensions="600,60,0" Location="660,300,0" Text="DAY 1" />`
+      + row(1) + row(2) + row(3) + '<Rectangle Name="SPONSORS" Dimensions="900,60,0" Location="510,700,0" />',
+    '<Fly Object="BAR 1" Delay="0.2" /><Fly Object="BAR 2" Delay="0.3" /><Fly Object="BAR 3" Delay="0.4" />');
+
+  it('finds numbered rows and adds one below with the next numbers, moving what comes after and growing the panel', () => {
+    const root = schedule();
+    const [g] = repeatGroups(root);
+    expect(g.count).toBe(3);
+    expect(g.step).toEqual([0, 75]);
+    const r = setCount(root, g.id, 4, { shiftAfter: true, stretch: true });
+    const bar4 = named(r.root, 'BAR 4')!;
+    expect(bar4.attrs.Location).toBe('0,225,0');
+    expect(named(r.root, 'POSITION 4')!.attrs.Text).toBe('4');
+    expect(named(r.root, 'RACE 4')!.attrs.Text).toBe('RACE 4');
+    expect(named(r.root, 'SPONSORS')!.attrs.Location).toBe('510,775,0');
+    expect(named(r.root, 'PANEL')!.attrs.Dimensions).toBe('900,475,0');
+    expect(named(r.root, 'TITLE')!.attrs.Location).toBe('660,300,0');
+    // the copy's entry follows the stagger of the rows
+    expect(animationsOf(storyboards(r.root)[0].node).find((a) => a.attrs.Object === 'BAR 4')!.attrs.Delay).toBe('0.5');
+    // the panel picture repeats the band under the last row instead of being squashed
+    expect(r.bands).toHaveLength(1);
+    expect(r.bands[0]).toMatchObject({ name: 'PANEL', axis: 1, op: 'insert' });
+    expect(r.bands[0].to - r.bands[0].from).toBeCloseTo(75 / 400, 5);
+    // and back
+    const back = setCount(r.root, g.id, 2, { shiftAfter: true, stretch: true, center: true });
+    expect(repeatGroups(back.root)[0].count).toBe(2);
+    expect(named(back.root, 'BAR 3')).toBeUndefined();
+    expect(named(back.root, 'SPONSORS')!.attrs.Location).toBe('510,700,0');
+  });
+
+  it('treats hidden rows at the end as spares', () => {
+    const root = doc(row(1) + row(2) + layer('BAR 3', 150, '<Rectangle Name="ROWBG 3" Dimensions="800,60,0" Location="560,400,0" /><TextBlock Name="POSITION 3" Dimensions="40,40,0" Location="570,410,0" Text="3" /><TextBlock Name="RACE 3" Dimensions="120,40,0" Location="1200,410,0" Text="RACE 3" />', ' Visible="False"'));
+    const [g] = repeatGroups(root);
+    expect([g.count, g.spares]).toEqual([2, 1]);
+    const r = setCount(root, g.id, 3);
+    expect(named(r.root, 'BAR 3')!.attrs.Visible).toBeUndefined();
+    expect(named(r.root, 'BAR 3')!.attrs.Location).toBe('0,150,0');
+  });
+
+  it('fills the empty cell of a team grid and hides the placeholder there', () => {
+    const team = (code: string, x: number, y: number) => layer(code, 0, `<Image Name="${code} BG" Dimensions="800,380,0" Location="${x},${y},0" /><TextBlock Name="RANK ${code}" Dimensions="100,50,0" Location="${x + 20},${y + 20},0" Text="1" /><TextBlock Name="Country${code}" Dimensions="300,50,0" Location="${x + 20},${y + 100},0" Text="X" />`);
+    const root = doc(team('OMA', 1000, 100) + team('KAZ', 100, 100) + team('UAE', 100, 550) + layer('Photo', 0, '<Image Name="PHOTO OMA" Dimensions="300,380,0" Location="1500,100,0" />')
+      + '<Image Name="EMPTY" Dimensions="800,380,0" Location="1000,550,0" />');
+    const [g] = repeatGroups(root);
+    expect(g.members.map((m) => m.label)).toEqual(['OMA', 'KAZ', 'UAE']);
+    expect(g.members[0].paths).toHaveLength(2); // its photo layer goes with it
+    const r = setCount(root, g.id, 4);
+    expect(repeatGroups(r.root)[0].count).toBe(4);
+    expect(at(r.root, 'TEAMD BG')).toEqual([1000, 550]);
+    expect(named(r.root, 'RANK TEAMD')).toBeDefined();
+    expect(at(r.root, 'PHOTO TEAMD')).toEqual([1500, 550]);
+    expect(named(r.root, 'EMPTY')!.attrs.Visible).toBe('False');
+  });
+
+  it('keeps a part’s photo layer with its loose elements (HelmBG, HelmNAME + layer HELM)', () => {
+    const card = (p: string, x: number) => `<Image Name="${p}BG" Dimensions="200,130,0" Location="${x},300,0" /><TextBlock Name="${p}NAME" Dimensions="200,25,0" Location="${x},430,0" Text="Name" /><TextBlock Name="${p}NUMBER" Dimensions="60,50,0" Location="${x + 130},300,0" Text="1" />`;
+    const photo = (p: string, x: number) => `<Layer Name="${p.toUpperCase()}" Dimensions="200,170,0" Location="${x},290,0"><Layer.Composition><Composition Width="200" Height="170"><Image Name="${p}PHOTO" Dimensions="340,340,0" Location="-100,5,0" /></Composition></Layer.Composition></Layer>`;
+    const root = doc(card('Helm', 100) + card('Grinder', 400) + card('Pit', 700) + photo('Helm', 100) + photo('Grinder', 400) + photo('Pit', 700));
+    const [g] = repeatGroups(root);
+    expect(g.members.map((m) => m.paths.length)).toEqual([4, 4, 4]);
+    const less = setCount(root, g.id, 2);
+    expect(named(less.root, 'PIT')).toBeUndefined();
+    expect(named(less.root, 'PitBG')).toBeUndefined();
+    const more = setCount(root, g.id, 4);
+    expect(named(more.root, 'Pit1BG')!.attrs.Location).toBe('1000,300,0');
+    expect(named(more.root, 'Pit1PHOTO')).toBeDefined();
+  });
+
+  it('gives a stretched picture a new bitmap with the band repeated', async () => {
+    const s = setup();
+    const svc = new GtzipService(s.ctx);
+    const t = svc.addTemplate(sampleGtzip(), 't.gtzip');
+    const root = schedule();
+    const [g] = repeatGroups(root);
+    const r = await svc.setPartCount({ template: t.id, doc: root, group: g.id, count: 5, options: { stretch: true, shiftAfter: true } });
+    const src = named(r.doc as GtNode, 'PANEL')!.children[0].children[0].attrs.Source;
+    expect(src.startsWith('upload:')).toBe(true);
+    const png = svc.image(null, src);
+    expect(png.subarray(1, 4).toString()).toBe('PNG');
   });
 });
