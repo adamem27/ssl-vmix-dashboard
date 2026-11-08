@@ -19,6 +19,7 @@ import { readZip } from '../matchboard/matchboard.js';
 import { zipStore } from '../xlsx.js';
 import { joinVmixPath } from '../paths.js';
 import { drawTitle, Img } from './draw.js';
+import { guessScene, SCENES } from './scenes.js';
 import { clone, elements, fields, GtNode, parseXml, serializeXml, sourceName } from './model.js';
 
 export const GTZIP_DIR = 'gtzip';
@@ -128,6 +129,14 @@ export const generateSchema = z.object({
   thumbnail: z.boolean().default(true),
 });
 
+export const saveTemplateSchema = z.object({
+  templateId: z.string().min(1).max(100),
+  name: z.string().min(1).max(120),
+  doc: nodeSchema,
+  scene: z.string().max(60).nullable().optional(),
+  variant: z.string().max(60).nullable().optional(),
+});
+
 export function safeFileName(raw: string): string {
   const n = raw.trim().replace(/\.gtzip$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').replace(/[. ]+$/, '');
   if (!n) throw badRequest('Enter a file name.');
@@ -148,6 +157,8 @@ async function canvas(): Promise<CanvasMod | null> {
 export interface TemplateMeta {
   id: string; name: string; originalFilename: string; uploadedAt: string; size: number;
   width: number; height: number; elements: number; fields: number; storyboards: number;
+  /** Scene of the broadcast list (scenes.ts) and its variant this template is for. */
+  scene?: string | null; variant?: string | null;
 }
 export interface OutputInfo { name: string; file: string; size: number; createdAt: string; vmixPath: string | null; templateId: string | null }
 
@@ -178,7 +189,7 @@ export class GtzipService {
     }).filter((m): m is TemplateMeta => !!m && typeof m.id === 'string' && fs.existsSync(this.tplPath(m.id))).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  addTemplate(buf: Buffer, originalFilename: string, name?: string): TemplateMeta {
+  addTemplate(buf: Buffer, originalFilename: string, name?: string, scene?: { scene: string | null; variant: string | null }): TemplateMeta {
     const p = loadPackage(buf);
     const base = name?.trim() || originalFilename.replace(/\.gtzip$/i, '');
     fs.mkdirSync(this.templatesDir, { recursive: true });
@@ -188,6 +199,7 @@ export class GtzipService {
       id, name: base.slice(0, 120), originalFilename: originalFilename.slice(0, 200), uploadedAt: new Date().toISOString(), size: buf.length,
       width: Number(p.doc.attrs.Width ?? 1920), height: Number(p.doc.attrs.Height ?? 1080),
       elements: elements(p.doc).length, fields: fields(p.doc).length, storyboards: p.doc.children.filter((c) => c.tag === 'Storyboard').length,
+      scene: scene ? scene.scene : guessScene(originalFilename)?.scene ?? null, variant: scene ? scene.variant : guessScene(originalFilename)?.variant ?? null,
     };
     fs.writeFileSync(this.metaPath(id), JSON.stringify(meta, null, 2));
     return meta;
@@ -199,8 +211,15 @@ export class GtzipService {
     return JSON.parse(fs.readFileSync(f, 'utf8'));
   }
 
-  renameTemplate(id: string, name: string): TemplateMeta {
-    const m = { ...this.meta(id), name: name.trim().slice(0, 120) || this.meta(id).name };
+  updateTemplate(id: string, patch: { name?: string; scene?: string | null; variant?: string | null }): TemplateMeta {
+    const cur = this.meta(id);
+    const m: TemplateMeta = { ...cur, ...patch, name: patch.name?.trim().slice(0, 120) || cur.name };
+    if (patch.scene !== undefined) {
+      const sc = SCENES.find((x) => x.id === patch.scene);
+      if (patch.scene && !sc) throw badRequest('Unknown scene.');
+      m.scene = sc?.id ?? null;
+      m.variant = sc ? (sc.variants.find((x) => x.id === patch.variant) ?? sc.variants[0]).id : null;
+    }
     fs.writeFileSync(this.metaPath(id), JSON.stringify(m, null, 2));
     return m;
   }
@@ -291,30 +310,41 @@ export class GtzipService {
     for (let i = 2; ; i++) if (!this.exists(`${base} (${i})`)) return `${base} (${i})`;
   }
 
-  async generate(input: z.infer<typeof generateSchema>): Promise<OutputInfo> {
-    const name = safeFileName(input.fileName);
-    if (this.exists(name)) throw conflict(`“${name}.gtzip” already exists. Generating never replaces a file – choose another name.`, { suggestion: this.freeName(name) });
-    if (input.doc.tag !== 'Composition') throw badRequest('The title must start with a Composition.');
-    const p = this.pkg(input.templateId);
-    p.doc = input.doc;
+  /** A complete .gtzip from the template's package with the edited document (new pictures embedded, unused ones dropped). */
+  private async build(templateId: string, doc: GtNode, thumbnail: boolean): Promise<Buffer> {
+    if (doc.tag !== 'Composition') throw badRequest('The title must start with a Composition.');
+    const p = this.pkg(templateId);
+    p.doc = clone(doc);
     // embed new pictures; the same picture used twice is stored once
     const added = new Map<string, string>();
-    const bitmaps: GtNode[] = [];
-    const walk = (n: GtNode) => { if (n.tag === 'Bitmap') bitmaps.push(n); n.children.forEach(walk); };
-    walk(p.doc);
-    for (const b of bitmaps) {
+    for (const b of collect(p.doc, 'Bitmap')) {
       const s = b.attrs.Source ?? '';
       if (!s.startsWith('upload:') && !s.startsWith('asset:')) continue;
       if (!added.has(s)) added.set(s, addImage(p, this.image(null, s), s.startsWith('upload:') ? s.slice(7).replace(/^[0-9a-f]{12}-/, '') : path.basename(s.slice(6))));
       b.attrs.Source = added.get(s)!;
     }
     pruneResources(p);
-    if (input.thumbnail) {
+    if (thumbnail) {
       const t = await this.renderThumbnail(p).catch(() => null);
       if (t) p.files.set(THUMB, t);
     }
     const buf = savePackage(p);
     loadPackage(buf); // sanity check: the file reads back
+    return buf;
+  }
+
+  /** Keeps an edited state as a template of its own (e.g. one variant of a scene); the source template is not touched. */
+  async saveAsTemplate(input: z.infer<typeof saveTemplateSchema>): Promise<TemplateMeta> {
+    const buf = await this.build(input.templateId, input.doc, true);
+    const src = this.meta(input.templateId);
+    const m = this.addTemplate(buf, `${safeFileName(input.name)}.gtzip`, input.name);
+    return input.scene !== undefined ? this.updateTemplate(m.id, { scene: input.scene, variant: input.variant ?? null }) : src.scene ? this.updateTemplate(m.id, { scene: src.scene, variant: src.variant }) : m;
+  }
+
+  async generate(input: z.infer<typeof generateSchema>): Promise<OutputInfo> {
+    const name = safeFileName(input.fileName);
+    if (this.exists(name)) throw conflict(`“${name}.gtzip” already exists. Generating never replaces a file – choose another name.`, { suggestion: this.freeName(name) });
+    const buf = await this.build(input.templateId, input.doc, input.thumbnail);
     fs.mkdirSync(this.outputsDir, { recursive: true });
     const final = this.outputPath(name);
     const tmp = `${final}.${process.pid}.tmp`;

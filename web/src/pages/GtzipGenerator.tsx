@@ -10,9 +10,17 @@ import {
 } from '../../../server/src/services/gtzip/model';
 import { drawTitle, Img } from '../../../server/src/services/gtzip/draw';
 
-interface TemplateMeta { id: string; name: string; originalFilename: string; uploadedAt: string; size: number; width: number; height: number; elements: number; fields: number; storyboards: number }
+interface TemplateMeta { id: string; name: string; originalFilename: string; uploadedAt: string; size: number; width: number; height: number; elements: number; fields: number; storyboards: number; scene?: string | null; variant?: string | null }
 interface OutputInfo { name: string; file: string; size: number; createdAt: string; vmixPath: string | null; templateId: string | null }
-interface GtzipState { templates: TemplateMeta[]; outputs: OutputInfo[]; outputsDir: string }
+interface SceneDef { id: string; name: string; group: string; variants: { id: string; label: string }[] }
+interface GtzipState { templates: TemplateMeta[]; outputs: OutputInfo[]; outputsDir: string; scenes: SceneDef[] }
+
+function sceneLabel(scenes: SceneDef[], t: { scene?: string | null; variant?: string | null }): string | null {
+  const s = scenes.find((x) => x.id === t.scene);
+  if (!s) return null;
+  const v = s.variants.find((x) => x.id === t.variant);
+  return v && s.variants.length > 1 ? `${s.name} · ${v.label}` : s.name;
+}
 interface TemplateDoc { meta: TemplateMeta; doc: GtNode; images: Record<string, { embedded: boolean; name: string }> }
 
 const small = 'input px-2 py-1 text-xs';
@@ -35,11 +43,8 @@ export function GtzipGeneratorPage() {
         <Outputs state={st} onOpenTemplate={(id) => setParams({ t: id }, { replace: true })} />
       </aside>
       <section className="min-w-0 flex-1">
-        {tpl ? <EditorLoader key={tpl.id} meta={tpl} />
-          : <Empty title="GTZIP generator">
-            Upload a title saved by GT Title Designer (.gtzip) as a template, then change it – rows, bars, sizes, texts, pictures, animations – and
-            generate new .gtzip files. Templates are never modified and generating never replaces an existing file.
-          </Empty>}
+        {tpl ? <EditorLoader key={tpl.id} meta={tpl} scenes={st.scenes} onOpen={(id) => setParams({ t: id }, { replace: true })} />
+          : <ScenesOverview state={st} onOpen={(id) => setParams({ t: id }, { replace: true })} />}
       </section>
     </div>
   );
@@ -76,7 +81,7 @@ function Templates({ state, selected, onSelect }: { state: GtzipState; selected:
     <div className="card p-3">
       {dialog}
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Templates</h2>
+        <h2 className="text-sm font-semibold">Templates {selected && <button className="ml-1 text-[11px] font-normal text-accent-300 hover:underline" onClick={() => onSelect(null)}>all scenes</button>}</h2>
         <Button size="sm" busy={busy} onClick={() => input.current?.click()}>+ Upload .gtzip</Button>
         <input ref={input} type="file" accept=".gtzip" multiple hidden onChange={(e) => upload(e.target.files)} />
       </div>
@@ -88,7 +93,7 @@ function Templates({ state, selected, onSelect }: { state: GtzipState; selected:
               <img src={`/api/gtzip/templates/${t.id}/thumbnail`} alt="" className="h-9 w-16 shrink-0 rounded bg-ink-950 object-contain" onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
               <span className="min-w-0">
                 <span className="block truncate text-xs font-medium text-ink-100">{t.name}</span>
-                <span className="block text-[11px] text-ink-500">{t.elements} elements · {t.fields} fields</span>
+                <span className="block truncate text-[11px] text-ink-500">{sceneLabel(state.scenes, t) ?? 'no scene'} · {t.fields} fields</span>
               </span>
             </button>
             <div className="mt-1 hidden gap-1 group-hover:flex">
@@ -137,11 +142,11 @@ function Outputs({ state, onOpenTemplate }: { state: GtzipState; onOpenTemplate:
 }
 
 // ---------- editor ----------
-function EditorLoader({ meta }: { meta: TemplateMeta }) {
+function EditorLoader({ meta, scenes, onOpen }: { meta: TemplateMeta; scenes: SceneDef[]; onOpen: (id: string) => void }) {
   const q = useQuery({ queryKey: ['gtzip-template', meta.id], queryFn: () => api.get<TemplateDoc>(`/api/gtzip/templates/${meta.id}`), refetchOnWindowFocus: false, staleTime: Infinity });
   if (q.isLoading) return <Loading label="Opening the title…" />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
-  return <Editor tpl={q.data!} />;
+  return <Editor tpl={{ ...q.data!, meta }} scenes={scenes} onOpen={onOpen} />;
 }
 
 const draftKey = (id: string) => `gtzip-draft:${id}`;
@@ -212,7 +217,7 @@ const imageUrl = (templateId: string, src: string) => `/api/gtzip/image?template
 
 type SideTab = 'layers' | 'animations' | 'fields';
 
-function Editor({ tpl }: { tpl: TemplateDoc }) {
+function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[]; onOpen: (id: string) => void }) {
   const id = tpl.meta.id;
   const draft = useMemo(() => readDraft(id), [id]);
   const h = useHistory(draft ?? tpl.doc);
@@ -222,6 +227,7 @@ function Editor({ tpl }: { tpl: TemplateDoc }) {
   const [bg, setBg] = useState<'checker' | 'dark' | 'light'>('dark');
   const [side, setSide] = useState<SideTab>('layers');
   const [dupOpen, setDupOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
   const toast = useToast();
   const { ask, dialog } = useConfirm();
   const images = useImages(id);
@@ -284,7 +290,10 @@ function Editor({ tpl }: { tpl: TemplateDoc }) {
     <div className="space-y-3">
       {dialog}
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto truncate text-lg font-semibold">{tpl.meta.name}</h1>
+        <h1 className="truncate text-lg font-semibold">{tpl.meta.name}</h1>
+        <SceneSelect scenes={scenes} meta={tpl.meta} />
+        <span className="mr-auto" />
+        <Button size="sm" onClick={() => setSaveOpen(true)} title="Keep this state as a template of its own, e.g. one variant of the scene">Save as template…</Button>
         <Button size="sm" onClick={h.undo} disabled={!h.canUndo} title="Ctrl+Z">↶ Undo</Button>
         <Button size="sm" onClick={h.redo} disabled={!h.canRedo} title="Ctrl+Shift+Z">↷ Redo</Button>
         <Button size="sm" variant="ghost" onClick={reset} disabled={doc === tpl.doc}>Reset to template</Button>
@@ -324,6 +333,7 @@ function Editor({ tpl }: { tpl: TemplateDoc }) {
           {side === 'fields' && <Fields doc={doc} />}
         </div>
       </div>
+      {saveOpen && <SaveTemplateDialog scenes={scenes} tpl={tpl} doc={doc} onClose={() => setSaveOpen(false)} onSaved={(m) => { setSaveOpen(false); onOpen(m.id); }} />}
       {dupOpen && <DuplicateDialog infos={selInfos} els={els} doc={doc} onClose={() => setDupOpen(false)} onApply={(o) => {
         try {
           const r = duplicate(doc, selInfos.map((e) => e.path), o);
@@ -870,5 +880,109 @@ function Fields({ doc }: { doc: GtNode }) {
         {list.map((f) => <li key={f.name} className="flex justify-between border-b border-ink-800/60 py-1"><span>{f.name}</span><span className="text-ink-500">{f.kind === 'Text' ? 'text' : 'image'}</span></li>)}
       </ul>
     </div>
+  );
+}
+
+// ---------- scenes ----------
+function ScenesOverview({ state, onOpen }: { state: GtzipState; onOpen: (id: string) => void }) {
+  const groups = [...new Set(state.scenes.map((s) => s.group))];
+  const total = state.scenes.reduce((n, s) => n + s.variants.length, 0);
+  const done = state.scenes.reduce((n, s) => n + s.variants.filter((v) => state.templates.some((t) => t.scene === s.id && t.variant === v.id)).length, 0);
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold">Scenes</h1>
+        <p className="text-sm text-ink-400">
+          {done} of {total} scene variants have a template. Upload a .gtzip (the scene is recognised from the file name, or set it in the editor), change it and
+          use “Save as template…” for each variant, then Generate the files for vMix. Templates are never modified and generating never replaces a file.
+        </p>
+      </div>
+      {groups.map((g) => (
+        <div key={g} className="card p-3">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">{g}</h2>
+          <table className="w-full text-sm">
+            <tbody>
+              {state.scenes.filter((s) => s.group === g).map((s) => s.variants.map((v, i) => {
+                const ts = state.templates.filter((t) => t.scene === s.id && t.variant === v.id);
+                return (
+                  <tr key={s.id + v.id} className="border-t border-ink-800/60 first:border-0">
+                    <td className="w-1/3 py-1.5 pr-2 align-top">{i === 0 ? <span className="font-medium text-ink-100">{s.name}</span> : null}</td>
+                    <td className="w-1/4 py-1.5 pr-2 align-top text-ink-400">{s.variants.length > 1 ? v.label : ''}</td>
+                    <td className="py-1.5 align-top">
+                      {ts.length ? <div className="flex flex-wrap gap-1">{ts.map((t) => (
+                        <button key={t.id} onClick={() => onOpen(t.id)} className="rounded bg-emerald-950/60 px-2 py-0.5 text-xs text-emerald-200 hover:bg-emerald-900/70">✓ {t.name}</button>
+                      ))}</div> : <span className="text-xs text-ink-600">no template yet</span>}
+                    </td>
+                  </tr>
+                );
+              }))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SceneSelect({ scenes, meta }: { scenes: SceneDef[]; meta: TemplateMeta }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const sc = scenes.find((s) => s.id === meta.scene);
+  const save = async (scene: string | null, variant: string | null) => {
+    try { await api.patch(`/api/gtzip/templates/${meta.id}`, { scene, variant }); qc.invalidateQueries({ queryKey: ['gtzip'] }); } catch (e) { toast.error(e); }
+  };
+  return (
+    <span className="flex items-center gap-1 text-xs">
+      <select className={cx(small, 'w-auto')} value={meta.scene ?? ''} onChange={(e) => save(e.target.value || null, null)} title="Which scene of the broadcast this template is">
+        <option value="">scene…</option>
+        {scenes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      {sc && sc.variants.length > 1 && (
+        <select className={cx(small, 'w-auto')} value={meta.variant ?? ''} onChange={(e) => save(sc.id, e.target.value)}>
+          {sc.variants.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+        </select>
+      )}
+    </span>
+  );
+}
+
+function SaveTemplateDialog({ scenes, tpl, doc, onClose, onSaved }: { scenes: SceneDef[]; tpl: TemplateDoc; doc: GtNode; onClose: () => void; onSaved: (m: TemplateMeta) => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [scene, setScene] = useState(tpl.meta.scene ?? '');
+  const sc = scenes.find((s) => s.id === scene);
+  const [variant, setVariant] = useState(tpl.meta.variant ?? '');
+  const vv = sc?.variants.find((v) => v.id === variant) ?? sc?.variants[0];
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const shownName = name || (sc ? `${sc.name}${vv && sc.variants.length > 1 ? ` – ${vv.label}` : ''}` : `${tpl.meta.name} (edited)`);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const m = await api.post<TemplateMeta>('/api/gtzip/templates/from-doc', { templateId: tpl.meta.id, name: shownName, doc, scene: sc?.id ?? null, variant: vv?.id ?? null });
+      await qc.invalidateQueries({ queryKey: ['gtzip'] });
+      toast.ok(`Template “${m.name}” saved.`);
+      onSaved(m);
+    } catch (e) { toast.error(e); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open onClose={onClose} title="Save as template" footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" busy={busy} onClick={save}>Save template</Button></>}>
+      <div className="space-y-3 text-sm">
+        <p className="text-xs text-ink-400">Keeps the current state as a new template. “{tpl.meta.name}” stays as it is.</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label><span className="label">Scene</span>
+            <select className="input" value={scene} onChange={(e) => { setScene(e.target.value); setVariant(''); }}>
+              <option value="">none</option>{scenes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </label>
+          <label><span className="label">Variant</span>
+            <select className="input" value={vv?.id ?? ''} disabled={!sc || sc.variants.length < 2} onChange={(e) => setVariant(e.target.value)}>
+              {(sc?.variants ?? []).map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="block"><span className="label">Template name</span><input className="input" value={name} placeholder={shownName} onChange={(e) => setName(e.target.value)} /></label>
+      </div>
+    </Modal>
   );
 }

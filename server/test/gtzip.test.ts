@@ -197,3 +197,20 @@ describe('gtzip rename pattern', () => {
     expect(storyboards(r)[0].animations.map((a) => a.attrs.Object)).toEqual(['HELM', 'SAILOR10']);
   });
 });
+
+describe('gtzip scenes', () => {
+  it('recognises scenes from file names and saves variants as templates', async () => {
+    const s = setup();
+    const svc = new GtzipService(s.ctx);
+    const t = svc.addTemplate(sampleGtzip(), 'day_schedule_2_rows_NO_TIME.gtzip');
+    expect([t.scene, t.variant]).toEqual(['day-schedule', '2-races-no-time']);
+    const bar = elements(svc.template(t.id).doc).find((e) => e.node.attrs.Name === 'BAR 1')!;
+    const { root } = duplicate(svc.template(t.id).doc, [bar.path], { count: 2, dx: 0, dy: 70 });
+    const v = await svc.saveAsTemplate({ templateId: t.id, name: 'Day schedule – 3 races', doc: root, scene: 'day-schedule', variant: '3-races' });
+    expect([v.scene, v.variant, v.name]).toEqual(['day-schedule', '3-races', 'Day schedule – 3 races']);
+    expect(allNames(svc.template(v.id).doc).has('BAR 3')).toBe(true);
+    expect(allNames(svc.template(t.id).doc).has('BAR 3')).toBe(false);
+    expect(svc.updateTemplate(v.id, { scene: 'team-lineup', variant: 'nope' }).variant).toBe('8-sailors');
+    expect(() => svc.updateTemplate(v.id, { scene: 'nope' })).toThrow();
+  });
+});
