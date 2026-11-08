@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, DateOverviewRow, Declaration, FieldValue, Member, RunOutcome, Sailor, SyncStatus, Team } from '../api';
 import { useMeta } from '../App';
 import { SyncSummaryView } from './Settings';
+import { LineupPanel } from './Lineup';
 import { Badge, Button, cx, Empty, ErrorBox, fmtDate, fmtDateTime, Loading, Modal, todayIn, useConfirm, useToast } from '../components/ui';
 
 export function DeclarationsPage() {
@@ -35,7 +36,7 @@ export function DeclarationsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-2xl font-bold">Crew declarations</h1>
+          <h1 className="text-2xl font-bold">Declarations and line-ups</h1>
         </div>
         <SyncMini />
       </div>
@@ -54,6 +55,7 @@ export function DeclarationsPage() {
             </button>
           ))}
         </div>
+        <SyncAllLineups date={date} count={declaredCount} />
         {!!unmatched.data?.length && (
           <button onClick={() => setShowUnmatched(true)} className="ml-auto rounded-md border border-amber-800 bg-amber-950/40 px-3 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-900/40">
             ⚠ {unmatched.data.length} unmatched entries
@@ -94,7 +96,10 @@ export function DeclarationsPage() {
         </aside>
 
         <section className="min-w-0">
-          {teamId ? <DeclarationPanel key={`${teamId}|${date}`} teamId={teamId} date={date} tz={tz} /> : <Empty title="Choose a team" />}
+          {teamId ? <>
+            <DeclarationPanel key={`${teamId}|${date}`} teamId={teamId} date={date} tz={tz} />
+            <LineupPanel key={`l-${teamId}`} teamId={teamId} date={date} tz={tz} />
+          </> : <Empty title="Choose a team" />}
         </section>
       </div>
 
@@ -373,4 +378,22 @@ function AssignModal({ open, onClose, m, sailors, act }: { open: boolean; onClos
       </div>
     </Modal>
   );
+}
+
+/** Command (not automatic): copies every team's declaration of the day into its line-up. */
+function SyncAllLineups({ date, count }: { date: string; count: number }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { ask, dialog } = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (!(await ask('Sync all line-ups?', <>The line-ups of the {count} teams with a declaration on {fmtDate(date)} are filled from those declarations. Sailors already in their line-ups are replaced; titles and team names stay.</>, 'Sync all'))) return;
+    setBusy(true);
+    try { const r = await api.post<{ teams: number }>('/api/lineups/sync-all', { date }); qc.invalidateQueries({ queryKey: ['lineup'] }); qc.invalidateQueries({ queryKey: ['lineups'] }); toast.ok(`${r.teams} line-ups filled from declarations`); }
+    catch (e) { toast.error(e); } finally { setBusy(false); }
+  };
+  return <>
+    <Button size="sm" busy={busy} disabled={!count} onClick={run} title="Fill the line-up of every team that has a declaration on this day">Sync all line-ups</Button>
+    {dialog}
+  </>;
 }

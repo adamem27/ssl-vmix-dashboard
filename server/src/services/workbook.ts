@@ -7,6 +7,9 @@ import { todayIn } from './dates.js';
 import { jsonCaptains, jsonFleetSet, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './jsonExport.js';
 import { buildXlsx, sheetNames } from './xlsx.js';
 import { jsonGraphics } from './generator/generator.js';
+import { GRAPHIC_KINDS, graphicSheetRows, seedGraphicSets } from './graphicSets.js';
+import { lineupSheetRows } from './lineups.js';
+import { resultSheetRows } from './results.js';
 
 export interface WorkbookSheet { name: string; path: string; rows: Record<string, string>[] }
 
@@ -14,6 +17,7 @@ export interface WorkbookSheet { name: string; path: string; rows: Record<string
 export function allSheets(ctx: AssetCtx): WorkbookSheet[] {
   const ev = activeEvent(ctx.db);
   const today = todayIn(ev.timezone);
+  seedGraphicSets(ctx.db, ev.id);
   const sets = ctx.db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev.id) as { id: string; name: string }[];
   const list = [
     { name: 'Teams', path: '/json/teams', rows: jsonTeams(ctx) },
@@ -22,6 +26,9 @@ export function allSheets(ctx: AssetCtx): WorkbookSheet[] {
     { name: 'Weather', path: '/json/weather', rows: jsonWeather(ctx.db) },
     { name: 'Schedule', path: '/json/schedule', rows: jsonSchedule(ctx.db, ev.id, today) },
     { name: 'People', path: '/json/people', rows: jsonPeople(ctx, ev.id) },
+    ...GRAPHIC_KINDS.map((k) => ({ name: k.sheet, path: `/json/graphics-sets/${k.kind}`, rows: graphicSheetRows(ctx.db, ev.id, k.kind) })),
+    { name: 'Lineups', path: '/json/lineups', rows: lineupSheetRows(ctx, ev.id) },
+    { name: 'Results', path: '/json/results', rows: resultSheetRows(ctx, ev.id) },
     { name: 'Graphics', path: '/json/graphics', rows: jsonGraphics(ctx.db, ctx.assetsDir) },
     ...sets.map((s) => ({ name: s.name, path: `/json/fleets/${s.id}`, rows: jsonFleetSet(ctx, s.id) })),
   ];

@@ -13,6 +13,7 @@ import { DeclarationsPage } from './pages/Declarations';
 import { SettingsPage } from './pages/Settings';
 import { GeneratorPage } from './pages/Generator';
 import { GtzipGeneratorPage } from './pages/GtzipGenerator';
+import { ResultsPage } from './pages/Results';
 
 export function useMeta() {
   return useQuery({ queryKey: ['meta'], queryFn: () => api.get<Meta>('/api/meta'), staleTime: 60_000 });
@@ -73,8 +74,9 @@ function VmixLayout() {
         <ul className="flex gap-1 overflow-x-auto md:flex-col">
           <li><NavLink to="/vmix/overview" className={item}>Teams & crews</NavLink></li>
           <li><NavLink to="/vmix/fleets" className={item}>Fleets</NavLink></li>
-          <li><NavLink to="/vmix/declarations" className={item}>Declarations</NavLink></li>
+          <li><NavLink to="/vmix/declarations" className={item}>Declarations and line-ups</NavLink></li>
           <li><NavLink to="/vmix/general" className={item}>General graphics</NavLink></li>
+          <li><NavLink to="/vmix/results" className={item}>Results</NavLink></li>
           <li><NavLink to="/vmix/generator" className={item}>PNG generator</NavLink></li>
           <li><NavLink to="/vmix/gtzip" className={item}>GTZIP generator</NavLink></li>
           <li><NavLink to="/vmix/json" className={item}>JSON</NavLink></li>
@@ -102,6 +104,7 @@ export function App() {
           <Route path="declarations" element={<DeclarationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="general" element={<GeneralPage />} />
+          <Route path="results" element={<ResultsPage />} />
           <Route path="json" element={<JsonPage />} />
           <Route path="generator" element={<GeneratorPage />} />
           <Route path="gtzip" element={<GtzipGeneratorPage />} />

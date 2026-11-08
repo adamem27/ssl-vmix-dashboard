@@ -4,6 +4,7 @@ import { useMeta } from '../App';
 import { api, Asset, FleetSetDetail, FleetSetSummary } from '../api';
 import { Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
 import { Cell, ImgCell, SelectCell } from '../components/cells';
+import { GraphicSetsSections } from './GraphicSets';
 
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -11,14 +12,23 @@ const WIND_UNITS = ['kn', 'm/s', 'km/h', 'mph'];
 const STATUSES = ['Scheduled', 'Next', 'Live', 'Finished', 'Postponed', 'Cancelled'];
 const LANGUAGES = ['English', 'Polish', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese', 'Japanese'];
 
+const SECTIONS: [string, string][] = [['g-weather', 'Weather'], ['g-schedule', 'Schedule'], ['g-people', 'People'], ['g-welcome', 'Welcome'], ['g-socials', 'Follow us'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-announcement', 'Announcements']];
+
 const shiftDate = (d: string, days: number) => new Date(Date.parse(d + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
 
 export function GeneralPage() {
   return (
     <div className="space-y-4">
-      <WeatherPanel />
-      <SchedulePanel />
-      <PeoplePanel />
+      <nav className="sticky top-[60px] z-10 -mx-1 flex flex-wrap gap-1 rounded-lg border border-ink-800 bg-ink-950/90 px-2 py-1.5 backdrop-blur" aria-label="Sections">
+        {SECTIONS.map(([id, label]) => (
+          <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            className="rounded px-2 py-1 text-xs font-medium text-ink-400 hover:bg-ink-850 hover:text-ink-100">{label}</a>
+        ))}
+      </nav>
+      <div id="g-weather" className="scroll-mt-28"><WeatherPanel /></div>
+      <div id="g-schedule" className="scroll-mt-28"><SchedulePanel /></div>
+      <div id="g-people" className="scroll-mt-28"><PeoplePanel /></div>
+      <GraphicSetsSections />
     </div>
   );
 }
