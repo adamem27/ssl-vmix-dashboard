@@ -91,15 +91,15 @@ describe('PNG generator export', () => {
     setGradientsFromColors(db, pol, ['#ff0000', '#ffffff']);
 
     exporter.flush();
-    const file = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_bar.png');
+    const file = path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_bar.png');
     expect(fs.existsSync(file)).toBe(true);
-    expect(fs.existsSync(path.join(ctx.assetsDir, 'generated', 'POL', 'POL_panel_left.png'))).toBe(true);
-    expect(fs.existsSync(path.join(ctx.assetsDir, 'generated', 'XXX'))).toBe(false);
+    expect(fs.existsSync(path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_panel_left.png'))).toBe(true);
+    expect(fs.existsSync(path.join(ctx.assetsDir, 'PNG generator', 'XXX'))).toBe(false);
     expect(inspectImage(fs.readFileSync(file))?.width).toBe(50);
     expect(listOutputs(db)).toHaveLength(2);
 
     const before = fs.statSync(file).mtimeMs;
-    const panelFile = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_panel_left.png');
+    const panelFile = path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_panel_left.png');
     const panelBefore = fs.readFileSync(panelFile);
     updateTemplate(db, panel.id, { radius: 6 });
     exporter.flush();
@@ -110,8 +110,8 @@ describe('PNG generator export', () => {
     updateTeam(db, pol, { code: 'PL' });
     exporter.flush();
     expect(fs.existsSync(file)).toBe(false);
-    expect(fs.existsSync(path.join(ctx.assetsDir, 'generated', 'POL'))).toBe(false);
-    expect(fs.existsSync(path.join(ctx.assetsDir, 'generated', 'PL', 'PL_strip.png'))).toBe(true);
+    expect(fs.existsSync(path.join(ctx.assetsDir, 'PNG generator', 'POL'))).toBe(false);
+    expect(fs.existsSync(path.join(ctx.assetsDir, 'PNG generator', 'PL', 'PL_strip.png'))).toBe(true);
   });
 
   it('skips elements whose gradient version the team has not set', () => {
@@ -121,7 +121,7 @@ describe('PNG generator export', () => {
     createTemplate(db, { ...STARTER_TEMPLATES[3], width: 10, height: 10 });
     setGradient(db, t, 1, redBlue);
     exporter.flush();
-    expect(listOutputs(db).map((o) => o.rel)).toEqual(['generated/POL/POL_bar.png']);
+    expect(listOutputs(db).map((o) => o.rel)).toEqual(['PNG generator/POL/POL_bar.png']);
   });
 
   it('lists vMix paths per team in the Graphics sheet', () => {
@@ -132,7 +132,7 @@ describe('PNG generator export', () => {
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('paths.vmixAssetsRoot', 'C:\\SSL-vMix')").run();
     expect(jsonGraphics(db, ctx.assetsDir)[0].bar).toBe('');
     exporter.flush();
-    expect(jsonGraphics(db, ctx.assetsDir)).toEqual([{ code: 'POL', name: 'Poland', bar: 'C:\\SSL-vMix\\generated\\POL\\POL_bar.png' }]);
+    expect(jsonGraphics(db, ctx.assetsDir)).toEqual([{ code: 'POL', name: 'Poland', bar: 'C:\\SSL-vMix\\PNG generator\\POL\\POL_bar.png' }]);
   });
 
   it('seeds starter elements and board gradients once, without touching existing gradients', () => {
@@ -183,8 +183,8 @@ describe('PNG generator export', () => {
 
     updateTemplate(db, panel.id, { strokeWidth: 2 });
     exporter.flush();
-    const file = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_panel_left.png');
-    const bar = path.join(ctx.assetsDir, 'generated', 'POL', 'POL_bar.png');
+    const file = path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_panel_left.png');
+    const bar = path.join(ctx.assetsDir, 'PNG generator', 'POL', 'POL_bar.png');
     const [before, barBefore] = [fs.readFileSync(file), fs.statSync(bar).mtimeMs];
     expect(getStrokeGradient(db)).toEqual(DEFAULT_STROKE_GRADIENT);
     setStrokeGradient(db, { angle: 0, stops: [{ pos: 0, color: '#ff00ff', opacity: 100 }, { pos: 100, color: '#ff00ff', opacity: 100 }] });

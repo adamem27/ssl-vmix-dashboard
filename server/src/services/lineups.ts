@@ -51,7 +51,7 @@ function normalize(raw: Partial<LineupData>): LineupData {
   };
 }
 
-function load(db: DB, eventId: string, teamId: string) {
+export function loadLineup(db: DB, eventId: string, teamId: string) {
   const r = db.prepare('SELECT * FROM lineups WHERE event_id = ? AND team_id = ?').get(eventId, teamId) as any;
   let data: Partial<LineupData> = {};
   try { data = r ? JSON.parse(r.data) : {}; } catch { /* reset */ }
@@ -68,13 +68,13 @@ function store(db: DB, eventId: string, teamId: string, data: LineupData, synced
 
 export function getLineup(ctx: AssetCtx, eventId: string, teamId: string) {
   getTeam(ctx, teamId);
-  const l = load(ctx.db, eventId, teamId);
+  const l = loadLineup(ctx.db, eventId, teamId);
   return { teamId, ...l, slots: slotDefs(l.data.extra).map((d) => ({ key: d.key, label: d.label, position: d.position })) };
 }
 
 export function saveLineup(ctx: AssetCtx, eventId: string, teamId: string, patch: { title?: string; teamName?: string; extra?: number; rows?: Partial<LineupRow>[] }) {
   getTeam(ctx, teamId);
-  const cur = load(ctx.db, eventId, teamId).data;
+  const cur = loadLineup(ctx.db, eventId, teamId).data;
   const next: Partial<LineupData> = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }) };
   const rows = new Map(cur.rows.map((r) => [r.slot, r]));
   for (const p of patch.rows ?? []) {
@@ -121,7 +121,7 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
   const t = ov.teams.find((x) => x.id === teamId);
   if (!t) throw notFound('Team');
   if (!t.declaration) return { synced: false as const, reason: 'No declaration for this day' };
-  const cur = load(ctx.db, eventId, teamId).data;
+  const cur = loadLineup(ctx.db, eventId, teamId).data;
   const crew = [
     ...t.sailors.filter((s) => s.declared).sort((a, b) => a.declared!.sort - b.declared!.sort)
       .map((s) => ({ sailorId: s.id, firstName: s.firstName, lastName: s.lastName, number: s.declared!.number || s.defaultNumber, position: s.declared!.position || s.defaultPosition, captain: s.isCaptain })),
@@ -171,7 +171,7 @@ export function lineupSheetRows(ctx: AssetCtx, eventId: string): Record<string, 
   const out: Record<string, string>[] = [];
   for (const t of listTeams(ctx)) {
     if (!saved.has(t.id)) continue;
-    const { data } = load(ctx.db, eventId, t.id);
+    const { data } = loadLineup(ctx.db, eventId, t.id);
     const row: Record<string, string> = {
       code: t.code, TeamName: (data.teamName || t.name).toUpperCase(), LineupText: data.title,
       Flag: img(t.assets.flag_big), Emblem: img(t.assets.emblem_light), CaptainSlot: data.rows.find((r) => r.captain)?.slot ?? '',

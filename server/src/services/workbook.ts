@@ -2,38 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { activeEvent } from '../db/db.js';
-import { AssetCtx } from './assets.js';
+import { AssetCtx, organizeAssets } from './assets.js';
 import { todayIn } from './dates.js';
-import { jsonCaptains, jsonFleetSet, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './jsonExport.js';
-import { buildXlsx, sheetNames } from './xlsx.js';
-import { jsonGraphics } from './generator/generator.js';
-import { GRAPHIC_KINDS, graphicSheetRows, seedGraphicSets } from './graphicSets.js';
-import { lineupSheetRows } from './lineups.js';
-import { resultSheetRows } from './results.js';
+import { buildXlsx } from './xlsx.js';
+import { seedGraphicSets } from './graphicSets.js';
+import { SHEETS, sheetRows } from './workbookSheets.js';
 
 export interface WorkbookSheet { name: string; path: string; rows: Record<string, string>[] }
 
-/** Every data source as one named sheet, in a fixed order; sheet names are valid Excel names. */
+/** The four sheets of the vMix workbook (see workbookSheets.ts). */
 export function allSheets(ctx: AssetCtx): WorkbookSheet[] {
   const ev = activeEvent(ctx.db);
   const today = todayIn(ev.timezone);
   seedGraphicSets(ctx.db, ev.id);
-  const sets = ctx.db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev.id) as { id: string; name: string }[];
-  const list = [
-    { name: 'Teams', path: '/json/teams', rows: jsonTeams(ctx) },
-    { name: 'Sailors', path: '/json/sailors', rows: jsonSailors(ctx, ev.id, today) },
-    { name: 'Captains', path: '/json/captains', rows: jsonCaptains(ctx) },
-    { name: 'Weather', path: '/json/weather', rows: jsonWeather(ctx.db) },
-    { name: 'Schedule', path: '/json/schedule', rows: jsonSchedule(ctx.db, ev.id, today) },
-    { name: 'People', path: '/json/people', rows: jsonPeople(ctx, ev.id) },
-    ...GRAPHIC_KINDS.map((k) => ({ name: k.sheet, path: `/json/graphics-sets/${k.kind}`, rows: graphicSheetRows(ctx.db, ev.id, k.kind) })),
-    { name: 'Lineups', path: '/json/lineups', rows: lineupSheetRows(ctx, ev.id) },
-    { name: 'Results', path: '/json/results', rows: resultSheetRows(ctx, ev.id) },
-    { name: 'Graphics', path: '/json/graphics', rows: jsonGraphics(ctx.db, ctx.assetsDir) },
-    ...sets.map((s) => ({ name: s.name, path: `/json/fleets/${s.id}`, rows: jsonFleetSet(ctx, s.id) })),
-  ];
-  const names = sheetNames(list.map((s) => s.name));
-  return list.map((s, i) => ({ ...s, name: names[i] }));
+  return SHEETS.map((s) => ({ name: s.name, path: `/json/sheet/${s.key}`, rows: sheetRows(ctx, ev.id, today, s.key) }));
 }
 
 /**
@@ -58,6 +40,7 @@ export class WorkbookWriter {
 
   tick() {
     try {
+      organizeAssets(this.ctx); // a renamed team or sailor moves its files before the paths are written
       const sheets = allSheets(this.ctx);
       const hash = createHash('sha1').update(JSON.stringify(sheets.map((s) => [s.name, s.rows]))).digest('hex');
       if (hash === this.lastHash && fs.existsSync(this.file)) return;

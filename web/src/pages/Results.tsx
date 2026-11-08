@@ -5,6 +5,7 @@ import { api, FleetSetSummary, Team } from '../api';
 import { Button, cx, Empty, ErrorBox, fmtDateTime, Loading, useConfirm, useToast } from '../components/ui';
 import { SaveInput } from '../components/fields';
 import { TeamProfileLink } from '../components/TeamProfileLink';
+import { useStage } from '../components/StagePicker';
 
 interface RRow { teamId: string; races: string[]; points: string; autoPoints: string; total: string }
 interface Group { fleetId: string; fleetName: string; setId: string; setName: string; title: string; subtitle: string; races: number; rows: RRow[]; updatedAt: string | null }
@@ -15,7 +16,8 @@ export function ResultsPage() {
   const [params, setParams] = useSearchParams();
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
   const teams = useQuery({ queryKey: ['teams'], queryFn: () => api.get<Team[]>('/api/teams') });
-  const setId = params.get('set') ?? sets.data?.[0]?.id ?? null;
+  const stage = useStage();
+  const setId = params.get('set') ?? stage.data?.current?.id ?? sets.data?.[0]?.id ?? null;
   const groups = useQuery({ queryKey: ['results', setId], queryFn: () => api.get<Group[]>(`/api/results/set/${setId}`), enabled: !!setId });
 
   if (sets.isLoading) return <Loading />;
@@ -27,7 +29,7 @@ export function ResultsPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-bold">Results</h1>
-          <p className="text-sm text-ink-400">Overall results of each group. Rows are the standing (top = 1st). Points add up the race scores unless you type them. Sheet “Results”, one row per group (T1Name, T1R1, T1Points…).</p>
+          <p className="text-sm text-ink-400">Overall results of each group. Rows are the standing (top = 1st). Points add up the race scores unless you type them. Sheet “Results” lists the groups of the stage chosen at the top, one row per team.</p>
         </div>
       </div>
       {!sets.data?.length ? (

@@ -2,6 +2,7 @@ import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, Meta } from './api';
 import { cx } from './components/ui';
+import { StagePicker } from './components/StagePicker';
 import { CommentatorPage } from './pages/Commentator';
 import { OverviewPage } from './pages/Overview';
 import { GeneralPage } from './pages/General';
@@ -56,7 +57,8 @@ function TopBar() {
           <NavLink to="/vmix" className={tab}>vMix graphics</NavLink>
           <NavLink to="/commentator" className={tab}>Commentator</NavLink>
         </nav>
-        <div className="ml-auto truncate text-xs text-ink-400" title="Active event">
+        <div className="ml-auto"><StagePicker /></div>
+        <div className="truncate text-xs text-ink-400" title="Active event">
           {meta.data && <>Event: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
         </div>
         <VmixPcBadge />

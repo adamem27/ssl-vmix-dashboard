@@ -42,7 +42,7 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
     } catch (e) { toast.error(e); } finally { setBusy(''); }
   };
   const clear = async () => {
-    if (!(await ask('Clear the line-up?', 'Every place is emptied and the team’s row leaves the Lineups sheet.', 'Clear'))) return;
+    if (!(await ask('Clear the line-up?', 'Every place is emptied; the sailors lose their line-up place in the Sailors sheet.', 'Clear'))) return;
     try { done(await api.del<Lineup>(`/api/lineups/${teamId}`)); } catch (e) { toast.error(e); }
   };
   // drag a sailor onto another place: the two places swap sailors (place names stay)
@@ -65,7 +65,7 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
       <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
         <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">Line-up</h2>
         <span className="text-xs text-ink-500">
-          {l.syncedAt ? <>Filled from the declaration of {fmtDate(l.syncedDate!)} at {fmtDateTime(l.syncedAt, tz)}{l.updatedAt && l.updatedAt > l.syncedAt ? ', edited since' : ''}.</> : l.exists ? 'Entered by hand.' : 'Empty: the team has no row in the Lineups sheet yet.'}
+          {l.syncedAt ? <>Filled from the declaration of {fmtDate(l.syncedDate!)} at {fmtDateTime(l.syncedAt, tz)}{l.updatedAt && l.updatedAt > l.syncedAt ? ', edited since' : ''}.</> : l.exists ? 'Entered by hand.' : 'Empty so far.'}
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button size="sm" variant="primary" busy={busy === 'sync'} disabled={!hasDecl} onClick={sync} title={hasDecl ? `Copy the crew declared for ${fmtDate(date)} into the line-up` : `No declaration on ${fmtDate(date)}`}>
@@ -75,11 +75,11 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
         </div>
       </header>
       <div className="flex flex-wrap items-end gap-3 border-b border-ink-800 px-3 py-2">
-        <label className="w-40"><span className="label">Title <span className="font-mono text-ink-600">LineupText</span></span>
+        <label className="w-40"><span className="label">Title</span>
           <SaveInput value={l.data.title} onSave={(title) => put({ title })} label="Title" maxLength={60} /></label>
-        <label className="w-64"><span className="label">Team name <span className="font-mono text-ink-600">TeamName</span></span>
+        <label className="w-64"><span className="label">Team name</span>
           <SaveInput value={l.data.teamName} onSave={(teamName) => put({ teamName })} label="Team name" placeholder={team.data?.name} maxLength={80} /></label>
-        <p className="mb-1 text-xs text-ink-500">Surnames and the team name go to vMix in capitals. Drag a sailor onto another place to swap them.</p>
+        <p className="mb-1 text-xs text-ink-500">In Excel: title and team name in “Teams”, places in “Sailors” (Line-up place). Surnames go in capitals. Drag a sailor onto another place to swap them.</p>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
         {l.data.rows.map((r) => {
@@ -95,7 +95,6 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
                 <span className="grid h-10 w-10 shrink-0 cursor-grab place-items-center overflow-hidden rounded bg-ink-900 text-[10px] text-ink-600">{photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : 'photo'}</span>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold uppercase tracking-wide text-ink-200">{def?.label ?? r.slot}</div>
-                  <div className="font-mono text-[10px] text-ink-600">{r.slot}</div>
                 </div>
                 <button onClick={() => setRow(r.slot, { captain: !r.captain })} aria-pressed={r.captain} title={r.captain ? 'Captain (click to remove)' : 'Make captain'}
                   className={cx('h-7 rounded px-1.5 text-xs font-bold', r.captain ? 'bg-amber-500/25 text-amber-300' : 'text-ink-500 hover:bg-ink-800 hover:text-ink-100')}>C</button>

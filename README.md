@@ -44,7 +44,7 @@ Testy: `npm test`. Kontrola typów: `npm run typecheck`.
 |---|---|---|
 | Katalog danych | `data/` w katalogu projektu | `DATA_DIR` |
 | Baza SQLite | `data/ssl-vmix.sqlite` (+ pliki `-wal`, `-shm`) | `DB_PATH` |
-| Przesłane pliki | `data/assets/teams/<id drużyny>/<slot>_<losowy>.png`, `data/assets/sailors/<id>/photo_<losowy>.png/jpg` | `ASSETS_DIR` |
+| Przesłane pliki | `data/assets/Teams/<KOD> - <nazwa>/<KOD> - <slot>.png`, `data/assets/Sailors/<KOD> - <nazwa>/<NAZWISKO> <Imię> - Photo.jpg`, `data/assets/People/<osoba> - Photo.jpg` (ponowne wgranie daje nazwę z „v2”, żeby vMix odświeżył obraz; zmiana nazwy drużyny przenosi pliki) | `ASSETS_DIR` |
 | Port / adres | `4310` / `127.0.0.1` | `PORT` / `HOST` |
 
 Przesłane pliki dostają unikalne nazwy w katalogu właściciela, więc dwa pliki `flag.png` różnych drużyn nigdy się nie nadpiszą. Przy zastąpieniu grafiki stary plik tego slotu jest usuwany. Migracje bazy uruchamiają się automatycznie przy starcie.
@@ -154,7 +154,7 @@ Importer: `server/src/importers/sslFabrikCrewList.ts`, rejestr: `server/src/impo
 
 ## Jeden plik dla vMix (Excel z arkuszami)
 
-Dashboard sam utrzymuje plik `data/assets/ssl-vmix.xlsx` z arkuszami: Teams, Sailors, Captains, Weather, Schedule, People oraz po jednym arkuszu na każdy zestaw flot. Plik nadpisuje się w ciągu kilku sekund po każdej zmianie danych. W vMix dodaj go jako Data Source → Excel/CSV i wybierz arkusz. Ponieważ plik leży w folderze `data/assets`, udostępnienie tego folderu w sieci (patrz niżej) wystarcza, żeby vMix na innym komputerze go widział. Inne miejsce ustawisz zmienną `WORKBOOK_FILE`.
+Dashboard sam utrzymuje plik `data/assets/ssl-vmix.xlsx` z czterema arkuszami: **General** (wszystkie grafiki ogólne, wiersz na każdą wartość: Graphic · Version · Field · Value), **Teams** (wiersz na drużynę: grupa, miejsce, nazwy, ranking, grafiki), **Sailors** (wiersz na żeglarza: kapitan, miejsce w line-upie, deklaracja dnia, zdjęcie) i **Results** (wiersz na drużynę w grupie). Teams, Sailors i Results obejmują drużyny i grupy etapu wybranego w nagłówku dashboardu (pole „Stage”). Plik nadpisuje się w ciągu kilku sekund po każdej zmianie danych. W vMix dodaj go jako Data Source → Excel/CSV i wybierz arkusz. Ponieważ plik leży w folderze `data/assets`, udostępnienie tego folderu w sieci (patrz niżej) wystarcza, żeby vMix na innym komputerze go widział. Inne miejsce ustawisz zmienną `WORKBOOK_FILE`.
 
 Jeden adres z wyborem arkusza jest też jako XML: `/xml/all`. W vMix: Data Source → XML, adres `http://<komputer>:4310/xml/all`, XPath np. `//sheet[@name='Teams']/row` (ekran JSON podaje XPath dla wybranego arkusza). Zbiorczy `/json/all` (nazwy arkuszy jako klucze) jest dla innych narzędzi; źródło JSON w vMix czyta tablicę obiektów, więc w vMix używaj adresów pojedynczych arkuszy, np. `/json/teams`. Ekran **JSON** pokazuje arkusze jak w Excelu: zakładki na dole, numery wierszy i kolumn, ścieżkę pliku i przycisk pobrania.
 
@@ -191,7 +191,7 @@ Ekran **PNG generator** zastępuje ręczne eksporty z Illustratora. Każda druż
 - **Fale Copacabana:** zawsze ten sam kształt, przeniesiony 1:1 z `gradienty.ai` (czarne pasy, długość fali 81,111 px, rząd co 60,833 px). Element ustala tylko, czy ma fale, ich krycie (w pliku 10%) i skalę (100%, na małych elementach 53,3%).
 - **Podgląd:** wszystkie elementy wybranej drużyny albo jeden element dla wszystkich drużyn, na szachownicy, ciemnym lub jasnym tle. Podgląd liczy ten sam kod co eksport, więc piksele są te same.
 
-Eksport: przy włączonym **Auto export** pliki zapisują się w ciągu kilku sekund po zmianie do `data/assets/generated/<KOD>/<KOD>_<plik>.png` (renderowane są tylko zmienione pliki, a pliki usuniętych elementów i zmienionych kodów są kasowane). Ponieważ to katalog `assets`, `sync-vmix` kopiuje je na komputer z vMixem, np. `C:\SSL-vMix\generated\POL\POL_bar.png`. Arkusz **Graphics** w `ssl-vmix.xlsx` (i `/json/graphics`) ma jeden wiersz na drużynę i kolumnę ze ścieżką dla każdego elementu. „Export now” renderuje wszystko od nowa, „ZIP” pobiera komplet.
+Eksport: przy włączonym **Auto export** pliki zapisują się w ciągu kilku sekund po zmianie do `data/assets/PNG generator/<KOD>/<KOD>_<plik>.png` (renderowane są tylko zmienione pliki, a pliki usuniętych elementów i zmienionych kodów są kasowane). Ponieważ to katalog `assets`, `sync-vmix` kopiuje je na komputer z vMixem, np. `C:\SSL-vMix\PNG generator\POL\POL_bar.png`. Ścieżki trafiają do arkusza **Teams** w `ssl-vmix.xlsx` (kolumny „PNG <element>”). „Export now” renderuje wszystko od nowa, „ZIP” pobiera komplet.
 
 Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów z `gradienty.ai` (929×75, 851×390 ×2, 802×102, 1130×75, 289×40, 210×134) i gradienty 11 drużyn odczytane z tej tablicy (MAR, MOZ, SEY, TAH, AUT, EST, SLO, BEL, LTU, NOR, SRB). Pozostałe drużyny czekają na swoje kolory.
 

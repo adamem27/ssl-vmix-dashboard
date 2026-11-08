@@ -10,7 +10,7 @@ import { DEFAULT_STROKE_GRADIENT, ElementSpec, Gradient, gradientVersions, gradi
 
 export const VARIANTS = [1, 2, 3] as const;
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
-export const GENERATED_DIR = 'generated';
+export const GENERATED_DIR = 'PNG generator';
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Colour must be #RRGGBB');
 const pct = z.number().min(0).max(100);
