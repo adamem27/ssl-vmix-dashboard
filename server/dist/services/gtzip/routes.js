@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import { z } from 'zod';
 import { badRequest } from '../errors.js';
-import { generateSchema, sniffMime } from './gtzip.js';
+import { countSchema, generateSchema, saveTemplateSchema, sniffMime } from './gtzip.js';
+import { SCENES } from './scenes.js';
 /** /api/gtzip/… – the GTZIP generator tab. Nothing here modifies a template or an existing generated file. */
 export function registerGtzipRoutes(app, svc) {
     const disposition = (name) => `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, '')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
-    app.get('/api/gtzip', async () => ({ templates: svc.listTemplates(), outputs: svc.listOutputs(), outputsDir: svc.outputsDir }));
+    app.get('/api/gtzip', async () => ({ templates: svc.listTemplates(), outputs: svc.listOutputs(), outputsDir: svc.outputsDir, scenes: SCENES }));
+    app.post('/api/gtzip/templates/from-doc', async (req) => svc.saveAsTemplate(saveTemplateSchema.parse(req.body)));
     app.post('/api/gtzip/templates', async (req) => {
         const file = await req.file();
         if (!file)
@@ -15,7 +17,7 @@ export function registerGtzipRoutes(app, svc) {
         return svc.addTemplate(await file.toBuffer(), file.filename);
     });
     app.get('/api/gtzip/templates/:id', async (req) => svc.template(req.params.id));
-    app.patch('/api/gtzip/templates/:id', async (req) => svc.renameTemplate(req.params.id, z.object({ name: z.string().min(1).max(120) }).parse(req.body).name));
+    app.patch('/api/gtzip/templates/:id', async (req) => svc.updateTemplate(req.params.id, z.object({ name: z.string().min(1).max(120).optional(), scene: z.string().max(60).nullable().optional(), variant: z.string().max(60).nullable().optional() }).parse(req.body)));
     app.delete('/api/gtzip/templates/:id', async (req) => { svc.deleteTemplate(req.params.id); return { ok: true }; });
     app.get('/api/gtzip/templates/:id/file', async (req, reply) => {
         const m = svc.meta(req.params.id);
@@ -40,6 +42,7 @@ export function registerGtzipRoutes(app, svc) {
     });
     app.get('/api/gtzip/asset-images', async () => svc.assetImages());
     app.get('/api/gtzip/free-name', async (req) => ({ name: svc.freeName(String(req.query.name ?? 'title')) }));
+    app.post('/api/gtzip/part-count', async (req) => svc.setPartCount(countSchema.parse(req.body)));
     app.post('/api/gtzip/generate', async (req) => svc.generate(generateSchema.parse(req.body)));
     app.get('/api/gtzip/outputs/:name', async (req, reply) => {
         const f = svc.outputFile(req.params.name);

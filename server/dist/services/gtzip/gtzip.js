@@ -19,7 +19,9 @@ import { readZip } from '../matchboard/matchboard.js';
 import { zipStore } from '../xlsx.js';
 import { joinVmixPath } from '../paths.js';
 import { drawTitle } from './draw.js';
+import { guessScene, SCENES } from './scenes.js';
 import { clone, elements, fields, parseXml, serializeXml, sourceName } from './model.js';
+import { setCount } from './params.js';
 export const GTZIP_DIR = 'gtzip';
 const DOC = 'document.xml', RES = 'resources.xml', CT = '[Content_Types].xml', THUMB = 'thumbnail.png';
 const CT_NS = 'http://schemas.openxmlformats.org/package/2006/content-types';
@@ -142,6 +144,13 @@ export const generateSchema = z.object({
     doc: nodeSchema,
     thumbnail: z.boolean().default(true),
 });
+export const saveTemplateSchema = z.object({
+    templateId: z.string().min(1).max(100),
+    name: z.string().min(1).max(120),
+    doc: nodeSchema,
+    scene: z.string().max(60).nullable().optional(),
+    variant: z.string().max(60).nullable().optional(),
+});
 export function safeFileName(raw) {
     const n = raw.trim().replace(/\.gtzip$/i, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, ' ').replace(/[. ]+$/, '');
     if (!n)
@@ -198,7 +207,7 @@ export class GtzipService {
             }
         }).filter((m) => !!m && typeof m.id === 'string' && fs.existsSync(this.tplPath(m.id))).sort((a, b) => a.name.localeCompare(b.name));
     }
-    addTemplate(buf, originalFilename, name) {
+    addTemplate(buf, originalFilename, name, scene) {
         const p = loadPackage(buf);
         const base = name?.trim() || originalFilename.replace(/\.gtzip$/i, '');
         fs.mkdirSync(this.templatesDir, { recursive: true });
@@ -208,6 +217,7 @@ export class GtzipService {
             id, name: base.slice(0, 120), originalFilename: originalFilename.slice(0, 200), uploadedAt: new Date().toISOString(), size: buf.length,
             width: Number(p.doc.attrs.Width ?? 1920), height: Number(p.doc.attrs.Height ?? 1080),
             elements: elements(p.doc).length, fields: fields(p.doc).length, storyboards: p.doc.children.filter((c) => c.tag === 'Storyboard').length,
+            scene: scene ? scene.scene : guessScene(originalFilename)?.scene ?? null, variant: scene ? scene.variant : guessScene(originalFilename)?.variant ?? null,
         };
         fs.writeFileSync(this.metaPath(id), JSON.stringify(meta, null, 2));
         return meta;
@@ -218,8 +228,16 @@ export class GtzipService {
             throw notFound('Template');
         return JSON.parse(fs.readFileSync(f, 'utf8'));
     }
-    renameTemplate(id, name) {
-        const m = { ...this.meta(id), name: name.trim().slice(0, 120) || this.meta(id).name };
+    updateTemplate(id, patch) {
+        const cur = this.meta(id);
+        const m = { ...cur, ...patch, name: patch.name?.trim().slice(0, 120) || cur.name };
+        if (patch.scene !== undefined) {
+            const sc = SCENES.find((x) => x.id === patch.scene);
+            if (patch.scene && !sc)
+                throw badRequest('Unknown scene.');
+            m.scene = sc?.id ?? null;
+            m.variant = sc ? (sc.variants.find((x) => x.id === patch.variant) ?? sc.variants[0]).id : null;
+        }
         fs.writeFileSync(this.metaPath(id), JSON.stringify(m, null, 2));
         return m;
     }
@@ -320,21 +338,15 @@ export class GtzipService {
             if (!this.exists(`${base} (${i})`))
                 return `${base} (${i})`;
     }
-    async generate(input) {
-        const name = safeFileName(input.fileName);
-        if (this.exists(name))
-            throw conflict(`“${name}.gtzip” already exists. Generating never replaces a file – choose another name.`, { suggestion: this.freeName(name) });
-        if (input.doc.tag !== 'Composition')
+    /** A complete .gtzip from the template's package with the edited document (new pictures embedded, unused ones dropped). */
+    async build(templateId, doc, thumbnail) {
+        if (doc.tag !== 'Composition')
             throw badRequest('The title must start with a Composition.');
-        const p = this.pkg(input.templateId);
-        p.doc = input.doc;
+        const p = this.pkg(templateId);
+        p.doc = clone(doc);
         // embed new pictures; the same picture used twice is stored once
         const added = new Map();
-        const bitmaps = [];
-        const walk = (n) => { if (n.tag === 'Bitmap')
-            bitmaps.push(n); n.children.forEach(walk); };
-        walk(p.doc);
-        for (const b of bitmaps) {
+        for (const b of collect(p.doc, 'Bitmap')) {
             const s = b.attrs.Source ?? '';
             if (!s.startsWith('upload:') && !s.startsWith('asset:'))
                 continue;
@@ -343,13 +355,27 @@ export class GtzipService {
             b.attrs.Source = added.get(s);
         }
         pruneResources(p);
-        if (input.thumbnail) {
+        if (thumbnail) {
             const t = await this.renderThumbnail(p).catch(() => null);
             if (t)
                 p.files.set(THUMB, t);
         }
         const buf = savePackage(p);
         loadPackage(buf); // sanity check: the file reads back
+        return buf;
+    }
+    /** Keeps an edited state as a template of its own (e.g. one variant of a scene); the source template is not touched. */
+    async saveAsTemplate(input) {
+        const buf = await this.build(input.templateId, input.doc, true);
+        const src = this.meta(input.templateId);
+        const m = this.addTemplate(buf, `${safeFileName(input.name)}.gtzip`, input.name);
+        return input.scene !== undefined ? this.updateTemplate(m.id, { scene: input.scene, variant: input.variant ?? null }) : src.scene ? this.updateTemplate(m.id, { scene: src.scene, variant: src.variant }) : m;
+    }
+    async generate(input) {
+        const name = safeFileName(input.fileName);
+        if (this.exists(name))
+            throw conflict(`“${name}.gtzip” already exists. Generating never replaces a file – choose another name.`, { suggestion: this.freeName(name) });
+        const buf = await this.build(input.templateId, input.doc, input.thumbnail);
         fs.mkdirSync(this.outputsDir, { recursive: true });
         const final = this.outputPath(name);
         const tmp = `${final}.${process.pid}.tmp`;
@@ -431,6 +457,54 @@ export class GtzipService {
         drawTitle(ctx, p.doc, { image: (src) => imgs.get(src) ?? null, fallbackFont: 'Space Grotesk' });
         return cv.toBuffer('image/png');
     }
+    /**
+     * Changes how many of a repeated part (rows, teams, sailors) the title has. Pictures stretched with the parts get a
+     * new bitmap with a band repeated or cut out (saved like an uploaded picture), so they are not squashed.
+     */
+    async setPartCount(body) {
+        let r;
+        try {
+            r = setCount(body.doc, body.group, body.count, body.options);
+        }
+        catch (e) {
+            throw badRequest(e.message);
+        }
+        if (!r.bands.length)
+            return { doc: r.root };
+        const c = await canvas();
+        if (!c)
+            return { doc: r.root };
+        const byName = new Map(collect(r.root, 'Image').map((n) => [n.attrs.Name, n]));
+        const current = new Map();
+        for (const b of r.bands) {
+            const n = byName.get(b.name);
+            const bm = n?.children.find((x) => x.tag === 'Image.Bitmap')?.children.find((x) => x.tag === 'Bitmap');
+            const src = bm?.attrs.Source;
+            if (!bm || !src)
+                continue;
+            let buf = current.get(b.name);
+            if (!buf) {
+                try {
+                    buf = this.image(body.template ?? null, src);
+                }
+                catch {
+                    continue;
+                }
+            }
+            try {
+                const im = await c.loadImage(buf);
+                const out = sliceBand(c, im, b);
+                current.set(b.name, out);
+            }
+            catch { /* unreadable picture: stays stretched */ }
+        }
+        for (const [name, buf] of current) {
+            const bm = byName.get(name).children.find((x) => x.tag === 'Image.Bitmap').children.find((x) => x.tag === 'Bitmap');
+            const base = sourceName(bm.attrs.Source).replace(/^[0-9a-f]{12}-/, '').replace(/\.[^.]+$/, '');
+            bm.attrs.Source = this.saveUpload(buf, `${base}.png`).source;
+        }
+        return { doc: r.root };
+    }
     /** Renders any document (editor state) to PNG with the template's pictures, for checks and tests. */
     async renderDoc(templateId, doc, width = 640) {
         const p = this.pkg(templateId);
@@ -442,6 +516,42 @@ export class GtzipService {
         }
         return this.renderThumbnail(p, width);
     }
+}
+export const countSchema = z.object({
+    template: z.string().max(200).nullable().optional(),
+    doc: z.any().refine((d) => d && typeof d === 'object' && d.tag === 'Composition', 'A GT document is needed.'),
+    group: z.string().max(4000),
+    count: z.number().int().min(1).max(40),
+    options: z.object({ shiftAfter: z.boolean().optional(), stretch: z.boolean().optional(), center: z.boolean().optional() }).default({}),
+});
+/** A picture with the band from…to repeated right after itself (insert) or cut out (remove), along the band's axis. */
+function sliceBand(c, im, b) {
+    const W = im.width, H = im.height;
+    const L = b.axis === 0 ? W : H;
+    const p0 = Math.max(0, Math.min(L, Math.round(b.from * L))), p1 = Math.max(p0, Math.min(L, Math.round(b.to * L)));
+    const band = p1 - p0;
+    const nl = b.op === 'insert' ? L + band : L - band;
+    const cv = c.createCanvas(b.axis === 0 ? Math.max(1, nl) : W, b.axis === 1 ? Math.max(1, nl) : H);
+    const ctx = cv.getContext('2d');
+    // copies the strip a…b of the picture to position at along the axis
+    const put = (a, e, at) => {
+        if (e <= a)
+            return;
+        if (b.axis === 1)
+            ctx.drawImage(im, 0, a, W, e - a, 0, at, W, e - a);
+        else
+            ctx.drawImage(im, a, 0, e - a, H, at, 0, e - a, H);
+    };
+    if (b.op === 'insert') {
+        put(0, p1, 0);
+        put(p0, p1, p1);
+        put(p1, L, p1 + band);
+    }
+    else {
+        put(0, p0, 0);
+        put(p1, L, p0);
+    }
+    return cv.toBuffer('image/png');
 }
 function collect(n, tag, out = []) { if (n.tag === tag)
     out.push(n); n.children.forEach((c) => collect(c, tag, out)); return out; }
