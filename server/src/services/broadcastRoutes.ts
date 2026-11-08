@@ -30,7 +30,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   app.get('/api/lineups', async () => lu.lineupStatus(db, ev().id));
   app.get<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) => lu.getLineup(ctx, ev().id, req.params.teamId));
   app.put<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) =>
-    lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20) }).partial().parse(req.body)));
+    lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20), order: z.array(s(20)).max(20) }).partial().parse(req.body)));
   app.delete<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) => lu.clearLineup(ctx, ev().id, req.params.teamId));
   const date = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
   app.post<{ Params: { teamId: string } }>('/api/lineups/:teamId/sync', async (req) => {

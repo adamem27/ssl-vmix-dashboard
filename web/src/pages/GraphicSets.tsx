@@ -17,11 +17,13 @@ const tickerText = (d: Record<string, string>) => {
 };
 
 /** One panel per graphic (Welcome, Follow us, Tickers, …); each version is a card and a row in its sheet. */
-export function GraphicSetsSections() {
+/** The panels of the given kinds (all when none given), in the order asked for. */
+export function GraphicSetsSections({ kinds }: { kinds?: string[] }) {
   const q = useGraphicSets();
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
-  return <>{q.data!.kinds.map((k) => <KindPanel key={k.kind} k={k} sets={q.data!.sets.filter((s) => s.kind === k.kind)} />)}</>;
+  const list = kinds ? kinds.map((id) => q.data!.kinds.find((k) => k.kind === id)).filter((k): k is GKind => !!k) : q.data!.kinds;
+  return <>{list.map((k) => <KindPanel key={k.kind} k={k} sets={q.data!.sets.filter((s) => s.kind === k.kind)} />)}</>;
 }
 
 function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {

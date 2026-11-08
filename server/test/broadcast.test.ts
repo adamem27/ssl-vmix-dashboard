@@ -45,7 +45,13 @@ describe('line-ups', () => {
     expect(at('Helm').lastName).toBe('Bermudez');
     expect(at('Main').position).toBe('MAIN TRIMMER');
     expect([at('Trimmer').firstName, at('Trimmer1').firstName]).toEqual(['Ana', 'Jon']);
-    expect(at('Grinder').firstName).toBe('Eli'); // floater fills the first free place
+    expect(at('Bow').firstName).toBe('Eli'); // floater fills the first free place (bow comes first)
+    expect(l.data.rows.map((x) => x.slot)).toEqual(['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Tactician', 'Helm']);
+    // the team's own order of places: kept on save and on the next sync
+    lu.saveLineup(ctx, eventId, teamId, { order: ['Helm', 'Tactician'] });
+    expect(lu.getLineup(ctx, eventId, teamId).data.rows.slice(0, 3).map((x) => x.slot)).toEqual(['Helm', 'Tactician', 'Bow']);
+    lu.syncLineupFromDeclaration(ctx, eventId, teamId, date);
+    expect(lu.getLineup(ctx, eventId, teamId).data.rows[0].slot).toBe('Helm');
     expect(l.data.teamName).toBe('Spain');
     lu.saveLineup(ctx, eventId, teamId, { rows: [{ slot: 'Pit', captain: true }] });
     lu.saveLineup(ctx, eventId, teamId, { rows: [{ slot: 'Helm', captain: true }] });

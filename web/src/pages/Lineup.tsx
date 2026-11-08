@@ -7,7 +7,7 @@ import { SaveInput } from '../components/fields';
 interface Row { slot: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; captain: boolean }
 interface Lineup {
   teamId: string; exists: boolean; syncedAt: string | null; syncedDate: string | null; updatedAt: string | null;
-  data: { title: string; teamName: string; extra: number; rows: Row[] };
+  data: { title: string; teamName: string; extra: number; rows: Row[]; order?: string[] };
   slots: { key: string; label: string; position: string }[];
 }
 const MAX_EXTRA = 6;
@@ -23,7 +23,8 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
   const sailors = useQuery({ queryKey: ['sailors', teamId], queryFn: () => api.get<Sailor[]>(`/api/teams/${teamId}/sailors`) });
   const decl = useQuery({ queryKey: ['decl', teamId, date], queryFn: () => api.get<{ declaration: { members: unknown[] } | null }>(`/api/declarations?teamId=${teamId}&date=${date}`) });
   const [busy, setBusy] = useState('');
-  const [drag, setDrag] = useState<string | null>(null);
+  // two kinds of drag: a whole place (its handle) changes the order of places; a sailor (the name) swaps sailors
+  const [drag, setDrag] = useState<{ kind: 'place' | 'sailor'; slot: string } | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
   const done = (l: Lineup) => { qc.setQueryData(key, l); qc.invalidateQueries({ queryKey: ['lineups'] }); };
@@ -52,6 +53,17 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
     const who = (r: Row) => ({ sailorId: r.sailorId, firstName: r.firstName, lastName: r.lastName, number: r.number, captain: r.captain });
     void put({ rows: [{ slot: a, ...who(rb) }, { slot: b, ...who(ra) }] });
   };
+  // drag a place onto another: it takes that place's spot in the order
+  const reorder = (from: string, to: string) => {
+    const keys = q.data!.data.rows.map((r) => r.slot);
+    const next = keys.filter((k) => k !== from);
+    next.splice(keys.indexOf(to), 0, from);
+    void put({ order: next });
+  };
+  const drop = (target: string) => {
+    if (drag && drag.slot !== target) (drag.kind === 'place' ? reorder : swap)(drag.slot, target);
+    setDrag(null); setOver(null);
+  };
 
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
@@ -79,25 +91,35 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
           <SaveInput value={l.data.title} onSave={(title) => put({ title })} label="Title" maxLength={60} /></label>
         <label className="w-64"><span className="label">Team name</span>
           <SaveInput value={l.data.teamName} onSave={(teamName) => put({ teamName })} label="Team name" placeholder={team.data?.name} maxLength={80} /></label>
-        <p className="mb-1 text-xs text-ink-500">In Excel: title and team name in “Teams”, places in “Sailors” (Line-up place). Surnames go in capitals. Drag a sailor onto another place to swap them.</p>
+        <p className="mb-1 text-xs text-ink-500">In Excel: title and team name in “Teams”, places in “Sailors” (Line-up place). Surnames go in capitals. Drag a place by ⠿ to change the order; drag a sailor’s name onto another place to swap sailors.</p>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">
         {l.data.rows.map((r) => {
           const def = l.slots.find((s) => s.key === r.slot);
           const photo = r.sailorId ? byId.get(r.sailorId)?.photo?.previewUrl : null;
           return (
-            <div key={r.slot} draggable={!!(r.firstName || r.lastName)}
-              onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.slot); setDrag(r.slot); }} onDragEnd={() => { setDrag(null); setOver(null); }}
-              onDragOver={(e) => { if (drag && drag !== r.slot) { e.preventDefault(); setOver(r.slot); } }} onDragLeave={() => setOver(null)}
-              onDrop={(e) => { e.preventDefault(); if (drag && drag !== r.slot) swap(drag, r.slot); setDrag(null); setOver(null); }}
-              className={cx('rounded-lg border bg-ink-950/40 p-2', r.captain ? 'border-amber-700/70' : 'border-ink-800', drag === r.slot && 'opacity-40', over === r.slot && 'ring-2 ring-accent-400')}>
-              <div className="mb-1.5 flex items-center gap-2">
-                <span className="grid h-10 w-10 shrink-0 cursor-grab place-items-center overflow-hidden rounded bg-ink-900 text-[10px] text-ink-600">{photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : 'photo'}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold uppercase tracking-wide text-ink-200">{def?.label ?? r.slot}</div>
-                </div>
+            <div key={r.slot}
+              onDragOver={(e) => { if (drag && drag.slot !== r.slot) { e.preventDefault(); setOver(r.slot); } }} onDragLeave={() => setOver(null)}
+              onDrop={(e) => { e.preventDefault(); drop(r.slot); }}
+              className={cx('rounded-lg border bg-ink-950/40 p-2', r.captain ? 'border-amber-700/70' : 'border-ink-800', drag?.slot === r.slot && 'opacity-40',
+                over === r.slot && (drag?.kind === 'place' ? 'ring-2 ring-sky-400' : 'ring-2 ring-accent-400'))}>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <span draggable onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.slot); setDrag({ kind: 'place', slot: r.slot }); }}
+                  onDragEnd={() => { setDrag(null); setOver(null); }} title="Drag to move this place"
+                  className="flex cursor-grab select-none items-center gap-1 rounded px-1 py-0.5 hover:bg-ink-850">
+                  <span className="text-ink-500" aria-hidden>⠿</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-ink-200">{def?.label ?? r.slot}</span>
+                </span>
+                <span className="flex-1" />
                 <button onClick={() => setRow(r.slot, { captain: !r.captain })} aria-pressed={r.captain} title={r.captain ? 'Captain (click to remove)' : 'Make captain'}
                   className={cx('h-7 rounded px-1.5 text-xs font-bold', r.captain ? 'bg-amber-500/25 text-amber-300' : 'text-ink-500 hover:bg-ink-800 hover:text-ink-100')}>C</button>
+              </div>
+              <div draggable={!!(r.firstName || r.lastName)}
+                onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', r.slot); setDrag({ kind: 'sailor', slot: r.slot }); }}
+                onDragEnd={() => { setDrag(null); setOver(null); }} title={r.firstName || r.lastName ? 'Drag onto another place to swap sailors' : undefined}
+                className={cx('mb-1.5 flex items-center gap-2 rounded', (r.firstName || r.lastName) && 'cursor-grab hover:bg-ink-850')}>
+                <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded bg-ink-900 text-[10px] text-ink-600">{photo ? <img src={photo} alt="" className="h-full w-full object-cover" /> : 'photo'}</span>
+                <span className="min-w-0 truncate text-sm">{r.firstName || r.lastName ? <><b className="uppercase">{r.lastName}</b> {r.firstName}</> : <span className="text-ink-600">empty</span>}</span>
               </div>
               <select className="input mb-1 py-1 text-sm" value={r.sailorId ?? ''} aria-label={`${def?.label} sailor`}
                 onChange={(e) => {
