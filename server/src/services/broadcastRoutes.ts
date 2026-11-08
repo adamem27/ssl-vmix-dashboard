@@ -37,7 +37,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     const r = lu.syncLineupFromDeclaration(ctx, ev().id, req.params.teamId, date.parse(req.body).date);
     return { ...r, lineup: lu.getLineup(ctx, ev().id, req.params.teamId) };
   });
-  app.post('/api/lineups/sync-all', async (req) => lu.syncAllLineups(ctx, ev().id, date.parse(req.body).date));
+  app.post('/api/lineups/sync-all', async (req) => lu.syncAllLineups(ctx, ev().id, date.parse(req.body).date, wb.stageTeamIds(db, ev().id)));
 
   // ---------- results ----------
   app.get<{ Params: { setId: string } }>('/api/results/set/:setId', async (req) => rs.listResults(db, req.params.setId));
@@ -50,13 +50,21 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   app.delete<{ Params: { fleetId: string } }>('/api/results/:fleetId', async (req) => rs.clearResults(db, req.params.fleetId));
 
   // ---------- current stage (decides which teams and groups go to the workbook) ----------
-  const stageInfo = () => ({ current: wb.currentStage(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
+  const stageInfo = () => ({ current: wb.currentStage(db, ev().id), teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
   app.get('/api/stage', async () => stageInfo());
   app.put('/api/stage', async (req) => { wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId); return stageInfo(); });
 
   // ---------- JSON for vMix ----------
   app.get<{ Params: { key: string } }>('/json/sheet/:key', async (req) => wb.sheetRows(ctx, ev().id, todayIn(ev().timezone), req.params.key));
   app.get<{ Params: { kind: string } }>('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind));
-  app.get('/json/lineups', async () => lu.lineupSheetRows(ctx, ev().id));
-  app.get('/json/results', async () => rs.resultSheetRows(ctx, ev().id));
+  // both follow the current stage like the workbook does
+  app.get('/json/lineups', async () => {
+    const ids = wb.stageTeamIds(db, ev().id);
+    const codes = ids && new Set(ids.map((id) => (db.prepare('SELECT code FROM teams WHERE id = ?').get(id) as { code: string } | undefined)?.code));
+    return lu.lineupSheetRows(ctx, ev().id).filter((r) => !codes || codes.has(r.code));
+  });
+  app.get('/json/results', async () => {
+    const stage = wb.currentStage(db, ev().id);
+    return rs.resultSheetRows(ctx, ev().id).filter((r) => !stage || r.set === stage.name);
+  });
 }

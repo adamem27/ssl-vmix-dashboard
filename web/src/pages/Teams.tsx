@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, Team } from '../api';
 import { Badge, Button, cx, Empty, ErrorBox, Loading } from '../components/ui';
 import { TeamFormModal } from '../components/TeamForm';
+import { StageNote, useStageTeams } from '../components/StagePicker';
 
 type Filter = 'all' | 'missing' | 'complete';
 
@@ -15,25 +16,28 @@ export function TeamsPage() {
   const search = params.get('q') ?? '';
   const filter = (params.get('f') as Filter) ?? 'all';
   const [adding, setAdding] = useState(false);
+  const stage = useStageTeams();
+  const inStage = useMemo(() => (q.data ?? []).filter((t) => stage.inStage(t.id)), [q.data, stage]);
   const set = (k: string, v: string) => { const p = new URLSearchParams(params); v ? p.set(k, v) : p.delete(k); setParams(p, { replace: true }); };
 
   const list = useMemo(() => {
     const s = search.trim().toLowerCase();
-    return (q.data ?? []).filter((t) => {
+    return inStage.filter((t) => {
       if (s && !t.name.toLowerCase().includes(s) && !t.code.toLowerCase().includes(s) && !t.aliases.some((a) => a.toLowerCase().includes(s))) return false;
       if (filter === 'missing') return t.assetsFilled < t.assetsTotal;
       if (filter === 'complete') return t.assetsFilled === t.assetsTotal;
       return true;
     });
-  }, [q.data, search, filter]);
-  const missingCount = (q.data ?? []).filter((t) => t.assetsFilled < t.assetsTotal).length;
+  }, [inStage, search, filter]);
+  const missingCount = inStage.filter((t) => t.assetsFilled < t.assetsTotal).length;
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="mr-auto">
           <h1 className="text-2xl font-bold">Teams</h1>
-          <p className="text-sm text-ink-400">{q.data ? `${q.data.length} teams · ${missingCount} with missing assets` : ' '}</p>
+          <p className="text-sm text-ink-400">{q.data ? `${inStage.length} teams${stage.stage ? ` in stage ${stage.stage.name}` : ''} · ${missingCount} with missing assets` : ' '}</p>
+          <StageNote shown={inStage.length} total={q.data?.length ?? 0} />
         </div>
         <input className="input w-64" type="search" placeholder="Search by name or code…" value={search} onChange={(e) => set('q', e.target.value)} aria-label="Search teams" />
         <div role="radiogroup" aria-label="Completeness filter" className="inline-flex rounded-md border border-ink-700 bg-ink-900 p-0.5">

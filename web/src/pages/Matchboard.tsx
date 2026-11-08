@@ -5,6 +5,7 @@ import { TeamProfileLink } from '../components/TeamProfileLink';
 import { Button, cx, ErrorBox, fmtDateTime, Loading, useConfirm, useToast } from '../components/ui';
 import { drawMatchboard, resolveTeams, MbLayout, MbSlot, MbSlotState, MbState, MbTeam, MbText } from '../../../server/src/services/matchboard/draw';
 import { Gradient, Raster } from '../../../server/src/services/generator/render';
+import { useStageTeams } from '../components/StagePicker';
 
 interface MbStatus { file: string; vmixPath: string | null; exists: boolean; lastWriteAt: string | null; error: string | null }
 interface FontInfo { sans: { source: 'uploaded' | 'system' | 'missing'; weights: number[] }; grotesk: boolean }
@@ -112,7 +113,9 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
     catch (e) { toast.error(e); } finally { setBusy(''); }
   };
 
-  const sortedTeams = useMemo(() => [...teams].sort((a, b) => a.code.localeCompare(b.code)), [teams]);
+  const stage = useStageTeams();
+  // the team pickers offer the teams of the current stage (a team already placed stays selectable)
+  const sortedTeams = useMemo(() => teams.filter((t) => stage.inStage(t.id)).sort((a, b) => a.code.localeCompare(b.code)), [teams, stage]);
   const teamById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
   const L = data.layout;
   const texts = new Map(L.texts.map((t) => [t.id, t]));
@@ -253,7 +256,7 @@ function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange, 
         <select className="input w-[4.5rem] shrink-0 px-1 py-1 text-xs" value={v.teamId ?? ''} aria-label="Team or text"
           onChange={(e) => onChange({ ...v, teamId: e.target.value || null, text: e.target.value ? v.text : v.text || slot.text, highlight: e.target.value ? v.highlight : false })}>
           <option value="">Text</option>
-          {teams.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
+          {(picked && !teams.includes(picked) ? [picked, ...teams] : teams).map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
         </select>
         {picked
           ? <span className="flex min-w-0 flex-1 items-center"><TeamProfileLink teamId={picked.id} name={picked.name} /><span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={picked.name}>{picked.name}</span></span>

@@ -6,6 +6,7 @@ import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, Overvie
 import { Badge, Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
 import { Cell, ImgCell } from '../components/cells';
 import { TeamProfileLink } from '../components/TeamProfileLink';
+import { StageNote, useStageTeams } from '../components/StagePicker';
 
 const SHORT: Record<string, string> = {
   background_1: 'BG1', background_2: 'BG2', emblem_dark: 'EM D', emblem_light: 'EM L', flag_small: 'FL S', flag_big: 'FL B',
@@ -36,7 +37,10 @@ export function OverviewPage() {
   const day = date ?? todayIn(tz);
 
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
-  const validSet = sets.data?.some((s) => s.id === setId) ? setId : '';
+  const stage = useStageTeams();
+  const chosenSet = sets.data?.some((s) => s.id === setId) ? setId : '';
+  // with a stage picked the table follows it (its teams, its fleets)
+  const validSet = chosenSet || (stage.stage?.id ?? '');
   const data = useQuery({
     queryKey: ['overview', day, validSet],
     queryFn: () => api.get<Overview>(`/api/overview?date=${day}${validSet ? `&set=${validSet}` : ''}`),
@@ -44,12 +48,12 @@ export function OverviewPage() {
     refetchInterval: 30_000,
   });
   const setDetail = useQuery({ queryKey: ['fleet-set', validSet], queryFn: () => api.get<FleetSetDetail>(`/api/fleet-sets/${validSet}`), enabled: !!validSet });
-  useEffect(() => savePrefs({ setId: validSet, open: [...open] }), [validSet, open]);
+  useEffect(() => savePrefs({ setId: chosenSet, open: [...open] }), [chosenSet, open]);
   const refresh = () => { qc.invalidateQueries({ queryKey: ['overview'] }); qc.invalidateQueries({ queryKey: ['teams'] }); };
 
   const query = norm(q.trim());
   const rows = useMemo(() => {
-    const list = (data.data?.teams ?? []).map((t) => {
+    const list = (data.data?.teams ?? []).filter((t) => stage.inStage(t.id)).map((t) => {
       if (!query) return { t, hits: null as Set<string> | null };
       const teamHit = norm(`${t.code} ${t.name}`).includes(query);
       const hits = new Set(t.sailors.filter((s) => norm(fullName(s)).includes(query)).map((s) => s.id));
@@ -61,7 +65,7 @@ export function OverviewPage() {
       if (!pa || !pb) return pa ? -1 : pb ? 1 : a.t.name.localeCompare(b.t.name);
       return pa.fleetName.localeCompare(pb.fleetName, undefined, { numeric: true }) || pa.position - pb.position;
     });
-  }, [data.data, query, validSet]);
+  }, [data.data, query, validSet, stage]);
 
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allOpen = rows.length > 0 && rows.every((r) => open.has(r.t.id));
@@ -77,7 +81,7 @@ export function OverviewPage() {
           <Button size="sm" variant="ghost" onClick={() => setDate(shiftDate(day, 1))} aria-label="Next day">›</Button>
         </div>
         <select className="input w-60 py-1.5 text-sm" value={validSet} onChange={(e) => setSetId(e.target.value)} aria-label="Fleet set">
-          <option value="">Fleet set: none</option>
+          <option value="">{stage.stage ? `Fleet set: stage (${stage.stage.name})` : 'Fleet set: none'}</option>
           {(sets.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <div className="ml-auto flex gap-2">

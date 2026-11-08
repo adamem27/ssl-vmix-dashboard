@@ -37,6 +37,14 @@ export function setCurrentStage(db: DB, eventId: string, setId: string | null) {
   return currentStage(db, eventId);
 }
 
+/** Ids of the teams placed in the current stage, or null when no stage is picked (then every team counts). */
+export function stageTeamIds(db: DB, eventId: string): string[] | null {
+  const stage = currentStage(db, eventId);
+  if (!stage) return null;
+  return (db.prepare(`SELECT x.team_id AS teamId FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id
+    WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id) as { teamId: string }[]).map((r) => r.teamId);
+}
+
 type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: string | null } | undefined | null;
 const img = (a: Asset) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 const yes = (b: boolean) => (b ? 'Yes' : '');

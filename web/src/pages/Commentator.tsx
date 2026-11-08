@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
 import { cx, Empty, ErrorBox, Loading, todayIn } from '../components/ui';
+import { useStage } from '../components/StagePicker';
 
 const LS_KEY = 'commentator.v1';
 function loadPrefs(): { setId?: string; fleetId?: string } {
@@ -20,12 +21,13 @@ export function CommentatorPage() {
   const tz = meta.data?.event.timezone ?? 'UTC';
   const day = todayIn(tz);
   const prefs = useMemo(loadPrefs, []);
-  const [setId, setSetId] = useState(prefs.setId ?? '');
+  const [setId, setSetId] = useState(''); // picked on this page; otherwise the current stage, then the last one used
   const [fleetId, setFleetId] = useState(prefs.fleetId ?? '');
   const [hover, setHover] = useState<Hover | null>(null);
 
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
-  const activeSet = sets.data?.find((s) => s.id === setId)?.id ?? sets.data?.find((s) => s.assignedCount > 0)?.id ?? sets.data?.[0]?.id ?? '';
+  const stage = useStage();
+  const activeSet = sets.data?.find((s) => s.id === setId)?.id ?? stage.data?.current?.id ?? sets.data?.find((s) => s.id === prefs.setId)?.id ?? sets.data?.find((s) => s.assignedCount > 0)?.id ?? sets.data?.[0]?.id ?? '';
   const detail = useQuery({ queryKey: ['fleet-set', activeSet], queryFn: () => api.get<FleetSetDetail>(`/api/fleet-sets/${activeSet}`), enabled: !!activeSet, refetchInterval: 30_000 });
   const data = useQuery({ queryKey: ['overview', day, activeSet], queryFn: () => api.get<Overview>(`/api/overview?date=${day}&set=${activeSet}`), enabled: !!activeSet && !!meta.data, refetchInterval: 30_000 });
   const fleets = detail.data?.fleets ?? [];
