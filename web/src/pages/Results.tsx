@@ -114,10 +114,10 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
                     <td className="px-1 py-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="grid h-4 w-6 shrink-0 place-items-center overflow-hidden rounded-sm bg-ink-900">{flag && <img src={flag} alt="" className="h-full w-full object-cover" />}</span>
-                        <span className="font-mono text-xs font-bold text-ink-100">{t?.code ?? '?'}</span>
+                        <span className="w-8 shrink-0 font-mono text-xs font-bold text-ink-100">{t?.code ?? '?'}</span>
+                        {t ? <TeamProfileLink teamId={t.id} name={t.name} /> : <span className="w-5" />}
                         <span className="truncate text-ink-300">{t?.name ?? 'Unknown team'}</span>
                         {t?.ranking && <span className="text-[10px] text-ink-500">[{t.ranking}]</span>}
-                        {t && <TeamProfileLink teamId={t.id} name={t.name} />}
                       </div>
                     </td>
                     {r.races.map((v, j) => (

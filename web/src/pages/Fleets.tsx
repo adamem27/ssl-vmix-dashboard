@@ -298,9 +298,9 @@ function TeamChip({ team, compact, overlay }: { team?: Team; compact?: boolean; 
         {team.thumb?.previewUrl && <img src={team.thumb.previewUrl} alt="" className="max-h-full max-w-full object-contain" />}
       </span>
       <span className="w-10 shrink-0 font-mono text-xs text-ink-400">{team.code}</span>
+      {!overlay && <TeamProfileLink teamId={team.id} name={team.name} className="-ml-1" />}
       <span className="truncate text-sm font-medium">{team.name}</span>
       {team.isDemo && !compact && <Badge tone="demo">Demo</Badge>}
-      {!overlay && <TeamProfileLink teamId={team.id} name={team.name} className="ml-auto" />}
     </div>
   );
 }
