@@ -7,15 +7,19 @@ import { applyGoldCupOnStart } from './services/presets.js';
 import { GeneratorExporter, seedGenerator } from './services/generator/generator.js';
 import { applyTeamGraphicsOnStart } from './services/teamGraphics.js';
 import { rankingOnStart } from './services/ranking.js';
+import { MatchboardExporter, seedHighlightTemplate } from './services/matchboard/matchboard.js';
+import { createTemplate } from './services/generator/generator.js';
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
 const workbook = new WorkbookWriter({ db, assetsDir: config.assetsDir }, config.workbookFile, (m) => app.log.warn(m));
 const generator = new GeneratorExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
-const app = await buildApp({ db, generator, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
+const matchboard = new MatchboardExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
+const app = await buildApp({ db, generator, matchboard, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset)
     app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
 seedGenerator(db);
+seedHighlightTemplate(db, (t) => createTemplate(db, t));
 const graphics = applyTeamGraphicsOnStart({ db, assetsDir: config.assetsDir });
 if (graphics)
     app.log.info(`Team flags and emblems applied: ${JSON.stringify(graphics)}`);
@@ -23,6 +27,7 @@ sync.start();
 const stopRanking = rankingOnStart(db, (m) => app.log.info(m));
 workbook.start();
 generator.start();
+matchboard.schedule(2000);
 await app.listen({ host: config.host, port: config.port });
 app.log.info(`Database: ${config.dbPath}`);
 app.log.info(`Assets folder: ${config.assetsDir}`);
@@ -34,6 +39,7 @@ const shutdown = async () => {
     stopRanking();
     workbook.stop();
     generator.stop();
+    matchboard.stop();
     await app.close();
     db.close();
     process.exit(0);

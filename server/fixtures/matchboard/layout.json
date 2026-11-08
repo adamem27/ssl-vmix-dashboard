@@ -1,0 +1,2350 @@
+{
+ "width": 1920,
+ "height": 1080,
+ "sections": [
+  {
+   "id": "titles",
+   "kind": "titles",
+   "title": "Titles"
+  },
+  {
+   "id": "region-asia",
+   "kind": "qualifying",
+   "title": "Asia"
+  },
+  {
+   "id": "region-africa-oceania",
+   "kind": "qualifying",
+   "title": "Africa & Oceania"
+  },
+  {
+   "id": "region-europe",
+   "kind": "qualifying",
+   "title": "Europe"
+  },
+  {
+   "id": "region-pan-america",
+   "kind": "qualifying",
+   "title": "Pan-America"
+  },
+  {
+   "id": "stage-1-32-finals",
+   "kind": "final",
+   "title": "1/32 Finals"
+  },
+  {
+   "id": "stage-1-16-finals",
+   "kind": "final",
+   "title": "1/16 Finals"
+  },
+  {
+   "id": "stage-1-8-finals",
+   "kind": "final",
+   "title": "1/8 Finals"
+  },
+  {
+   "id": "stage-quarterfinals",
+   "kind": "final",
+   "title": "Quarterfinals"
+  },
+  {
+   "id": "stage-semifinals",
+   "kind": "final",
+   "title": "Semifinals"
+  },
+  {
+   "id": "stage-final",
+   "kind": "final",
+   "title": "Final"
+  }
+ ],
+ "texts": [
+  {
+   "id": "qualifying-series",
+   "label": "Qualifying Series title",
+   "section": "titles",
+   "text": "Qualifying Series",
+   "x": 552.0,
+   "baseline": 143.6,
+   "size": 22.3,
+   "color": "#4e5c7c",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "final-series",
+   "label": "Final Series title",
+   "section": "titles",
+   "text": "Final Series",
+   "x": 1256.3,
+   "baseline": 143.6,
+   "size": 22.3,
+   "color": "#4e5c7c",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "draw-note",
+   "label": "Draw label",
+   "section": "titles",
+   "text": "DRAW*",
+   "x": 784.5,
+   "baseline": 575.5,
+   "size": 13.0,
+   "color": "#4e5c7c",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "region-asia-name",
+   "label": "Name",
+   "section": "region-asia",
+   "text": "Asia",
+   "x": 377.8,
+   "baseline": 212.3,
+   "size": 18.6,
+   "color": "#ffffff",
+   "align": "left",
+   "weight": 600
+  },
+  {
+   "id": "region-asia-date",
+   "label": "Dates & place",
+   "section": "region-asia",
+   "text": "DEC '25 I THAILAND",
+   "x": 726.1,
+   "baseline": 212.3,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "right",
+   "weight": 500
+  },
+  {
+   "id": "region-africa-oceania-name",
+   "label": "Name",
+   "section": "region-africa-oceania",
+   "text": "Africa & Oceania",
+   "x": 377.8,
+   "baseline": 405.7,
+   "size": 18.6,
+   "color": "#ffffff",
+   "align": "left",
+   "weight": 600
+  },
+  {
+   "id": "region-africa-oceania-date",
+   "label": "Dates & place",
+   "section": "region-africa-oceania",
+   "text": "2-4 JUN '26 I SWITZERLAND",
+   "x": 726.1,
+   "baseline": 405.7,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "right",
+   "weight": 500
+  },
+  {
+   "id": "region-europe-name",
+   "label": "Name",
+   "section": "region-europe",
+   "text": "Europe",
+   "x": 377.8,
+   "baseline": 601.0,
+   "size": 18.6,
+   "color": "#ffffff",
+   "align": "left",
+   "weight": 600
+  },
+  {
+   "id": "region-europe-date",
+   "label": "Dates & place",
+   "section": "region-europe",
+   "text": "8-11 JUN & 14-17 JUL '26 I SWITZERLAND",
+   "x": 726.1,
+   "baseline": 601.0,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "right",
+   "weight": 500
+  },
+  {
+   "id": "region-pan-america-name",
+   "label": "Name",
+   "section": "region-pan-america",
+   "text": "Pan-America",
+   "x": 377.8,
+   "baseline": 796.2,
+   "size": 18.6,
+   "color": "#ffffff",
+   "align": "left",
+   "weight": 600
+  },
+  {
+   "id": "region-pan-america-date",
+   "label": "Dates & place",
+   "section": "region-pan-america",
+   "text": "12 - 16 NOV '26 I BRAZIL",
+   "x": 726.1,
+   "baseline": 796.2,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "right",
+   "weight": 500
+  },
+  {
+   "id": "stage-quarterfinals-name",
+   "label": "Name",
+   "section": "stage-quarterfinals",
+   "text": "Quarterfinals",
+   "x": 1325.4,
+   "baseline": 206.1,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-quarterfinals-date",
+   "label": "Dates",
+   "section": "stage-quarterfinals",
+   "text": "07 - 10 DEC",
+   "x": 1325.4,
+   "baseline": 223.6,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "stage-semifinals-name",
+   "label": "Name",
+   "section": "stage-semifinals",
+   "text": "Semifinals",
+   "x": 1474.8,
+   "baseline": 206.1,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-semifinals-date",
+   "label": "Dates",
+   "section": "stage-semifinals",
+   "text": "12 DEC",
+   "x": 1474.8,
+   "baseline": 223.6,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "stage-final-name",
+   "label": "Name",
+   "section": "stage-final",
+   "text": "Final",
+   "x": 1629.8,
+   "baseline": 206.1,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-final-date",
+   "label": "Dates",
+   "section": "stage-final",
+   "text": "13 DEC",
+   "x": 1629.8,
+   "baseline": 223.6,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "stage-1-32-finals-name",
+   "label": "Name",
+   "section": "stage-1-32-finals",
+   "text": "1/32 Finals",
+   "x": 877.2,
+   "baseline": 206.3,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-1-32-finals-date",
+   "label": "Dates",
+   "section": "stage-1-32-finals",
+   "text": "19 - 22 NOV",
+   "x": 879.8,
+   "baseline": 224.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "stage-1-16-finals-name",
+   "label": "Name",
+   "section": "stage-1-16-finals",
+   "text": "1/16 Finals",
+   "x": 1024.0,
+   "baseline": 206.3,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-1-16-finals-date",
+   "label": "Dates",
+   "section": "stage-1-16-finals",
+   "text": "26 - 29 NOV",
+   "x": 1026.7,
+   "baseline": 224.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "stage-1-8-finals-name",
+   "label": "Name",
+   "section": "stage-1-8-finals",
+   "text": "1/8 Finals",
+   "x": 1176.1,
+   "baseline": 206.3,
+   "size": 14.9,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "stage-1-8-finals-date",
+   "label": "Dates",
+   "section": "stage-1-8-finals",
+   "text": "02 - 05 DEC",
+   "x": 1176.0,
+   "baseline": 224.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 500
+  },
+  {
+   "id": "qs-a-label",
+   "label": "Label",
+   "section": "region-asia",
+   "text": "QS A",
+   "x": 417.4,
+   "baseline": 242.5,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-b-label",
+   "label": "Label",
+   "section": "region-asia",
+   "text": "QS B",
+   "x": 507.1,
+   "baseline": 242.5,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r1-a-label",
+   "label": "Label",
+   "section": "stage-1-32-finals",
+   "text": "R1 A",
+   "x": 877.3,
+   "baseline": 282.1,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r2-a-label",
+   "label": "Label",
+   "section": "stage-1-16-finals",
+   "text": "R2 A",
+   "x": 1026.7,
+   "baseline": 292.7,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "ef-a-label",
+   "label": "Label",
+   "section": "stage-1-8-finals",
+   "text": "EF A",
+   "x": 1176.1,
+   "baseline": 303.2,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qf-a-label",
+   "label": "Label",
+   "section": "stage-quarterfinals",
+   "text": "QF A",
+   "x": 1325.5,
+   "baseline": 313.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-c-label",
+   "label": "Label",
+   "section": "region-africa-oceania",
+   "text": "QS C",
+   "x": 417.4,
+   "baseline": 436.0,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r1-b-label",
+   "label": "Label",
+   "section": "stage-1-32-finals",
+   "text": "R1 B",
+   "x": 877.2,
+   "baseline": 454.5,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r2-b-label",
+   "label": "Label",
+   "section": "stage-1-16-finals",
+   "text": "R2 B",
+   "x": 1026.7,
+   "baseline": 458.0,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "ef-b-label",
+   "label": "Label",
+   "section": "stage-1-8-finals",
+   "text": "EF B",
+   "x": 1176.1,
+   "baseline": 461.5,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qf-b-label",
+   "label": "Label",
+   "section": "stage-quarterfinals",
+   "text": "QF B",
+   "x": 1325.5,
+   "baseline": 465.0,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "sf-a-label",
+   "label": "Label",
+   "section": "stage-semifinals",
+   "text": "SF A",
+   "x": 1474.9,
+   "baseline": 469.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "final-label",
+   "label": "Label",
+   "section": "stage-final",
+   "text": "FINAL",
+   "x": 1629.8,
+   "baseline": 524.2,
+   "size": 12.8,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "sf-b-label",
+   "label": "Label",
+   "section": "stage-semifinals",
+   "text": "SF B",
+   "x": 1474.8,
+   "baseline": 614.5,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qf-c-label",
+   "label": "Label",
+   "section": "stage-quarterfinals",
+   "text": "QF C",
+   "x": 1325.5,
+   "baseline": 616.3,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "ef-c-label",
+   "label": "Label",
+   "section": "stage-1-8-finals",
+   "text": "EF C",
+   "x": 1176.1,
+   "baseline": 619.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r2-c-label",
+   "label": "Label",
+   "section": "stage-1-16-finals",
+   "text": "R2 C",
+   "x": 1026.7,
+   "baseline": 623.3,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r1-c-label",
+   "label": "Label",
+   "section": "stage-1-32-finals",
+   "text": "R1 C",
+   "x": 877.3,
+   "baseline": 626.9,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-d-label",
+   "label": "Label",
+   "section": "region-europe",
+   "text": "QS D",
+   "x": 417.4,
+   "baseline": 633.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-e-label",
+   "label": "Label",
+   "section": "region-europe",
+   "text": "QS E",
+   "x": 507.1,
+   "baseline": 633.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-f-label",
+   "label": "Label",
+   "section": "region-europe",
+   "text": "QS F",
+   "x": 596.8,
+   "baseline": 633.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-g-label",
+   "label": "Label",
+   "section": "region-europe",
+   "text": "QS G",
+   "x": 686.5,
+   "baseline": 633.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "petit-f-label",
+   "label": "Label",
+   "section": "stage-final",
+   "text": "PETIT F.",
+   "x": 1629.8,
+   "baseline": 692.8,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qf-d-label",
+   "label": "Label",
+   "section": "stage-quarterfinals",
+   "text": "QF D",
+   "x": 1325.4,
+   "baseline": 767.6,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "ef-d-label",
+   "label": "Label",
+   "section": "stage-1-8-finals",
+   "text": "EF D",
+   "x": 1176.0,
+   "baseline": 778.1,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r2-d-label",
+   "label": "Label",
+   "section": "stage-1-16-finals",
+   "text": "R2 D",
+   "x": 1026.7,
+   "baseline": 788.7,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "r1-d-label",
+   "label": "Label",
+   "section": "stage-1-32-finals",
+   "text": "R1 D",
+   "x": 877.3,
+   "baseline": 799.2,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-h-label",
+   "label": "Label",
+   "section": "region-pan-america",
+   "text": "QS H",
+   "x": 417.4,
+   "baseline": 826.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  },
+  {
+   "id": "qs-i-label",
+   "label": "Label",
+   "section": "region-pan-america",
+   "text": "QS I",
+   "x": 507.1,
+   "baseline": 826.4,
+   "size": 11.2,
+   "color": "#ffffff",
+   "align": "center",
+   "weight": 600
+  }
+ ],
+ "groups": [
+  {
+   "id": "qs-a",
+   "section": "region-asia",
+   "labelId": "qs-a-label",
+   "slots": [
+    "qs-a-1",
+    "qs-a-2",
+    "qs-a-3",
+    "qs-a-4"
+   ]
+  },
+  {
+   "id": "qs-b",
+   "section": "region-asia",
+   "labelId": "qs-b-label",
+   "slots": [
+    "qs-b-1",
+    "qs-b-2",
+    "qs-b-3"
+   ]
+  },
+  {
+   "id": "qs-c",
+   "section": "region-africa-oceania",
+   "labelId": "qs-c-label",
+   "slots": [
+    "qs-c-1",
+    "qs-c-2",
+    "qs-c-3",
+    "qs-c-4"
+   ]
+  },
+  {
+   "id": "qs-d",
+   "section": "region-europe",
+   "labelId": "qs-d-label",
+   "slots": [
+    "qs-d-1",
+    "qs-d-2",
+    "qs-d-3"
+   ]
+  },
+  {
+   "id": "qs-e",
+   "section": "region-europe",
+   "labelId": "qs-e-label",
+   "slots": [
+    "qs-e-1",
+    "qs-e-2",
+    "qs-e-3",
+    "qs-e-4"
+   ]
+  },
+  {
+   "id": "qs-f",
+   "section": "region-europe",
+   "labelId": "qs-f-label",
+   "slots": [
+    "qs-f-1",
+    "qs-f-2",
+    "qs-f-3"
+   ]
+  },
+  {
+   "id": "qs-g",
+   "section": "region-europe",
+   "labelId": "qs-g-label",
+   "slots": [
+    "qs-g-1",
+    "qs-g-2",
+    "qs-g-3"
+   ]
+  },
+  {
+   "id": "qs-h",
+   "section": "region-pan-america",
+   "labelId": "qs-h-label",
+   "slots": [
+    "qs-h-1",
+    "qs-h-2",
+    "qs-h-3",
+    "qs-h-4"
+   ]
+  },
+  {
+   "id": "qs-i",
+   "section": "region-pan-america",
+   "labelId": "qs-i-label",
+   "slots": [
+    "qs-i-1",
+    "qs-i-2",
+    "qs-i-3",
+    "qs-i-4"
+   ]
+  },
+  {
+   "id": "r1-a",
+   "section": "stage-1-32-finals",
+   "labelId": "r1-a-label",
+   "slots": [
+    "r1-a-1",
+    "r1-a-2",
+    "r1-a-3",
+    "r1-a-4"
+   ]
+  },
+  {
+   "id": "r1-b",
+   "section": "stage-1-32-finals",
+   "labelId": "r1-b-label",
+   "slots": [
+    "r1-b-1",
+    "r1-b-2",
+    "r1-b-3",
+    "r1-b-4"
+   ]
+  },
+  {
+   "id": "r1-c",
+   "section": "stage-1-32-finals",
+   "labelId": "r1-c-label",
+   "slots": [
+    "r1-c-1",
+    "r1-c-2",
+    "r1-c-3",
+    "r1-c-4"
+   ]
+  },
+  {
+   "id": "r1-d",
+   "section": "stage-1-32-finals",
+   "labelId": "r1-d-label",
+   "slots": [
+    "r1-d-1",
+    "r1-d-2",
+    "r1-d-3",
+    "r1-d-4"
+   ]
+  },
+  {
+   "id": "r2-a",
+   "section": "stage-1-16-finals",
+   "labelId": "r2-a-label",
+   "slots": [
+    "r2-a-1",
+    "r2-a-2",
+    "r2-a-3",
+    "r2-a-4"
+   ]
+  },
+  {
+   "id": "r2-b",
+   "section": "stage-1-16-finals",
+   "labelId": "r2-b-label",
+   "slots": [
+    "r2-b-1",
+    "r2-b-2",
+    "r2-b-3",
+    "r2-b-4"
+   ]
+  },
+  {
+   "id": "r2-c",
+   "section": "stage-1-16-finals",
+   "labelId": "r2-c-label",
+   "slots": [
+    "r2-c-1",
+    "r2-c-2",
+    "r2-c-3",
+    "r2-c-4"
+   ]
+  },
+  {
+   "id": "r2-d",
+   "section": "stage-1-16-finals",
+   "labelId": "r2-d-label",
+   "slots": [
+    "r2-d-1",
+    "r2-d-2",
+    "r2-d-3",
+    "r2-d-4"
+   ]
+  },
+  {
+   "id": "ef-a",
+   "section": "stage-1-8-finals",
+   "labelId": "ef-a-label",
+   "slots": [
+    "ef-a-1",
+    "ef-a-2",
+    "ef-a-3",
+    "ef-a-4"
+   ]
+  },
+  {
+   "id": "ef-b",
+   "section": "stage-1-8-finals",
+   "labelId": "ef-b-label",
+   "slots": [
+    "ef-b-1",
+    "ef-b-2",
+    "ef-b-3",
+    "ef-b-4"
+   ]
+  },
+  {
+   "id": "ef-c",
+   "section": "stage-1-8-finals",
+   "labelId": "ef-c-label",
+   "slots": [
+    "ef-c-1",
+    "ef-c-2",
+    "ef-c-3",
+    "ef-c-4"
+   ]
+  },
+  {
+   "id": "ef-d",
+   "section": "stage-1-8-finals",
+   "labelId": "ef-d-label",
+   "slots": [
+    "ef-d-1",
+    "ef-d-2",
+    "ef-d-3",
+    "ef-d-4"
+   ]
+  },
+  {
+   "id": "qf-a",
+   "section": "stage-quarterfinals",
+   "labelId": "qf-a-label",
+   "slots": [
+    "qf-a-1",
+    "qf-a-2",
+    "qf-a-3",
+    "qf-a-4"
+   ]
+  },
+  {
+   "id": "qf-b",
+   "section": "stage-quarterfinals",
+   "labelId": "qf-b-label",
+   "slots": [
+    "qf-b-1",
+    "qf-b-2",
+    "qf-b-3",
+    "qf-b-4"
+   ]
+  },
+  {
+   "id": "qf-c",
+   "section": "stage-quarterfinals",
+   "labelId": "qf-c-label",
+   "slots": [
+    "qf-c-1",
+    "qf-c-2",
+    "qf-c-3",
+    "qf-c-4"
+   ]
+  },
+  {
+   "id": "qf-d",
+   "section": "stage-quarterfinals",
+   "labelId": "qf-d-label",
+   "slots": [
+    "qf-d-1",
+    "qf-d-2",
+    "qf-d-3",
+    "qf-d-4"
+   ]
+  },
+  {
+   "id": "sf-a",
+   "section": "stage-semifinals",
+   "labelId": "sf-a-label",
+   "slots": [
+    "sf-a-1",
+    "sf-a-2",
+    "sf-a-3",
+    "sf-a-4"
+   ]
+  },
+  {
+   "id": "sf-b",
+   "section": "stage-semifinals",
+   "labelId": "sf-b-label",
+   "slots": [
+    "sf-b-1",
+    "sf-b-2",
+    "sf-b-3",
+    "sf-b-4"
+   ]
+  },
+  {
+   "id": "final",
+   "section": "stage-final",
+   "labelId": "final-label",
+   "slots": [
+    "final-1",
+    "final-2",
+    "final-3",
+    "final-4"
+   ]
+  },
+  {
+   "id": "petit-f",
+   "section": "stage-final",
+   "labelId": "petit-f-label",
+   "slots": [
+    "petit-f-1",
+    "petit-f-2",
+    "petit-f-3",
+    "petit-f-4"
+   ]
+  }
+ ],
+ "slots": [
+  {
+   "id": "qs-a-1",
+   "x": 377.8,
+   "y": 248.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 261.9,
+   "baseline": 266.9,
+   "size": 13.0,
+   "team": "PHI",
+   "text": ""
+  },
+  {
+   "id": "qs-a-2",
+   "x": 377.8,
+   "y": 275.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 288.3,
+   "baseline": 293.3,
+   "size": 13.0,
+   "team": "MYA",
+   "text": ""
+  },
+  {
+   "id": "qs-a-3",
+   "x": 377.8,
+   "y": 301.5,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 314.7,
+   "baseline": 319.7,
+   "size": 13.0,
+   "team": "KOR",
+   "text": ""
+  },
+  {
+   "id": "qs-a-4",
+   "x": 377.8,
+   "y": 327.9,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 341.1,
+   "baseline": 346.1,
+   "size": 13.0,
+   "team": "VIE",
+   "text": ""
+  },
+  {
+   "id": "qs-b-1",
+   "x": 467.5,
+   "y": 248.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 261.9,
+   "baseline": 266.9,
+   "size": 13.0,
+   "team": "OMA",
+   "text": ""
+  },
+  {
+   "id": "qs-b-2",
+   "x": 467.5,
+   "y": 275.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 288.3,
+   "baseline": 293.3,
+   "size": 13.0,
+   "team": "UAE",
+   "text": ""
+  },
+  {
+   "id": "qs-b-3",
+   "x": 467.5,
+   "y": 301.5,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 314.7,
+   "baseline": 319.7,
+   "size": 13.0,
+   "team": "KAZ",
+   "text": ""
+  },
+  {
+   "id": "r1-a-1",
+   "x": 837.7,
+   "y": 288.3,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 301.5,
+   "baseline": 306.5,
+   "size": 13.0,
+   "team": "COL",
+   "text": ""
+  },
+  {
+   "id": "r1-a-2",
+   "x": 837.7,
+   "y": 314.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 327.9,
+   "baseline": 332.9,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 1"
+  },
+  {
+   "id": "r1-a-3",
+   "x": 837.7,
+   "y": 341.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 354.2,
+   "baseline": 359.2,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 2"
+  },
+  {
+   "id": "r1-a-4",
+   "x": 837.7,
+   "y": 367.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 380.6,
+   "baseline": 385.6,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 3"
+  },
+  {
+   "id": "r2-a-1",
+   "x": 987.1,
+   "y": 298.9,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 312.1,
+   "baseline": 317.1,
+   "size": 13.0,
+   "team": "HUN",
+   "text": ""
+  },
+  {
+   "id": "r2-a-2",
+   "x": 987.1,
+   "y": 325.3,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 338.5,
+   "baseline": 343.5,
+   "size": 13.0,
+   "team": "ECU",
+   "text": ""
+  },
+  {
+   "id": "r2-a-3",
+   "x": 987.1,
+   "y": 351.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 364.8,
+   "baseline": 369.8,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 C1"
+  },
+  {
+   "id": "r2-a-4",
+   "x": 987.1,
+   "y": 378.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 391.2,
+   "baseline": 396.2,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 B2"
+  },
+  {
+   "id": "ef-a-1",
+   "x": 1136.5,
+   "y": 309.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 322.6,
+   "baseline": 327.6,
+   "size": 13.0,
+   "team": "NZL",
+   "text": ""
+  },
+  {
+   "id": "ef-a-2",
+   "x": 1136.5,
+   "y": 335.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 349.0,
+   "baseline": 354.0,
+   "size": 13.0,
+   "team": "SUI",
+   "text": ""
+  },
+  {
+   "id": "ef-a-3",
+   "x": 1136.5,
+   "y": 362.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 375.3,
+   "baseline": 380.3,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 B1"
+  },
+  {
+   "id": "ef-a-4",
+   "x": 1136.5,
+   "y": 388.5,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 401.7,
+   "baseline": 406.7,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 A2"
+  },
+  {
+   "id": "qf-a-1",
+   "x": 1285.9,
+   "y": 320.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 333.2,
+   "baseline": 338.2,
+   "size": 13.0,
+   "team": "GBR",
+   "text": ""
+  },
+  {
+   "id": "qf-a-2",
+   "x": 1285.9,
+   "y": 346.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 359.6,
+   "baseline": 364.6,
+   "size": 13.0,
+   "team": "DEN",
+   "text": ""
+  },
+  {
+   "id": "qf-a-3",
+   "x": 1285.9,
+   "y": 372.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 385.9,
+   "baseline": 390.9,
+   "size": 13.0,
+   "team": null,
+   "text": "EF A1"
+  },
+  {
+   "id": "qf-a-4",
+   "x": 1285.9,
+   "y": 399.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 412.3,
+   "baseline": 417.3,
+   "size": 13.0,
+   "team": null,
+   "text": "EF D2"
+  },
+  {
+   "id": "qs-c-1",
+   "x": 377.8,
+   "y": 442.2,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 455.3,
+   "baseline": 460.3,
+   "size": 13.0,
+   "team": "TAH",
+   "text": ""
+  },
+  {
+   "id": "qs-c-2",
+   "x": 377.8,
+   "y": 468.5,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 481.6,
+   "baseline": 486.6,
+   "size": 13.0,
+   "team": "SEY",
+   "text": ""
+  },
+  {
+   "id": "qs-c-3",
+   "x": 377.8,
+   "y": 495.1,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 508.2,
+   "baseline": 513.1,
+   "size": 13.0,
+   "team": "MAR",
+   "text": ""
+  },
+  {
+   "id": "qs-c-4",
+   "x": 377.8,
+   "y": 521.4,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 534.5,
+   "baseline": 539.5,
+   "size": 13.0,
+   "team": "MOZ",
+   "text": ""
+  },
+  {
+   "id": "r1-b-1",
+   "x": 837.7,
+   "y": 460.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 473.9,
+   "baseline": 478.9,
+   "size": 13.0,
+   "team": "KOR",
+   "text": ""
+  },
+  {
+   "id": "r1-b-2",
+   "x": 837.7,
+   "y": 487.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 500.3,
+   "baseline": 505.3,
+   "size": 13.0,
+   "team": "GRE",
+   "text": ""
+  },
+  {
+   "id": "r1-b-3",
+   "x": 837.7,
+   "y": 513.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 526.6,
+   "baseline": 531.6,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 4"
+  },
+  {
+   "id": "r1-b-4",
+   "x": 837.7,
+   "y": 539.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 553.0,
+   "baseline": 558.0,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 5"
+  },
+  {
+   "id": "r2-b-1",
+   "x": 987.1,
+   "y": 464.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 477.4,
+   "baseline": 482.4,
+   "size": 13.0,
+   "team": "CHI",
+   "text": ""
+  },
+  {
+   "id": "r2-b-2",
+   "x": 987.1,
+   "y": 490.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 503.8,
+   "baseline": 508.8,
+   "size": 13.0,
+   "team": "RSA",
+   "text": ""
+  },
+  {
+   "id": "r2-b-3",
+   "x": 987.1,
+   "y": 516.9,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 530.1,
+   "baseline": 535.1,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 A1"
+  },
+  {
+   "id": "r2-b-4",
+   "x": 987.1,
+   "y": 543.3,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 556.5,
+   "baseline": 561.5,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 C2"
+  },
+  {
+   "id": "ef-b-1",
+   "x": 1136.5,
+   "y": 467.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 480.9,
+   "baseline": 485.9,
+   "size": 13.0,
+   "team": "POL",
+   "text": ""
+  },
+  {
+   "id": "ef-b-2",
+   "x": 1136.5,
+   "y": 494.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 507.3,
+   "baseline": 512.3,
+   "size": 13.0,
+   "team": "BRA",
+   "text": ""
+  },
+  {
+   "id": "ef-b-3",
+   "x": 1136.5,
+   "y": 520.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 533.6,
+   "baseline": 538.6,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 D1"
+  },
+  {
+   "id": "ef-b-4",
+   "x": 1136.5,
+   "y": 546.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 560.0,
+   "baseline": 565.0,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 B2"
+  },
+  {
+   "id": "qf-b-1",
+   "x": 1285.9,
+   "y": 471.4,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 484.5,
+   "baseline": 489.4,
+   "size": 13.0,
+   "team": "AUS",
+   "text": ""
+  },
+  {
+   "id": "qf-b-2",
+   "x": 1285.9,
+   "y": 497.7,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 510.8,
+   "baseline": 515.8,
+   "size": 13.0,
+   "team": "NED",
+   "text": ""
+  },
+  {
+   "id": "qf-b-3",
+   "x": 1285.9,
+   "y": 524.0,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 537.1,
+   "baseline": 542.1,
+   "size": 13.0,
+   "team": null,
+   "text": "EF C1"
+  },
+  {
+   "id": "qf-b-4",
+   "x": 1285.9,
+   "y": 550.4,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 563.5,
+   "baseline": 568.5,
+   "size": 13.0,
+   "team": null,
+   "text": "EF A2"
+  },
+  {
+   "id": "sf-a-1",
+   "x": 1435.3,
+   "y": 475.8,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 488.9,
+   "baseline": 493.9,
+   "size": 13.0,
+   "team": null,
+   "text": "QF A1"
+  },
+  {
+   "id": "sf-a-2",
+   "x": 1435.3,
+   "y": 502.1,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 515.2,
+   "baseline": 520.2,
+   "size": 13.0,
+   "team": null,
+   "text": "QF C1"
+  },
+  {
+   "id": "sf-a-3",
+   "x": 1435.3,
+   "y": 528.4,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 541.5,
+   "baseline": 546.5,
+   "size": 13.0,
+   "team": null,
+   "text": "QF B2"
+  },
+  {
+   "id": "sf-a-4",
+   "x": 1435.3,
+   "y": 554.8,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 567.9,
+   "baseline": 572.9,
+   "size": 13.0,
+   "team": null,
+   "text": "QF D2"
+  },
+  {
+   "id": "final-1",
+   "x": 1584.5,
+   "y": 531.3,
+   "w": 90.6,
+   "h": 30.2,
+   "cy": 546.4,
+   "baseline": 552.1,
+   "size": 14.9,
+   "team": null,
+   "text": "SF A1"
+  },
+  {
+   "id": "final-2",
+   "x": 1584.5,
+   "y": 561.5,
+   "w": 90.6,
+   "h": 30.2,
+   "cy": 576.6,
+   "baseline": 582.3,
+   "size": 14.9,
+   "team": null,
+   "text": "SF A2"
+  },
+  {
+   "id": "final-3",
+   "x": 1584.5,
+   "y": 591.6,
+   "w": 90.6,
+   "h": 30.2,
+   "cy": 606.7,
+   "baseline": 612.4,
+   "size": 14.9,
+   "team": null,
+   "text": "SF B2"
+  },
+  {
+   "id": "final-4",
+   "x": 1584.5,
+   "y": 621.8,
+   "w": 90.6,
+   "h": 30.2,
+   "cy": 636.9,
+   "baseline": 642.6,
+   "size": 14.9,
+   "team": null,
+   "text": "SF B1"
+  },
+  {
+   "id": "sf-b-1",
+   "x": 1435.3,
+   "y": 620.9,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 634.0,
+   "baseline": 638.9,
+   "size": 13.0,
+   "team": null,
+   "text": "QF C2"
+  },
+  {
+   "id": "sf-b-2",
+   "x": 1435.3,
+   "y": 647.1,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 660.3,
+   "baseline": 665.3,
+   "size": 13.0,
+   "team": null,
+   "text": "QF A2"
+  },
+  {
+   "id": "sf-b-3",
+   "x": 1435.3,
+   "y": 673.5,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 686.6,
+   "baseline": 691.6,
+   "size": 13.0,
+   "team": null,
+   "text": "QF D1"
+  },
+  {
+   "id": "sf-b-4",
+   "x": 1435.3,
+   "y": 699.9,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 713.0,
+   "baseline": 718.0,
+   "size": 13.0,
+   "team": null,
+   "text": "QF B1"
+  },
+  {
+   "id": "qf-c-1",
+   "x": 1285.9,
+   "y": 622.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 635.6,
+   "baseline": 640.6,
+   "size": 13.0,
+   "team": null,
+   "text": "EF B2"
+  },
+  {
+   "id": "qf-c-2",
+   "x": 1285.9,
+   "y": 648.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 662.0,
+   "baseline": 667.0,
+   "size": 13.0,
+   "team": null,
+   "text": "EF D1"
+  },
+  {
+   "id": "qf-c-3",
+   "x": 1285.9,
+   "y": 675.3,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 688.5,
+   "baseline": 693.5,
+   "size": 13.0,
+   "team": "ESP",
+   "text": ""
+  },
+  {
+   "id": "qf-c-4",
+   "x": 1285.9,
+   "y": 701.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 714.9,
+   "baseline": 719.9,
+   "size": 13.0,
+   "team": "ITA",
+   "text": ""
+  },
+  {
+   "id": "ef-c-1",
+   "x": 1136.5,
+   "y": 625.9,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 639.1,
+   "baseline": 644.1,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 C2"
+  },
+  {
+   "id": "ef-c-2",
+   "x": 1136.5,
+   "y": 652.3,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 665.5,
+   "baseline": 670.5,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 A1"
+  },
+  {
+   "id": "ef-c-3",
+   "x": 1136.5,
+   "y": 678.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 692.0,
+   "baseline": 697.0,
+   "size": 13.0,
+   "team": "CAN",
+   "text": ""
+  },
+  {
+   "id": "ef-c-4",
+   "x": 1136.5,
+   "y": 705.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 718.4,
+   "baseline": 723.4,
+   "size": 13.0,
+   "team": "SWE",
+   "text": ""
+  },
+  {
+   "id": "r2-c-1",
+   "x": 987.1,
+   "y": 629.6,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 642.7,
+   "baseline": 647.7,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 D2"
+  },
+  {
+   "id": "r2-c-2",
+   "x": 987.1,
+   "y": 655.9,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 669.0,
+   "baseline": 674.0,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 B1"
+  },
+  {
+   "id": "r2-c-3",
+   "x": 987.1,
+   "y": 682.4,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 695.5,
+   "baseline": 700.5,
+   "size": 13.0,
+   "team": "THA",
+   "text": ""
+  },
+  {
+   "id": "r2-c-4",
+   "x": 987.1,
+   "y": 708.8,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 721.9,
+   "baseline": 726.9,
+   "size": 13.0,
+   "team": "JPN",
+   "text": ""
+  },
+  {
+   "id": "r1-c-1",
+   "x": 837.7,
+   "y": 633.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 646.2,
+   "baseline": 651.2,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 6"
+  },
+  {
+   "id": "r1-c-2",
+   "x": 837.7,
+   "y": 659.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 672.6,
+   "baseline": 677.6,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 7"
+  },
+  {
+   "id": "r1-c-3",
+   "x": 837.7,
+   "y": 685.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 699.0,
+   "baseline": 704.0,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 8"
+  },
+  {
+   "id": "r1-c-4",
+   "x": 837.7,
+   "y": 712.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 725.4,
+   "baseline": 730.4,
+   "size": 13.0,
+   "team": "MAS",
+   "text": ""
+  },
+  {
+   "id": "qs-d-1",
+   "x": 377.8,
+   "y": 640.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 653.2,
+   "baseline": 658.2,
+   "size": 13.0,
+   "team": "EST",
+   "text": ""
+  },
+  {
+   "id": "qs-d-2",
+   "x": 377.8,
+   "y": 666.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 679.6,
+   "baseline": 684.6,
+   "size": 13.0,
+   "team": "AUT",
+   "text": ""
+  },
+  {
+   "id": "qs-d-3",
+   "x": 377.8,
+   "y": 692.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 706.0,
+   "baseline": 711.0,
+   "size": 13.0,
+   "team": "SLO",
+   "text": ""
+  },
+  {
+   "id": "qs-e-1",
+   "x": 467.5,
+   "y": 640.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 653.2,
+   "baseline": 658.2,
+   "size": 13.0,
+   "team": "LTU",
+   "text": ""
+  },
+  {
+   "id": "qs-e-2",
+   "x": 467.5,
+   "y": 666.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 679.6,
+   "baseline": 684.6,
+   "size": 13.0,
+   "team": "NOR",
+   "text": ""
+  },
+  {
+   "id": "qs-e-3",
+   "x": 467.5,
+   "y": 692.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 706.0,
+   "baseline": 711.0,
+   "size": 13.0,
+   "team": "BEL",
+   "text": ""
+  },
+  {
+   "id": "qs-e-4",
+   "x": 467.5,
+   "y": 719.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 732.4,
+   "baseline": 737.4,
+   "size": 13.0,
+   "team": "SRB",
+   "text": ""
+  },
+  {
+   "id": "qs-f-1",
+   "x": 557.2,
+   "y": 640.1,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 653.3,
+   "baseline": 658.2,
+   "size": 13.0,
+   "team": "UKR",
+   "text": ""
+  },
+  {
+   "id": "qs-f-2",
+   "x": 557.2,
+   "y": 666.5,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 679.6,
+   "baseline": 684.6,
+   "size": 13.0,
+   "team": "FIN",
+   "text": ""
+  },
+  {
+   "id": "qs-f-3",
+   "x": 557.2,
+   "y": 692.9,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 706.0,
+   "baseline": 711.0,
+   "size": 13.0,
+   "team": "GRE",
+   "text": ""
+  },
+  {
+   "id": "qs-g-1",
+   "x": 646.9,
+   "y": 640.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 653.2,
+   "baseline": 658.2,
+   "size": 13.0,
+   "team": "POR",
+   "text": ""
+  },
+  {
+   "id": "qs-g-2",
+   "x": 646.9,
+   "y": 666.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 679.6,
+   "baseline": 684.6,
+   "size": 13.0,
+   "team": "TUR",
+   "text": ""
+  },
+  {
+   "id": "qs-g-3",
+   "x": 646.9,
+   "y": 692.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 706.0,
+   "baseline": 711.0,
+   "size": 13.0,
+   "team": "BUL",
+   "text": ""
+  },
+  {
+   "id": "petit-f-1",
+   "x": 1590.2,
+   "y": 699.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 712.2,
+   "baseline": 717.2,
+   "size": 13.0,
+   "team": null,
+   "text": "SF A3"
+  },
+  {
+   "id": "petit-f-2",
+   "x": 1590.2,
+   "y": 725.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 738.6,
+   "baseline": 743.6,
+   "size": 13.0,
+   "team": null,
+   "text": "SF A4"
+  },
+  {
+   "id": "petit-f-3",
+   "x": 1590.2,
+   "y": 751.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 764.9,
+   "baseline": 769.9,
+   "size": 13.0,
+   "team": null,
+   "text": "SF B4"
+  },
+  {
+   "id": "petit-f-4",
+   "x": 1590.2,
+   "y": 778.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 791.2,
+   "baseline": 796.2,
+   "size": 13.0,
+   "team": null,
+   "text": "SF B3"
+  },
+  {
+   "id": "qf-d-1",
+   "x": 1285.9,
+   "y": 773.7,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 786.9,
+   "baseline": 791.9,
+   "size": 13.0,
+   "team": null,
+   "text": "EF C2"
+  },
+  {
+   "id": "qf-d-2",
+   "x": 1285.9,
+   "y": 800.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 813.3,
+   "baseline": 818.3,
+   "size": 13.0,
+   "team": null,
+   "text": "EF B1"
+  },
+  {
+   "id": "qf-d-3",
+   "x": 1285.9,
+   "y": 826.5,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 839.7,
+   "baseline": 844.7,
+   "size": 13.0,
+   "team": "GER",
+   "text": ""
+  },
+  {
+   "id": "qf-d-4",
+   "x": 1285.9,
+   "y": 852.9,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 866.1,
+   "baseline": 871.1,
+   "size": 13.0,
+   "team": "USA",
+   "text": ""
+  },
+  {
+   "id": "ef-d-1",
+   "x": 1136.5,
+   "y": 784.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 797.4,
+   "baseline": 802.4,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 D2"
+  },
+  {
+   "id": "ef-d-2",
+   "x": 1136.5,
+   "y": 810.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 823.8,
+   "baseline": 828.8,
+   "size": 13.0,
+   "team": null,
+   "text": "R2 C1"
+  },
+  {
+   "id": "ef-d-3",
+   "x": 1136.5,
+   "y": 837.1,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 850.3,
+   "baseline": 855.3,
+   "size": 13.0,
+   "team": "ARG",
+   "text": ""
+  },
+  {
+   "id": "ef-d-4",
+   "x": 1136.5,
+   "y": 863.5,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 876.7,
+   "baseline": 881.7,
+   "size": 13.0,
+   "team": "FRA",
+   "text": ""
+  },
+  {
+   "id": "r2-d-1",
+   "x": 987.1,
+   "y": 794.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 808.0,
+   "baseline": 813.0,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 A2"
+  },
+  {
+   "id": "r2-d-2",
+   "x": 987.1,
+   "y": 821.2,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 834.4,
+   "baseline": 839.4,
+   "size": 13.0,
+   "team": null,
+   "text": "R1 D1"
+  },
+  {
+   "id": "r2-d-3",
+   "x": 987.1,
+   "y": 847.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 860.8,
+   "baseline": 865.8,
+   "size": 13.0,
+   "team": "PER",
+   "text": ""
+  },
+  {
+   "id": "r2-d-4",
+   "x": 987.1,
+   "y": 874.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 887.2,
+   "baseline": 892.2,
+   "size": 13.0,
+   "team": "CZE",
+   "text": ""
+  },
+  {
+   "id": "r1-d-1",
+   "x": 837.7,
+   "y": 805.5,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 818.6,
+   "baseline": 823.5,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 9"
+  },
+  {
+   "id": "r1-d-2",
+   "x": 837.7,
+   "y": 831.8,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 844.9,
+   "baseline": 849.9,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 10"
+  },
+  {
+   "id": "r1-d-3",
+   "x": 837.7,
+   "y": 858.2,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 871.4,
+   "baseline": 876.4,
+   "size": 13.0,
+   "team": null,
+   "text": "DRAW 11"
+  },
+  {
+   "id": "r1-d-4",
+   "x": 837.7,
+   "y": 884.6,
+   "w": 79.1,
+   "h": 26.3,
+   "cy": 897.8,
+   "baseline": 902.8,
+   "size": 13.0,
+   "team": "SGP",
+   "text": ""
+  },
+  {
+   "id": "qs-h-1",
+   "x": 377.8,
+   "y": 832.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 845.8,
+   "baseline": 850.8,
+   "size": 13.0,
+   "team": "URU",
+   "text": ""
+  },
+  {
+   "id": "qs-h-2",
+   "x": 377.8,
+   "y": 859.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 872.2,
+   "baseline": 877.2,
+   "size": 13.0,
+   "team": "PUR",
+   "text": ""
+  },
+  {
+   "id": "qs-h-3",
+   "x": 377.8,
+   "y": 885.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 898.6,
+   "baseline": 903.6,
+   "size": 13.0,
+   "team": "VEN",
+   "text": ""
+  },
+  {
+   "id": "qs-h-4",
+   "x": 377.8,
+   "y": 911.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 925.0,
+   "baseline": 930.0,
+   "size": 13.0,
+   "team": "ANT",
+   "text": ""
+  },
+  {
+   "id": "qs-i-1",
+   "x": 467.5,
+   "y": 832.6,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 845.8,
+   "baseline": 850.8,
+   "size": 13.0,
+   "team": "BER",
+   "text": ""
+  },
+  {
+   "id": "qs-i-2",
+   "x": 467.5,
+   "y": 859.0,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 872.2,
+   "baseline": 877.2,
+   "size": 13.0,
+   "team": "MEX",
+   "text": ""
+  },
+  {
+   "id": "qs-i-3",
+   "x": 467.5,
+   "y": 885.4,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 898.6,
+   "baseline": 903.6,
+   "size": 13.0,
+   "team": "CUB",
+   "text": ""
+  },
+  {
+   "id": "qs-i-4",
+   "x": 467.5,
+   "y": 911.8,
+   "w": 79.1,
+   "h": 26.4,
+   "cy": 925.0,
+   "baseline": 930.0,
+   "size": 13.0,
+   "team": "ESA",
+   "text": ""
+  }
+ ]
+}
