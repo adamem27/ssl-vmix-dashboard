@@ -1,0 +1,199 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { buildApp } from '../src/app.js';
+import { GtzipService, loadPackage, resourcePart, savePackage } from '../src/services/gtzip/gtzip.js';
+import { allNames, duplicate, elements, GtNode, parseXml, remove, renameElement, serializeXml, storyboards } from '../src/services/gtzip/model.js';
+import { zipStore } from '../src/services/xlsx.js';
+import { setup } from './helpers.js';
+
+// 1×1 transparent PNG
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+const FLAG = 'aaaaaaaa-0000-0000-0000-000000000001\\FLAG_BRN.png';
+const PART = 'bbbbbbbb-0000-0000-0000-000000000001';
+
+const DOC = `<?xml version="1.0" encoding="utf-16"?>
+<Composition Width="1920" Height="1080">
+  <Layer Name="BAR 1" Dimensions="1920,1080,0" Location="0,25,0">
+    <Layer.Composition>
+      <Composition Width="1920" Height="1080">
+        <Image Name="Image1" Dimensions="930,60,0" Location="493.5,527,0">
+          <Image.Bitmap>
+            <Bitmap Source="${FLAG}" />
+          </Image.Bitmap>
+        </Image>
+        <TextBlock Name="RACE 1" Dimensions="95,38,0" Location="1291,535,0" Text="RACE&#xD;&#xA;1" FontFamily="General Sans" FontSize="25">
+          <TextBlock.Fill>
+            <Brush Color="#FFFFFFFF" />
+          </TextBlock.Fill>
+        </TextBlock>
+        <Image Name="FLAG 2" Dimensions="48,32,0" Location="1046,540,0">
+          <Image.Mask>
+            <Mask Object="MASK" />
+          </Image.Mask>
+        </Image>
+        <Image Name="FLAG 1" Dimensions="48,32,0" Location="988,540,0" />
+        <Rectangle Name="MASK" Dimensions="48,32,0" Location="988,540,0" Radius="4,4" />
+      </Composition>
+    </Layer.Composition>
+  </Layer>
+  <TextBlock Name="TITLE" Text="DAY 1" />
+  <Storyboard>
+    <Storyboard.Animations>
+      <Fly Object="BAR 1" Delay="0.15" Duration="0.65" Interpolation="CubicEasingInOut" />
+      <Fade Object="TITLE" />
+    </Storyboard.Animations>
+  </Storyboard>
+  <Storyboard Type="DataChangeIn" DataName="FLAG 1.Source">
+    <Storyboard.Animations>
+      <Fade Object="FLAG 1" Duration="0.3" />
+    </Storyboard.Animations>
+  </Storyboard>
+</Composition>`.replace(/\n/g, '\r\n');
+
+function sampleGtzip(): Buffer {
+  const res = `<resources><resource filename="${FLAG}"><source guid="${PART}">${FLAG}</source></resource></resources>`;
+  const ct = '﻿<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml" /><Default Extension="png" ContentType="image/png" />'
+    + `<Override PartName="/${PART}" ContentType="application/octet-stream" /></Types>`;
+  return zipStore([[PART, PNG], ['resources.xml', Buffer.from(res)], ['document.xml', Buffer.from(DOC)], ['thumbnail.png', PNG], ['[Content_Types].xml', Buffer.from(ct)]]);
+}
+
+describe('gtzip model', () => {
+  it('reads and writes GT Title Designer XML byte for byte', () => {
+    const { decl, root } = parseXml(DOC);
+    expect(decl + '\r\n' + serializeXml(root, true)).toBe(DOC);
+    const buf = sampleGtzip();
+    expect(savePackage(loadPackage(buf)).equals(buf)).toBe(true);
+  });
+
+  it('round-trips real GT files when GTZIP_SAMPLES points at a folder of them', () => {
+    const dir = process.env.GTZIP_SAMPLES;
+    if (!dir || !fs.existsSync(dir)) return;
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.gtzip'))) {
+      const buf = fs.readFileSync(path.join(dir, f));
+      const p = loadPackage(buf), back = loadPackage(savePackage(p));
+      for (const n of ['document.xml', 'resources.xml', '[Content_Types].xml']) expect(back.files.get(n)!.equals(p.files.get(n)!), `${f} ${n}`).toBe(true);
+    }
+  });
+
+  it('duplicates a row with renumbered names, offsets, animations and DataChange storyboards', () => {
+    const { root } = parseXml(DOC);
+    const bar = elements(root).find((e) => e.node.attrs.Name === 'BAR 1')!;
+    const { root: r, added } = duplicate(root, [bar.path], { count: 2, dx: 0, dy: 70, delayStep: 0.05 });
+    const names = [...allNames(r)];
+    expect(names).toEqual(expect.arrayContaining(['BAR 2', 'BAR 3', 'Image2', 'Image3', 'RACE 2', 'RACE 3', 'FLAG 3', 'FLAG 4', 'FLAG 5', 'FLAG 6', 'MASK1', 'MASK2']));
+    expect(added).toHaveLength(2);
+    const bar3 = elements(r).find((e) => e.node.attrs.Name === 'BAR 3')!.node;
+    expect(bar3.attrs.Location).toBe('0,165,0');
+    // the copy's flag is masked by the copy's mask
+    const masked = elements(r).find((e) => e.node.attrs.Name === 'FLAG 4')!.node;
+    expect(masked.children[0].children[0].attrs.Object).toBe('MASK1');
+    const sbs = storyboards(r);
+    const fly = sbs[0].animations.filter((a) => a.tag === 'Fly').map((a) => [a.attrs.Object, a.attrs.Delay]);
+    expect(fly).toEqual([['BAR 1', '0.15'], ['BAR 2', '0.2'], ['BAR 3', '0.25']]);
+    expect(sbs.map((s) => s.node.attrs.DataName).filter(Boolean)).toEqual(['FLAG 1.Source', 'FLAG 3.Source', 'FLAG 5.Source']);
+    // the original is untouched
+    expect(allNames(root).has('BAR 2')).toBe(false);
+  });
+
+  it('renames with a pattern and removes with references', () => {
+    const { root } = parseXml(DOC);
+    const flag1 = elements(root).find((e) => e.node.attrs.Name === 'FLAG 1')!;
+    const { root: r } = duplicate(root, [flag1.path], { count: 1, dx: 58, dy: 0, find: 'FLAG 1', replace: 'NATION {n}', start: 7 });
+    expect(allNames(r).has('NATION 7')).toBe(true);
+    renameElement(r, 'TITLE', 'HEADLINE');
+    expect(storyboards(r)[0].animations.some((a) => a.attrs.Object === 'HEADLINE')).toBe(true);
+    expect(() => renameElement(r, 'HEADLINE', 'BAR 1')).toThrow();
+    const mask = elements(r).find((e) => e.node.attrs.Name === 'MASK')!;
+    const gone = remove(r, [mask.path, elements(r).find((e) => e.node.attrs.Name === 'FLAG 1')!.path]);
+    expect(allNames(gone).has('MASK')).toBe(false);
+    expect(elements(gone).find((e) => e.node.attrs.Name === 'FLAG 2')!.node.children).toHaveLength(0);
+    expect(storyboards(gone).some((s) => s.node.attrs.DataName === 'FLAG 1.Source')).toBe(false);
+  });
+});
+
+describe('gtzip generator API', () => {
+  async function app() {
+    const s = setup();
+    const a = await buildApp({ db: s.db, assetsDir: s.ctx.assetsDir, sync: s.sync });
+    return { ...s, app: a };
+  }
+  const upload = (file: string, buf: Buffer, url: string) => {
+    const boundary = '----gt' + Math.random().toString(16).slice(2);
+    const body = Buffer.concat([Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file}"\r\nContent-Type: application/octet-stream\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--\r\n`)]);
+    return { method: 'POST' as const, url, payload: body, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
+  };
+
+  it('generates new single files and never overwrites', async () => {
+    const { app: a, ctx } = await app();
+    const tplBuf = sampleGtzip();
+    const up = await a.inject(upload('day_schedule.gtzip', tplBuf, '/api/gtzip/templates'));
+    expect(up.statusCode).toBe(200);
+    const tpl = up.json();
+    expect(tpl.fields).toBe(5);
+    const t = (await a.inject({ url: `/api/gtzip/templates/${tpl.id}` })).json();
+    expect(t.images[FLAG]).toEqual({ embedded: true, name: 'FLAG_BRN.png' });
+
+    // edit: four bars, a new picture on the copy
+    const bar = elements(t.doc).find((e) => e.node.attrs.Name === 'BAR 1')!;
+    const { root } = duplicate(t.doc, [bar.path], { count: 3, dx: 0, dy: 70 });
+    const pic = (await a.inject(upload('logo.png', PNG, '/api/gtzip/images'))).json();
+    expect(pic.source).toMatch(/^upload:[0-9a-f]{12}-logo\.png$/);
+    const img4 = elements(root).find((e) => e.node.attrs.Name === 'Image4')!.node as GtNode;
+    img4.children[0].children[0].attrs.Source = pic.source;
+
+    const gen = await a.inject({ method: 'POST', url: '/api/gtzip/generate', payload: { templateId: tpl.id, fileName: 'Day schedule 4 races', doc: root } });
+    expect(gen.statusCode).toBe(200);
+    const out = gen.json();
+    expect(out.file).toBe('Day schedule 4 races.gtzip');
+    const file = path.join(ctx.assetsDir, 'gtzip', out.file);
+    const p = loadPackage(fs.readFileSync(file));
+    expect(allNames(p.doc).has('BAR 4')).toBe(true);
+    const src4 = elements(p.doc).find((e) => e.node.attrs.Name === 'Image4')!.node.children[0].children[0].attrs.Source;
+    expect(src4).toMatch(/^[0-9a-f-]{36}\\logo\.png$/);
+    expect(resourcePart(p, src4)).toBeTruthy();
+    expect(p.res.children).toHaveLength(2);
+    expect(p.ct.children.filter((c) => c.tag === 'Override')).toHaveLength(2);
+    const before = fs.readFileSync(file);
+
+    // same name again → 409 with a suggestion, file untouched
+    const again = await a.inject({ method: 'POST', url: '/api/gtzip/generate', payload: { templateId: tpl.id, fileName: 'day schedule 4 RACES.gtzip', doc: t.doc } });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().details.suggestion).toBe('day schedule 4 RACES (2)');
+    expect(fs.readFileSync(file).equals(before)).toBe(true);
+
+    // the template file is never modified
+    const stored = (await a.inject({ url: `/api/gtzip/templates/${tpl.id}/file` })).rawPayload;
+    expect(stored.equals(tplBuf)).toBe(true);
+
+    const list = (await a.inject({ url: '/api/gtzip' })).json();
+    expect(list.outputs.map((o: any) => o.name)).toEqual(['Day schedule 4 races']);
+    expect(list.outputs[0].templateId).toBe(tpl.id);
+    // a generated file can become a template of its own
+    const t2 = await a.inject({ method: 'POST', url: '/api/gtzip/outputs/Day schedule 4 races/to-template' });
+    expect(t2.json().elements).toBe(elements(p.doc).length);
+  });
+
+  it('rejects files that are not GT titles', async () => {
+    const { app: a } = await app();
+    expect((await a.inject(upload('x.gtzip', Buffer.from('nope'), '/api/gtzip/templates'))).statusCode).toBe(400);
+    expect((await a.inject(upload('x.gtzip', zipStore([['a.txt', Buffer.from('x')]]), '/api/gtzip/templates'))).statusCode).toBe(400);
+  });
+
+  it('renders a thumbnail', async () => {
+    const s = setup();
+    const svc = new GtzipService(s.ctx);
+    const t = svc.addTemplate(sampleGtzip(), 't.gtzip');
+    const png = await svc.renderDoc(t.id, svc.template(t.id).doc);
+    if (png) expect(png.subarray(1, 4).toString()).toBe('PNG');
+  });
+});
+
+describe('gtzip rename pattern', () => {
+  it('matches any case and keeps all-caps names all-caps', () => {
+    const { root } = parseXml(`<Composition><Image Name="HelmBG" /><Layer Name="HELM" Dimensions="10,10,0" /><Storyboard><Storyboard.Animations><Expand Object="HELM" /></Storyboard.Animations></Storyboard></Composition>`);
+    const { root: r } = duplicate(root, [[0], [1]], { count: 1, dx: 0, dy: 0, find: 'helm', replace: 'Sailor{n}', start: 10 });
+    expect([...allNames(r)]).toEqual(['HelmBG', 'Sailor10BG', 'HELM', 'SAILOR10']);
+    expect(storyboards(r)[0].animations.map((a) => a.attrs.Object)).toEqual(['HELM', 'SAILOR10']);
+  });
+});
