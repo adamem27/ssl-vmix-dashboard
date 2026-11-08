@@ -5,7 +5,7 @@ import { nameKey } from './normalize.js';
 
 export interface SailorInput {
   firstName?: string; lastName?: string; defaultPosition?: string; defaultNumber?: string;
-  bestResult1?: string; bestResult2?: string; sourceRef?: string | null;
+  bestResult1?: string; bestResult2?: string; bestResult3?: string; sourceRef?: string | null;
 }
 
 export function createSailor(db: DB, teamId: string, input: SailorInput, isDemo = false): string {
@@ -14,10 +14,10 @@ export function createSailor(db: DB, teamId: string, input: SailorInput, isDemo 
   const t = nowIso();
   const first = (input.firstName ?? '').trim();
   const last = (input.lastName ?? '').trim();
-  db.prepare(`INSERT INTO sailors (id, team_id, first_name, last_name, name_key, default_position, default_number, best_result_1, best_result_2, source_ref, is_demo, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+  db.prepare(`INSERT INTO sailors (id, team_id, first_name, last_name, name_key, default_position, default_number, best_result_1, best_result_2, best_result_3, source_ref, is_demo, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(id, teamId, first, last, nameKey(`${first} ${last}`), (input.defaultPosition ?? '').trim(), (input.defaultNumber ?? '').trim(),
-      input.bestResult1 ?? '', input.bestResult2 ?? '', input.sourceRef ?? null, isDemo ? 1 : 0, t, t);
+      input.bestResult1 ?? '', input.bestResult2 ?? '', input.bestResult3 ?? '', input.sourceRef ?? null, isDemo ? 1 : 0, t, t);
   return id;
 }
 
@@ -26,11 +26,11 @@ export function updateSailor(db: DB, id: string, input: SailorInput) {
   if (!s) throw notFound('Sailor');
   const first = input.firstName !== undefined ? input.firstName.trim() : s.first_name;
   const last = input.lastName !== undefined ? input.lastName.trim() : s.last_name;
-  db.prepare(`UPDATE sailors SET first_name = ?, last_name = ?, name_key = ?, default_position = ?, default_number = ?, best_result_1 = ?, best_result_2 = ?, source_ref = ?, updated_at = ? WHERE id = ?`)
+  db.prepare(`UPDATE sailors SET first_name = ?, last_name = ?, name_key = ?, default_position = ?, default_number = ?, best_result_1 = ?, best_result_2 = ?, best_result_3 = ?, source_ref = ?, updated_at = ? WHERE id = ?`)
     .run(first, last, nameKey(`${first} ${last}`),
       input.defaultPosition !== undefined ? input.defaultPosition.trim() : s.default_position,
       input.defaultNumber !== undefined ? input.defaultNumber.trim() : s.default_number,
-      input.bestResult1 ?? s.best_result_1, input.bestResult2 ?? s.best_result_2,
+      input.bestResult1 ?? s.best_result_1, input.bestResult2 ?? s.best_result_2, input.bestResult3 ?? s.best_result_3,
       input.sourceRef !== undefined ? input.sourceRef : s.source_ref, nowIso(), id);
 }
 
@@ -53,7 +53,7 @@ export function deleteSailor(ctx: AssetCtx, id: string) {
 export function sailorDto(ctx: AssetCtx, s: any) {
   return {
     id: s.id, teamId: s.team_id, firstName: s.first_name, lastName: s.last_name, defaultPosition: s.default_position, defaultNumber: s.default_number,
-    bestResult1: s.best_result_1, bestResult2: s.best_result_2, sourceRef: s.source_ref, isDemo: !!s.is_demo, isCaptain: !!s.is_captain, updatedAt: s.updated_at,
+    bestResult1: s.best_result_1, bestResult2: s.best_result_2, bestResult3: s.best_result_3 ?? '', sourceRef: s.source_ref, isDemo: !!s.is_demo, isCaptain: !!s.is_captain, updatedAt: s.updated_at,
     photo: listAssets(ctx, 'sailor', s.id).photo ?? null,
   };
 }

@@ -9,9 +9,9 @@ describe('SSL Fabrik crew list parser', () => {
     const w: string[] = [];
     const m = parseCrewCell('Christian Binder (W:67.00) (J-23) -->Mainsail trimmerDavid Hussl (W:81.00) (J-3) -->PitKeanu Prettner (W:75.00) (J-7) -->Bow', w);
     expect(m).toEqual([
-      { sourceName: 'Christian Binder', number: '23', position: 'Mainsail trimmer', sourceId: null },
-      { sourceName: 'David Hussl', number: '3', position: 'Pit', sourceId: null },
-      { sourceName: 'Keanu Prettner', number: '7', position: 'Bow', sourceId: null },
+      { sourceName: 'Christian Binder', number: '23', position: 'Mainsail trimmer', weight: '67.00', sourceId: null },
+      { sourceName: 'David Hussl', number: '3', position: 'Pit', weight: '81.00', sourceId: null },
+      { sourceName: 'Keanu Prettner', number: '7', position: 'Bow', weight: '75.00', sourceId: null },
     ]);
     expect(w).toEqual([]);
   });
@@ -23,7 +23,7 @@ describe('SSL Fabrik crew list parser', () => {
     ]);
   });
 
-  it('finds the table by headers, skips group rows, ignores weights, completes the year', () => {
+  it('finds the table by headers, skips group rows, keeps weights, completes the year', () => {
     const html = fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'demo-crew-list.html'), 'utf8');
     const r = parseSslFabrikCrewList(html, { year: 2026, baseUrl: 'https://example.org/list' });
     expect(r.declarations).toHaveLength(6);
@@ -32,7 +32,8 @@ describe('SSL Fabrik crew list parser', () => {
     expect(dma.postedRaw).toBe('10-06 16:38');
     expect(dma.sourceRef).toBe('https://example.org/qualify3/index.php/en/daily-weight-declaration/details/67/101');
     expect(parseSslFabrikCrewList(html, { year: 2026, baseUrl: '' }).declarations[0].sourceRef).toBeNull();
-    expect(JSON.stringify(r.declarations)).not.toContain('70.00');
+    expect(dma.totalWeight).toBe('700.00');
+    expect(dma.members[0].weight).toBe('70.00');
   });
 
   it('throws a readable error when the expected table is missing', () => {

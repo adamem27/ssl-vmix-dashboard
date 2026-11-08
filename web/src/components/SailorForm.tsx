@@ -4,7 +4,7 @@ import { api, Sailor, SailorDetail } from '../api';
 import { AssetSlot } from './AssetSlot';
 import { Button, Field, Modal, useToast } from './ui';
 
-const EMPTY = { firstName: '', lastName: '', defaultPosition: '', defaultNumber: '', bestResult1: '', bestResult2: '' };
+const EMPTY = { firstName: '', lastName: '', defaultPosition: '', defaultNumber: '', bestResult1: '', bestResult2: '', bestResult3: '' };
 
 export function SailorFields({ value, onChange }: { value: typeof EMPTY; onChange: (v: typeof EMPTY) => void }) {
   const f = (k: keyof typeof EMPTY) => ({ value: value[k], onChange: (e: { target: { value: string } }) => onChange({ ...value, [k]: e.target.value }) });
@@ -16,12 +16,13 @@ export function SailorFields({ value, onChange }: { value: typeof EMPTY; onChang
       <Field label="Number (default)" className="col-span-2"><input className="input tabular-nums" {...f('defaultNumber')} maxLength={10} placeholder="e.g. 7" /></Field>
       <Field label="Best results 1" className="col-span-6"><input className="input" {...f('bestResult1')} maxLength={500} /></Field>
       <Field label="Best results 2" className="col-span-6"><input className="input" {...f('bestResult2')} maxLength={500} /></Field>
+      <Field label="Best results 3" className="col-span-6"><input className="input" {...f('bestResult3')} maxLength={500} /></Field>
     </div>
   );
 }
 
 export function sailorToForm(s?: Sailor | null) {
-  return s ? { firstName: s.firstName, lastName: s.lastName, defaultPosition: s.defaultPosition, defaultNumber: s.defaultNumber, bestResult1: s.bestResult1, bestResult2: s.bestResult2 } : { ...EMPTY };
+  return s ? { firstName: s.firstName, lastName: s.lastName, defaultPosition: s.defaultPosition, defaultNumber: s.defaultNumber, bestResult1: s.bestResult1, bestResult2: s.bestResult2, bestResult3: s.bestResult3 ?? '' } : { ...EMPTY };
 }
 
 export function SailorFormModal({ open, onClose, teamId, sailor }: { open: boolean; onClose: () => void; teamId: string; sailor?: Sailor | null }) {

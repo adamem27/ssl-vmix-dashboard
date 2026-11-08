@@ -1,8 +1,10 @@
-/** A crew member as published by the source. Only fields the dashboard needs: no weights. */
+/** A crew member as published by the source. */
 export interface ParsedMember {
   sourceName: string;
   number: string | null;
   position: string | null;
+  /** Declared weight in kg as published (e.g. "67.00"), when the source has it. */
+  weight?: string | null;
   /** Stable person id from the source, when the source has one. */
   sourceId: string | null;
 }
@@ -15,6 +17,8 @@ export interface ParsedDeclaration {
   dateRaw: string;
   postedRaw: string | null;
   sourceRef: string | null;
+  /** The source's own crew total in kg, when published. */
+  totalWeight?: string | null;
   members: ParsedMember[];
 }
 

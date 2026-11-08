@@ -3,7 +3,7 @@ import { AssetCtx, listAssets, removeAllForOwner } from './assets.js';
 import { conflict, notFound } from './errors.js';
 import { TEAM_SLOTS } from './slots.js';
 
-export interface TeamInput { name?: string; code?: string; nickname?: string; aliases?: string[]; notes?: string }
+export interface TeamInput { name?: string; code?: string; nickname?: string; aliases?: string[]; notes?: string; ranking?: string }
 
 function cleanAliases(a: string[] | undefined) {
   return JSON.stringify([...new Set((a ?? []).map((x) => x.trim()).filter(Boolean))]);
@@ -34,6 +34,11 @@ export function updateTeam(db: DB, id: string, input: TeamInput) {
     input.nickname !== undefined ? input.nickname.trim() : cur.nickname,
     input.aliases !== undefined ? cleanAliases(input.aliases) : cur.aliases,
     input.notes ?? cur.notes, nowIso(), id);
+  // Ranking typed by the operator. Empty, or the same as the source value, goes back to the source value.
+  if (input.ranking !== undefined) {
+    const v = input.ranking.trim();
+    db.prepare('UPDATE teams SET ranking_ovr = ? WHERE id = ?').run(v && v !== (cur.ranking_src ?? '') ? v : null, id);
+  }
 }
 
 export function deleteTeam(ctx: AssetCtx, id: string) {
@@ -53,6 +58,8 @@ export function teamDto(ctx: AssetCtx, t: any) {
   try { aliases = JSON.parse(t.aliases); } catch { /* keep empty */ }
   return {
     id: t.id, name: t.name, code: t.code, nickname: t.nickname ?? '', aliases, notes: t.notes, isDemo: !!t.is_demo, updatedAt: t.updated_at,
+    ranking: t.ranking_ovr ?? t.ranking_src ?? '', rankingSource: t.ranking_src ?? null, rankingPoints: t.ranking_points_src ?? '',
+    rankingManual: t.ranking_ovr !== null && t.ranking_ovr !== undefined, rankingFetchedAt: t.ranking_fetched_at ?? null,
     assets, assetsFilled: filled, assetsTotal: TEAM_SLOTS.length,
     thumb: thumb ? { slot: thumb.slot, previewUrl: thumb.previewUrl, checkStatus: thumb.checkStatus } : null,
     sailorCount,

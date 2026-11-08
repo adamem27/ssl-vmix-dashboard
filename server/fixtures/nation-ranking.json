@@ -1,0 +1,666 @@
+{
+"source": "https://worldofsailors.com/ranking/nation",
+"snapshot": "2026-11-08",
+"rows": [
+{
+"position": 1,
+"nation": "GREAT BRITAIN",
+"points": 53
+},
+{
+"position": 2,
+"nation": "UNITED STATES",
+"points": 172
+},
+{
+"position": 3,
+"nation": "ITALY",
+"points": 241
+},
+{
+"position": 4,
+"nation": "AUSTRALIA",
+"points": 245
+},
+{
+"position": 5,
+"nation": "SPAIN",
+"points": 292
+},
+{
+"position": 6,
+"nation": "NETHERLANDS",
+"points": 313
+},
+{
+"position": 7,
+"nation": "SWEDEN",
+"points": 316
+},
+{
+"position": 8,
+"nation": "BRAZIL",
+"points": 369
+},
+{
+"position": 9,
+"nation": "GERMANY",
+"points": 394
+},
+{
+"position": 10,
+"nation": "NEW ZEALAND",
+"points": 439
+},
+{
+"position": 11,
+"nation": "FRANCE",
+"points": 486
+},
+{
+"position": 12,
+"nation": "POLAND",
+"points": 606
+},
+{
+"position": 13,
+"nation": "IRELAND",
+"points": 665
+},
+{
+"position": 14,
+"nation": "DENMARK",
+"points": 680
+},
+{
+"position": 15,
+"nation": "ARGENTINA",
+"points": 680
+},
+{
+"position": 16,
+"nation": "CANADA",
+"points": 719
+},
+{
+"position": 17,
+"nation": "NORWAY",
+"points": 723
+},
+{
+"position": 18,
+"nation": "HUNGARY",
+"points": 803
+},
+{
+"position": 19,
+"nation": "SWITZERLAND",
+"points": 1267
+},
+{
+"position": 20,
+"nation": "JAPAN",
+"points": 1325
+},
+{
+"position": 21,
+"nation": "BELGIUM",
+"points": 1749
+},
+{
+"position": 22,
+"nation": "AUSTRIA",
+"points": 1830
+},
+{
+"position": 23,
+"nation": "CZECH REPUBLIC",
+"points": 1933
+},
+{
+"position": 24,
+"nation": "CROATIA",
+"points": 2101
+},
+{
+"position": 25,
+"nation": "PORTUGAL",
+"points": 2272
+},
+{
+"position": 26,
+"nation": "CHILE",
+"points": 2705
+},
+{
+"position": 27,
+"nation": "GREECE",
+"points": 2943
+},
+{
+"position": 28,
+"nation": "TURKIYE",
+"points": 3248
+},
+{
+"position": 29,
+"nation": "HONG KONG",
+"points": 3579
+},
+{
+"position": 30,
+"nation": "UKRAINE",
+"points": 3810
+},
+{
+"position": 31,
+"nation": "SLOVENIA",
+"points": 4241
+},
+{
+"position": 32,
+"nation": "ISRAEL",
+"points": 4297
+},
+{
+"position": 33,
+"nation": "CHINA",
+"points": 4401
+},
+{
+"position": 34,
+"nation": "FINLAND",
+"points": 4726
+},
+{
+"position": 35,
+"nation": "PERU",
+"points": 4799
+},
+{
+"position": 36,
+"nation": "THAILAND",
+"points": 4849
+},
+{
+"position": 37,
+"nation": "ESTONIA",
+"points": 4851
+},
+{
+"position": 38,
+"nation": "SOUTH AFRICA",
+"points": 4902
+},
+{
+"position": 39,
+"nation": "ECUADOR",
+"points": 6322
+},
+{
+"position": 40,
+"nation": "SINGAPORE",
+"points": 6378
+},
+{
+"position": 41,
+"nation": "RUSSIAN FEDERATION",
+"points": 6757
+},
+{
+"position": 42,
+"nation": "LITHUANIA",
+"points": 7449
+},
+{
+"position": 43,
+"nation": "MONACO",
+"points": 7815
+},
+{
+"position": 44,
+"nation": "MALAYSIA",
+"points": 8901
+},
+{
+"position": 45,
+"nation": "PUERTO RICO",
+"points": 10237
+},
+{
+"position": 46,
+"nation": "COLOMBIA",
+"points": 10380
+},
+{
+"position": 47,
+"nation": "URUGUAY",
+"points": 10451
+},
+{
+"position": 48,
+"nation": "GUATEMALA",
+"points": 11453
+},
+{
+"position": 49,
+"nation": "UNITED ARAB EMIRATES",
+"points": 11660
+},
+{
+"position": 50,
+"nation": "KOREA, REPUBLIC OF",
+"points": 11704
+},
+{
+"position": 51,
+"nation": "INDIA",
+"points": 12704
+},
+{
+"position": 52,
+"nation": "BERMUDA",
+"points": 12984
+},
+{
+"position": 53,
+"nation": "MEXICO",
+"points": 13974
+},
+{
+"position": 54,
+"nation": "SERBIA",
+"points": 15810
+},
+{
+"position": 55,
+"nation": "VIRGIN ISLANDS, U.S.",
+"points": 18383
+},
+{
+"position": 56,
+"nation": "BAHAMAS",
+"points": 19153
+},
+{
+"position": 57,
+"nation": "VENEZUELA, BOLIVARIAN REPUBLIC OF",
+"points": 22157
+},
+{
+"position": 58,
+"nation": "CUBA",
+"points": 23440
+},
+{
+"position": 59,
+"nation": "LATVIA",
+"points": 24074
+},
+{
+"position": 60,
+"nation": "TAHITI",
+"points": 24944
+},
+{
+"position": 61,
+"nation": "SLOVAKIA",
+"points": 24963
+},
+{
+"position": 62,
+"nation": "OMAN",
+"points": 25447
+},
+{
+"position": 63,
+"nation": "MALTA",
+"points": 31182
+},
+{
+"position": 64,
+"nation": "MYANMAR",
+"points": 35409
+},
+{
+"position": 65,
+"nation": "PHILIPPINES",
+"points": 36073
+},
+{
+"position": 66,
+"nation": "BULGARIA",
+"points": 37775
+},
+{
+"position": 67,
+"nation": "BELARUS",
+"points": 39166
+},
+{
+"position": 68,
+"nation": "TAIWAN",
+"points": 47645
+},
+{
+"position": 69,
+"nation": "CYPRUS",
+"points": 51562
+},
+{
+"position": 70,
+"nation": "ROMANIA",
+"points": 71966
+},
+{
+"position": 71,
+"nation": "MOROCCO",
+"points": 73577
+},
+{
+"position": 72,
+"nation": "ANTIGUA AND BARBUDA",
+"points": 77061
+},
+{
+"position": 73,
+"nation": "LUXEMBOURG",
+"points": 82033
+},
+{
+"position": 74,
+"nation": "TRINIDAD AND TOBAGO",
+"points": 98222
+},
+{
+"position": 75,
+"nation": "PAKISTAN",
+"points": 103456
+},
+{
+"position": 76,
+"nation": "ANGOLA",
+"points": 109529
+},
+{
+"position": 77,
+"nation": "KAZAKHSTAN",
+"points": 121797
+},
+{
+"position": 78,
+"nation": "BRITISH VIRGIN ISLANDS",
+"points": 159595
+},
+{
+"position": 79,
+"nation": "SEYCHELLES",
+"points": 161252
+},
+{
+"position": 80,
+"nation": "SAUDI ARABIA",
+"points": 184580
+},
+{
+"position": 81,
+"nation": "VIETNAM",
+"points": 198717
+},
+{
+"position": 82,
+"nation": "MOZAMBIQUE",
+"points": 222838
+},
+{
+"position": 83,
+"nation": "GEORGIA",
+"points": 257515
+},
+{
+"position": 84,
+"nation": "DOMINICAN REPUBLIC",
+"points": 35426
+},
+{
+"position": 85,
+"nation": "ALGERIA",
+"points": 94056
+},
+{
+"position": 86,
+"nation": "PARAGUAY",
+"points": 95162
+},
+{
+"position": 87,
+"nation": "NETHERLAND ANTILLES",
+"points": 99518
+},
+{
+"position": 88,
+"nation": "ARUBA",
+"points": 104659
+},
+{
+"position": 89,
+"nation": "CAYMAN ISLANDS",
+"points": 105610
+},
+{
+"position": 90,
+"nation": "EL SALVADOR",
+"points": 123047
+},
+{
+"position": 91,
+"nation": "IRAN, ISLAMIC REPUBLIC OF",
+"points": 158388
+},
+{
+"position": 92,
+"nation": "SRI LANKA",
+"points": 175675
+},
+{
+"position": 93,
+"nation": "MOLDOVA, REPUBLIC OF",
+"points": 188776
+},
+{
+"position": 94,
+"nation": "MONTENEGRO",
+"points": 27728
+},
+{
+"position": 95,
+"nation": "EGYPT",
+"points": 44088
+},
+{
+"position": 96,
+"nation": "TUNISIA",
+"points": 47754
+},
+{
+"position": 97,
+"nation": "INDONESIA",
+"points": 52331
+},
+{
+"position": 98,
+"nation": "BAHRAIN",
+"points": 71417
+},
+{
+"position": 99,
+"nation": "KUWAIT",
+"points": 71521
+},
+{
+"position": 100,
+"nation": "QATAR",
+"points": 111197
+},
+{
+"position": 101,
+"nation": "AZERBAIJAN",
+"points": 131879
+},
+{
+"position": 102,
+"nation": "KOREA, DEMOCRATIC PEOPLE'S REPUBLIC OF",
+"points": 175016
+},
+{
+"position": 103,
+"nation": "TANZANIA, UNITED REPUBLIC OF",
+"points": 196251
+},
+{
+"position": 104,
+"nation": "LIBYA",
+"points": 201651
+},
+{
+"position": 105,
+"nation": "NORTH MACEDONIA",
+"points": 213622
+},
+{
+"position": 106,
+"nation": "BARBADOS",
+"points": 52909
+},
+{
+"position": 107,
+"nation": "FIJI",
+"points": 56726
+},
+{
+"position": 108,
+"nation": "KENYA",
+"points": 73566
+},
+{
+"position": 109,
+"nation": "MACAU",
+"points": 119103
+},
+{
+"position": 110,
+"nation": "JORDAN",
+"points": 130044
+},
+{
+"position": 111,
+"nation": "SAINT LUCIA",
+"points": 45983
+},
+{
+"position": 112,
+"nation": "GRENADA",
+"points": 65779
+},
+{
+"position": 113,
+"nation": "ANDORRA",
+"points": 91591
+},
+{
+"position": 114,
+"nation": "IRAQ",
+"points": 112950
+},
+{
+"position": 115,
+"nation": "SAINT KITTS AND NEVIS",
+"points": 118977
+},
+{
+"position": 116,
+"nation": "SAMOA",
+"points": 25844
+},
+{
+"position": 117,
+"nation": "AFGHANISTAN",
+"points": 28460
+},
+{
+"position": 118,
+"nation": "UZBEKISTAN",
+"points": 48238
+},
+{
+"position": 119,
+"nation": "SAINT VINCENT AND THE GRENADINES",
+"points": 56445
+},
+{
+"position": 120,
+"nation": "ICELAND",
+"points": 66202
+},
+{
+"position": 121,
+"nation": "ARMENIA",
+"points": 70480
+},
+{
+"position": 122,
+"nation": "MAURITIUS",
+"points": 82100
+},
+{
+"position": 123,
+"nation": "BELIZE",
+"points": 2218
+},
+{
+"position": 124,
+"nation": "NAMIBIA",
+"points": 2553
+},
+{
+"position": 125,
+"nation": "NIGERIA",
+"points": 6318
+},
+{
+"position": 126,
+"nation": "KYRGYZSTAN",
+"points": 6699
+},
+{
+"position": 127,
+"nation": "CAMBODIA",
+"points": 8533
+},
+{
+"position": 128,
+"nation": "SUDAN",
+"points": 28708
+},
+{
+"position": 129,
+"nation": "BRUNEI DARUSSALAM",
+"points": 29671
+},
+{
+"position": 130,
+"nation": "PANAMA",
+"points": 42574
+},
+{
+"position": 131,
+"nation": "BOLIVIA, PLURINATIONAL STATE OF",
+"points": 45145
+},
+{
+"position": 132,
+"nation": "COOK ISLANDS",
+"points": 46212
+}
+]
+}

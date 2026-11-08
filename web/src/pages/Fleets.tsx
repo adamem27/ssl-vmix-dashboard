@@ -97,7 +97,8 @@ export function FleetsPage() {
       } else if (nameModal.mode === 'renameSet') {
         refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { name: value })); toast.ok('Fleet set renamed');
       } else if (nameModal.mode === 'newFleet') {
-        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value })); toast.ok(`Fleet “${value}” added`);
+        const size = d?.fleets[d.fleets.length - 1]?.size ?? 4;
+        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value, size })); toast.ok(`Fleet “${value}” added (${size} teams)`);
       } else {
         await api.patch(`/api/fleets/${nameModal.id}`, { name: value }); refresh(); toast.ok('Fleet renamed');
       }
@@ -113,6 +114,12 @@ export function FleetsPage() {
   const deleteFleet = async (f: FleetSetDetail['fleets'][number]) => {
     if (!(await ask('Delete fleet?', <>Fleet <b>{f.name}</b> will be deleted{f.filled ? ` and ${f.filled} team(s) will return to available teams` : ''}.</>, 'Delete fleet'))) return;
     try { await api.del(`/api/fleets/${f.id}`); refresh(); toast.ok('Fleet deleted'); } catch (e) { toast.error(e); }
+  };
+  const resize = async (f: FleetSetDetail['fleets'][number] | null, size: number) => {
+    try {
+      if (f) { await api.patch(`/api/fleets/${f.id}`, { size }); refresh(); toast.ok(`${f.name}: ${size} teams`); }
+      else { refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { fleetSize: size })); toast.ok(`Every fleet in this set: ${size} teams`); }
+    } catch (e) { toast.error(e); }
   };
   const moveFleet = async (id: string, direction: -1 | 1) => {
     try { await api.post(`/api/fleets/${id}/move`, { direction }); refresh(); } catch (e) { toast.error(e); }
@@ -163,6 +170,12 @@ export function FleetsPage() {
             <div>
               <div className="mb-2 flex items-center gap-3">
                 <span className="text-sm text-ink-400">{d.fleets.length} fleets · {d.fleets.filter((f) => !f.complete).length} incomplete</span>
+                {!!d.fleets.length && (
+                  <label className="flex items-center gap-1.5 text-xs text-ink-400">
+                    All fleets:
+                    <SizeSelect value={d.fleets.every((f) => f.size === d.fleets[0].size) ? d.fleets[0].size : 0} onChange={(n) => resize(null, n)} label="Teams in every fleet of this set" />
+                  </label>
+                )}
                 <Button size="sm" className="ml-auto" variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: `Fleet ${d.fleets.length + 1}` })}>+ Add fleet</Button>
               </div>
               {!d.fleets.length ? (
@@ -173,7 +186,8 @@ export function FleetsPage() {
                     <section key={f.id} className={cx('card', !f.complete && 'border-amber-900/60')} aria-label={f.name}>
                       <header className="flex items-center gap-2 border-b border-ink-800 px-3 py-2">
                         <h3 className="truncate font-semibold">{f.name}</h3>
-                        <Badge tone={f.complete ? 'ok' : 'warn'}>{f.complete ? 'Complete' : `Incomplete ${f.filled}/4`}</Badge>
+                        <Badge tone={f.complete ? 'ok' : 'warn'}>{f.complete ? 'Complete' : `Incomplete ${f.filled}/${f.size}`}</Badge>
+                        <SizeSelect value={f.size} onChange={(n) => resize(f, n)} label={`Teams in ${f.name}`} />
                         <div className="ml-auto flex">
                           <IconBtn label="Move fleet left" disabled={fi === 0} onClick={() => moveFleet(f.id, -1)}>←</IconBtn>
                           <IconBtn label="Move fleet right" disabled={fi === d.fleets.length - 1} onClick={() => moveFleet(f.id, 1)}>→</IconBtn>
@@ -189,7 +203,7 @@ export function FleetsPage() {
                               <>
                                 <div className="min-w-0 flex-1"><TeamChip team={teamById.get(tid)} compact /></div>
                                 <IconBtn label="Move up" disabled={i === 0} onClick={() => place(tid, f.id, i, 'swap')}>↑</IconBtn>
-                                <IconBtn label="Move down" disabled={i === 3} onClick={() => place(tid, f.id, i + 2, 'swap')}>↓</IconBtn>
+                                <IconBtn label="Move down" disabled={i === f.size - 1} onClick={() => place(tid, f.id, i + 2, 'swap')}>↓</IconBtn>
                                 <select className="w-8 cursor-pointer rounded bg-transparent text-xs text-ink-400 hover:bg-ink-800" aria-label={`Move ${tName(tid)} to another fleet`} value=""
                                   onChange={(e) => { if (e.target.value) void place(tid, e.target.value, undefined); }}>
                                   <option value="">⇄</option>
@@ -243,6 +257,17 @@ export function FleetsPage() {
       </Modal>
       {dialog}
     </div>
+  );
+}
+
+const SIZES = Array.from({ length: 16 }, (_, i) => i + 1);
+function SizeSelect({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
+  return (
+    <select className="rounded border border-ink-700 bg-ink-900 px-1 py-0.5 text-xs text-ink-300" aria-label={label} title={label} value={value}
+      onChange={(e) => { const n = Number(e.target.value); if (n) onChange(n); }}>
+      {!value && <option value={0}>mixed</option>}
+      {SIZES.map((n) => <option key={n} value={n}>{n} teams</option>)}
+    </select>
   );
 }
 

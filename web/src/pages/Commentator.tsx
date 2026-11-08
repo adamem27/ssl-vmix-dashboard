@@ -168,10 +168,11 @@ function SailorPopup({ h }: { h: Hover }) {
           {s.isCaptain && <div className="mt-1 text-xs font-semibold text-amber-300">★ Captain</div>}
         </div>
       </div>
-      {(s.bestResult1 || s.bestResult2) && (
+      {(s.bestResult1 || s.bestResult2 || s.bestResult3) && (
         <ul className="space-y-1 border-t border-ink-800 px-3 py-2 text-sm text-ink-200">
           {s.bestResult1 && <li>🏆 {s.bestResult1}</li>}
           {s.bestResult2 && <li>🏆 {s.bestResult2}</li>}
+          {s.bestResult3 && <li>🏆 {s.bestResult3}</li>}
         </ul>
       )}
     </div>

@@ -12,6 +12,7 @@ import { createTeam, deleteTeam, getTeam, listTeams, updateTeam } from './servic
 import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateSailor } from './services/sailors.js';
 import * as fleets from './services/fleets.js';
 import * as decl from './services/declarations.js';
+import * as ranking from './services/ranking.js';
 import { SyncService } from './services/sync.js';
 import { allSheets, WorkbookWriter } from './services/workbook.js';
 import { buildXlsx, zipStore } from './services/xlsx.js';
@@ -86,7 +87,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   }));
 
   // ---------- teams ----------
-  const teamBody = z.object({ name: str(120).min(1, 'Name is required'), code: str(20).min(1, 'Code is required'), nickname: str(120).optional(), aliases: z.array(str(120)).max(50).optional(), notes: str(2000).optional() });
+  const teamBody = z.object({ name: str(120).min(1, 'Name is required'), code: str(20).min(1, 'Code is required'), nickname: str(120).optional(), aliases: z.array(str(120)).max(50).optional(), notes: str(2000).optional(), ranking: str(40).optional() });
   app.get('/api/teams', async () => listTeams(ctx));
   app.post('/api/teams', async (req) => getTeam(ctx, createTeam(db, teamBody.parse(req.body))));
   app.get<{ Params: { id: string } }>('/api/teams/:id', async (req) => getTeam(ctx, req.params.id));
@@ -95,6 +96,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return getTeam(ctx, req.params.id);
   });
   app.delete<{ Params: { id: string } }>('/api/teams/:id', async (req) => { deleteTeam(ctx, req.params.id); return { ok: true }; });
+  app.get('/api/ranking', async () => ({ url: ranking.RANKING_URL, last: ranking.lastRankingResult(db) }));
+  app.post('/api/ranking/refresh', async () => ranking.refreshRanking(db));
   app.get<{ Params: { id: string } }>('/api/teams/:id/sailors', async (req) => { getTeam(ctx, req.params.id); return listSailors(ctx, req.params.id); });
 
   // ---------- assets (team slots and sailor photo share one API) ----------
@@ -131,7 +134,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // ---------- sailors ----------
   const sailorBody = z.object({
     firstName: str(80), lastName: str(80), defaultPosition: str(80), defaultNumber: str(10),
-    bestResult1: str(500), bestResult2: str(500), sourceRef: str(200).nullable(),
+    bestResult1: str(500), bestResult2: str(500), bestResult3: str(500), sourceRef: str(200).nullable(),
   }).partial();
   app.post<{ Params: { id: string } }>('/api/teams/:id/sailors', async (req) => {
     const body = sailorBody.parse(req.body);
@@ -150,25 +153,29 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.delete<{ Params: { id: string } }>('/api/sailors/:id', async (req) => { deleteSailor(ctx, req.params.id); return { ok: true }; });
 
   // ---------- fleets ----------
+  const fleetSize = z.number().int().min(fleets.MIN_FLEET_SIZE).max(fleets.MAX_FLEET_SIZE);
   app.get('/api/fleet-sets', async () => fleets.listSets(db, ev().id));
   app.post('/api/fleet-sets', async (req) => {
-    const b = z.object({ name: str(120).min(1, 'Name is required'), fleetCount: z.number().int().min(0).max(30).optional() }).parse(req.body);
-    return fleets.getSetDetail(db, fleets.createSet(db, ev().id, b.name.trim(), b.fleetCount ?? 0));
+    const b = z.object({ name: str(120).min(1, 'Name is required'), fleetCount: z.number().int().min(0).max(30).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
+    return fleets.getSetDetail(db, fleets.createSet(db, ev().id, b.name.trim(), b.fleetCount ?? 0, b.fleetSize));
   });
   app.get<{ Params: { id: string } }>('/api/fleet-sets/:id', async (req) => fleets.getSetDetail(db, req.params.id));
   app.patch<{ Params: { id: string } }>('/api/fleet-sets/:id', async (req) => {
-    fleets.renameSet(db, req.params.id, z.object({ name: str(120).min(1) }).parse(req.body).name.trim());
+    const b = z.object({ name: str(120).min(1).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
+    if (b.name !== undefined) fleets.renameSet(db, req.params.id, b.name.trim());
+    if (b.fleetSize !== undefined) fleets.setSetFleetSize(db, req.params.id, b.fleetSize);
     return fleets.getSetDetail(db, req.params.id);
   });
   app.delete<{ Params: { id: string } }>('/api/fleet-sets/:id', async (req) => { fleets.deleteSet(db, req.params.id); return { ok: true }; });
   app.post<{ Params: { id: string } }>('/api/fleet-sets/:id/fleets', async (req) => {
-    const { name } = z.object({ name: str(120).min(1, 'Name is required') }).parse(req.body);
-    fleets.createFleet(db, req.params.id, name.trim());
+    const { name, size } = z.object({ name: str(120).min(1, 'Name is required'), size: fleetSize.optional() }).parse(req.body);
+    fleets.createFleet(db, req.params.id, name.trim(), size);
     return fleets.getSetDetail(db, req.params.id);
   });
   app.patch<{ Params: { id: string } }>('/api/fleets/:id', async (req) => {
-    const { name } = z.object({ name: str(120).min(1) }).parse(req.body);
-    fleets.renameFleet(db, req.params.id, name.trim());
+    const { name, size } = z.object({ name: str(120).min(1).optional(), size: fleetSize.optional() }).parse(req.body);
+    if (name !== undefined) fleets.renameFleet(db, req.params.id, name.trim());
+    if (size !== undefined) fleets.setFleetSize(db, req.params.id, size);
     return { ok: true };
   });
   app.post<{ Params: { id: string } }>('/api/fleets/:id/move', async (req) => {
@@ -181,7 +188,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     let position = b.position;
     if (position === undefined) {
       const free = fleets.firstFreePosition(db, b.fleetId);
-      if (free === null) throw badRequest('This fleet already has four teams. Choose a specific place to swap.');
+      if (free === null) throw badRequest('This fleet is full. Choose a specific place to swap, or add places to the fleet.');
       position = free;
     }
     const result = fleets.placeTeam(db, req.params.id, { teamId: b.teamId, fleetId: b.fleetId, position, onOccupied: b.onOccupied });
@@ -211,7 +218,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   app.delete<{ Params: { id: string } }>('/api/declarations/:id', async (req) => { decl.deleteDeclaration(db, req.params.id); return { ok: true }; });
   app.post<{ Params: { id: string } }>('/api/declarations/:id/members', async (req) => {
-    decl.addMember(ctx, req.params.id, z.object({ sailorId: id, position: str(80).optional(), number: str(10).optional() }).parse(req.body));
+    decl.addMember(ctx, req.params.id, z.object({ sailorId: id, position: str(80).optional(), number: str(10).optional(), weight: str(20).optional() }).parse(req.body));
     return decl.getDeclarationById(ctx, req.params.id);
   });
   const memberDecl = (memberId: string) => {
@@ -221,12 +228,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   };
   app.patch<{ Params: { id: string } }>('/api/declaration-members/:id', async (req) => {
     const d = memberDecl(req.params.id);
-    decl.setOverride(db, req.params.id, z.object({ position: str(80).optional(), number: str(10).optional() }).parse(req.body));
+    decl.setOverride(db, req.params.id, z.object({ position: str(80).optional(), number: str(10).optional(), weight: str(20).optional() }).parse(req.body));
     return decl.getDeclarationById(ctx, d);
   });
   app.post<{ Params: { id: string } }>('/api/declaration-members/:id/reset', async (req) => {
     const d = memberDecl(req.params.id);
-    decl.clearOverride(db, req.params.id, z.object({ field: z.enum(['position', 'number', 'all']) }).parse(req.body).field);
+    decl.clearOverride(db, req.params.id, z.object({ field: z.enum(['position', 'number', 'weight', 'all']) }).parse(req.body).field);
     return decl.getDeclarationById(ctx, d);
   });
   app.post<{ Params: { id: string } }>('/api/declaration-members/:id/assign', async (req) => {

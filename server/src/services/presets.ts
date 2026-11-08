@@ -195,7 +195,7 @@ export function applyRooming(ctx: AssetCtx, teams: RoomingTeam[] = loadRooming()
       const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(t.code) as { id: string } | undefined;
       if (!team) { r.missingTeams.push(t.code); continue; }
       r.teams++;
-      type Row = { id: string; first_name: string; last_name: string; name_key: string; default_position: string; default_number: string; best_result_1: string; best_result_2: string };
+      type Row = { id: string; first_name: string; last_name: string; name_key: string; default_position: string; default_number: string; best_result_1: string; best_result_2: string; best_result_3: string };
       const current = db.prepare('SELECT * FROM sailors WHERE team_id = ?').all(team.id) as Row[];
       const used = new Set<string>();
       const lastKey = (s: string) => nameKey(s).split(' ').filter(Boolean);
@@ -227,7 +227,7 @@ export function applyRooming(ctx: AssetCtx, teams: RoomingTeam[] = loadRooming()
       for (const c of current) {
         if (used.has(c.id)) continue;
         const hasPhoto = db.prepare("SELECT 1 FROM assets WHERE owner_type = 'sailor' AND owner_id = ?").get(c.id);
-        if (hasPhoto || c.best_result_1 || c.best_result_2) { r.kept.push(`${t.code} ${c.first_name} ${c.last_name}`); continue; }
+        if (hasPhoto || c.best_result_1 || c.best_result_2 || c.best_result_3) { r.kept.push(`${t.code} ${c.first_name} ${c.last_name}`); continue; }
         deleteSailor(ctx, c.id);
         r.removed++;
       }

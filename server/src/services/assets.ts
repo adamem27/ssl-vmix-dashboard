@@ -3,7 +3,8 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { DB, getSetting, newId, nowIso } from '../db/db.js';
 import { inspectImage, kindLabel } from './images.js';
-import { allowedKinds, OwnerType, slotsFor } from './slots.js';
+import { allowedKinds, isSponsorSlot, OwnerType, slotsFor } from './slots.js';
+import { normalizeLogo } from './logo.js';
 import { joinVmixPath, localCandidate, readIfExists, validateEnteredPath } from './paths.js';
 import { badRequest, notFound } from './errors.js';
 
@@ -81,6 +82,8 @@ export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slo
   assertSlot(owner, slot);
   if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(OWNER_LABEL[owner]);
   if (!buf.length) throw badRequest('The file is empty.');
+  // Sponsor logos (PNG or JPG) are evened out onto one standard transparent PNG canvas.
+  if (isSponsorSlot(owner, slot)) buf = normalizeLogo(buf);
   const info = inspectImage(buf);
   const kinds = allowedKinds(owner);
   if (!info || !kinds.includes(info.kind)) {

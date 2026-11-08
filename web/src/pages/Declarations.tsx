@@ -82,6 +82,7 @@ export function DeclarationsPage() {
                       <>
                         {r.unmatched > 0 && <Badge tone="warn" title="Unmatched sailors">{r.unmatched}?</Badge>}
                         {r.overrides > 0 && <Badge tone="info" title="Manual corrections">✎{r.overrides}</Badge>}
+                        {r.totalWeight ? <span className="tabular-nums text-[11px] text-ink-500" title="Crew weight">{r.totalWeight} kg</span> : null}
                         <span className="tabular-nums text-xs text-ink-400">{r.members}</span>
                       </>
                     ) : <span className="text-xs text-ink-600">none</span>}
@@ -238,14 +239,25 @@ function DeclarationPanel({ teamId, date, tz }: { teamId: string; date: string; 
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[820px] text-sm">
           <thead className="border-b border-ink-800 text-left text-xs uppercase tracking-wide text-ink-500">
-            <tr><th className="w-14 px-2 py-2" /><th className="w-12" /><th className="w-28">Number</th><th>Sailor</th><th className="w-56">Position</th><th className="w-40 pr-3 text-right">Actions</th></tr>
+            <tr><th className="w-14 px-2 py-2" /><th className="w-12" /><th className="w-28">Number</th><th>Sailor</th><th className="w-56">Position</th><th className="w-32">Weight (kg)</th><th className="w-40 pr-3 text-right">Actions</th></tr>
           </thead>
           <tbody>
             {decl.members.map((m, i) => (
               <MemberRow key={m.id} m={m} first={i === 0} last={i === decl.members.length - 1} sailors={sailors.data ?? []} act={act} />
             ))}
-            {!decl.members.length && <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-500">The crew is empty. Add sailors below.</td></tr>}
+            {!decl.members.length && <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-500">The crew is empty. Add sailors below.</td></tr>}
           </tbody>
+          {!!decl.members.length && (
+            <tfoot>
+              <tr className="border-t border-ink-700 text-sm">
+                <td colSpan={5} className="px-3 py-2 text-right text-ink-400">Total crew weight on board</td>
+                <td className="py-2 font-bold tabular-nums text-ink-50">{decl.totalWeight ? `${decl.totalWeight} kg` : '—'}</td>
+                <td className="pr-3 text-right text-xs text-ink-500">
+                  {decl.sourceTotalWeight && decl.sourceTotalWeight !== decl.totalWeight && <span title="Total stated by the organiser">organiser: {decl.sourceTotalWeight} kg</span>}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
         <div className="flex flex-wrap items-center gap-2 border-t border-ink-800 p-3">
           <select className="input w-72" value={addId} onChange={(e) => setAddId(e.target.value)} aria-label="Sailor to add">
@@ -271,9 +283,9 @@ type Act = (key: string, fn: () => Promise<Declaration | null>, okMsg?: string) 
 
 function MemberRow({ m, first, last, sailors, act }: { m: Member; first: boolean; last: boolean; sailors: Sailor[]; act: Act }) {
   const [assigning, setAssigning] = useState(false);
-  const save = (field: 'position' | 'number', value: string) =>
+  const save = (field: 'position' | 'number' | 'weight', value: string) =>
     act(`f-${m.id}`, () => api.patch<Declaration>(`/api/declaration-members/${m.id}`, { [field]: value }), `Manual correction saved (${field})`);
-  const reset = (field: 'position' | 'number') =>
+  const reset = (field: 'position' | 'number' | 'weight') =>
     act(`r-${m.id}`, () => api.post<Declaration>(`/api/declaration-members/${m.id}/reset`, { field }), 'Source value restored');
   const name = m.sailor ? `${m.sailor.firstName} ${m.sailor.lastName}`.trim() : m.sourceName ?? '—';
   const nameDiffers = m.sailor && m.sourceName && m.sourceName.toLowerCase() !== name.toLowerCase();
@@ -304,6 +316,7 @@ function MemberRow({ m, first, last, sailors, act }: { m: Member; first: boolean
         {nameDiffers && <p className="text-xs text-ink-500">in source: “{m.sourceName}”</p>}
       </td>
       <td className="pr-2"><EditableField value={m.position} onSave={(v) => save('position', v)} onReset={() => reset('position')} canReset={m.hasSource} label={`Position: ${name}`} /></td>
+      <td className="pr-2"><EditableField value={m.weight} onSave={(v) => save('weight', v)} onReset={() => reset('weight')} canReset={m.hasSource} narrow label={`Weight: ${name}`} /></td>
       <td className="pr-3 text-right">
         <div className="flex justify-end gap-1">
           {m.hasSource && <Button size="sm" variant="ghost" onClick={() => setAssigning(true)}>{m.sailor ? 'Change person' : 'Assign'}</Button>}

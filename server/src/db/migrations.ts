@@ -270,4 +270,36 @@ CREATE TABLE gen_outputs (
 );
 `,
   },
+  {
+    version: 6,
+    name: 'fleet_size_pb3_ranking_weights',
+    sql: `
+-- Teams per fleet, set per fleet (was always 4). Slots are rebuilt so positions can go past 4.
+ALTER TABLE fleets ADD COLUMN size INTEGER NOT NULL DEFAULT 4;
+CREATE TABLE fleet_slots_v6 (
+  fleet_id TEXT NOT NULL REFERENCES fleets(id) ON DELETE CASCADE,
+  fleet_set_id TEXT NOT NULL REFERENCES fleet_sets(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 16),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  PRIMARY KEY (fleet_id, position),
+  UNIQUE (fleet_set_id, team_id)
+);
+INSERT INTO fleet_slots_v6 (fleet_id, fleet_set_id, position, team_id) SELECT fleet_id, fleet_set_id, position, team_id FROM fleet_slots;
+DROP TABLE fleet_slots;
+ALTER TABLE fleet_slots_v6 RENAME TO fleet_slots;
+
+ALTER TABLE sailors ADD COLUMN best_result_3 TEXT NOT NULL DEFAULT '';
+
+-- Nation ranking: source values from worldofsailors.com, ranking_ovr typed by the operator (NULL = use source).
+ALTER TABLE teams ADD COLUMN ranking_src TEXT;
+ALTER TABLE teams ADD COLUMN ranking_points_src TEXT;
+ALTER TABLE teams ADD COLUMN ranking_ovr TEXT;
+ALTER TABLE teams ADD COLUMN ranking_fetched_at TEXT;
+
+-- Declared weights in kg, same src/ovr rule as position and number.
+ALTER TABLE declaration_members ADD COLUMN src_weight TEXT;
+ALTER TABLE declaration_members ADD COLUMN ovr_weight TEXT;
+ALTER TABLE declarations ADD COLUMN src_total_weight TEXT;
+`,
+  },
 ];

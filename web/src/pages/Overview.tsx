@@ -8,7 +8,7 @@ import { Cell, ImgCell } from '../components/cells';
 
 const SHORT: Record<string, string> = {
   background_1: 'BG1', background_2: 'BG2', emblem_dark: 'EM D', emblem_light: 'EM L', flag_small: 'FL S', flag_big: 'FL B',
-  lowerthird_photo: 'LT P', lowerthird_anthem: 'LT A', sponsor_1: 'SP1', sponsor_2: 'SP2', sponsor_3: 'SP3',
+  lowerthird_photo: 'LT P', lowerthird_anthem: 'LT A', sponsor_1: 'SP1', sponsor_2: 'SP2', sponsor_3: 'SP3', sponsor_4: 'SP4', sponsor_5: 'SP5',
 };
 
 const LS_KEY = 'overview.v1';
@@ -64,7 +64,7 @@ export function OverviewPage() {
 
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allOpen = rows.length > 0 && rows.every((r) => open.has(r.t.id));
-  const cols = 8 + (meta.data?.teamSlots.length ?? 11);
+  const cols = 9 + (meta.data?.teamSlots.length ?? 11);
 
   return (
     <div className="space-y-3">
@@ -94,6 +94,7 @@ export function OverviewPage() {
                 <th className="w-20 px-2 py-2">Code</th>
                 <th className="px-2 py-2">Team</th>
                 <th className="px-2 py-2">Nickname</th>
+                <th className="w-16 px-2 py-2" title="Nation ranking (worldofsailors.com), editable">Rank</th>
                 <th className="w-40 px-2 py-2">Fleet</th>
                 {meta.data!.teamSlots.map((s) => <th key={s.key} className="w-12 px-0.5 py-2 text-center" title={s.label}>{SHORT[s.key] ?? s.label}</th>)}
                 <th className="w-14 px-2 py-2 text-right">Crew</th>
@@ -151,15 +152,20 @@ function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: Overview
         </div>
       </td>
       <td className="px-1"><Cell value={t.nickname} onSave={(v) => save({ nickname: v })} className="text-ink-300" label="Nickname" /></td>
+      <td className="px-1" title={t.rankingManual ? 'Set by hand (clear it to follow the ranking page)' : t.rankingPoints ? `SSL points: ${t.rankingPoints}` : undefined}>
+        <Cell value={t.ranking} onSave={(v) => save({ ranking: v })} className={cx('tabular-nums', t.rankingManual ? 'text-sky-300' : 'text-ink-300')} label="Ranking" />
+      </td>
       <td className="px-1">{set ? <FleetPicker team={t} set={set} onChanged={onChanged} /> : <span className="px-1 text-ink-600">—</span>}</td>
       {meta.data!.teamSlots.map((s) => (
-        <td key={s.key} className="px-0.5 py-1"><ImgCell kind="teams" ownerId={t.id} slot={s.key} label={`${t.code} · ${s.label}`} asset={t.assets[s.key]} onChanged={onChanged} /></td>
+        <td key={s.key} className="px-0.5 py-1"><ImgCell kind="teams" ownerId={t.id} slot={s.key} label={`${t.code} · ${s.label}`} asset={t.assets[s.key]} onChanged={onChanged}
+          {...(s.key.startsWith('sponsor_') ? { accept: 'png+jpg' as const } : {})} /></td>
       ))}
       <td className="px-2 text-right tabular-nums text-ink-300">{t.sailors.length}</td>
       <td className="px-2">
         {t.declaration ? (
           <span className="flex gap-1">
             <Badge tone="ok">{t.declaration.members}</Badge>
+            {t.declaration.totalWeight && <span className="text-xs tabular-nums text-ink-400" title="Crew weight on board">{t.declaration.totalWeight} kg</span>}
             {t.declaration.unmatched.length > 0 && <Badge tone="warn" title="Not in roster">{t.declaration.unmatched.length} ?</Badge>}
           </span>
         ) : <span className="text-ink-600">—</span>}
@@ -246,8 +252,10 @@ function CrewTable({ team, hits, onChanged }: { team: OverviewTeam; hits: Set<st
           <th className="w-44 py-1">Position</th>
           <th className="py-1">Best result 1</th>
           <th className="py-1">Best result 2</th>
+          <th className="py-1">Best result 3</th>
           <th className="w-20 py-1" title="From the day’s declaration">Day no.</th>
           <th className="w-36 py-1" title="From the day’s declaration">Day position</th>
+          <th className="w-16 py-1" title="Weight from the day’s declaration">Day kg</th>
           <th className="w-8 py-1" />
         </tr>
       </thead>
@@ -258,9 +266,10 @@ function CrewTable({ team, hits, onChanged }: { team: OverviewTeam; hits: Set<st
             <td />
             <td />
             <td className="px-1 tabular-nums">{m.number}</td>
-            <td colSpan={5} className="px-1">{m.name} <Link to="/vmix/declarations" className="ml-1"><Badge tone="warn">Not in roster</Badge></Link></td>
+            <td colSpan={6} className="px-1">{m.name} <Link to="/vmix/declarations" className="ml-1"><Badge tone="warn">Not in roster</Badge></Link></td>
             <td className="px-1 tabular-nums">{m.number}</td>
             <td className="px-1">{m.position}</td>
+            <td className="px-1 tabular-nums">{m.weight}</td>
             <td />
           </tr>
         ))}
@@ -297,8 +306,10 @@ function SailorRow({ s, hasDecl, highlight, onChanged }: { s: OverviewSailor; ha
       <td><Cell value={s.defaultPosition} onSave={(v) => save({ defaultPosition: v })} label="Position" /></td>
       <td><Cell value={s.bestResult1} onSave={(v) => save({ bestResult1: v })} className="text-ink-300" label="Best result 1" /></td>
       <td><Cell value={s.bestResult2} onSave={(v) => save({ bestResult2: v })} className="text-ink-300" label="Best result 2" /></td>
+      <td><Cell value={s.bestResult3} onSave={(v) => save({ bestResult3: v })} className="text-ink-300" label="Best result 3" /></td>
       <td className={cx('px-1 tabular-nums', differs(s.declared?.number, s.defaultNumber) && 'font-semibold text-amber-200')}>{s.declared?.number || <span className="text-ink-600">—</span>}</td>
       <td className={cx('px-1', differs(s.declared?.position, s.defaultPosition) && 'font-semibold text-amber-200')}>{s.declared?.position || <span className="text-ink-600">—</span>}</td>
+      <td className="px-1 tabular-nums text-ink-300">{s.declared?.weight || <span className="text-ink-600">—</span>}</td>
       <td className="text-center"><button onClick={remove} className="invisible px-1 text-ink-500 hover:text-red-300 group-hover:visible" aria-label={`Delete ${fullName(s)}`}>✕</button></td>
     </tr>
   );
@@ -325,7 +336,7 @@ function NewSailorRow({ teamId, onCreated }: { teamId: string; onCreated: () => 
       <td className="py-1 pr-1">{input('lastName', 'Last name')}</td>
       <td className="py-1 pr-1">{input('defaultPosition', 'Position')}</td>
       <td className="py-1"><Button size="sm" variant="primary" disabled={!ok} onClick={add}>Add</Button></td>
-      <td colSpan={4} />
+      <td colSpan={6} />
     </tr>
   );
 }

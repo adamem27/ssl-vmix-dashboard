@@ -13,7 +13,7 @@ import { ParseError } from './types.js';
  * - Crews: one cell, each member written as `Name (W:67.00) (J-23) -->Role`
  * - Posted: "DD-MM HH:MM"; View link: .../daily-weight-declaration/details/<list>/<row>
  *
- * Columns are located by header text, never by position or CSS class. Weights are ignored.
+ * Columns are located by header text, never by position or CSS class. Weights (W:) and Total Weight are kept in kg.
  */
 
 const KNOWN_ROLES = [
@@ -22,7 +22,13 @@ const KNOWN_ROLES = [
   'skipper', 'coach', 'reserve', 'substitute',
 ];
 
-const MARKER = /(?:\(\s*W\s*:[^)]*\)\s*)?\(\s*J\s*-?\s*([^)]*?)\s*\)\s*-->\s*/g;
+const MARKER = /(?:\(\s*W\s*:\s*([^)]*?)\s*\)\s*)?\(\s*J\s*-?\s*([^)]*?)\s*\)\s*-->\s*/g;
+
+/** "67.00", "67,5 kg" → "67.00" / "67.5"; anything without a number → null. */
+export function cleanWeight(raw: string | null | undefined): string | null {
+  const m = (raw ?? '').replace(',', '.').match(/\d+(?:\.\d+)?/);
+  return m ? m[0] : null;
+}
 
 function clean(s: string) { return s.replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim(); }
 
@@ -58,8 +64,8 @@ export function parseCrewCell(text: string, warnings: string[]): ParsedMember[] 
     let role: string, nextName = '';
     if (i + 1 < markers.length) [role, nextName] = splitRoleAndName(seg, warnings);
     else role = clean(seg.split('\n').map(clean).filter(Boolean).join(' '));
-    const num = clean(m[1] ?? '');
-    if (name) members.push({ sourceName: name, number: num || null, position: role || null, sourceId: null });
+    const num = clean(m[2] ?? '');
+    if (name) members.push({ sourceName: name, number: num || null, position: role || null, weight: cleanWeight(m[1]), sourceId: null });
     else warnings.push('Skipped a crew entry with no name.');
     name = nextName;
   }
@@ -94,7 +100,7 @@ function cellText($: cheerio.CheerioAPI, el: any): string {
 export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseResult {
   const $ = cheerio.load(html);
   const warnings: string[] = [];
-  type Cols = { country: number; date: number; crews: number; posted: number };
+  type Cols = { country: number; date: number; crews: number; posted: number; total: number };
   let found: { table: any; cols: Cols; headerRow: any } | null = null;
 
   $('table').each((_, table) => {
@@ -103,7 +109,7 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
       if (found) return false;
       const cells = $(tr).children('th,td').toArray().map((c) => clean($(c).text()).toLowerCase());
       const idx = (re: RegExp) => cells.findIndex((c) => re.test(c));
-      const cols = { country: idx(/^(country|team|nation)$/), date: idx(/sailing\s*date|^date$/), crews: idx(/^crews?$/), posted: idx(/^posted$/) };
+      const cols = { country: idx(/^(country|team|nation)$/), date: idx(/sailing\s*date|^date$/), crews: idx(/^crews?$/), posted: idx(/^posted$/), total: idx(/total\s*weight/) };
       if (cols.country >= 0 && cols.crews >= 0 && cols.date >= 0) { found = { table, cols, headerRow: tr }; return false; }
       return undefined;
     });
@@ -133,7 +139,8 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
     if (href && href !== '#') {
       try { sourceRef = ctx.baseUrl ? new URL(href, ctx.baseUrl).toString() : /^https?:\/\//i.test(href) ? href : null; } catch { sourceRef = null; }
     }
-    const decl: ParsedDeclaration = { teamRef, date, dateRaw, postedRaw, sourceRef, members };
+    const totalWeight = cols.total >= 0 && cells[cols.total] ? cleanWeight(clean($(cells[cols.total]).text())) : null;
+    const decl: ParsedDeclaration = { teamRef, date, dateRaw, postedRaw, sourceRef, totalWeight, members };
     const key = `${teamRef.toLowerCase()}|${date}`;
     const prev = byKey.get(key);
     if (prev) {
@@ -150,6 +157,6 @@ export function parseSslFabrikCrewList(html: string, ctx: ParseContext): ParseRe
 export const sslFabrikCrewList: Importer = {
   id: 'ssl-fabrik-crew-list',
   label: 'SSL Gold Cup – Daily Crew List (tabela HTML)',
-  description: 'Fabrik/Joomla list with Country, Sailing Date, Crews, Posted columns. Weights are ignored.',
+  description: 'Fabrik/Joomla list with Country, Sailing Date, Crews, Total Weight, Posted columns.',
   parse: parseSslFabrikCrewList,
 };

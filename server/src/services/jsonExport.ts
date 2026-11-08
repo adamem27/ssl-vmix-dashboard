@@ -14,7 +14,7 @@ type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: 
 const img = (a: Asset) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 
 function teamFields(t: ReturnType<typeof listTeams>[number]) {
-  const o: Record<string, string> = { code: t.code, name: t.name, nickname: t.nickname };
+  const o: Record<string, string> = { code: t.code, name: t.name, nickname: t.nickname, ranking: t.ranking, ranking_points: t.rankingPoints };
   for (const s of TEAM_SLOTS) o[s.key] = img(t.assets[s.key]);
   return o;
 }
@@ -25,7 +25,7 @@ function captainFields(ctx: AssetCtx, teamId: string) {
     captain_name: c ? `${c.first_name} ${c.last_name}`.trim() : '',
     captain_first_name: c?.first_name ?? '', captain_last_name: c?.last_name ?? '',
     captain_number: c?.default_number ?? '', captain_position: c?.default_position ?? '',
-    captain_best_result_1: c?.best_result_1 ?? '', captain_best_result_2: c?.best_result_2 ?? '',
+    captain_best_result_1: c?.best_result_1 ?? '', captain_best_result_2: c?.best_result_2 ?? '', captain_best_result_3: c?.best_result_3 ?? '',
     captain_photo: c ? img(listAssets(ctx, 'sailor', c.id).photo) : '',
   };
 }
@@ -65,7 +65,8 @@ export function jsonSailors(ctx: AssetCtx, eventId: string, date: string, teamCo
         captain: s.isCaptain ? '1' : '',
         first_name: s.firstName, last_name: s.lastName, full_name: `${s.firstName} ${s.lastName}`.trim(),
         number: s.declared?.number || s.defaultNumber, position: s.declared?.position || s.defaultPosition,
-        best_result_1: s.bestResult1, best_result_2: s.bestResult2,
+        weight: s.declared?.weight ?? '', team_total_weight: t.declaration?.totalWeight ?? '',
+        best_result_1: s.bestResult1, best_result_2: s.bestResult2, best_result_3: s.bestResult3,
         [SAILOR_SLOTS[0].key]: img(s.photo),
       });
     }
@@ -77,15 +78,15 @@ export function jsonFleetSet(ctx: AssetCtx, setId: string) {
   const { db } = ctx;
   if (!db.prepare('SELECT 1 FROM fleet_sets WHERE id = ?').get(setId)) throw notFound('Fleet set');
   const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
-  const fleets = db.prepare('SELECT id, name, placeholders FROM fleets WHERE fleet_set_id = ? ORDER BY sort, created_at').all(setId) as any[];
+  const fleets = db.prepare('SELECT id, name, placeholders, size FROM fleets WHERE fleet_set_id = ? ORDER BY sort, created_at').all(setId) as any[];
   const slots = db.prepare('SELECT fleet_id, position, team_id FROM fleet_slots WHERE fleet_set_id = ?').all(setId) as any[];
   const rows: Record<string, string>[] = [];
   for (const f of fleets) {
     const ph = JSON.parse(f.placeholders || '[]') as string[];
-    for (let p = 1; p <= 4; p++) {
+    for (let p = 1; p <= (f.size || 4); p++) {
       const t = teams.get(slots.find((s) => s.fleet_id === f.id && s.position === p)?.team_id);
       const empty: Record<string, string> = Object.fromEntries(TEAM_SLOTS.map((s) => [s.key, '']));
-      rows.push({ fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', nickname: '', ...empty }) });
+      rows.push({ fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', nickname: '', ranking: '', ranking_points: '', ...empty }) });
     }
   }
   return rows;

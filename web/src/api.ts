@@ -46,13 +46,14 @@ export interface Asset {
 
 export interface Team {
   id: string; name: string; code: string; nickname: string; aliases: string[]; notes: string; isDemo: boolean; updatedAt: string;
+  ranking: string; rankingSource: string | null; rankingPoints: string; rankingManual: boolean; rankingFetchedAt: string | null;
   assets: Record<string, Asset>; assetsFilled: number; assetsTotal: number;
   thumb: { slot: string; previewUrl: string | null; checkStatus: string } | null; sailorCount: number;
 }
 
 export interface Sailor {
   id: string; teamId: string; firstName: string; lastName: string; defaultPosition: string; defaultNumber: string;
-  bestResult1: string; bestResult2: string; sourceRef: string | null; isDemo: boolean; isCaptain: boolean; updatedAt: string; photo: Asset | null;
+  bestResult1: string; bestResult2: string; bestResult3: string; sourceRef: string | null; isDemo: boolean; isCaptain: boolean; updatedAt: string; photo: Asset | null;
 }
 export interface SailorDetail extends Sailor {
   history: { date: string; teamId: string; memberId: string; position: string; number: string; hasOverride: number; origin: string }[];
@@ -62,7 +63,7 @@ export interface SailorDetail extends Sailor {
 export interface FleetSetSummary { id: string; name: string; fleetCount: number; assignedCount: number; updatedAt: string }
 export interface FleetSetDetail {
   set: { id: string; name: string; updatedAt: string };
-  fleets: { id: string; name: string; positions: (string | null)[]; placeholders: (string | null)[]; filled: number; complete: boolean }[];
+  fleets: { id: string; name: string; size: number; positions: (string | null)[]; placeholders: (string | null)[]; filled: number; complete: boolean }[];
   assignedTeamIds: string[];
 }
 
@@ -71,15 +72,16 @@ export interface Member {
   id: string; origin: 'manual' | 'import'; sort: number; sourceName: string | null; inSource: boolean; hasSource: boolean;
   matchStatus: 'matched' | 'unmatched' | 'ambiguous' | 'manual'; sailorLocked: boolean;
   sailor: { id: string; firstName: string; lastName: string; defaultPosition: string; defaultNumber: string; photo: Asset | null } | null;
-  position: FieldValue; number: FieldValue; overrideUpdatedAt: string | null;
+  position: FieldValue; number: FieldValue; weight: FieldValue; overrideUpdatedAt: string | null;
 }
 export interface Declaration {
   id: string; teamId: string; date: string; origin: 'manual' | 'import'; sourceRef: string | null; sourcePostedRaw: string | null;
   sourceFetchedAt: string | null; notes: string; createdAt: string; updatedAt: string; members: Member[];
+  totalWeight: string; sourceTotalWeight: string | null;
 }
 export interface DateOverviewRow {
   teamId: string; name: string; code: string; isDemo: number; declarationId: string | null; origin: string | null;
-  sourceFetchedAt: string | null; members: number; unmatched: number; overrides: number;
+  sourceFetchedAt: string | null; members: number; unmatched: number; overrides: number; totalWeight: number | null;
 }
 
 export interface ImportSummary {
@@ -98,6 +100,7 @@ export interface SyncStatus {
   running: boolean; lastAttemptAt: string | null; lastSuccessAt: string | null; nextRunAt: string | null; backendStartedAt: string;
   lastRun: SyncRun | null;
 }
+export interface RankingResult { rows: number; matched: number; teamsWithoutRanking: string[]; fetchedAt: string; source: 'live' | 'snapshot' }
 export interface RunOutcome { status: 'success' | 'error' | 'already_running'; error?: string; summary?: ImportSummary }
 
 export interface SettingsInfo {
@@ -106,12 +109,12 @@ export interface SettingsInfo {
   hasDemo: boolean;
 }
 
-export interface OverviewSailor extends Sailor { declared: { position: string; number: string; manual: boolean; sort: number } | null }
+export interface OverviewSailor extends Sailor { declared: { position: string; number: string; weight: string; manual: boolean; sort: number } | null }
 export interface OverviewTeam {
-  id: string; code: string; name: string; nickname: string; isDemo: boolean; thumb: Team['thumb']; assets: Record<string, Asset>;
+  id: string; code: string; name: string; nickname: string; ranking: string; rankingManual: boolean; rankingPoints: string; isDemo: boolean; thumb: Team['thumb']; assets: Record<string, Asset>;
   slots: { key: string; label: string; status: Asset['checkStatus'] | 'missing' }[]; assetsFilled: number; assetsTotal: number;
   place: { fleetName: string; position: number } | null;
-  declaration: { members: number; unmatched: { name: string; position: string; number: string }[] } | null;
+  declaration: { members: number; totalWeight: string; unmatched: { name: string; position: string; number: string; weight: string }[] } | null;
   sailors: OverviewSailor[];
 }
 export interface Overview { date: string; fleetSetId: string | null; teams: OverviewTeam[] }

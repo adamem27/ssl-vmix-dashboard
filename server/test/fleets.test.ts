@@ -23,7 +23,26 @@ describe('fleets', () => {
     expect(detail.fleets[0].filled).toBe(4);
     expect(detail.fleets[0].complete).toBe(true);
     // DB constraint as a second line of defence
-    expect(() => db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, 5, ?)').run(f1, setId, teams[4])).toThrow();
+    expect(() => db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, 17, ?)').run(f1, setId, teams[4])).toThrow();
+  });
+
+  it('fleet size can be changed per fleet; shrinking needs the extra places empty', () => {
+    const { db, teams, setId, f1, f2 } = world();
+    fleets.setFleetSize(db, f1, 6);
+    teams.forEach((t, i) => fleets.placeTeam(db, setId, { teamId: t, fleetId: f1, position: i + 1 }));
+    let d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[0]).toMatchObject({ size: 6, filled: 6, complete: true });
+    expect(d.fleets[1]).toMatchObject({ size: 4, filled: 0 });
+    expect(() => fleets.setFleetSize(db, f1, 4)).toThrow(/Places 5, 6/);
+    fleets.unassignTeam(db, setId, teams[4]);
+    fleets.unassignTeam(db, setId, teams[5]);
+    fleets.setFleetSize(db, f1, 4);
+    expect(() => fleets.placeTeam(db, setId, { teamId: teams[4], fleetId: f1, position: 5 })).toThrow(HttpError);
+    fleets.setFleetSize(db, f2, 2);
+    d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[1].positions).toHaveLength(2);
+    expect(() => fleets.setFleetSize(db, f2, 0)).toThrow(HttpError);
+    expect(() => fleets.setFleetSize(db, f2, 17)).toThrow(HttpError);
   });
 
   it('never contains the same team twice', () => {
