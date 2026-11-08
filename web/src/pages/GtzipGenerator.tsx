@@ -409,7 +409,7 @@ function GenerateBar({ tpl, doc }: { tpl: TemplateDoc; doc: GtNode }) {
 
 // ---------- quick form ----------
 interface CountOptions { shiftAfter: boolean; stretch: boolean; center: boolean }
-const COUNT_OPTS_KEY = 'gtzip-count-options';
+const COUNT_OPTS_KEY = 'gtzip-count-options-v2';
 const textOf = (n: GtNode) => {
   if (n.tag !== 'Ticker' || n.attrs.Text != null) return n.attrs.Text ?? '';
   return n.children.find((c) => c.tag === 'Ticker.Template')?.children.find((c) => c.tag === 'TextBlock')?.attrs.Text ?? '';
@@ -444,7 +444,7 @@ function QuickForm({ tpl, doc, commit, images, sel, setSel }: {
   const els = useMemo(() => elements(doc), [doc]);
   const items = useMemo(() => fillable(els, doc), [els, doc]);
   const [opts, setOptsState] = useState<CountOptions>(() => {
-    try { return { shiftAfter: true, stretch: true, center: false, ...JSON.parse(localStorage.getItem(COUNT_OPTS_KEY) ?? '{}') }; } catch { return { shiftAfter: true, stretch: true, center: false }; }
+    try { return { shiftAfter: true, stretch: true, center: true, ...JSON.parse(localStorage.getItem(COUNT_OPTS_KEY) ?? '{}') }; } catch { return { shiftAfter: true, stretch: true, center: true }; }
   });
   const setOpts = (o: CountOptions) => { setOptsState(o); try { localStorage.setItem(COUNT_OPTS_KEY, JSON.stringify(o)); } catch { /* storage unavailable */ } };
   const [busy, setBusy] = useState<string | null>(null);
@@ -511,7 +511,7 @@ function QuickForm({ tpl, doc, commit, images, sel, setSel }: {
         {groups.length > 0 && <div className="flex flex-wrap gap-3 border-t border-ink-800 pt-2 text-[11px] text-ink-400">
           <label className="flex items-center gap-1.5" title="E.g. the sponsor bar under the rows goes down when a row is added"><input type="checkbox" checked={opts.shiftAfter} onChange={(e) => setOpts({ ...opts, shiftAfter: e.target.checked })} /> Move what comes after</label>
           <label className="flex items-center gap-1.5" title="The panel behind the rows grows or shrinks with them"><input type="checkbox" checked={opts.stretch} onChange={(e) => setOpts({ ...opts, stretch: e.target.checked })} /> Resize the background</label>
-          <label className="flex items-center gap-1.5" title="Everything moves by half the change, so the title stays centred on screen"><input type="checkbox" checked={opts.center} onChange={(e) => setOpts({ ...opts, center: e.target.checked })} /> Keep centred</label>
+          <label className="flex items-center gap-1.5" title="When the graphic sits in the middle of the screen, everything moves by half the change, so it stays centred"><input type="checkbox" checked={opts.center} onChange={(e) => setOpts({ ...opts, center: e.target.checked })} /> Keep centred</label>
         </div>}
       </div>
 

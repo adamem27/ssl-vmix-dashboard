@@ -149,7 +149,7 @@ describe('gtzip generator API', () => {
     expect(out.file).toBe('Day schedule 4 races.gtzip');
     const file = path.join(ctx.assetsDir, 'gtzip', out.file);
     const p = loadPackage(fs.readFileSync(file));
-    expect(allNames(p.doc).has('BAR 4')).toBe(true);
+    expect(allNames(p.doc).has('Bar 4')).toBe(true);
     const src4 = elements(p.doc).find((e) => e.node.attrs.Name === 'Image4')!.node.children[0].children[0].attrs.Source;
     expect(src4).toMatch(/^[0-9a-f-]{36}\\logo\.png$/);
     expect(resourcePart(p, src4)).toBeTruthy();
@@ -209,7 +209,7 @@ describe('gtzip scenes', () => {
     const { root } = duplicate(svc.template(t.id).doc, [bar.path], { count: 2, dx: 0, dy: 70 });
     const v = await svc.saveAsTemplate({ templateId: t.id, name: 'Day schedule – 3 races', doc: root, scene: 'day-schedule', variant: '3-races' });
     expect([v.scene, v.variant, v.name]).toEqual(['day-schedule', '3-races', 'Day schedule – 3 races']);
-    expect(allNames(svc.template(v.id).doc).has('BAR 3')).toBe(true);
+    expect(allNames(svc.template(v.id).doc).has('Bar 3')).toBe(true);
     expect(allNames(svc.template(t.id).doc).has('BAR 3')).toBe(false);
     expect(svc.updateTemplate(v.id, { scene: 'team-lineup', variant: 'nope' }).variant).toBe('8-sailors');
     expect(() => svc.updateTemplate(v.id, { scene: 'nope' })).toThrow();
@@ -303,5 +303,23 @@ describe('gtzip part counts', () => {
     expect(src.startsWith('upload:')).toBe(true);
     const png = svc.image(null, src);
     expect(png.subarray(1, 4).toString()).toBe('PNG');
+  });
+});
+
+describe('gtzip layer names', () => {
+  it('gives layers readable names, keeps field names and team codes, and moves the animations along', async () => {
+    const { tidyLayers } = await import('../src/services/gtzip/tidy.js');
+    const L = (name: string, kids: GtNode[]): GtNode => ({ tag: 'Layer', attrs: { Name: name }, children: [{ tag: 'Layer.Composition', attrs: {}, children: [{ tag: 'Composition', attrs: {}, children: kids }] }] });
+    const T = (name: string): GtNode => ({ tag: 'TextBlock', attrs: { Name: name }, children: [] });
+    const root: GtNode = { tag: 'Composition', attrs: {}, children: [
+      L('BG layer', [T('BG1')]), L('HEADER', [T('TITLE')]), L('ROW 1', [T('TEAM 1')]), L('Layer1', [{ tag: 'Ticker', attrs: { Name: 'Ticker1' }, children: [] }]),
+      L('OMA', [T('OMA Name'), L('PHOTO OMA', [T('OMA Photo')])]), L('BAR layer', [T('BAR')]), L('T1PhotoLayer', [T('T1Photo')]),
+      { tag: 'Storyboard', attrs: {}, children: [{ tag: 'Storyboard.Animations', attrs: {}, children: [{ tag: 'Fade', attrs: { Object: 'HEADER' }, children: [] }, { tag: 'Fade', attrs: { Object: 'TITLE' }, children: [] }] }] },
+    ] };
+    const ren = tidyLayers(root);
+    expect(ren).toEqual({ 'BG layer': 'Background', HEADER: 'Header', 'ROW 1': 'Row 1', Layer1: 'Ticker', 'PHOTO OMA': 'Photo OMA', 'BAR layer': 'Main bar', T1PhotoLayer: 'T1 photo' });
+    expect(allNames(root).has('TITLE')).toBe(true);
+    const anims = root.children[7].children[0].children.map((a) => a.attrs.Object);
+    expect(anims).toEqual(['Header', 'TITLE']);
   });
 });
