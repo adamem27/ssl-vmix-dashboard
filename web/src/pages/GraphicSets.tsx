@@ -33,7 +33,7 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
   const add = () => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${k.label === 'Tickers' ? 'Ticker' : k.label} ${sets.length + 1}` }));
   const dup = (s: GSet) => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${s.name} copy`, copyFrom: s.id }));
   const move = (s: GSet, dir: -1 | 1) => run(() => api.post(`/api/graphic-sets/${s.id}/move`, { dir }));
-  const remove = async (s: GSet) => { if (await ask(`Delete “${s.name}”?`, <>This version of {k.label} and its row in the “{k.sheet}” sheet are removed.</>, 'Delete')) await run(() => api.del(`/api/graphic-sets/${s.id}`)); };
+  const remove = async (s: GSet) => { if (await ask(`Delete “${s.name}”?`, <>This version of {k.label} and its rows in the “General” sheet are removed.</>, 'Delete')) await run(() => api.del(`/api/graphic-sets/${s.id}`)); };
   const save = async (s: GSet, patch: { name?: string; data?: Record<string, string> }) => {
     try {
       const r = await api.patch<GSet>(`/api/graphic-sets/${s.id}`, patch);
@@ -45,14 +45,14 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
     <section id={`g-${k.kind}`} className="card scroll-mt-28">
       <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
         <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{k.label}</h2>
-        <span className="text-xs text-ink-500">{k.description} Sheet “{k.sheet}”, one row per version.</span>
+        <span className="text-xs text-ink-500">{k.description} In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</span>
         <Button size="sm" className="ml-auto" onClick={add}>+ New version</Button>
       </header>
       <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
         {sets.map((s, i) => (
           <div key={s.id} className="rounded-lg border border-ink-800 bg-ink-950/40">
             <div className="flex items-center gap-1 border-b border-ink-800 px-2 py-1.5">
-              <span className="w-5 text-center text-[11px] font-semibold tabular-nums text-ink-500" title="Row in the sheet">{i + 1}</span>
+              <span className="w-5 text-center text-[11px] font-semibold tabular-nums text-ink-500" title="Order in the sheet">{i + 1}</span>
               <SaveInput value={s.name} onSave={(name) => save(s, { name })} label="Version name" className="max-w-[16rem] border-transparent bg-transparent font-semibold" maxLength={80} />
               <div className="ml-auto flex items-center">
                 <button disabled={i === 0} onClick={() => move(s, -1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move up">▲</button>
@@ -65,7 +65,7 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
               {k.fields.map((f) => (
                 <label key={f.key} className={cx('block min-w-0', (f.wide || f.type === 'list') && 'col-span-2')}>
                   <span className="flex items-baseline gap-2 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
-                    {f.label}<span className="font-mono normal-case tracking-normal text-ink-600">{f.key}</span>{f.hint && <span className="normal-case tracking-normal text-ink-500">· {f.hint}</span>}
+                    {f.label}{f.hint && <span className="normal-case tracking-normal text-ink-500">· {f.hint}</span>}
                   </span>
                   {f.type === 'select' ? (
                     <select className="input py-1 text-sm" value={s.data[f.key] ?? ''} onChange={(e) => save(s, { data: { [f.key]: e.target.value } })} aria-label={f.label}>
@@ -80,14 +80,14 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
               ))}
               {k.kind === 'ticker' && (
                 <div className="col-span-2 min-w-0">
-                  <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Ticker text <span className="font-mono normal-case tracking-normal text-ink-600">text</span></span>
+                  <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Ticker text</span>
                   <div className="truncate rounded border border-ink-800 bg-ink-900 px-2 py-1 font-mono text-xs text-ink-300" title={tickerText(s.data)}>{tickerText(s.data) || '—'}</div>
                 </div>
               )}
             </div>
           </div>
         ))}
-        {!sets.length && <p className="px-1 py-4 text-sm text-ink-500">No versions yet. Add one to fill the “{k.sheet}” sheet.</p>}
+        {!sets.length && <p className="px-1 py-4 text-sm text-ink-500">No versions yet. Add one to put it in the Excel file.</p>}
       </div>
       {dialog}
     </section>
