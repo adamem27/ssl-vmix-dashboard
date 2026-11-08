@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { getSetting, setSetting } from '../db/db.js';
+import { listAssets } from './assets.js';
 import { badRequest } from './errors.js';
 import { getWeather, listPeople, listSchedule } from './general.js';
 import { listOutputs, listTemplates, outputRel } from './generator/generator.js';
@@ -12,7 +13,7 @@ import { listResults } from './results.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 /**
- * The vMix workbook: six sheets, data in rows, every value in one place only.
+ * The vMix workbook: seven sheets, data in rows, every value in one place only.
  *  - General: every general graphic, one row per value (Graphic · Version · Field · Value).
  *  - Teams:   one row per team of the current stage (its group and place, names, ranking, graphics).
  *  - Sailors: one row per sailor of those teams (captain, line-up place, today's declaration, photo).
@@ -129,6 +130,43 @@ export function announcementsSheet(ctx, eventId) {
 export function peopleSheet(ctx, eventId) {
     return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Title: p.title, Photo: img(p.photo) }));
 }
+// ---------- Line-up ----------
+/**
+ * Line-up: one row per team of the stage (a vMix title shows one row). Team graphics first, then the places in the
+ * order set in the Line-up panel: “1 Place”, “1 Name”, “1 Surname”, … for the first place, “2 …” for the second.
+ */
+export function lineupSheet(ctx, eventId) {
+    const { db } = ctx;
+    const { stage, teams } = stageTeams(ctx, eventId);
+    const lineups = teams.map(({ t }) => loadLineup(db, eventId, t.id));
+    const places = Math.max(9, ...lineups.map((l) => l.data.rows.length));
+    return teams.map(({ t, group }, i) => {
+        const lu = lineups[i];
+        const defs = slotDefs(lu.data.extra);
+        const a = t.assets;
+        const row = {};
+        if (stage)
+            row.Group = group;
+        Object.assign(row, {
+            Code: t.code, Team: (lu.data.teamName || t.name).toUpperCase(), Title: lu.data.title,
+            'Flag big': img(a.flag_big), 'Flag small': img(a.flag_small), 'Emblem light': img(a.emblem_light), 'Emblem dark': img(a.emblem_dark),
+            'Line-up background': img(a.background_2),
+            'Sponsor 1': img(a.sponsor_1), 'Sponsor 2': img(a.sponsor_2), 'Sponsor 3': img(a.sponsor_3), 'Sponsor 4': img(a.sponsor_4), 'Sponsor 5': img(a.sponsor_5),
+        });
+        for (let n = 1; n <= places; n++) {
+            const r = lu.data.rows[n - 1];
+            const filled = !!r && !!(r.firstName || r.lastName);
+            row[`${n} Place`] = r ? defs.find((d) => d.key === r.slot)?.label ?? r.slot : '';
+            row[`${n} Number`] = filled ? r.number : '';
+            row[`${n} Name`] = filled ? r.firstName : '';
+            row[`${n} Surname`] = filled ? r.lastName.toUpperCase() : '';
+            row[`${n} Position`] = r ? r.position : '';
+            row[`${n} Captain`] = filled && r.captain ? 'Yes' : '';
+            row[`${n} Photo`] = filled && r.sailorId ? img(listAssets(ctx, 'sailor', r.sailorId).photo) : '';
+        }
+        return row;
+    });
+}
 // ---------- Teams ----------
 export function teamsSheet(ctx, eventId, today) {
     const { db } = ctx;
@@ -143,11 +181,9 @@ export function teamsSheet(ctx, eventId, today) {
             row.Group = group;
             row.Place = place;
         }
-        const lu = loadLineup(db, eventId, t.id);
         Object.assign(row, {
             Code: t.code, Name: t.name, Nickname: t.nickname, Ranking: t.ranking, 'Ranking points': t.rankingPoints,
             'Team weight': ov.get(t.id)?.declaration?.totalWeight ?? '',
-            'Line-up title': lu.exists ? lu.data.title : '', 'Line-up team name': lu.exists ? (lu.data.teamName || t.name).toUpperCase() : '',
         });
         for (const s of TEAM_SLOTS)
             row[s.label] = img(t.assets[s.key]);
@@ -253,6 +289,7 @@ export const SHEETS = [
     { name: 'General', key: 'general' },
     { name: 'Teams', key: 'teams' },
     { name: 'Sailors', key: 'sailors' },
+    { name: 'Line-up', key: 'lineup' },
     { name: 'Results', key: 'results' },
     { name: 'Announcements', key: 'announcements' },
     { name: 'People', key: 'people' },
@@ -264,6 +301,8 @@ export function sheetRows(ctx, eventId, today, key) {
         return teamsSheet(ctx, eventId, today);
     if (key === 'sailors')
         return sailorsSheet(ctx, eventId, today);
+    if (key === 'lineup')
+        return lineupSheet(ctx, eventId);
     if (key === 'results')
         return resultsSheet(ctx, eventId);
     if (key === 'announcements')

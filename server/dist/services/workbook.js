@@ -11,7 +11,7 @@ import { applyPanamColours } from './generator/generator.js';
 import { SHEETS, sheetRows } from './workbookSheets.js';
 /** Bump when the file's look changes without its data, so the next tick rewrites it. */
 const LAYOUT_VERSION = 2;
-/** The six sheets of the vMix workbook (see workbookSheets.ts). */
+/** The seven sheets of the vMix workbook (see workbookSheets.ts). */
 export function allSheets(ctx) {
     const ev = activeEvent(ctx.db);
     const today = todayIn(ev.timezone);

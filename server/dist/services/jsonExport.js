@@ -83,6 +83,7 @@ export function jsonIndex(_db, _eventId) {
         { name: 'General', path: '/json/sheet/general' },
         { name: 'Teams', path: '/json/sheet/teams' },
         { name: 'Sailors', path: '/json/sheet/sailors' },
+        { name: 'Line-up', path: '/json/sheet/lineup' },
         { name: 'Results', path: '/json/sheet/results' },
         { name: 'Announcements', path: '/json/sheet/announcements' },
         { name: 'People', path: '/json/sheet/people' },
