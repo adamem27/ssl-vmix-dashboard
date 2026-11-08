@@ -8,6 +8,11 @@ export function assertDate(d) {
     if (!DATE_RE.test(d) || Number.isNaN(Date.parse(d + 'T00:00:00Z')))
         throw badRequest('Date must be in YYYY-MM-DD format.');
 }
+/** Sum of weights in kg as a short string ("702.5"); empty when no member has a weight. */
+export function sumWeights(values) {
+    const nums = values.map((v) => Number(String(v ?? '').replace(',', '.'))).filter((n) => String(n) !== 'NaN' && n > 0);
+    return nums.length ? String(Number(nums.reduce((a, b) => a + b, 0).toFixed(2))) : '';
+}
 export function listDates(db, eventId) {
     return db.prepare(`SELECT declaration_date AS date, COUNT(*) AS teams,
       SUM(CASE WHEN origin = 'import' THEN 1 ELSE 0 END) AS imported
@@ -20,7 +25,8 @@ export function dateOverview(db, eventId, date) {
     SELECT t.id AS teamId, t.name, t.code, t.is_demo AS isDemo, d.id AS declarationId, d.origin, d.source_fetched_at AS sourceFetchedAt,
       (SELECT COUNT(*) FROM declaration_members m WHERE m.declaration_id = d.id) AS members,
       (SELECT COUNT(*) FROM declaration_members m WHERE m.declaration_id = d.id AND m.sailor_id IS NULL) AS unmatched,
-      (SELECT COUNT(*) FROM declaration_members m WHERE m.declaration_id = d.id AND (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL)) AS overrides
+      (SELECT COUNT(*) FROM declaration_members m WHERE m.declaration_id = d.id AND (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL OR m.ovr_weight IS NOT NULL)) AS overrides,
+      (SELECT ROUND(SUM(CAST(COALESCE(m.ovr_weight, m.src_weight) AS REAL)), 2) FROM declaration_members m WHERE m.declaration_id = d.id) AS totalWeight
     FROM teams t LEFT JOIN declarations d ON d.team_id = t.id AND d.event_id = ? AND d.declaration_date = ?
     ORDER BY t.name COLLATE NOCASE`).all(eventId, date);
 }
@@ -45,6 +51,7 @@ function memberDto(ctx, r) {
         sailor: s ? { id: s.id, firstName: s.first_name, lastName: s.last_name, defaultPosition: s.default_position, defaultNumber: s.default_number, photo } : null,
         position: field(r.ovr_position, r.src_position),
         number: field(r.ovr_number, r.src_number),
+        weight: field(r.ovr_weight, r.src_weight),
         overrideUpdatedAt: r.ovr_updated_at,
     };
 }
@@ -53,6 +60,9 @@ function declDto(ctx, d) {
     return {
         id: d.id, teamId: d.team_id, date: d.declaration_date, origin: d.origin, sourceRef: d.source_ref, sourcePostedRaw: d.source_posted_raw,
         sourceFetchedAt: d.source_fetched_at, notes: d.notes, createdAt: d.created_at, updatedAt: d.updated_at,
+        // Crew on board: the sum of every listed member's weight; the source's own total is shown beside it.
+        totalWeight: sumWeights(members.map((m) => m.ovr_weight ?? m.src_weight)),
+        sourceTotalWeight: d.src_total_weight,
         members: members.map((m) => memberDto(ctx, m)),
     };
 }
@@ -81,18 +91,18 @@ export function createManualDeclaration(ctx, eventId, teamId, date, prefill) {
     db.transaction(() => {
         db.prepare(`INSERT INTO declarations (id, event_id, team_id, declaration_date, origin, created_at, updated_at) VALUES (?, ?, ?, ?, 'manual', ?, ?)`)
             .run(id, eventId, teamId, date, t, t);
-        const ins = db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, sailor_id, sailor_locked, match_status, ovr_position, ovr_number, ovr_updated_at, created_at, updated_at)
-      VALUES (?, ?, 'manual', ?, ?, 1, 'manual', ?, ?, ?, ?, ?)`);
+        const ins = db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, sailor_id, sailor_locked, match_status, ovr_position, ovr_number, ovr_weight, ovr_updated_at, created_at, updated_at)
+      VALUES (?, ?, 'manual', ?, ?, 1, 'manual', ?, ?, ?, ?, ?, ?)`);
         if (prefill === 'previous') {
             const prev = db.prepare('SELECT id FROM declarations WHERE event_id = ? AND team_id = ? AND declaration_date < ? ORDER BY declaration_date DESC LIMIT 1').get(eventId, teamId, date);
             if (prev) {
                 const rows = db.prepare('SELECT * FROM declaration_members WHERE declaration_id = ? AND sailor_id IS NOT NULL ORDER BY sort').all(prev.id);
-                rows.forEach((r, i) => ins.run(newId(), id, i, r.sailor_id, r.ovr_position ?? r.src_position ?? '', r.ovr_number ?? r.src_number ?? '', t, t, t));
+                rows.forEach((r, i) => ins.run(newId(), id, i, r.sailor_id, r.ovr_position ?? r.src_position ?? '', r.ovr_number ?? r.src_number ?? '', r.ovr_weight ?? r.src_weight ?? null, t, t, t));
             }
         }
         else if (prefill === 'roster') {
             const rows = db.prepare('SELECT id, default_position, default_number FROM sailors WHERE team_id = ? ORDER BY last_name, first_name').all(teamId);
-            rows.forEach((r, i) => ins.run(newId(), id, i, r.id, r.default_position, r.default_number, t, t, t));
+            rows.forEach((r, i) => ins.run(newId(), id, i, r.id, r.default_position, r.default_number, null, t, t, t));
         }
     })();
     return getDeclarationById(ctx, id);
@@ -123,12 +133,22 @@ export function addMember(ctx, declId, input) {
         throw conflict('This sailor is already in the crew.');
     const t = nowIso();
     const sort = db.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS n FROM declaration_members WHERE declaration_id = ?').get(declId).n;
-    db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, sailor_id, sailor_locked, match_status, ovr_position, ovr_number, ovr_updated_at, created_at, updated_at)
-    VALUES (?, ?, 'manual', ?, ?, 1, 'manual', ?, ?, ?, ?, ?)`)
-        .run(newId(), declId, sort, s.id, input.position ?? s.default_position, input.number ?? s.default_number, t, t, t);
+    db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, sailor_id, sailor_locked, match_status, ovr_position, ovr_number, ovr_weight, ovr_updated_at, created_at, updated_at)
+    VALUES (?, ?, 'manual', ?, ?, 1, 'manual', ?, ?, ?, ?, ?, ?)`)
+        .run(newId(), declId, sort, s.id, input.position ?? s.default_position, input.number ?? s.default_number, cleanKg(input.weight), t, t, t);
     touch(db, declId);
 }
-/** Manual correction of daily position/number. Stored as an override; the source value stays underneath. */
+/** Typed weight → "72.5"; empty → null. Rejects anything that is not a plausible weight in kg. */
+export function cleanKg(raw) {
+    const s = String(raw ?? '').trim().replace(',', '.').replace(/\s*kg$/i, '');
+    if (!s)
+        return null;
+    const n = Number(s);
+    if (!Number.isFinite(n) || n <= 0 || n > 400)
+        throw badRequest('Weight must be a number of kilograms, e.g. 72.5.');
+    return String(n);
+}
+/** Manual correction of daily position/number/weight. Stored as an override; the source value stays underneath. */
 export function setOverride(db, memberId, patch) {
     const m = getMember(db, memberId);
     const t = nowIso();
@@ -136,6 +156,8 @@ export function setOverride(db, memberId, patch) {
         db.prepare('UPDATE declaration_members SET ovr_position = ?, ovr_updated_at = ?, updated_at = ? WHERE id = ?').run(patch.position.trim(), t, t, m.id);
     if (patch.number !== undefined)
         db.prepare('UPDATE declaration_members SET ovr_number = ?, ovr_updated_at = ?, updated_at = ? WHERE id = ?').run(patch.number.trim(), t, t, m.id);
+    if (patch.weight !== undefined)
+        db.prepare('UPDATE declaration_members SET ovr_weight = ?, ovr_updated_at = ?, updated_at = ? WHERE id = ?').run(cleanKg(patch.weight), t, t, m.id);
     touch(db, m.declaration_id);
 }
 /** Drop the manual value so the field shows the source value again. */
@@ -148,6 +170,8 @@ export function clearOverride(db, memberId, field) {
         db.prepare('UPDATE declaration_members SET ovr_position = NULL, updated_at = ? WHERE id = ?').run(t, m.id);
     if (field === 'number' || field === 'all')
         db.prepare('UPDATE declaration_members SET ovr_number = NULL, updated_at = ? WHERE id = ?').run(t, m.id);
+    if (field === 'weight' || field === 'all')
+        db.prepare('UPDATE declaration_members SET ovr_weight = NULL, updated_at = ? WHERE id = ?').run(t, m.id);
     touch(db, m.declaration_id);
 }
 /** Operator links a published name to a sailor. remember=true also maps that spelling for future imports. */

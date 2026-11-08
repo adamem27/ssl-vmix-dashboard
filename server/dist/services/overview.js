@@ -1,4 +1,4 @@
-import { assertDate } from './declarations.js';
+import { assertDate, sumWeights } from './declarations.js';
 import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
@@ -18,7 +18,8 @@ export function overview(ctx, eventId, date, fleetSetId) {
     const members = db.prepare(`
     SELECT d.team_id AS teamId, d.origin AS declOrigin, m.sailor_id AS sailorId, m.source_name AS sourceName, m.sort, m.in_source AS inSource,
       COALESCE(m.ovr_position, m.src_position, '') AS position, COALESCE(m.ovr_number, m.src_number, '') AS number,
-      (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL) AS manual
+      COALESCE(m.ovr_weight, m.src_weight, '') AS weight,
+      (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL OR m.ovr_weight IS NOT NULL) AS manual
     FROM declarations d JOIN declaration_members m ON m.declaration_id = d.id
     WHERE d.event_id = ? AND d.declaration_date = ? ORDER BY m.sort`).all(eventId, date);
     const declared = new Set(db.prepare('SELECT team_id FROM declarations WHERE event_id = ? AND declaration_date = ?').all(eventId, date).map((r) => r.team_id));
@@ -27,14 +28,14 @@ export function overview(ctx, eventId, date, fleetSetId) {
         const bySailor = new Map(teamMembers.filter((m) => m.sailorId).map((m) => [m.sailorId, m]));
         const sailors = listSailors(ctx, t.id).map((s) => {
             const m = bySailor.get(s.id);
-            return { ...s, declared: m ? { position: m.position, number: m.number, manual: !!m.manual, sort: m.sort } : null };
+            return { ...s, declared: m ? { position: m.position, number: m.number, weight: m.weight, manual: !!m.manual, sort: m.sort } : null };
         });
         return {
-            id: t.id, code: t.code, name: t.name, nickname: t.nickname, isDemo: t.isDemo, thumb: t.thumb, assets: t.assets,
+            id: t.id, code: t.code, name: t.name, nickname: t.nickname, ranking: t.ranking, rankingManual: t.rankingManual, rankingPoints: t.rankingPoints, isDemo: t.isDemo, thumb: t.thumb, assets: t.assets,
             slots: TEAM_SLOTS.map((s) => ({ key: s.key, label: s.label, status: t.assets[s.key]?.checkStatus ?? 'missing' })),
             assetsFilled: t.assetsFilled, assetsTotal: t.assetsTotal,
             place: places.get(t.id) ?? null,
-            declaration: declared.has(t.id) ? { members: teamMembers.length, unmatched: teamMembers.filter((m) => !m.sailorId).map((m) => ({ name: m.sourceName ?? '', position: m.position, number: m.number })) } : null,
+            declaration: declared.has(t.id) ? { members: teamMembers.length, totalWeight: sumWeights(teamMembers.map((m) => m.weight)), unmatched: teamMembers.filter((m) => !m.sailorId).map((m) => ({ name: m.sourceName ?? '', position: m.position, number: m.number, weight: m.weight })) } : null,
             sailors,
         };
     });

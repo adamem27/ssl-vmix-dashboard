@@ -234,7 +234,7 @@ export function applyRooming(ctx, teams = loadRooming()) {
                 if (used.has(c.id))
                     continue;
                 const hasPhoto = db.prepare("SELECT 1 FROM assets WHERE owner_type = 'sailor' AND owner_id = ?").get(c.id);
-                if (hasPhoto || c.best_result_1 || c.best_result_2) {
+                if (hasPhoto || c.best_result_1 || c.best_result_2 || c.best_result_3) {
                     r.kept.push(`${t.code} ${c.first_name} ${c.last_name}`);
                     continue;
                 }

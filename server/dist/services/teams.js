@@ -27,6 +27,11 @@ export function updateTeam(db, id, input) {
     if (code !== cur.code)
         assertCodeFree(db, code, id);
     db.prepare('UPDATE teams SET name = ?, code = ?, nickname = ?, aliases = ?, notes = ?, updated_at = ? WHERE id = ?').run(input.name !== undefined ? input.name.trim() : cur.name, code, input.nickname !== undefined ? input.nickname.trim() : cur.nickname, input.aliases !== undefined ? cleanAliases(input.aliases) : cur.aliases, input.notes ?? cur.notes, nowIso(), id);
+    // Ranking typed by the operator. Empty, or the same as the source value, goes back to the source value.
+    if (input.ranking !== undefined) {
+        const v = input.ranking.trim();
+        db.prepare('UPDATE teams SET ranking_ovr = ? WHERE id = ?').run(v && v !== (cur.ranking_src ?? '') ? v : null, id);
+    }
 }
 export function deleteTeam(ctx, id) {
     const sailors = ctx.db.prepare('SELECT id FROM sailors WHERE team_id = ?').all(id);
@@ -49,6 +54,8 @@ export function teamDto(ctx, t) {
     catch { /* keep empty */ }
     return {
         id: t.id, name: t.name, code: t.code, nickname: t.nickname ?? '', aliases, notes: t.notes, isDemo: !!t.is_demo, updatedAt: t.updated_at,
+        ranking: t.ranking_ovr ?? t.ranking_src ?? '', rankingSource: t.ranking_src ?? null, rankingPoints: t.ranking_points_src ?? '',
+        rankingManual: t.ranking_ovr !== null && t.ranking_ovr !== undefined, rankingFetchedAt: t.ranking_fetched_at ?? null,
         assets, assetsFilled: filled, assetsTotal: TEAM_SLOTS.length,
         thumb: thumb ? { slot: thumb.slot, previewUrl: thumb.previewUrl, checkStatus: thumb.checkStatus } : null,
         sailorCount,

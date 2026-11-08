@@ -10,6 +10,8 @@ export const TEAM_SLOTS = [
     { key: 'sponsor_1', label: 'Sponsor logo 1' },
     { key: 'sponsor_2', label: 'Sponsor logo 2' },
     { key: 'sponsor_3', label: 'Sponsor logo 3' },
+    { key: 'sponsor_4', label: 'Sponsor logo 4' },
+    { key: 'sponsor_5', label: 'Sponsor logo 5' },
 ];
 export const SAILOR_SLOTS = [{ key: 'photo', label: 'Photo' }];
 export const PERSON_SLOTS = [{ key: 'photo', label: 'Photo' }];
@@ -20,3 +22,5 @@ export function slotsFor(owner) {
 export function allowedKinds(owner) {
     return owner === 'team' ? ['png'] : ['png', 'jpeg'];
 }
+/** Uploads to these slots are redrawn to one standard size (see logo.ts). */
+export const isSponsorSlot = (owner, slot) => owner === 'team' && /^sponsor_\d+$/.test(slot);

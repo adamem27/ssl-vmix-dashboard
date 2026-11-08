@@ -6,6 +6,7 @@ import { WorkbookWriter } from './services/workbook.js';
 import { applyGoldCupOnStart } from './services/presets.js';
 import { GeneratorExporter, seedGenerator } from './services/generator/generator.js';
 import { applyTeamGraphicsOnStart } from './services/teamGraphics.js';
+import { rankingOnStart } from './services/ranking.js';
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
 const workbook = new WorkbookWriter({ db, assetsDir: config.assetsDir }, config.workbookFile, (m) => app.log.warn(m));
@@ -19,6 +20,7 @@ const graphics = applyTeamGraphicsOnStart({ db, assetsDir: config.assetsDir });
 if (graphics)
     app.log.info(`Team flags and emblems applied: ${JSON.stringify(graphics)}`);
 sync.start();
+const stopRanking = rankingOnStart(db, (m) => app.log.info(m));
 workbook.start();
 generator.start();
 await app.listen({ host: config.host, port: config.port });
@@ -29,6 +31,7 @@ app.log.info(`Generated PNGs: ${generator.dir}`);
 app.log.info(`Dashboard: http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`);
 const shutdown = async () => {
     sync.stop();
+    stopRanking();
     workbook.stop();
     generator.stop();
     await app.close();

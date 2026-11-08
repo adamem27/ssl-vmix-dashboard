@@ -74,14 +74,14 @@ export function applyParsed(db, eventId, parsed, fetchedAt) {
         let created = false;
         if (!decl) {
             decl = { id: newId() };
-            db.prepare(`INSERT INTO declarations (id, event_id, team_id, declaration_date, origin, source_ref, source_posted_raw, source_fetched_at, created_at, updated_at)
-                  VALUES (?, ?, ?, ?, 'import', ?, ?, ?, ?, ?)`).run(decl.id, eventId, team.id, p.date, p.sourceRef, p.postedRaw, fetchedAt, t, t);
+            db.prepare(`INSERT INTO declarations (id, event_id, team_id, declaration_date, origin, source_ref, source_posted_raw, source_fetched_at, src_total_weight, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, 'import', ?, ?, ?, ?, ?, ?)`).run(decl.id, eventId, team.id, p.date, p.sourceRef, p.postedRaw, fetchedAt, p.totalWeight ?? null, t, t);
             created = true;
             s.declarationsAdded++;
         }
         else {
-            db.prepare('UPDATE declarations SET source_ref = COALESCE(?, source_ref), source_posted_raw = COALESCE(?, source_posted_raw), source_fetched_at = ? WHERE id = ?')
-                .run(p.sourceRef, p.postedRaw, fetchedAt, decl.id);
+            db.prepare('UPDATE declarations SET source_ref = COALESCE(?, source_ref), source_posted_raw = COALESCE(?, source_posted_raw), source_fetched_at = ?, src_total_weight = COALESCE(?, src_total_weight) WHERE id = ?')
+                .run(p.sourceRef, p.postedRaw, fetchedAt, p.totalWeight ?? null, decl.id);
         }
         const rows = db.prepare('SELECT * FROM declaration_members WHERE declaration_id = ?').all(decl.id);
         const bySource = new Map(rows.filter((r) => r.source_key).map((r) => [r.source_key, r]));
@@ -101,8 +101,8 @@ export function applyParsed(db, eventId, parsed, fetchedAt) {
             if (!row && match?.status === 'matched') {
                 const manual = rows.find((r) => r.sailor_id === match.sailorId && !r.source_key);
                 if (manual) {
-                    db.prepare('UPDATE declaration_members SET source_key = ?, source_name = ?, src_position = ?, src_number = ?, in_source = 1, updated_at = ? WHERE id = ?')
-                        .run(key, m.sourceName, m.position, m.number, t, manual.id);
+                    db.prepare('UPDATE declaration_members SET source_key = ?, source_name = ?, src_position = ?, src_number = ?, src_weight = ?, in_source = 1, updated_at = ? WHERE id = ?')
+                        .run(key, m.sourceName, m.position, m.number, m.weight ?? null, t, manual.id);
                     row = { ...manual, source_key: key };
                     bySource.set(key, row);
                     changedHere = true;
@@ -112,23 +112,23 @@ export function applyParsed(db, eventId, parsed, fetchedAt) {
                 }
             }
             if (!row) {
-                db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, source_name, source_key, src_position, src_number, in_source, sailor_id, sailor_locked, match_status, created_at, updated_at)
-                    VALUES (?, ?, 'import', ?, ?, ?, ?, ?, 1, ?, 0, ?, ?, ?)`)
-                    .run(newId(), decl.id, i, m.sourceName, key, m.position, m.number, match.sailorId, match.status, t, t);
+                db.prepare(`INSERT INTO declaration_members (id, declaration_id, origin, sort, source_name, source_key, src_position, src_number, src_weight, in_source, sailor_id, sailor_locked, match_status, created_at, updated_at)
+                    VALUES (?, ?, 'import', ?, ?, ?, ?, ?, ?, 1, ?, 0, ?, ?, ?)`)
+                    .run(newId(), decl.id, i, m.sourceName, key, m.position, m.number, m.weight ?? null, match.sailorId, match.status, t, t);
                 s.membersAdded++;
                 if (match.status !== 'matched')
                     s.membersUnmatched++;
                 changedHere = true;
                 return;
             }
-            const srcChanged = row.src_position !== m.position || row.src_number !== m.number || row.source_name !== m.sourceName || !row.in_source;
+            const srcChanged = row.src_position !== m.position || row.src_number !== m.number || row.src_weight !== (m.weight ?? null) || row.source_name !== m.sourceName || !row.in_source;
             const sailorId = row.sailor_locked ? row.sailor_id : match.sailorId;
             const status = row.sailor_locked ? row.match_status : match.status;
             const matchChanged = sailorId !== row.sailor_id || status !== row.match_status;
             if (srcChanged || matchChanged || (row.origin === 'import' && row.sort !== i)) {
-                db.prepare(`UPDATE declaration_members SET source_name = ?, src_position = ?, src_number = ?, in_source = 1, sailor_id = ?, match_status = ?,
+                db.prepare(`UPDATE declaration_members SET source_name = ?, src_position = ?, src_number = ?, src_weight = ?, in_source = 1, sailor_id = ?, match_status = ?,
                     sort = CASE WHEN origin = 'import' THEN ? ELSE sort END, updated_at = ? WHERE id = ?`)
-                    .run(m.sourceName, m.position, m.number, sailorId, status, i, t, row.id);
+                    .run(m.sourceName, m.position, m.number, m.weight ?? null, sailorId, status, i, t, row.id);
             }
             if (srcChanged || matchChanged) {
                 s.membersChanged++;
@@ -142,7 +142,7 @@ export function applyParsed(db, eventId, parsed, fetchedAt) {
         for (const r of rows) {
             if (!r.source_key || seen.has(r.source_key) || !r.in_source)
                 continue;
-            const operatorTouched = r.origin === 'manual' || r.ovr_position !== null || r.ovr_number !== null || r.sailor_locked;
+            const operatorTouched = r.origin === 'manual' || r.ovr_position !== null || r.ovr_number !== null || r.ovr_weight !== null || r.sailor_locked;
             if (operatorTouched) {
                 db.prepare('UPDATE declaration_members SET in_source = 0, updated_at = ? WHERE id = ?').run(t, r.id);
                 s.warnings.push(`${p.teamRef} ${p.dateRaw}: “${r.source_name}” is no longer in the source; entry kept because it has manual changes.`);
