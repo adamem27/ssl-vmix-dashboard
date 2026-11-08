@@ -254,6 +254,20 @@ describe('gtzip part counts', () => {
     expect(named(back.root, 'SPONSORS')!.attrs.Location).toBe('510,700,0');
   });
 
+  it('keeps the animations when rows go and fits them to the new number of rows', () => {
+    const anims = '<Reveal Object="PANEL" Duration="0.8" Direction="Top" /><Fly Object="BAR 1" Delay="0.2" /><Fly Object="BAR 2" Delay="0.3" /><Fly Object="BAR 3" Delay="0.4" /><Fade Object="SPONSORS" Delay="0.6" />';
+    const root = doc(`<Image Name="PANEL" Dimensions="900,400,0" Location="510,250,0"><Image.Bitmap><Bitmap Source="${FLAG}" /></Image.Bitmap></Image>` + row(1) + row(2) + row(3) + '<Rectangle Name="SPONSORS" Dimensions="900,60,0" Location="510,700,0" />', anims);
+    const [g] = repeatGroups(root);
+    const delays = (r: GtNode) => Object.fromEntries(animationsOf(storyboards(r)[0].node).map((a) => [a.attrs.Object, Number(a.attrs.Delay ?? 0)]));
+    const less = setCount(root, g.id, 2, { shiftAfter: true, stretch: true });
+    // removing a row used to drop every animation of the title
+    expect(delays(less.root)).toEqual({ PANEL: 0, 'BAR 1': 0.2, 'BAR 2': 0.3, SPONSORS: 0.5 });
+    const panel = animationsOf(storyboards(less.root)[0].node).find((a) => a.attrs.Object === 'PANEL')!;
+    expect(Number(panel.attrs.Duration)).toBeCloseTo(0.8 * 325 / 400, 2);
+    const more = setCount(root, g.id, 5, { shiftAfter: true, stretch: true });
+    expect(delays(more.root)).toMatchObject({ 'BAR 4': 0.5, 'BAR 5': 0.6, SPONSORS: 0.8 });
+  });
+
   it('treats hidden rows at the end as spares', () => {
     const root = doc(row(1) + row(2) + layer('BAR 3', 150, '<Rectangle Name="ROWBG 3" Dimensions="800,60,0" Location="560,400,0" /><TextBlock Name="POSITION 3" Dimensions="40,40,0" Location="570,410,0" Text="3" /><TextBlock Name="RACE 3" Dimensions="120,40,0" Location="1200,410,0" Text="RACE 3" />', ' Visible="False"'));
     const [g] = repeatGroups(root);

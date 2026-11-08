@@ -502,7 +502,7 @@ export function setCount(root0: GtNode, groupId: string, n: number, o: CountOpts
     const g = repeatGroups(root).find((x) => x.id === groupId);
     if (!g) throw new Error('This part of the title is not found any more.');
     if (g.spares) { root = remove(root, g.members[g.members.length - 1].paths); continue; }
-    if (g.count === target) return { root, bands };
+    if (g.count === target) { if (root !== root0) retime(root0, root, groupId); return { root, bands }; }
     // keep the step of the original parts while adding/removing (it is lost when only one part is left)
     if (!g.step) g.step = step0;
     root = g.count < target ? addOne(root, g, o, bands) : removeLast(root, g, o, bands);
@@ -511,3 +511,76 @@ export function setCount(root0: GtNode, groupId: string, n: number, o: CountOpts
   }
   return { root, bands };
 }
+
+/**
+ * Fits the animations to the new number of parts, so the title still plays as one piece: in every storyboard the
+ * parts keep their cascade (each part one step after the previous; a cascade that runs backwards, as in an Out, ends on
+ * the last part), what played after the parts moves along with the end of the cascade, and a background that grew or
+ * shrank with the parts reveals at the same speed (its Reveal/Expand/Wipe takes longer or shorter).
+ */
+function retime(root0: GtNode, root: GtNode, groupId: string) {
+  const g0 = repeatGroups(root0).find((x) => x.id === groupId);
+  const g1 = repeatGroups(root).find((x) => x.id === groupId);
+  if (!g0 || !g1) return;
+  const namesIn = (r: GtNode, m: RepeatMember) => m.paths.flatMap((p) => { const n = nodeAt(r, p); return n ? namedIn(n).map((x) => x.attrs.Name) : []; });
+  const m0 = g0.members.filter((m) => !m.hidden).map((m) => namesIn(root0, m));
+  const m1 = g1.members.filter((m) => !m.hidden).map((m) => namesIn(root, m));
+  const sb0 = storyboards(root0), sb1 = storyboards(root);
+  const r3 = (x: number) => Math.round(Math.max(0, x) * 1000) / 1000;
+  const setDelay = (a: GtNode, d: number) => { if (d <= 0) delete a.attrs.Delay; else a.attrs.Delay = String(r3(d)); };
+  sb1.forEach((sb, si) => {
+    const old = sb0.find((x) => (x.node.attrs.Type ?? '') === (sb.node.attrs.Type ?? '') && (x.node.attrs.DataName ?? '') === (sb.node.attrs.DataName ?? ''));
+    if (!old) return;
+    const anim0 = animationsOf(old.node), anim1 = animationsOf(sb.node);
+    // which part an animation belongs to, and which of its elements (by position) it moves
+    const slot = (names: string[][], obj: string) => { for (let k = 0; k < names.length; k++) { const j = names[k].indexOf(obj); if (j >= 0) return { k, j }; } return null; };
+    const series = new Map<string, { k: number; d: number }[]>();
+    let oldMax = -Infinity;
+    for (const a of anim0) {
+      const s0 = slot(m0, a.attrs.Object ?? '');
+      if (!s0) continue;
+      const key = `${a.tag}|${s0.j}`, d = Number(a.attrs.Delay ?? 0);
+      if (!series.has(key)) series.set(key, []);
+      series.get(key)!.push({ k: s0.k, d });
+      oldMax = Math.max(oldMax, d);
+    }
+    if (!series.size) return;
+    let newMax = -Infinity;
+    for (const a of anim1) {
+      const s1 = slot(m1, a.attrs.Object ?? '');
+      if (!s1) continue;
+      const pts = series.get(`${a.tag}|${s1.j}`);
+      if (!pts?.length) continue;
+      pts.sort((x, y) => x.k - y.k);
+      const first = pts[0], last = pts[pts.length - 1];
+      const step = pts.length > 1 ? (last.d - first.d) / (last.k - first.k) : 0;
+      // forward cascades start where they started; backward ones end on the last part where they ended
+      const d = step >= 0 ? first.d + (s1.k - first.k) * step : last.d + (m1.length - 1 - s1.k) * -step - (m0.length - 1 - last.k) * -step;
+      setDelay(a, d);
+      newMax = Math.max(newMax, r3(d));
+    }
+    if (!Number.isFinite(newMax)) return;
+    const shift = newMax - oldMax;
+    if (Math.abs(shift) > 1e-6) for (const a of anim1) {
+      if (slot(m1, a.attrs.Object ?? '')) continue;
+      const d = Number(a.attrs.Delay ?? 0);
+      if (d >= oldMax - 1e-6) setDelay(a, d + shift);
+    }
+    void si;
+  });
+  // backgrounds that grew/shrank with the parts: same reveal speed
+  const axis = g0.step && Math.abs(g0.step[0]) > Math.abs(g0.step[1]) ? 0 : 1;
+  const ix0 = boxIndex(root0), ix1 = boxIndex(root);
+  const pathOf = (ix: ReturnType<typeof boxIndex>, name: string) => ix.els.find((e) => e.node.attrs.Name === name)?.path;
+  for (const sb of sb1) for (const a of animationsOf(sb.node)) {
+    if (!['Reveal', 'Expand', 'Wipe'].includes(a.tag) || slot2(m1, a.attrs.Object)) continue;
+    const p0 = pathOf(ix0, a.attrs.Object ?? ''), p1 = pathOf(ix1, a.attrs.Object ?? '');
+    const b0 = p0 && ix0.of([p0]), b1 = p1 && ix1.of([p1]);
+    if (!b0 || !b1) continue;
+    const l0 = b0[axis + 2] - b0[axis], l1 = b1[axis + 2] - b1[axis];
+    if (l0 <= 0 || Math.abs(l1 / l0 - 1) < 0.02) continue;
+    const dur = Number(a.attrs.Duration ?? 1) * (l1 / l0);
+    a.attrs.Duration = String(r3(Math.min(3, Math.max(0.2, dur))));
+  }
+}
+const slot2 = (names: string[][], obj: string | undefined) => !!obj && names.some((n) => n.includes(obj));
