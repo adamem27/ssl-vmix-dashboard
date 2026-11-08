@@ -8,7 +8,8 @@ import { badRequest } from '../errors.js';
 import { joinVmixPath } from '../paths.js';
 import { listAssets } from '../assets.js';
 import { getStrokeGradient, listGradients, listTemplates } from '../generator/generator.js';
-import { defaultSlotState, drawMatchboard } from './draw.js';
+import { defaultSlotState, drawMatchboard, resolveTeams } from './draw.js';
+export { resolveTeams, linkOf } from './draw.js';
 /** The exported board lives next to the other assets, so vmix-sync mirrors it to the vMix machine. */
 export const MATCHBOARD_REL = 'matchboard/matchboard.png';
 /** Element added to the PNG generator for the highlight, sized like a matchboard row. */
@@ -290,7 +291,7 @@ export class MatchboardExporter {
         const state = getState(db);
         const tpl = listTemplates(db).find((t) => t.id === state.highlightTemplateId) ?? null;
         const gradients = new Map(listGradients(db).map((g) => [g.teamId, g.gradients]));
-        const used = new Set(Object.values(state.slots).map((s) => s.teamId).filter(Boolean));
+        const used = new Set([...resolveTeams(layout, state).values()].map((r) => r.teamId));
         const teams = new Map();
         for (const id of used) {
             const row = db.prepare('SELECT id, code FROM teams WHERE id = ?').get(id);

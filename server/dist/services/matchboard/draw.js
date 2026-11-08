@@ -15,6 +15,56 @@ export function defaultSlotState(s, teamIdByCode) {
     const teamId = s.team ? teamIdByCode.get(s.team.toUpperCase()) ?? null : null;
     return { teamId, text: s.team && !teamId ? s.team : s.text, highlight: false };
 }
+const norm = (t) => t.toUpperCase().replace(/[^A-Z0-9]/g, '');
+/** Reads a row text such as “R1 C1” (box R1 C, 1st place) as a link to that box's row; null for “DRAW 1” and other texts. */
+export function linkOf(layout, text) {
+    const m = /^(.*?)(\d)$/.exec(norm(text));
+    if (!m)
+        return null;
+    for (const g of layout.groups) {
+        const label = layout.texts.find((t) => t.id === g.labelId)?.text ?? '';
+        const place = Number(m[2]);
+        if (norm(label) === m[1] && place >= 1 && place <= g.slots.length)
+            return { group: g, place, label };
+    }
+    return null;
+}
+/**
+ * The team shown in every row: the one picked there, or for a row whose text links to a place in an earlier box
+ * (“R1 C1”) the team standing there once it is starred. Rows of a box are its standings, top row = 1st place.
+ * The Petit Final takes the teams that did not go through: its rows fill as soon as the semifinal has starred
+ * rows above them.
+ */
+export function resolveTeams(layout, state) {
+    const out = new Map();
+    const slotState = (id) => state.slots[id] ?? { teamId: null, text: layout.slots.find((s) => s.id === id)?.text ?? '', highlight: false };
+    const resolve = (id, depth) => {
+        if (out.has(id))
+            return out.get(id);
+        if (depth > 20)
+            return null;
+        const st = slotState(id);
+        let r = null;
+        if (st.teamId)
+            r = { teamId: st.teamId, from: null };
+        else {
+            const link = linkOf(layout, st.text);
+            if (link && !link.group.slots.includes(id)) {
+                const src = link.group.slots[link.place - 1];
+                const team = resolve(src, depth + 1);
+                const starred = link.group.slots.map((sid, i) => (slotState(sid).highlight && resolve(sid, depth + 1) ? i + 1 : 0)).filter(Boolean);
+                const petit = /PETIT/i.test(layout.texts.find((t) => t.id === layout.groups.find((g) => g.slots.includes(id))?.labelId)?.text ?? '');
+                if (team && (petit ? starred.length > 0 && link.place > Math.max(...starred) : slotState(src).highlight))
+                    r = { teamId: team.teamId, from: link };
+            }
+        }
+        out.set(id, r);
+        return r;
+    };
+    for (const s of layout.slots)
+        resolve(s.id, 0);
+    return new Map([...out].filter((e) => !!e[1]));
+}
 function roundRect(ctx, x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -48,13 +98,15 @@ export function drawMatchboard(ctx, input) {
     const { layout, state, teams } = input;
     const fonts = input.fonts ?? { sans: '"General Sans"', grotesk: '"Space Grotesk"' };
     const pr = input.pixelRatio ?? 1;
+    const resolved = resolveTeams(layout, state);
     ctx.save();
     ctx.textBaseline = 'alphabetic';
     if (input.background)
         ctx.drawImage(input.background, 0, 0, layout.width, layout.height);
     for (const s of layout.slots) {
         const st = state.slots[s.id] ?? { teamId: null, text: s.text, highlight: false };
-        const team = st.teamId ? teams.get(st.teamId) ?? null : null;
+        const teamId = resolved.get(s.id)?.teamId;
+        const team = teamId ? teams.get(teamId) ?? null : null;
         if (team && st.highlight && team.gradient && input.highlight) {
             const { variant: _v, ...spec } = input.highlight;
             const w = Math.max(1, Math.round(s.w * pr)), h = Math.max(1, Math.round(s.h * pr));
