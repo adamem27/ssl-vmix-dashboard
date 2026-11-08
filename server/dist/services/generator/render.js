@@ -195,27 +195,31 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
     }
     return { width: W, height: H, data };
 }
-/** The stroke (obwoluta) gradient from gradienty.ai: SSL green → blue at −45°, fading out at the end. */
+/** The stroke (obwoluta) gradient from finals-broadcast_ssl26_v2: orange → yellow at −45°, solid at both corners, clear in the middle. */
 export const DEFAULT_STROKE_GRADIENT = {
     angle: -45,
     stops: [
-        { pos: 0, color: '#00b15e', opacity: 10 },
-        { pos: 30, color: '#00b15e', opacity: 100 },
-        { pos: 70, color: '#0085e6', opacity: 100 },
-        { pos: 100, color: '#0085e6', opacity: 0 },
+        { pos: 0, color: '#f28c06', opacity: 100 },
+        { pos: 50, color: '#fece00', opacity: 0 },
+        { pos: 100, color: '#fece00', opacity: 100 },
     ],
 };
+/** A full-colour gradient (version 1) → the three standard versions seen in the Illustrator files. */
+export function gradientVersionsFrom(g) {
+    const stops = [...g.stops].sort((a, b) => a.pos - b.pos);
+    const squeeze = (from, to) => stops.map((s) => ({ ...s, pos: Math.round((from + ((to - from) * s.pos) / 100) * 10) / 10 }));
+    const first = stops[0], last = stops[stops.length - 1];
+    return [
+        // V1: full colour bar
+        { angle: g.angle, stops },
+        // V2: fades in from the left
+        { angle: g.angle, stops: [{ pos: 0, color: first.color, opacity: 0 }, ...squeeze(45, 100)] },
+        // V3: fades in and out
+        { angle: g.angle, stops: [{ pos: 0, color: first.color, opacity: 0 }, ...squeeze(30, 70), { pos: 100, color: last.color, opacity: 0 }] },
+    ];
+}
 /** Two or three base colours → the three standard versions seen in the Illustrator files. */
 export function gradientVersions(colors, angle = 0) {
     const c = colors.filter(Boolean);
-    const even = (cs, from, to) => cs.map((color, i) => ({ pos: cs.length === 1 ? from : from + ((to - from) * i) / (cs.length - 1), color, opacity: 100 }));
-    const solid = even(c, 0, 100);
-    return [
-        // V1: full colour bar
-        { angle, stops: solid },
-        // V2: fades in from the left
-        { angle, stops: [{ pos: 0, color: c[0], opacity: 0 }, ...even(c, 45, 100)] },
-        // V3: fades in and out
-        { angle, stops: [{ pos: 0, color: c[0], opacity: 0 }, ...even(c, 30, 70), { pos: 100, color: c[c.length - 1], opacity: 0 }] },
-    ];
+    return gradientVersionsFrom({ angle, stops: c.map((color, i) => ({ pos: c.length === 1 ? 0 : (100 * i) / (c.length - 1), color, opacity: 100 })) });
 }
