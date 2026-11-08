@@ -74,7 +74,15 @@ function Update-App {
     Move-Item (Join-Path $tmp 'app') $App
     Set-Content (Join-Path $App 'version.txt') "$($a.id)"
     # Launcher files take effect on the next start.
-    Get-ChildItem $tmp -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $Root $_.Name) -Force }
+    # A file that cannot be replaced (read-only, open elsewhere) only gets a warning: the app itself is already updated.
+    Get-ChildItem $tmp -File | ForEach-Object {
+      $name = $_.Name; $dest = Join-Path $Root $name
+      try {
+        if ((Test-Path $dest) -and (Get-FileHash $dest).Hash -eq (Get-FileHash $_.FullName).Hash) { return }
+        if (Test-Path $dest) { (Get-Item $dest -Force).Attributes = 'Normal' }
+        Copy-Item $_.FullName $dest -Force
+      } catch { Say "Could not replace $name ($($_.Exception.Message)) - keeping the old one." }
+    }
     if (Test-Path $old) { Remove-Item $old -Recurse -Force -ErrorAction SilentlyContinue }
     Say 'Updated.'
   } catch {
