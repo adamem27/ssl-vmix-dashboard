@@ -9,6 +9,7 @@ import {
   sourceName, storyboardLength, storyboards, vec,
 } from '../../../server/src/services/gtzip/model';
 import { drawTitle, Img } from '../../../server/src/services/gtzip/draw';
+import { RepeatGroup, repeatGroups } from '../../../server/src/services/gtzip/params';
 
 interface TemplateMeta { id: string; name: string; originalFilename: string; uploadedAt: string; size: number; width: number; height: number; elements: number; fields: number; storyboards: number; scene?: string | null; variant?: string | null }
 interface OutputInfo { name: string; file: string; size: number; createdAt: string; vmixPath: string | null; templateId: string | null }
@@ -216,6 +217,8 @@ function useImages(templateId: string) {
 const imageUrl = (templateId: string, src: string) => `/api/gtzip/image?template=${encodeURIComponent(templateId)}&src=${encodeURIComponent(src)}`;
 
 type SideTab = 'layers' | 'animations' | 'fields';
+type Mode = 'quick' | 'advanced';
+const MODE_KEY = 'gtzip-mode';
 
 function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[]; onOpen: (id: string) => void }) {
   const id = tpl.meta.id;
@@ -228,6 +231,8 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
   const [side, setSide] = useState<SideTab>('layers');
   const [dupOpen, setDupOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
+  const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'advanced' ? 'advanced' : 'quick'; } catch { return 'quick'; } });
+  const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ } };
   const toast = useToast();
   const { ask, dialog } = useConfirm();
   const images = useImages(id);
@@ -293,6 +298,11 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
         <h1 className="truncate text-lg font-semibold">{tpl.meta.name}</h1>
         <SceneSelect scenes={scenes} meta={tpl.meta} />
         <span className="mr-auto" />
+        <span className="flex rounded-md border border-ink-700 p-0.5 text-xs">
+          {([['quick', 'Quick form'], ['advanced', 'Advanced editor']] as [Mode, string][]).map(([k, l]) => (
+            <button key={k} onClick={() => setMode(k)} className={cx('rounded px-2 py-1', mode === k ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{l}</button>
+          ))}
+        </span>
         <Button size="sm" onClick={() => setSaveOpen(true)} title="Keep this state as a template of its own, e.g. one variant of the scene">Save as template…</Button>
         <Button size="sm" onClick={h.undo} disabled={!h.canUndo} title="Ctrl+Z">↶ Undo</Button>
         <Button size="sm" onClick={h.redo} disabled={!h.canRedo} title="Ctrl+Shift+Z">↷ Redo</Button>
@@ -312,7 +322,9 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
             onMove={(dx, dy) => mutateSel((n) => { const [x, y] = vec(n.attrs.Location); setVec(n, 'Location', x + dx, y + dy); }, 'drag')} />
           <p className="text-[11px] text-ink-500">Preview is approximate (fonts, effects and text fitting may differ slightly in vMix). Dashed boxes are picture fields filled by vMix.</p>
         </div>
-        <div className="w-full shrink-0 space-y-3 2xl:w-[28rem]">
+        {mode === 'quick' ? <div className="w-full shrink-0 2xl:w-[28rem]">
+          <QuickForm tpl={tpl} doc={doc} commit={commit} images={images.get} sel={sel} setSel={setSel} />
+        </div> : <div className="w-full shrink-0 space-y-3 2xl:w-[28rem]">
           <nav className="flex gap-1 border-b border-ink-800">
             {([['layers', 'Layers'], ['animations', 'Animations'], ['fields', 'vMix fields']] as [SideTab, string][]).map(([k, l]) => (
               <button key={k} onClick={() => setSide(k)} className={cx('-mb-px border-b-2 px-3 py-1.5 text-sm font-semibold', side === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{l}</button>
@@ -331,7 +343,7 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
           </>}
           {side === 'animations' && <Animations doc={doc} mutate={mutate} selNames={selInfos.map((e) => e.node.attrs.Name).filter(Boolean)} />}
           {side === 'fields' && <Fields doc={doc} />}
-        </div>
+        </div>}
       </div>
       {saveOpen && <SaveTemplateDialog scenes={scenes} tpl={tpl} doc={doc} onClose={() => setSaveOpen(false)} onSaved={(m) => { setSaveOpen(false); onOpen(m.id); }} />}
       {dupOpen && <DuplicateDialog infos={selInfos} els={els} doc={doc} onClose={() => setDupOpen(false)} onApply={(o) => {
@@ -353,7 +365,19 @@ function GenerateBar({ tpl, doc }: { tpl: TemplateDoc; doc: GtNode }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [suggest, setSuggest] = useState<string | null>(null);
-  useEffect(() => { api.get<{ name: string }>(`/api/gtzip/free-name?name=${encodeURIComponent(tpl.meta.name)}`).then((r) => setName(r.name)).catch(() => setName(tpl.meta.name)); }, [tpl.meta.name]);
+  // the template's name with the new count when the number of rows/teams/sailors changed (Day_schedule_4_races → …_3_races)
+  const baseName = useMemo(() => {
+    const before = repeatGroups(tpl.doc), after = repeatGroups(doc);
+    let n = tpl.meta.name;
+    for (const g of before) {
+      const a = after.find((x) => x.id === g.id);
+      if (!a || a.count === g.count) continue;
+      const re = new RegExp(`(^|\\D)${g.count}(?!\\d)`);
+      if (re.test(n)) n = n.replace(re, (_m, pre) => `${pre}${a.count}`);
+    }
+    return n;
+  }, [tpl.doc, tpl.meta.name, doc]);
+  useEffect(() => { api.get<{ name: string }>(`/api/gtzip/free-name?name=${encodeURIComponent(baseName)}`).then((r) => setName(r.name)).catch(() => setName(baseName)); }, [baseName]);
   const generate = async () => {
     setBusy(true); setSuggest(null);
     try {
@@ -381,6 +405,143 @@ function GenerateBar({ tpl, doc }: { tpl: TemplateDoc; doc: GtNode }) {
       <p className="w-full text-[11px] text-ink-500">Each click writes one new file. An existing file is never replaced, and the template stays unchanged.</p>
     </div>
   );
+}
+
+// ---------- quick form ----------
+interface CountOptions { shiftAfter: boolean; stretch: boolean; center: boolean }
+const COUNT_OPTS_KEY = 'gtzip-count-options';
+const textOf = (n: GtNode) => {
+  if (n.tag !== 'Ticker' || n.attrs.Text != null) return n.attrs.Text ?? '';
+  return n.children.find((c) => c.tag === 'Ticker.Template')?.children.find((c) => c.tag === 'TextBlock')?.attrs.Text ?? '';
+};
+function setTextOf(n: GtNode, v: string) {
+  const t = n.tag === 'Ticker' && n.attrs.Text == null ? n.children.find((c) => c.tag === 'Ticker.Template')?.children.find((c) => c.tag === 'TextBlock') : n;
+  if (t) t.attrs.Text = v.replace(/\r?\n/g, '\r\n');
+}
+/** What a person fills in: texts and pictures shown in the title (hidden previews and spares left out). */
+function fillable(els: ElementInfo[], doc: GtNode) {
+  const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
+  const byKey = new Map(els.map((e) => [pathKey(e.path), e]));
+  const shown = (e: ElementInfo): boolean => isVisible(e.node) && (!e.parentPath || shown(byKey.get(pathKey(e.parentPath))!));
+  return els.filter((e) => {
+    if (!e.node.attrs.Name || !shown(e)) return false;
+    if (e.node.tag === 'TextBlock' || e.node.tag === 'Ticker' || e.node.tag === 'Text3D') return true;
+    if (e.node.tag !== 'Image') return false;
+    const [w, h] = vec(e.node.attrs.Dimensions);
+    return !(w >= 0.9 * W && h >= 0.9 * H); // a full-frame picture is the background or a preview
+  });
+}
+
+/**
+ * The simple way to make a new file from a template: how many rows / teams / sailors (the title's repeated parts,
+ * found automatically), then the texts and pictures, part by part. The layer editor is the advanced mode.
+ */
+function QuickForm({ tpl, doc, commit, images, sel, setSel }: {
+  tpl: TemplateDoc; doc: GtNode; commit: (r: GtNode, key?: string) => void; images: (src: string) => Img | null; sel: string[]; setSel: (s: string[]) => void;
+}) {
+  const toast = useToast();
+  const groups = useMemo(() => repeatGroups(doc), [doc]);
+  const els = useMemo(() => elements(doc), [doc]);
+  const items = useMemo(() => fillable(els, doc), [els, doc]);
+  const [opts, setOptsState] = useState<CountOptions>(() => {
+    try { return { shiftAfter: true, stretch: true, center: false, ...JSON.parse(localStorage.getItem(COUNT_OPTS_KEY) ?? '{}') }; } catch { return { shiftAfter: true, stretch: true, center: false }; }
+  });
+  const setOpts = (o: CountOptions) => { setOptsState(o); try { localStorage.setItem(COUNT_OPTS_KEY, JSON.stringify(o)); } catch { /* storage unavailable */ } };
+  const [busy, setBusy] = useState<string | null>(null);
+  const [pick, setPick] = useState<ElementInfo | null>(null);
+
+  const setCount = async (g: RepeatGroup, n: number) => {
+    if (!Number.isFinite(n) || n < 1 || n === g.count || busy) return;
+    setBusy(g.id);
+    try {
+      const r = await api.post<{ doc: GtNode }>('/api/gtzip/part-count', { template: tpl.meta.id, doc, group: g.id, count: Math.min(40, Math.floor(n)), options: opts });
+      commit(r.doc);
+      if (!g.step && n > g.count) toast.ok('Added. If it should sit somewhere else, move it in the advanced editor.');
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
+  const edit = (e: ElementInfo, fn: (n: GtNode) => void, key: string) => { const r = clone(doc); fn(nodeAt(r, e.path)!); commit(r, key); };
+
+  // the texts and pictures of each part, then the rest
+  const owner = (e: ElementInfo) => {
+    const k = pathKey(e.path);
+    for (const g of groups) for (const m of g.members) if (m.paths.some((p) => k === pathKey(p) || k.startsWith(pathKey(p) + '/'))) return { g, m };
+    return null;
+  };
+  const general = items.filter((e) => !owner(e));
+  const selected = new Set(sel);
+
+  const field = (e: ElementInfo) => {
+    const k = pathKey(e.path);
+    const n = e.node;
+    const active = selected.has(k);
+    if (n.tag === 'Image') {
+      const src = bitmap(n)?.attrs.Source ?? '';
+      return (
+        <div key={k} className={cx('flex items-center gap-2 rounded px-1 py-0.5', active && 'bg-accent-500/15')} onClick={() => setSel([k])}>
+          <span className="w-32 shrink-0 truncate text-[11px] text-ink-400" title={n.attrs.Name}>{n.attrs.Name}</span>
+          <div className="checker flex h-8 w-14 shrink-0 items-center justify-center overflow-hidden rounded">
+            {src && images(src) ? <img src={imageUrl(tpl.meta.id, src)} alt="" className="max-h-full max-w-full" /> : <span className="text-[9px] text-ink-700">vMix</span>}
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => setPick(e)}>Replace…</Button>
+        </div>
+      );
+    }
+    return (
+      <label key={k} className={cx('flex items-center gap-2 rounded px-1 py-0.5', active && 'bg-accent-500/15')} onFocus={() => setSel([k])}>
+        <span className="w-32 shrink-0 truncate text-[11px] text-ink-400" title={n.attrs.Name}>{n.attrs.Name}</span>
+        <input className={small} value={textOf(n).replace(/\r\n/g, ' ⏎ ')} onChange={(ev) => edit(e, (x) => setTextOf(x, ev.target.value.replace(/ ⏎ /g, '\n')), `${k}:text`)} />
+      </label>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="card space-y-2 p-3">
+        <h2 className="text-sm font-semibold">How many</h2>
+        {!groups.length && <p className="text-xs text-ink-500">No repeated parts (rows, teams, sailors…) found in this title.</p>}
+        {groups.map((g) => (
+          <div key={g.id} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs text-ink-200" title={g.members.map((m) => m.label).join(', ')}>{g.label}</span>
+            <Button size="sm" variant="ghost" disabled={!!busy || g.count <= 1} onClick={() => setCount(g, g.count - 1)}>−</Button>
+            <CountInput value={g.count} disabled={!!busy} onCommit={(n) => setCount(g, n)} />
+            <Button size="sm" variant="ghost" disabled={!!busy || g.count >= 40} onClick={() => setCount(g, g.count + 1)}>+</Button>
+            {busy === g.id && <span className="text-[11px] text-ink-500">…</span>}
+          </div>
+        ))}
+        {groups.length > 0 && <div className="flex flex-wrap gap-3 border-t border-ink-800 pt-2 text-[11px] text-ink-400">
+          <label className="flex items-center gap-1.5" title="E.g. the sponsor bar under the rows goes down when a row is added"><input type="checkbox" checked={opts.shiftAfter} onChange={(e) => setOpts({ ...opts, shiftAfter: e.target.checked })} /> Move what comes after</label>
+          <label className="flex items-center gap-1.5" title="The panel behind the rows grows or shrinks with them"><input type="checkbox" checked={opts.stretch} onChange={(e) => setOpts({ ...opts, stretch: e.target.checked })} /> Resize the background</label>
+          <label className="flex items-center gap-1.5" title="Everything moves by half the change, so the title stays centred on screen"><input type="checkbox" checked={opts.center} onChange={(e) => setOpts({ ...opts, center: e.target.checked })} /> Keep centred</label>
+        </div>}
+      </div>
+
+      <div className="card space-y-1 p-3">
+        <h2 className="text-sm font-semibold">Texts and pictures</h2>
+        {general.map(field)}
+        {groups.map((g) => g.members.slice(0, g.count).map((m) => {
+          const mine = items.filter((e) => owner(e)?.m === m);
+          if (!mine.length) return null;
+          const open = mine.some((e) => selected.has(pathKey(e.path)));
+          return (
+            <details key={`${g.id}:${m.label}`} open={open || undefined} className="rounded border border-ink-800 px-1.5 py-1">
+              <summary className="cursor-pointer text-xs font-semibold text-ink-300">{m.label}</summary>
+              <div className="mt-1 space-y-1">{mine.map(field)}</div>
+            </details>
+          );
+        }))}
+        {!items.length && <p className="text-xs text-ink-500">No texts or pictures to fill in.</p>}
+      </div>
+      {pick && <PicturePicker onClose={() => setPick(null)} onPick={(s) => { edit(pick, (x) => setBitmapSource(x, s), 'pic'); setPick(null); }} />}
+    </div>
+  );
+}
+
+function CountInput({ value, disabled, onCommit }: { value: number; disabled: boolean; onCommit: (n: number) => void }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV(String(value)), [value]);
+  const done = () => { const n = Number(v); if (n !== value) onCommit(n); };
+  return <input className={cx(small, 'w-14 text-center')} type="number" min={1} max={40} value={v} disabled={disabled}
+    onChange={(e) => setV(e.target.value)} onBlur={done} onKeyDown={(e) => { if (e.key === 'Enter') done(); }} />;
 }
 
 // ---------- preview ----------

@@ -21,6 +21,7 @@ import { joinVmixPath } from '../paths.js';
 import { drawTitle, Img } from './draw.js';
 import { guessScene, SCENES } from './scenes.js';
 import { clone, elements, fields, GtNode, parseXml, serializeXml, sourceName } from './model.js';
+import { CountOpts, ImageBand, setCount } from './params.js';
 
 export const GTZIP_DIR = 'gtzip';
 const DOC = 'document.xml', RES = 'resources.xml', CT = '[Content_Types].xml', THUMB = 'thumbnail.png';
@@ -412,6 +413,39 @@ export class GtzipService {
     return cv.toBuffer('image/png');
   }
 
+  /**
+   * Changes how many of a repeated part (rows, teams, sailors) the title has. Pictures stretched with the parts get a
+   * new bitmap with a band repeated or cut out (saved like an uploaded picture), so they are not squashed.
+   */
+  async setPartCount(body: z.infer<typeof countSchema>): Promise<{ doc: GtNode }> {
+    let r: { root: GtNode; bands: ImageBand[] };
+    try { r = setCount(body.doc as GtNode, body.group, body.count, body.options as CountOpts); } catch (e) { throw badRequest((e as Error).message); }
+    if (!r.bands.length) return { doc: r.root };
+    const c = await canvas();
+    if (!c) return { doc: r.root };
+    const byName = new Map(collect(r.root, 'Image').map((n) => [n.attrs.Name, n]));
+    const current = new Map<string, Buffer>();
+    for (const b of r.bands) {
+      const n = byName.get(b.name);
+      const bm = n?.children.find((x) => x.tag === 'Image.Bitmap')?.children.find((x) => x.tag === 'Bitmap');
+      const src = bm?.attrs.Source;
+      if (!bm || !src) continue;
+      let buf = current.get(b.name);
+      if (!buf) { try { buf = this.image(body.template ?? null, src); } catch { continue; } }
+      try {
+        const im = await c.loadImage(buf);
+        const out = sliceBand(c, im, b);
+        current.set(b.name, out);
+      } catch { /* unreadable picture: stays stretched */ }
+    }
+    for (const [name, buf] of current) {
+      const bm = byName.get(name)!.children.find((x) => x.tag === 'Image.Bitmap')!.children.find((x) => x.tag === 'Bitmap')!;
+      const base = sourceName(bm.attrs.Source).replace(/^[0-9a-f]{12}-/, '').replace(/\.[^.]+$/, '');
+      bm.attrs.Source = this.saveUpload(buf, `${base}.png`).source;
+    }
+    return { doc: r.root };
+  }
+
   /** Renders any document (editor state) to PNG with the template's pictures, for checks and tests. */
   async renderDoc(templateId: string, doc: GtNode, width = 640) {
     const p = this.pkg(templateId);
@@ -422,6 +456,34 @@ export class GtzipService {
     }
     return this.renderThumbnail(p, width);
   }
+}
+
+export const countSchema = z.object({
+  template: z.string().max(200).nullable().optional(),
+  doc: z.any().refine((d) => d && typeof d === 'object' && d.tag === 'Composition', 'A GT document is needed.'),
+  group: z.string().max(4000),
+  count: z.number().int().min(1).max(40),
+  options: z.object({ shiftAfter: z.boolean().optional(), stretch: z.boolean().optional(), center: z.boolean().optional() }).default({}),
+});
+
+/** A picture with the band from…to repeated right after itself (insert) or cut out (remove), along the band's axis. */
+function sliceBand(c: any, im: any, b: ImageBand): Buffer {
+  const W = im.width, H = im.height;
+  const L = b.axis === 0 ? W : H;
+  const p0 = Math.max(0, Math.min(L, Math.round(b.from * L))), p1 = Math.max(p0, Math.min(L, Math.round(b.to * L)));
+  const band = p1 - p0;
+  const nl = b.op === 'insert' ? L + band : L - band;
+  const cv = c.createCanvas(b.axis === 0 ? Math.max(1, nl) : W, b.axis === 1 ? Math.max(1, nl) : H);
+  const ctx = cv.getContext('2d');
+  // copies the strip a…b of the picture to position at along the axis
+  const put = (a: number, e: number, at: number) => {
+    if (e <= a) return;
+    if (b.axis === 1) ctx.drawImage(im, 0, a, W, e - a, 0, at, W, e - a);
+    else ctx.drawImage(im, a, 0, e - a, H, at, 0, e - a, H);
+  };
+  if (b.op === 'insert') { put(0, p1, 0); put(p0, p1, p1); put(p1, L, p1 + band); }
+  else { put(0, p0, 0); put(p1, L, p0); }
+  return cv.toBuffer('image/png');
 }
 
 function collect(n: GtNode, tag: string, out: GtNode[] = []): GtNode[] { if (n.tag === tag) out.push(n); n.children.forEach((c) => collect(c, tag, out)); return out; }
