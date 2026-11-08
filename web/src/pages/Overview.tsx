@@ -5,6 +5,7 @@ import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
 import { Badge, Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
 import { Cell, ImgCell } from '../components/cells';
+import { TeamProfileLink } from '../components/TeamProfileLink';
 
 const SHORT: Record<string, string> = {
   background_1: 'BG1', background_2: 'BG2', emblem_dark: 'EM D', emblem_light: 'EM L', flag_small: 'FL S', flag_big: 'FL B',
@@ -147,6 +148,7 @@ function TeamRow({ team: t, isOpen, onToggle, set, onChanged }: { team: Overview
       <td className="px-1">
         <div className="flex items-center gap-1.5">
           <Cell value={t.name} onSave={(v) => save({ name: v })} className="font-medium text-ink-100" required label="Team name" />
+          <TeamProfileLink teamId={t.id} name={t.name} />
           {t.isDemo && <Badge tone="demo">Demo</Badge>}
           {captain && <span className="shrink-0 truncate text-xs text-amber-300" title="Captain">★ {fullName(captain)}</span>}
         </div>

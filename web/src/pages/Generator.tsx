@@ -2,6 +2,7 @@ import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, us
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { MatchboardTab } from './Matchboard';
+import { TeamProfileLink } from '../components/TeamProfileLink';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { ElementSpec, Gradient, GradientStop, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
@@ -143,11 +144,12 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
   );
 }
 
-function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+function Panel({ title, right, children, titleExtra }: { title: string; right?: ReactNode; children: ReactNode; titleExtra?: ReactNode }) {
   return (
     <section className="card">
       <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
         <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{title}</h2>
+        {titleExtra}
         <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
       </header>
       <div className="p-3">{children}</div>
@@ -240,7 +242,7 @@ function GradientPanel({ team, teams, variant, setVariant, onChange, onReload }:
   const copyTeam = (tid: string) => { const src = teams.find((t) => t.teamId === tid)?.gradients[variant]; if (src) onChange(structuredClone(src), true); };
 
   return (
-    <Panel title={`${team.code} · ${team.name}`} right={
+    <Panel title={`${team.code} · ${team.name}`} titleExtra={<TeamProfileLink teamId={team.teamId} name={team.name} />} right={
       <div className="flex overflow-hidden rounded border border-ink-700 text-xs">
         {VARIANTS.map((v) => (
           <button key={v} onClick={() => { setVariant(v); setSel(0); }} className={cx('flex items-center gap-1.5 px-3 py-1', variant === v ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>

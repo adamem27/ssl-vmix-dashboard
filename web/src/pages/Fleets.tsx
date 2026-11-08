@@ -4,6 +4,7 @@ import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core';
 import { api, ApiError, FleetSetDetail, FleetSetSummary, Team } from '../api';
+import { TeamProfileLink } from '../components/TeamProfileLink';
 import { Badge, Button, cx, Empty, ErrorBox, Field, Loading, Modal, useConfirm, useToast } from '../components/ui';
 
 type Occupied = { teamId: string; fleetId: string; position: number; occupantId: string; from: { fleetId: string; position: number; fleetName: string } | null; freePositions: number[] };
@@ -299,6 +300,7 @@ function TeamChip({ team, compact, overlay }: { team?: Team; compact?: boolean; 
       <span className="w-10 shrink-0 font-mono text-xs text-ink-400">{team.code}</span>
       <span className="truncate text-sm font-medium">{team.name}</span>
       {team.isDemo && !compact && <Badge tone="demo">Demo</Badge>}
+      {!overlay && <TeamProfileLink teamId={team.id} name={team.name} className="ml-auto" />}
     </div>
   );
 }
