@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, Meta } from './api';
 import { cx } from './components/ui';
 import { StagePicker } from './components/StagePicker';
+import { VersionBadge } from './components/VersionBadge';
 import { CommentatorPage } from './pages/Commentator';
 import { OverviewPage } from './pages/Overview';
 import { GeneralPage } from './pages/General';
@@ -62,6 +63,7 @@ function TopBar() {
           {meta.data && <>Event: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
         </div>
         <VmixPcBadge />
+        <VersionBadge />
       </div>
     </header>
   );

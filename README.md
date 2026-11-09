@@ -38,6 +38,10 @@ Dane demonstracyjne (opcjonalnie, oznaczone „DEMO”): **Settings → Demo dat
 
 Testy: `npm test`. Kontrola typów: `npm run typecheck`.
 
+## Wersje aplikacji
+
+Numer wersji to `1.0.N`: N to liczba zmian w `main`, więc rośnie o jeden z każdym pushem i wyższy numer zawsze oznacza nowszą aplikację. Numer liczy `scripts/version.mjs` przy `npm run build` (zapisuje `server/dist/version.json` razem z listą zmian z opisów commitów). Wersja jest w prawym górnym rogu dashboardu; kliknięcie pokazuje listę zmian, a kropka oznacza, że od ostatniego otwarcia doszło coś nowego. Paczka Windows ma ten sam numer w opisie wydania, a `/api/health` i `/api/version` zwracają go przez API. Przy większej zmianie podbij ręcznie `MAJOR.MINOR` w głównym `package.json` (np. na `1.1`).
+
 ## Gdzie są dane
 
 | Co | Domyślnie | Zmienna środowiskowa |

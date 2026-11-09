@@ -17,6 +17,7 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # full history: the build number counts the commits
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --no-audit --no-fund
@@ -41,9 +42,11 @@ jobs:
           $env:DATA_DIR = "$env:RUNNER_TEMP/data"; $env:PORT = '4310'
           $p = Start-Process out/app/node/node.exe -ArgumentList 'out/app/app.cjs' -PassThru -NoNewWindow
           $ok = $false
-          foreach ($i in 1..30) { Start-Sleep 1; try { if ((Invoke-RestMethod http://127.0.0.1:4310/api/health).ok) { $ok = $true; break } } catch { } }
+          foreach ($i in 1..30) { Start-Sleep 1; try { $h = Invoke-RestMethod http://127.0.0.1:4310/api/health; if ($h.ok) { $ok = $true; break } } catch { } }
           Stop-Process $p -Force
           if (-not $ok) { throw 'The dashboard did not start.' }
+          if ($h.version -notmatch '^\d+\.\d+\.\d+$') { throw "Bad version: $($h.version)" }
+          Write-Host "Version $($h.version)"
           if (-not (Test-Path "$env:RUNNER_TEMP/data/assets/ssl-vmix.xlsx")) { throw 'No workbook written.' }
       - name: Publish
         env:
@@ -53,6 +56,8 @@ jobs:
           gh release view windows-latest *> $null
           if ($LASTEXITCODE -ne 0) { gh release create windows-latest --title 'Windows package (latest)' --notes 'Built automatically from main. Download ssl-dashboard-windows.zip, unzip, run "SSL Dashboard.bat".' --latest }
           gh release upload windows-latest ssl-dashboard-windows.zip --clobber
+          $v = (Get-Content out/app/server/dist/version.json -Raw | ConvertFrom-Json).version
+          gh release edit windows-latest --notes "Version $v, built automatically from main. Download ssl-dashboard-windows.zip, unzip, run `"SSL Dashboard.bat`". The app shows its version at the top right; click it to see what changed."
       - name: Test the launcher (download from the release, start, stop)
         run: |
           $d = "$env:RUNNER_TEMP/launcher"
