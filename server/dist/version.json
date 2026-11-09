@@ -1,8 +1,14 @@
 {
-  "version": "1.0.83",
-  "commit": "adcfad6",
-  "date": "2026-11-09T01:18:18Z",
+  "version": "1.0.85",
+  "commit": "0ba7991",
+  "date": "2026-11-09T13:12:06+01:00",
   "changes": [
+    {
+      "version": "1.0.84",
+      "commit": "5f935fc",
+      "date": "2026-11-09T12:12:01Z",
+      "text": "GTZIP generator: download layers as PNG (one layer, the selection, cropped, or every layer)"
+    },
     {
       "version": "1.0.83",
       "commit": "adcfad6",

@@ -40,15 +40,34 @@ export function drawTitle(ctx, root, o) {
                 for (const m of h.children)
                     if (m.attrs.Object)
                         maskNames.add(m.attrs.Object);
-    drawComposition(ctx, root, 0, 0, W, H, o, maskNames);
+    let filter = null;
+    if (o.only?.length) {
+        // the containers on the way to each chosen element are drawn as frames (position, clip, opacity) only
+        const along = new Set();
+        const walk = (n, trail) => {
+            if (o.only.includes(n))
+                for (const t of trail)
+                    along.add(t);
+            for (const c of n.children)
+                walk(c, [...trail, n]);
+        };
+        walk(root, []);
+        filter = { chosen: new Set(o.only), along };
+    }
+    drawComposition(ctx, root, 0, 0, W, H, o, maskNames, filter);
 }
-function drawComposition(ctx, comp, ox, oy, pw, ph, o, maskNames) {
+function drawComposition(ctx, comp, ox, oy, pw, ph, o, maskNames, filter = null) {
     const byName = new Map();
     for (const c of comp.children)
         if (c.attrs.Name)
             byName.set(c.attrs.Name, c);
     for (const n of comp.children) {
-        const hidden = !isVisible(n);
+        // with a filter: a chosen element is drawn whole (filter off inside it), a container on the way only as a frame
+        const chosen = !!filter?.chosen.has(n);
+        if (filter && !chosen && !filter.along.has(n))
+            continue;
+        const inner = chosen ? null : filter;
+        const hidden = !filter && !isVisible(n);
         if (hidden && !o.showHidden)
             continue;
         if (n.tag === 'Rectangle' && maskNames.has(n.attrs.Name))
@@ -71,9 +90,9 @@ function drawComposition(ctx, comp, ox, oy, pw, ph, o, maskNames) {
             ctx.beginPath();
             ctx.rect(x, y, w, h);
             ctx.clip();
-            const inner = innerComposition(n);
-            if (inner)
-                drawComposition(ctx, inner, x, y, w, h, o, maskNames);
+            const sub = innerComposition(n);
+            if (sub)
+                drawComposition(ctx, sub, x, y, w, h, o, maskNames, inner);
         }
         else if (n.tag === 'Image') {
             const b = bitmap(n);
