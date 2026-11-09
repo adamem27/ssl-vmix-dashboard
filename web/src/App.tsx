@@ -16,6 +16,7 @@ import { SettingsPage } from './pages/Settings';
 import { GeneratorPage } from './pages/Generator';
 import { GtzipGeneratorPage } from './pages/GtzipGenerator';
 import { ResultsPage } from './pages/Results';
+import { LowerThirdsPage } from './pages/LowerThirds';
 
 export function useMeta() {
   return useQuery({ queryKey: ['meta'], queryFn: () => api.get<Meta>('/api/meta'), staleTime: 60_000 });
@@ -81,6 +82,7 @@ function VmixLayout() {
           <li><NavLink to="/vmix/declarations" className={item}>Declarations and line-ups</NavLink></li>
           <li><NavLink to="/vmix/general" className={item}>General graphics</NavLink></li>
           <li><NavLink to="/vmix/results" className={item}>Results</NavLink></li>
+          <li><NavLink to="/vmix/lowerthirds" className={item}>Lower thirds</NavLink></li>
           <li><NavLink to="/vmix/generator" className={item}>PNG generator</NavLink></li>
           <li><NavLink to="/vmix/gtzip" className={item}>GTZIP generator</NavLink></li>
           <li><NavLink to="/vmix/json" className={item}>JSON</NavLink></li>
@@ -109,6 +111,7 @@ export function App() {
           <Route path="settings" element={<SettingsPage />} />
           <Route path="general" element={<GeneralPage />} />
           <Route path="results" element={<ResultsPage />} />
+          <Route path="lowerthirds" element={<LowerThirdsPage />} />
           <Route path="json" element={<JsonPage />} />
           <Route path="generator" element={<GeneratorPage />} />
           <Route path="gtzip" element={<GtzipGeneratorPage />} />

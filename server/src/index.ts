@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { LowerThirds } from './services/lowerthirds.js';
 import { openDb } from './db/db.js';
 import { buildApp } from './app.js';
 import { SyncService } from './services/sync.js';
@@ -17,7 +18,8 @@ const sync = new SyncService(db);
 const workbook = new WorkbookWriter({ db, assetsDir: config.assetsDir }, config.workbookFile, (m) => app.log.warn(m));
 const generator = new GeneratorExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
 const matchboard = new MatchboardExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
-const app = await buildApp({ db, generator, matchboard, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
+const lowerThirds = new LowerThirds({ db, assetsDir: config.assetsDir }, undefined, (m) => console.warn(m));
+const app = await buildApp({ db, generator, matchboard, lowerThirds, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
@@ -32,6 +34,7 @@ const stopRanking = rankingOnStart(db, (m) => app.log.info(m));
 tidyAssetsFolder({ db, assetsDir: config.assetsDir });
 workbook.start();
 generator.start();
+lowerThirds.start();
 matchboard.schedule(2000);
 await app.listen({ host: config.host, port: config.port });
 app.log.info(`Database: ${config.dbPath}`);

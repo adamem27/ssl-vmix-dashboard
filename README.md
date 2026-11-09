@@ -205,6 +205,16 @@ Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów
 
 Kolumna **For** w tabeli elementów decyduje, w jakich barwach powstaje element: Teams (tylko drużyny), Neutral (tylko neutralne) albo Both (jedno i drugie). Elementy z „neutr” w nazwie lub nazwie pliku zostały przy aktualizacji jednorazowo oznaczone jako neutralne, pozostałe jako drużynowe. Neutralne elementy mają wypełnienie jak w finals-broadcast_ssl26_v2.ai (#1a1a1a, krycie 80%) i żółto-pomarańczową obwolutę w pełnym kolorze; wersja działa jak u drużyn (V1 pełna, V2 narasta, V3 narasta i zanika). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Kolumna **Gradient from** ustawia, z której strony zaczyna się gradient: lewa, prawa, góra albo dół (obwoluta obraca się razem z nim).
 
+## Lowerthirdy ze Stream Decka (Companion)
+
+Zakładka **Lower thirds** to te same klawisze co na Stream Decku: kraj wybiera drużynę, pozycja na łódce pokazuje żeglarza z dzisiejszego składu (zdjęcie, flaga, emblem, imię i nazwisko, numer i pozycja), NEXT RESULT przełącza tylko dolną linię na kolejne best results, TEAM pokazuje drużynę, OUT zdejmuje grafikę.
+
+- Gdy lowerthird jest na antenie, dashboard wysyła do vMixa tylko zmienione pola, więc tytuł nie schodzi z anteny, a grają animacje DataChange z GTZIP.
+- Żeglarz ze zdjęciem idzie na `lowerthird_photo`, drużyna i żeglarz bez zdjęcia na `lowerthird_no_photo` (nazwy do zmiany w ustawieniach zakładki).
+- W Companion: połączenie **Generic HTTP**, jeden klawisz z akcją GET na `http://<dashboard>/api/lt/key/$(this:page)/$(this:row)/$(this:column)`, skopiowany na wszystkie klawisze stron podanych w zakładce.
+- Etykiety klawiszy (kody krajów, nazwiska na pozycjach, kolor wybranego kraju i tego, co na antenie) dashboard wysyła sam przez **HTTP remote control** Companiona, jeśli wpiszesz jego adres.
+- Bezpośrednie adresy: `/api/lt/team?team=POL`, `/api/lt/sailor?team=POL&place=helm`, `/api/lt/next`, `/api/lt/out`.
+
 ## Floty
 
 Zestaw flot (runda) należy do wydarzenia; drużyna może być w jednym miejscu danego zestawu, a różne zestawy dzielą te same drużyny inaczej. Flota ma cztery uporządkowane miejsca (ograniczenie także w bazie). Niepełna flota jest oznaczona jako niekompletna. Upuszczenie na zajęte miejsce otwiera wybór: jawna zamiana albo wolne miejsce. Alternatywy dla przeciągania: listy wyboru w pustych miejscach, ↑ ↓, przeniesienie do innej floty, ✕. Przeciąganie działa też z klawiatury (Tab do drużyny, spacja, strzałki, spacja).
