@@ -148,10 +148,14 @@ export function setStrokeGradient(db, g) {
     return spec;
 }
 // ---------- neutral set (black with the gradient stroke) ----------
-export const neutralSchema = z.object({ enabled: z.boolean(), color: hex, strokeWidth: z.number().min(0).max(200) });
+export const neutralSchema = z.object({ enabled: z.boolean(), color: hex, opacity: pct, strokeWidth: z.number().min(0).max(200) });
 export function getNeutral(db) {
     try {
-        return neutralSchema.parse({ ...DEFAULT_NEUTRAL, ...JSON.parse(getSetting(db, 'generator.neutral')) });
+        const saved = JSON.parse(getSetting(db, 'generator.neutral'));
+        // saved before the opacity existed: the first, solid black version gives way to the Illustrator look
+        if (saved.opacity === undefined && saved.color === '#000000')
+            delete saved.color;
+        return neutralSchema.parse({ ...DEFAULT_NEUTRAL, ...saved });
     }
     catch {
         return DEFAULT_NEUTRAL;
@@ -186,7 +190,7 @@ export function plannedJobs(ctx) {
     }
     const neutral = getNeutral(ctx.db);
     if (neutral.enabled) {
-        const g = neutralGradient(neutral.color);
+        const g = neutralGradient(neutral.color, neutral.opacity);
         for (const t of templates) {
             const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...own } = t;
             const spec = neutralSpec(own, neutral);

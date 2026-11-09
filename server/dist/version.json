@@ -1,8 +1,14 @@
 {
-  "version": "1.0.82",
-  "commit": "c3d1b9e",
-  "date": "2026-11-09T02:17:37+01:00",
+  "version": "1.0.83",
+  "commit": "adcfad6",
+  "date": "2026-11-09T01:18:18Z",
   "changes": [
+    {
+      "version": "1.0.83",
+      "commit": "adcfad6",
+      "date": "2026-11-09T01:18:18Z",
+      "text": "PNG generator: neutral set see-through like the Illustrator file (#1a1a1a at 80%)"
+    },
     {
       "version": "1.0.81",
       "commit": "03fc7db",
