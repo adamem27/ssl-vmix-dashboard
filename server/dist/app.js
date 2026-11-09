@@ -22,6 +22,8 @@ import { GtzipService } from './services/gtzip/gtzip.js';
 import { registerGtzipRoutes } from './services/gtzip/routes.js';
 import { registerBroadcastRoutes } from './services/broadcastRoutes.js';
 import { LowerThirds } from './services/lowerthirds.js';
+import { Show } from './services/show.js';
+import { registerShowRoutes } from './services/showRoutes.js';
 import { registerLowerThirdRoutes } from './services/lowerthirdRoutes.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
@@ -480,7 +482,9 @@ export async function buildApp(deps) {
     });
     // ---------- GTZIP generator ----------
     registerBroadcastRoutes(app, ctx);
-    registerLowerThirdRoutes(app, ctx, deps.lowerThirds ?? new LowerThirds(ctx));
+    const lt = deps.lowerThirds ?? new LowerThirds(ctx);
+    registerLowerThirdRoutes(app, ctx, lt);
+    registerShowRoutes(app, ctx, deps.show ?? new Show(ctx, lt));
     registerGtzipRoutes(app, new GtzipService(ctx, () => getSetting(db, 'paths.vmixAssetsRoot') || null, () => matchboard.fonts()));
     // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
     // The sync program polls the manifest every few seconds; its last visit is the vMix machine's heartbeat.

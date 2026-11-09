@@ -1,8 +1,14 @@
 {
-  "version": "1.0.96",
-  "commit": "24b40ed",
-  "date": "2026-11-09T21:47:36Z",
+  "version": "1.0.97",
+  "commit": "6e7901a",
+  "date": "2026-11-09T22:45:54Z",
   "changes": [
+    {
+      "version": "1.0.97",
+      "commit": "6e7901a",
+      "date": "2026-11-09T22:45:54Z",
+      "text": "Show control: both Stream Decks from one registry of graphics, overlays read from vMix, undo/all out/panic, break scene rotation, Companion page files with a fallback page"
+    },
     {
       "version": "1.0.96",
       "commit": "24b40ed",
@@ -476,12 +482,6 @@
       "commit": "f0315b2",
       "date": "2026-10-17T23:46:44Z",
       "text": "Wymagaj Node 22.12+ (Vite 8 / rolldown)"
-    },
-    {
-      "version": "1.0.1",
-      "commit": "f9cf3f0",
-      "date": "2026-10-17T23:33:27Z",
-      "text": "Pierwsza wersja dashboardu SSL vMix graphics"
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { badRequest, notFound } from './errors.js';
-import { LINEUP_SLOTS, loadLineup } from './lineups.js';
+import { LINEUP_SLOTS, loadLineup, slotDefs } from './lineups.js';
 import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
@@ -37,7 +37,7 @@ export const ltConfigSchema = z.object({
     fields: z.object({ top: z.string().max(60), bottom: z.string().max(60), photo: z.string().max(60), flag: z.string().max(60), emblem: z.string().max(60), bar: z.string().max(60) }),
 });
 export const DEFAULT_LT = {
-    photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 1,
+    photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 2,
     barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', countryShowsTeam: false,
     companionUrl: '', companionPage: 1, rows: 4, cols: 8,
     fields: { top: 'Top text', bottom: 'Bottom text', photo: 'PHOTO', flag: 'Flag', emblem: 'Emblem', bar: 'Bar' },
@@ -76,7 +76,8 @@ export function ltTeams(ctx) {
 export function crewOf(ctx, teamId) {
     const lineup = loadLineup(ctx.db, activeEvent(ctx.db).id, teamId).data;
     const sailors = new Map(listSailors(ctx, teamId).map((s) => [s.id, s]));
-    return LINEUP_SLOTS.map((d) => {
+    // every place of the team's line-up, extra places (Sailor10…) included
+    return slotDefs(lineup.extra).map((d) => {
         const r = lineup.rows.find((x) => x.slot === d.key);
         const s = r?.sailorId ? sailors.get(r.sailorId) : undefined;
         return {
@@ -206,7 +207,7 @@ export class LowerThirds {
         return this.show(cfg.noPhotoInput || cfg.photoInput, ltFields(this.ctx, cfg, t.id, null), { kind: 'team', teamId: t.id, slot: null, line: 0 });
     }
     /** The sailor on a place of the line-up (`Pit`, `Trimmer1`…, or the place's label/position, any case). */
-    async showSailor(code, place) {
+    async showSailor(code, place, opts = {}) {
         const teamId = code ? this.teamByCode(code).id : this.state.teamId;
         if (!teamId)
             throw badRequest('Pick a country first.');
@@ -218,7 +219,7 @@ export class LowerThirds {
         if (!s.firstName && !s.lastName)
             throw badRequest(`Nobody on ${s.label} in this team's line-up.`);
         const cfg = this.config;
-        const input = s.photo && cfg.photoInput ? cfg.photoInput : cfg.noPhotoInput || cfg.photoInput;
+        const input = s.photo && cfg.photoInput && !opts.forceNoPhoto ? cfg.photoInput : cfg.noPhotoInput || cfg.photoInput;
         return this.show(input, ltFields(this.ctx, cfg, teamId, s, 0), { kind: 'sailor', teamId, slot: s.slot, line: 0 });
     }
     /** Next line under the sailor's name: position → best result 1 → 2 → 3 → position, only that field changes. */
@@ -232,7 +233,9 @@ export class LowerThirds {
         const lines = sailorLines(s);
         const line = lines.length ? (st.line + 1) % lines.length : 0;
         const cfg = this.config;
-        const input = s.photo && cfg.photoInput ? cfg.photoInput : cfg.noPhotoInput || cfg.photoInput;
+        // stay on the title that is on air, so only the line changes
+        const input = st.onAir && st.input && [cfg.photoInput, cfg.noPhotoInput].includes(st.input) ? st.input
+            : s.photo && cfg.photoInput ? cfg.photoInput : cfg.noPhotoInput || cfg.photoInput;
         return this.show(input, ltFields(this.ctx, cfg, st.teamId, s, line), { kind: 'sailor', teamId: st.teamId, slot: s.slot, line });
     }
     async out() {
@@ -321,6 +324,12 @@ export class LowerThirds {
         const cfg = this.config;
         if (!cfg.companionUrl)
             return { sent: 0 };
+        // the Show control tab owns the Companion keys unless its labels are switched off
+        try {
+            if (JSON.parse(getSetting(this.ctx.db, 'show.config') || '{}').labels !== false)
+                return { sent: 0, show: true };
+        }
+        catch { /* ignore */ }
         if (force)
             this.labels.clear();
         let n = 0;
