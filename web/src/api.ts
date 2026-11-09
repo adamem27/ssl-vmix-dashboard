@@ -3,7 +3,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, headers: {} };
+  // The commentator screen at /live reads the snapshot pushed by the venue PC when there is one.
+  const onLive = window.location.pathname === '/live';
+  const init: RequestInit = { method, headers: onLive ? { 'x-ssl-live': '1' } : {} };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) {
     init.body = JSON.stringify(body);
@@ -19,7 +21,8 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
   // Logged out (online mode): back to the login form.
-  if (res.status === 401) window.location.href = '/login';
+  if (res.status === 401 && !onLive) window.location.href = '/login';
+  if (res.status === 401) throw new ApiError(401, 'This commentator link is no longer valid. Ask the operator for the new one.');
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `Server error (HTTP ${res.status}).`, data?.details);
   return data as T;
 }

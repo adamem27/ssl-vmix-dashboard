@@ -157,6 +157,16 @@ function VmixLayout() {
 
 export function App() {
   return (
+    <Routes>
+      {/* Commentator screen on its own, without the menu: what the commentator link opens online. */}
+      <Route path="/live" element={<div className="min-h-screen"><CommentatorPage live /></div>} />
+      <Route path="*" element={<MainApp />} />
+    </Routes>
+  );
+}
+
+function MainApp() {
+  return (
     <div className="min-h-screen">
       <TopBar />
       <Routes>

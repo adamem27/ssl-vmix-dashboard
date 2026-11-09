@@ -101,6 +101,18 @@ W prawym górnym rogu dashboardu jest znacznik "vMix PC": zielony = synchronizac
 
 W vMix: Data Sources → Excel → `C:\SSL-vMix\ssl-vmix.xlsx` (lub JSON → `C:\SSL-vMix\ssl-vmix.json`). Okno synchronizacji musi być otwarte.
 
+## Ekran komentatora online (tylko do odczytu)
+
+Komentatorzy mogą oglądać zakładkę Commentator pod adresem w internecie, nawet gdy baza działa lokalnie na PC na regatach. Lokalny dashboard co 5 s wysyła na dashboard online wyłącznie dane tego ekranu (JSON i obrazki flag/zdjęć, gzip, zmienione obrazki tylko raz), a gdy nic się nie zmieniło, tylko krótki sygnał „żyję”. PC na regatach niczego nie wystawia do internetu: potrzebuje tylko wyjścia HTTPS.
+
+1. **Serwer online** (np. `https://sslgfx.em27code.com`, wdrożony jak w sekcji wyżej) musi mieć ustawione `DASHBOARD_PASSWORD`. Bez hasła odbiór danych jest wyłączony.
+2. **PC na regatach:** Settings → **Commentator online** → adres serwera online i jego hasło → Save → zaznacz „Send every 5 seconds”. Pod spodem pojawia się **link dla komentatorów**, np. `https://sslgfx.em27code.com/c/<token>`.
+3. **Komentator** otwiera link w dowolnej przeglądarce. Widzi tylko ekran komentatora (bez menu) z plakietką „Live”; gdy PC na regatach przestanie wysyłać, plakietka robi się czerwona i pokazuje godzinę ostatnich danych.
+
+Zabezpieczenie: link ustawia ciasteczko, które pozwala tylko na odczyt kilku adresów ekranu komentatora (`/api/meta`, `/api/stage`, `/api/fleet-sets`, `/api/overview`, `/api/commentator`, obrazki). Każdy zapis i każdy inny adres zwraca 403, a inne strony przekierowują na `/live`. Przycisk **New link** na serwerze online (Settings → Commentator online, część 2) unieważnia stary link i wszystkie otwarte sesje. Wysyłanie danych wymaga hasła dashboardu online.
+
+Własna subdomena (np. `komentator.em27code.com`): w DirectAdmin dodaj ją jako alias (domain pointer) domeny, pod którą działa aplikacja Node; link działa pod każdą z nazw. Dane odebrane z regat leżą w `DATA_DIR/live-feed/` i przetrwają restart serwera. Zalogowany admin podgląda je pod `/live`.
+
 ## Dashboard i vMix na różnych komputerach (sieć lokalna)
 
 1. Uruchom serwer z dostępem z sieci:
