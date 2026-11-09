@@ -19,6 +19,10 @@ export interface DrawOpts {
   fallbackFont?: string;
   /** Draw only these elements (with what is inside them), e.g. to save one layer as a PNG. Hidden ones are drawn too. */
   only?: GtNode[];
+  /** Animation preview: how an element is moved, scaled, faded or clipped now (see anim.ts). */
+  anim?: (n: GtNode, x: number, y: number, w: number, h: number) => { alpha: number; dx: number; dy: number; sx: number; sy: number; rot: number; clip: [number, number, number, number] | null } | null;
+  /** Text shown instead of an element's own (preview of a data change). */
+  text?: (n: GtNode) => string | undefined;
 }
 
 const WEIGHT: Record<string, number> = { Thin: 100, ExtraLight: 200, Light: 300, Normal: 400, Regular: 400, Medium: 500, SemiBold: 600, DemiBold: 600, Bold: 700, ExtraBold: 800, Black: 900 };
@@ -86,6 +90,14 @@ function drawComposition(ctx: any, comp: GtNode, ox: number, oy: number, pw: num
     const opacity = (n.attrs.Opacity != null ? Number(n.attrs.Opacity) : 1) * (hidden ? 0.35 : 1);
     ctx.save();
     ctx.globalAlpha *= opacity;
+    const an = o.anim?.(n, x, y, w, h);
+    if (an) {
+      if (an.alpha <= 0.001 || (an.clip && (an.clip[2] <= 0.01 || an.clip[3] <= 0.01)) || Math.abs(an.sx) < 0.001 || Math.abs(an.sy) < 0.001) { ctx.restore(); continue; }
+      ctx.globalAlpha *= an.alpha;
+      if (an.clip) { ctx.beginPath(); ctx.rect(an.clip[0], an.clip[1], an.clip[2], an.clip[3]); ctx.clip(); }
+      ctx.translate(an.dx, an.dy);
+      if (an.sx !== 1 || an.sy !== 1 || an.rot) { ctx.translate(x + w / 2, y + h / 2); if (an.rot) ctx.rotate(an.rot); ctx.scale(an.sx, an.sy); ctx.translate(-(x + w / 2), -(y + h / 2)); }
+    }
     // a mask clips to the masking rectangle (same composition)
     const maskHolder = n.children.find((c) => c.tag === `${n.tag}.Mask`);
     const mask = maskHolder?.children[0]?.attrs.Object ? byName.get(maskHolder.children[0].attrs.Object) : null;
@@ -132,7 +144,7 @@ function drawComposition(ctx: any, comp: GtNode, ox: number, oy: number, pw: num
 }
 
 function drawText(ctx: any, n: GtNode, x: number, y: number, w: number, h: number, o: DrawOpts) {
-  const text = n.attrs.Text ?? '';
+  const text = o.text?.(n) ?? n.attrs.Text ?? '';
   if (!text) return;
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const family = n.attrs.FontFamily ?? 'Arial';

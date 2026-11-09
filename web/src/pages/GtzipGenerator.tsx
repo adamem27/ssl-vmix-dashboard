@@ -10,6 +10,7 @@ import {
 } from '../../../server/src/services/gtzip/model';
 import { absBox as absBoxOf, Box, Canvas, CanvasApi, CanvasBg, topSelected, unionBox } from './gtzip/Canvas';
 import { Layers } from './gtzip/Layers';
+import { Frame, Player } from './gtzip/Player';
 import { drawTitle, Img } from '../../../server/src/services/gtzip/draw';
 import { RepeatGroup, repeatGroups } from '../../../server/src/services/gtzip/params';
 
@@ -259,6 +260,8 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
   const [pickOpen, setPickOpen] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
   const [full, setFull] = useState(false);
+  const [frame, setFrame] = useState<Frame | null>(null);
+  const closeFull = useCallback(() => setFull(false), []);
   const [zoom, setZoom] = useState(0.5);
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'quick' ? 'quick' : 'advanced'; } catch { return 'advanced'; } });
   const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ } };
@@ -523,10 +526,11 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
         </div>}
         <div className="min-w-0 flex-1">
           <Canvas ref={canvas} doc={doc} els={els} sel={sel} setSel={setSel} showHidden={prefs.showHidden} bg={prefs.bg} snap={{ grid: prefs.grid, guides: prefs.guides }}
-            images={images.get} redraw={images.version + fontsReady} height={canvasH} onZoom={setZoom}
+            images={images.get} redraw={images.version + fontsReady} height={canvasH} onZoom={setZoom} frame={frame}
             onBoxes={(b, resize, key) => setBoxes(b, resize, key)}
             onDropFiles={(files, at) => void uploadPictures(files, at)}
             onDoubleClick={(e) => { setSel([pathKey(e.path)]); setRight('props'); setFocusTick((n) => n + 1); }} />
+          <div className="mt-2"><Player doc={doc} onFrame={setFrame} /></div>
           <p className="mt-1 text-[11px] text-ink-500">
             Click selects · Shift/Ctrl adds · drag on empty space selects an area · Alt+click picks a layer or a locked element · drag handles to resize (Shift keeps proportions) ·
             arrows nudge (Shift ×10) · Ctrl+wheel zooms, wheel or Space+drag pans · Ctrl+C/V/D/G · drop PNG files to add them. Preview is approximate; dashed boxes are picture fields filled by vMix.
@@ -560,7 +564,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
           </div>
         </div>}
       </div>
-      {full && <FullPreview doc={doc} images={images.get} redraw={images.version + fontsReady} onClose={() => setFull(false)} />}
+      {full && <FullPreview doc={doc} images={images.get} redraw={images.version + fontsReady} onClose={closeFull} />}
       {pickOpen && <PicturePicker onClose={() => setPickOpen(false)} onPick={(s) => { setPickOpen(false); void addPicture(s, undefined, sourceName(s.replace(/^(upload|asset):/, '')).split('/').pop()); }} />}
       {saveOpen && <SaveTemplateDialog scenes={scenes} tpl={tpl} doc={doc} onClose={() => setSaveOpen(false)} onSaved={(m) => { setSaveOpen(false); onOpen(m.id); }} />}
       {dupOpen && <DuplicateDialog infos={selInfos} els={els} doc={doc} onClose={() => setDupOpen(false)} onApply={(o) => {
@@ -583,11 +587,18 @@ function FullPreview({ doc, images, redraw, onClose }: { doc: GtNode; images: (s
   const [bg, setBg] = useState<'black' | 'checker' | 'grey'>('black');
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
   const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
+  const [frame, setFrame] = useState<Frame | null>(null);
+  // onClose kept in a ref: the effect runs once, so re-renders of the editor do not leave full screen
+  const close = useRef(onClose); close.current = onClose;
   useEffect(() => {
     const el = box.current;
     el?.requestFullscreen?.().catch(() => { /* the overlay still covers the window */ });
-    const onFs = () => { if (!document.fullscreenElement) onClose(); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); e.stopPropagation(); };
+    const onFs = () => { if (!document.fullscreenElement) close.current(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); close.current(); return; }
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') e.stopPropagation(); // keep the editor's shortcuts away
+    };
     const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
     document.addEventListener('fullscreenchange', onFs);
     window.addEventListener('keydown', onKey, true);
@@ -598,7 +609,7 @@ function FullPreview({ doc, images, redraw, onClose }: { doc: GtNode; images: (s
       window.removeEventListener('resize', onResize);
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
     };
-  }, [onClose]);
+  }, []);
   const z = Math.min(size.w / W, size.h / H);
   useEffect(() => {
     const c = cv.current;
@@ -608,8 +619,8 @@ function FullPreview({ doc, images, redraw, onClose }: { doc: GtNode; images: (s
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr * z, 0, 0, dpr * z, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    drawTitle(ctx, doc, { image: images, fallbackFont: 'Space Grotesk' });
-  }, [doc, images, redraw, z, W, H]);
+    drawTitle(ctx, doc, { image: images, fallbackFont: 'Space Grotesk', anim: frame?.anim, text: frame?.text });
+  }, [doc, images, redraw, z, W, H, frame]);
   return (
     <div ref={box} className={cx('fixed inset-0 z-[100] grid place-items-center', bg === 'black' ? 'bg-black' : bg === 'grey' ? 'bg-[#3a3f4b]' : 'checker')} onClick={onClose}>
       <canvas ref={cv} style={{ width: W * z, height: H * z }} />
@@ -617,6 +628,7 @@ function FullPreview({ doc, images, redraw, onClose }: { doc: GtNode; images: (s
         {(['black', 'grey', 'checker'] as const).map((b) => <button key={b} onClick={() => setBg(b)} className={cx('rounded px-2 py-1', bg === b ? 'bg-white/20 text-white' : 'hover:bg-white/10')}>{b}</button>)}
         <button onClick={onClose} className="rounded px-2 py-1 hover:bg-white/10" title="Esc">✕ Close</button>
       </div>
+      <div className="absolute inset-x-3 bottom-3 opacity-30 transition-opacity hover:opacity-100 focus-within:opacity-100"><Player doc={doc} onFrame={setFrame} compact /></div>
     </div>
   );
 }

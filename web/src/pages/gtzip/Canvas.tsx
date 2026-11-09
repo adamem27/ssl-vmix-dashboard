@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
 import { ElementInfo, GtNode, isVisible, pathKey, size, vec } from '../../../../server/src/services/gtzip/model';
 import { drawTitle, Img } from '../../../../server/src/services/gtzip/draw';
+import type { Frame } from './Player';
 
 export type Box = [number, number, number, number];
 export type CanvasBg = 'grid' | 'gridlight' | 'checker' | 'dark';
@@ -45,6 +46,8 @@ interface Props {
   onDoubleClick?: (e: ElementInfo) => void;
   onZoom?: (z: number) => void;
   height: number;
+  /** A moment of an animation preview: drawn instead of the design, without selection. */
+  frame?: Frame | null;
 }
 
 let dragSeq = 0;
@@ -53,7 +56,7 @@ let dragSeq = 0;
  * The artboard as in a drawing program: zoom (Ctrl+wheel, buttons), pan (wheel, Space+drag, middle button),
  * 10 px grid, rulers, selection with handles, marquee, smart guides and grid snapping.
  */
-export const Canvas = forwardRef<CanvasApi, Props>(function Canvas({ doc, els, sel, setSel, showHidden, bg, snap, images, redraw, onBoxes, onDropFiles, onDoubleClick, onZoom, height }, ref) {
+export const Canvas = forwardRef<CanvasApi, Props>(function Canvas({ doc, els, sel, setSel, showHidden, bg, snap, images, redraw, onBoxes, onDropFiles, onDoubleClick, onZoom, height, frame }, ref) {
   const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
   const wrap = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
@@ -174,8 +177,9 @@ export const Canvas = forwardRef<CanvasApi, Props>(function Canvas({ doc, els, s
     ctx.save();
     ctx.beginPath(); ctx.rect(ax, ay, aw, ah); ctx.clip();
     ctx.translate(ax, ay); ctx.scale(z, z);
-    drawTitle(ctx, doc, { image: images, showHidden, placeholders: true, fallbackFont: 'Space Grotesk' });
+    drawTitle(ctx, doc, { image: images, showHidden, placeholders: true, fallbackFont: 'Space Grotesk', anim: frame?.anim, text: frame?.text });
     ctx.restore();
+    if (frame) { drawRulers(ctx, vw, height, view, cursor, null); return; }
     ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(ax) + 0.5, Math.round(ay) + 0.5, Math.round(aw), Math.round(ah));
 
     const scr = (b: Box): Box => [ax + b[0] * z, ay + b[1] * z, b[2] * z, b[3] * z];
@@ -211,7 +215,7 @@ export const Canvas = forwardRef<CanvasApi, Props>(function Canvas({ doc, els, s
       ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([4, 3]); ctx.strokeRect(x + 0.5, y + 0.5, w, h); ctx.setLineDash([]);
     }
     drawRulers(ctx, vw, height, view, cursor, selEls.length ? unionBox(selEls.map(boxOf)) : null);
-  }, [doc, els, sel, showHidden, bg, images, redraw, view, vw, height, W, H, hover, guides, marquee, cursor, byKey, boxOf]);
+  }, [doc, els, sel, showHidden, bg, images, redraw, view, vw, height, W, H, hover, guides, marquee, cursor, byKey, boxOf, frame]);
 
   // ---------- picking ----------
   const pick = (wx: number, wy: number, alt: boolean): ElementInfo | null => {
