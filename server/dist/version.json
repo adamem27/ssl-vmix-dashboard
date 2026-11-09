@@ -1,8 +1,14 @@
 {
-  "version": "1.0.104",
-  "commit": "c0cd346",
-  "date": "2026-11-09T23:41:30Z",
+  "version": "1.0.105",
+  "commit": "2e17950",
+  "date": "2026-11-09T23:45:25Z",
   "changes": [
+    {
+      "version": "1.0.105",
+      "commit": "2e17950",
+      "date": "2026-11-09T23:45:25Z",
+      "text": "Race signal flags (SSL style) come with the app: copied into assets/race-flags, offered in the GTZIP picture picker and synced to the vMix PC"
+    },
     {
       "version": "1.0.104",
       "commit": "c0cd346",
@@ -476,12 +482,6 @@
       "commit": "673909e",
       "date": "2026-10-18T07:27:04Z",
       "text": "XML with every sheet under one address for vMix (XPath per sheet)"
-    },
-    {
-      "version": "1.0.9",
-      "commit": "ebd9994",
-      "date": "2026-10-18T07:19:59Z",
-      "text": "One workbook for vMix: auto-updated .xlsx with a sheet per source"
     }
   ]
 }
