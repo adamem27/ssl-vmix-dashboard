@@ -1,13 +1,15 @@
-import { PointerEvent as RPointerEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../api';
 import { Button, cx, Empty, ErrorBox, fmtBytes, fmtDateTime, Loading, Modal, useConfirm, useToast } from '../components/ui';
 import {
   ANIMATION_TYPES, animationsOf, bitmap, brush, clone, DIRECTIONS, duplicate, elements, ElementInfo, fields, fmtNum, GtNode,
-  INTERPOLATIONS, isVisible, nodeAt, pathKey, remove, renameElement, reorder, setBitmapSource, setSolid, setVec, size,
-  sourceName, storyboardLength, storyboards, vec,
+  groupElements, insertElements, INTERPOLATIONS, isVisible, makeElement, moveElements, NewKind, nodeAt, pasteElements, Path, pathKey, remove,
+  renameElement, reorder, setBitmapSource, setSolid, setVec, size, sourceName, storyboardLength, storyboards, ungroup, uniqueName, vec,
 } from '../../../server/src/services/gtzip/model';
+import { absBox as absBoxOf, Box, Canvas, CanvasApi, CanvasBg, topSelected, unionBox } from './gtzip/Canvas';
+import { Layers } from './gtzip/Layers';
 import { drawTitle, Img } from '../../../server/src/services/gtzip/draw';
 import { RepeatGroup, repeatGroups } from '../../../server/src/services/gtzip/params';
 
@@ -26,25 +28,28 @@ interface TemplateDoc { meta: TemplateMeta; doc: GtNode; images: Record<string, 
 
 const small = 'input px-2 py-1 text-xs';
 const tiny = 'input px-1 py-1 text-xs';
-const TAG_ICON: Record<string, string> = { Layer: '▣', TextBlock: 'T', Image: '🖼', Rectangle: '▭', Ellipse: '◯', Ticker: '⇢' };
 const WEIGHTS = ['Normal', 'Medium', 'Bold'];
 
 export function GtzipGeneratorPage() {
   const [params, setParams] = useSearchParams();
   const q = useQuery({ queryKey: ['gtzip'], queryFn: () => api.get<GtzipState>('/api/gtzip'), refetchOnWindowFocus: false });
   const selected = params.get('t');
+  const [sidebar, setSidebarState] = useState(() => { try { return localStorage.getItem('gtzip-sidebar') === '1'; } catch { return false; } });
+  const setSidebar = (v: boolean) => { setSidebarState(v); try { localStorage.setItem('gtzip-sidebar', v ? '1' : '0'); } catch { /* storage unavailable */ } };
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
   const st = q.data!;
   const tpl = st.templates.find((t) => t.id === selected) ?? null;
+  // while a title is open the list folds away so the workspace gets the whole width
+  const showList = !tpl || sidebar;
   return (
     <div className="flex flex-col gap-4 xl:flex-row">
-      <aside className="w-full shrink-0 space-y-4 xl:w-64">
+      <aside className={cx('w-full shrink-0 space-y-4 xl:w-64', !showList && 'hidden')}>
         <Templates state={st} selected={tpl?.id ?? null} onSelect={(id) => setParams(id ? { t: id } : {}, { replace: true })} />
         <Outputs state={st} onOpenTemplate={(id) => setParams({ t: id }, { replace: true })} />
       </aside>
       <section className="min-w-0 flex-1">
-        {tpl ? <EditorLoader key={tpl.id} meta={tpl} scenes={st.scenes} onOpen={(id) => setParams({ t: id }, { replace: true })} />
+        {tpl ? <EditorLoader key={tpl.id} meta={tpl} scenes={st.scenes} onOpen={(id) => setParams({ t: id }, { replace: true })} sidebar={sidebar} setSidebar={setSidebar} />
           : <ScenesOverview state={st} onOpen={(id) => setParams({ t: id }, { replace: true })} />}
       </section>
     </div>
@@ -150,11 +155,11 @@ function Outputs({ state, onOpenTemplate }: { state: GtzipState; onOpenTemplate:
 }
 
 // ---------- editor ----------
-function EditorLoader({ meta, scenes, onOpen }: { meta: TemplateMeta; scenes: SceneDef[]; onOpen: (id: string) => void }) {
+function EditorLoader({ meta, scenes, onOpen, sidebar, setSidebar }: { meta: TemplateMeta; scenes: SceneDef[]; onOpen: (id: string) => void; sidebar: boolean; setSidebar: (v: boolean) => void }) {
   const q = useQuery({ queryKey: ['gtzip-template', meta.id], queryFn: () => api.get<TemplateDoc>(`/api/gtzip/templates/${meta.id}`), refetchOnWindowFocus: false, staleTime: Infinity });
   if (q.isLoading) return <Loading label="Opening the title…" />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
-  return <Editor tpl={{ ...q.data!, meta }} scenes={scenes} onOpen={onOpen} />;
+  return <Editor tpl={{ ...q.data!, meta }} scenes={scenes} onOpen={onOpen} sidebar={sidebar} setSidebar={setSidebar} />;
 }
 
 const draftKey = (id: string) => `gtzip-draft:${id}`;
@@ -223,27 +228,47 @@ function useImages(templateId: string) {
 }
 const imageUrl = (templateId: string, src: string) => `/api/gtzip/image?template=${encodeURIComponent(templateId)}&src=${encodeURIComponent(src)}`;
 
-type SideTab = 'layers' | 'animations' | 'fields';
 type Mode = 'quick' | 'advanced';
 const MODE_KEY = 'gtzip-mode';
 
-function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[]; onOpen: (id: string) => void }) {
+type RightTab = 'props' | 'animations' | 'fields';
+const VIEW_KEY = 'gtzip-view-v1';
+interface ViewPrefs { bg: CanvasBg; grid: boolean; guides: boolean; showHidden: boolean }
+const readView = (): ViewPrefs => { try { return { bg: 'grid', grid: true, guides: true, showHidden: false, ...JSON.parse(localStorage.getItem(VIEW_KEY) || '{}') }; } catch { return { bg: 'grid', grid: true, guides: true, showHidden: false }; } };
+/** Copied elements, shared by every open title in this tab. */
+let clipboard: GtNode[] = [];
+const FONTS = ['General Sans', 'Space Grotesk', 'Arial', 'Segoe UI', 'Montserrat', 'Roboto', 'Bebas Neue', 'Oswald'];
+
+/** Natural size of a picture, to insert it at its own size. */
+function pictureSize(url: string): Promise<[number, number]> {
+  return new Promise((res) => { const im = new Image(); im.onload = () => res([im.naturalWidth || 400, im.naturalHeight || 400]); im.onerror = () => res([400, 400]); im.src = url; });
+}
+
+function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc; scenes: SceneDef[]; onOpen: (id: string) => void; sidebar: boolean; setSidebar: (v: boolean) => void }) {
   const id = tpl.meta.id;
   const draft = useMemo(() => readDraft(id), [id]);
   const h = useHistory(draft ?? tpl.doc);
   const { doc, commit } = h;
   const [sel, setSel] = useState<string[]>([]);
-  const [showHidden, setShowHidden] = useState(false);
-  const [bg, setBg] = useState<'checker' | 'dark' | 'light'>('dark');
-  const [side, setSide] = useState<SideTab>('layers');
+  const [prefs, setPrefsState] = useState<ViewPrefs>(readView);
+  const setPrefs = (p: Partial<ViewPrefs>) => setPrefsState((cur) => { const n = { ...cur, ...p }; try { localStorage.setItem(VIEW_KEY, JSON.stringify(n)); } catch { /* storage unavailable */ } return n; });
+  const [right, setRight] = useState<RightTab>('props');
   const [dupOpen, setDupOpen] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
-  const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'advanced' ? 'advanced' : 'quick'; } catch { return 'quick'; } });
+  const [pickOpen, setPickOpen] = useState(false);
+  const [focusTick, setFocusTick] = useState(0);
+  const [zoom, setZoom] = useState(0.5);
+  const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'quick' ? 'quick' : 'advanced'; } catch { return 'advanced'; } });
   const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ } };
   const toast = useToast();
   const { ask, dialog } = useConfirm();
   const images = useImages(id);
   const fontsReady = useTitleFonts();
+  const canvas = useRef<CanvasApi>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [vh, setVh] = useState(() => window.innerHeight);
+  useEffect(() => { const f = () => setVh(window.innerHeight); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
+  const canvasH = Math.max(460, vh - 250);
 
   // keep the working copy across reloads (this browser only)
   useEffect(() => {
@@ -254,13 +279,49 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
   }, [doc, id, tpl.doc]);
 
   const els = useMemo(() => elements(doc), [doc]);
+  const byKey = useMemo(() => new Map(els.map((e) => [pathKey(e.path), e])), [els]);
   const selInfos = useMemo(() => els.filter((e) => sel.includes(pathKey(e.path))), [els, sel]);
   const one = selInfos.length === 1 ? selInfos[0] : null;
+  const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
 
   /** Applies a change to a copy of the document. */
   const mutate = (fn: (root: GtNode) => void, key?: string) => { const r = clone(doc); fn(r); commit(r, key); };
   const mutateSel = (fn: (n: GtNode, e: ElementInfo) => void, key?: string) =>
     mutate((r) => { for (const e of selInfos) { const n = nodeAt(r, e.path); if (n) fn(n, e); } }, key);
+  const run = (fn: () => { root: GtNode; added?: Path[] } | void, msg?: string) => {
+    try { const r = fn(); if (r) { commit(r.root); if (r.added) setSel(r.added.map(pathKey)); } if (msg) toast.ok(msg); } catch (e) { toast.error(e); }
+  };
+  /** Absolute boxes → Location (and Dimensions) of each element. */
+  const setBoxes = (boxes: Map<string, Box>, resize: boolean, key?: string) => mutate((r) => {
+    for (const [k, b] of boxes) {
+      const e = byKey.get(k); const n = e && nodeAt(r, e.path);
+      if (!e || !n) continue;
+      setVec(n, 'Location', b[0] - e.origin[0], b[1] - e.origin[1]);
+      if (resize) setVec(n, 'Dimensions', b[2], b[3]);
+    }
+  }, key);
+
+  // where new things go: into the selected layer, else next to the selected element, else the root
+  const targetLayer = (): Path | null => {
+    if (one?.node.tag === 'Layer') return one.path;
+    return selInfos[0]?.parentPath ?? null;
+  };
+  const insertAt = (kind: NewKind, base: string, box: Box, o: Parameters<typeof makeElement>[3] = {}) => {
+    const layer = targetLayer();
+    const lo = layer ? (() => { const le = byKey.get(pathKey(layer))!; const [x, y] = vec(le.node.attrs.Location); return [le.origin[0] + x, le.origin[1] + y]; })() : [0, 0];
+    run(() => insertElements(doc, [makeElement(kind, uniqueName(doc, base), [box[0] - lo[0], box[1] - lo[1], box[2], box[3]], o)], layer));
+  };
+  const centred = (w: number, hh: number): Box => { const [cx, cy] = canvas.current?.center() ?? [W / 2, H / 2]; return [Math.round(cx - w / 2), Math.round(cy - hh / 2), w, hh]; };
+  const addPicture = async (source: string, at?: [number, number], name = 'Picture') => {
+    let [w, hh] = await pictureSize(imageUrl(id, source));
+    const f = Math.min(1, (W * 0.8) / w, (H * 0.8) / hh); w = Math.round(w * f); hh = Math.round(hh * f);
+    insertAt('Image', name.replace(/\.[^.]+$/, '').replace(/[^\w -]+/g, ' ').trim().slice(0, 40) || 'Picture', at ? [at[0] - Math.round(w / 2), at[1] - Math.round(hh / 2), w, hh] : centred(w, hh), { source });
+  };
+  const uploadPictures = async (files: File[], at?: [number, number]) => {
+    for (const f of files) {
+      try { const r = await api.upload<{ source: string; name: string }>('/api/gtzip/images', f); await addPicture(r.source, at, f.name); } catch (e) { toast.error(e); }
+    }
+  };
 
   // ---------- layers as PNG ----------
   const base = tpl.meta.name.replace(/\.gtzip$/i, '');
@@ -279,32 +340,88 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
     toast.ok(`${top.length} PNG files saved (one per top-level layer).`);
   };
 
-  const onDelete = async () => {
+  const del = () => {
     if (!selInfos.length) return;
-    const names = selInfos.map((e) => e.node.attrs.Name || e.node.tag).join(', ');
-    if (!(await ask('Delete elements?', <>Deletes {names} with everything inside and their animations. Undo brings them back.</>, 'Delete'))) return;
     commit(remove(doc, selInfos.map((e) => e.path)));
+    toast.ok(`${selInfos.length === 1 ? (selInfos[0].node.attrs.Name || 'Element') : `${selInfos.length} elements`} deleted · Ctrl+Z brings back`);
     setSel([]);
   };
-  const onReorder = (delta: number) => {
-    if (!one) return;
-    const r = reorder(doc, one.path, delta);
-    commit(r.root);
-    setSel([pathKey(r.path)]);
+  const copy = () => { clipboard = topSelected(sel).map((k) => byKey.get(k)).filter((e): e is ElementInfo => !!e).map((e) => clone(e.node)); return clipboard.length; };
+  const paste = () => { if (clipboard.length) run(() => pasteElements(doc, clipboard, targetLayer(), 10, 10)); };
+  const dup = () => { if (selInfos.length) run(() => duplicate(doc, selInfos.map((e) => e.path), { count: 1, dx: 10, dy: 10 })); };
+  const arrange = (to: 'front' | 'back' | 'forward' | 'backward') => {
+    if (!selInfos.length) return;
+    if (to === 'forward' || to === 'backward') {
+      if (!one) { toast.error('Select one element to move one step.'); return; }
+      const r = reorder(doc, one.path, to === 'forward' ? 1 : -1); commit(r.root); setSel([pathKey(r.path)]); return;
+    }
+    const parents = [...new Set(selInfos.map((e) => pathKey(e.parentPath ?? [])))];
+    if (parents.length > 1) { toast.error('Bring forward or back elements of one layer at a time.'); return; }
+    run(() => moveElements(doc, selInfos.map((e) => e.path), selInfos[0].parentPath, to === 'back' ? 0 : undefined));
+  };
+  const group = () => { if (selInfos.length) run(() => { const g = groupElements(doc, selInfos.map((e) => e.path), 'Group'); return { root: g.root, added: [g.layer] }; }); };
+  const ungroupSel = () => { if (one?.node.tag === 'Layer') run(() => ungroup(doc, one.path)); else toast.error('Select a layer to ungroup.'); };
+
+  // ---------- align & distribute ----------
+  type Al = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+  const align = (a: Al) => {
+    const keys = topSelected(sel);
+    const boxes = keys.map((k) => [k, absBoxOf(byKey.get(k)!, doc, byKey)] as [string, Box]);
+    if (!boxes.length) return;
+    const ref: Box = boxes.length === 1 ? [0, 0, W, H] : unionBox(boxes.map((b) => b[1]));
+    const out = new Map<string, Box>();
+    for (const [k, b] of boxes) {
+      const nb: Box = [...b];
+      if (a === 'left') nb[0] = ref[0]; if (a === 'right') nb[0] = ref[0] + ref[2] - b[2]; if (a === 'hcenter') nb[0] = Math.round(ref[0] + (ref[2] - b[2]) / 2);
+      if (a === 'top') nb[1] = ref[1]; if (a === 'bottom') nb[1] = ref[1] + ref[3] - b[3]; if (a === 'vcenter') nb[1] = Math.round(ref[1] + (ref[3] - b[3]) / 2);
+      out.set(k, nb);
+    }
+    setBoxes(out, false);
+  };
+  const distribute = (axis: 0 | 1) => {
+    const keys = topSelected(sel);
+    if (keys.length < 3) { toast.error('Select three or more elements to space them evenly.'); return; }
+    const boxes = keys.map((k) => [k, absBoxOf(byKey.get(k)!, doc, byKey)] as [string, Box]).sort((a, b) => a[1][axis] - b[1][axis]);
+    const first = boxes[0][1], last = boxes[boxes.length - 1][1];
+    const span = last[axis] + last[axis + 2] - first[axis];
+    const gap = (span - boxes.reduce((s, b) => s + b[1][axis + 2], 0)) / (boxes.length - 1);
+    let pos = first[axis];
+    const out = new Map<string, Box>();
+    for (const [k, b] of boxes) { const nb: Box = [...b]; nb[axis] = Math.round(pos); out.set(k, nb); pos += b[axis + 2] + gap; }
+    setBoxes(out, false);
   };
 
-  // keyboard: undo/redo, delete, nudge
+  // ---------- keyboard ----------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (t.closest('input,textarea,select,[contenteditable]')) return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) h.redo(); else h.undo(); return; }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); h.redo(); return; }
+      if (t.closest('input,textarea,select,[contenteditable],[role=dialog]')) return;
+      const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+      if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) h.redo(); else h.undo(); return; }
+      if (mod && k === 'y') { e.preventDefault(); h.redo(); return; }
+      if (mod && k === 'a') { e.preventDefault(); setSel(els.filter((x) => !x.parentPath || !byKey.get(pathKey(x.parentPath))).map((x) => pathKey(x.path))); return; }
+      if (mod && k === 'v') { e.preventDefault(); paste(); return; }
+      if (mod && (k === '0')) { e.preventDefault(); canvas.current?.fit(); return; }
+      if (mod && (k === '1')) { e.preventDefault(); canvas.current?.zoomTo(1); return; }
+      if (mod && (k === '=' || k === '+')) { e.preventDefault(); canvas.current?.zoomBy(1.25); return; }
+      if (mod && k === '-') { e.preventDefault(); canvas.current?.zoomBy(0.8); return; }
+      if (k === 'escape') { setSel([]); return; }
       if (!selInfos.length) return;
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onDelete(); return; }
+      if (mod && k === 'c') { e.preventDefault(); toast.ok(`${copy()} copied`); return; }
+      if (mod && k === 'x') { e.preventDefault(); copy(); del(); return; }
+      if (mod && k === 'd') { e.preventDefault(); dup(); return; }
+      if (mod && k === 'g') { e.preventDefault(); if (e.shiftKey) ungroupSel(); else group(); return; }
+      if (mod && e.key === ']') { e.preventDefault(); arrange(e.shiftKey ? 'front' : 'forward'); return; }
+      if (mod && e.key === '[') { e.preventDefault(); arrange(e.shiftKey ? 'back' : 'backward'); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); del(); return; }
+      if (e.key === 'Enter' && one && (one.node.tag === 'TextBlock' || one.node.tag === 'Ticker')) { e.preventDefault(); setRight('props'); setFocusTick((n) => n + 1); return; }
       const step = e.shiftKey ? 10 : 1;
       const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-      if (d) { e.preventDefault(); mutateSel((n) => { const [x, y] = vec(n.attrs.Location); setVec(n, 'Location', x + d[0], y + d[1]); }, 'nudge'); }
+      if (d) {
+        e.preventDefault();
+        const keys = topSelected(sel);
+        mutate((r) => { for (const sk of keys) { const se = byKey.get(sk); const n = se && nodeAt(r, se.path); if (n) { const [x, y] = vec(n.attrs.Location); setVec(n, 'Location', x + d[0], y + d[1]); } } }, 'nudge');
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -315,66 +432,123 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
     commit(tpl.doc); setSel([]);
   };
 
+  const tb = 'grid h-8 min-w-8 place-items-center rounded px-1.5 text-sm text-ink-200 hover:bg-ink-700 disabled:opacity-30 disabled:hover:bg-transparent';
+  const Tool = ({ title, onClick, disabled, children }: { title: string; onClick: () => void; disabled?: boolean; children: ReactNode }) =>
+    <button className={tb} title={title} onClick={onClick} disabled={disabled}>{children}</button>;
+  const Sep = () => <span className="mx-1 h-6 w-px bg-ink-700" />;
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {dialog}
       <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setSidebar(!sidebar)} title="Show or hide the list of templates and generated files">{sidebar ? '⇤ Hide list' : '☰ Templates'}</Button>
         <h1 className="truncate text-lg font-semibold">{tpl.meta.name}</h1>
         <SceneSelect scenes={scenes} meta={tpl.meta} />
         <span className="mr-auto" />
         <span className="flex rounded-md border border-ink-700 p-0.5 text-xs">
-          {([['quick', 'Quick form'], ['advanced', 'Advanced editor']] as [Mode, string][]).map(([k, l]) => (
+          {([['advanced', 'Design'], ['quick', 'Quick form']] as [Mode, string][]).map(([k, l]) => (
             <button key={k} onClick={() => setMode(k)} className={cx('rounded px-2 py-1', mode === k ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{l}</button>
           ))}
         </span>
         <Button size="sm" onClick={() => setSaveOpen(true)} title="Keep this state as a template of its own, e.g. one variant of the scene">Save as template…</Button>
-        <Button size="sm" onClick={h.undo} disabled={!h.canUndo} title="Ctrl+Z">↶ Undo</Button>
-        <Button size="sm" onClick={h.redo} disabled={!h.canRedo} title="Ctrl+Shift+Z">↷ Redo</Button>
-        <Button size="sm" variant="ghost" onClick={reset} disabled={doc === tpl.doc}>Reset to template</Button>
+        <Button size="sm" onClick={h.undo} disabled={!h.canUndo} title="Ctrl+Z">↶</Button>
+        <Button size="sm" onClick={h.redo} disabled={!h.canRedo} title="Ctrl+Shift+Z">↷</Button>
+        <Button size="sm" variant="ghost" onClick={reset} disabled={doc === tpl.doc}>Reset</Button>
       </div>
       <GenerateBar tpl={tpl} doc={doc} />
-      <div className="flex flex-col gap-3 2xl:flex-row">
-        <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-ink-400">
-            <label className="flex items-center gap-1.5"><input type="checkbox" checked={showHidden} onChange={(e) => setShowHidden(e.target.checked)} /> Show hidden elements</label>
-            <span className="flex items-center gap-1">Background
-              {(['dark', 'checker', 'light'] as const).map((b) => <button key={b} onClick={() => setBg(b)} className={cx('rounded px-1.5 py-0.5', bg === b ? 'bg-ink-700 text-ink-50' : 'hover:bg-ink-800')}>{b}</button>)}
-            </span>
-            <span className="ml-auto">Click to select · Shift/Ctrl+click adds · drag moves · arrows nudge (Shift ×10)</span>
-          </div>
-          <Preview doc={doc} els={els} sel={sel} setSel={setSel} showHidden={showHidden} bg={bg} images={images.get} redraw={images.version + fontsReady}
-            onMove={(dx, dy) => mutateSel((n) => { const [x, y] = vec(n.attrs.Location); setVec(n, 'Location', x + dx, y + dy); }, 'drag')} />
-          <p className="text-[11px] text-ink-500">Preview is approximate (fonts, effects and text fitting may differ slightly in vMix). Dashed boxes are picture fields filled by vMix.</p>
+
+      {/* toolbar */}
+      <div className="card flex flex-wrap items-center gap-0.5 px-1.5 py-1">
+        <Tool title="Text (vMix text field)" onClick={() => insertAt('TextBlock', 'Text', centred(500, 80), { text: 'TEXT' })}><span className="font-bold">T</span></Tool>
+        <Tool title="Rectangle" onClick={() => insertAt('Rectangle', 'Box', centred(400, 120))}>▭</Tool>
+        <Tool title="Ellipse" onClick={() => insertAt('Ellipse', 'Circle', centred(200, 200))}>◯</Tool>
+        <Tool title="Picture from the dashboard (PNG generator, team graphics…)" onClick={() => setPickOpen(true)}>🖼</Tool>
+        <Tool title="Picture from this computer (or drop PNG files on the canvas)" onClick={() => fileInput.current?.click()}>⤒</Tool>
+        <input ref={fileInput} type="file" accept="image/png,image/jpeg" multiple hidden onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ''; void uploadPictures(f); }} />
+        <Tool title="Empty picture field filled by vMix (photo, flag…)" onClick={() => insertAt('Image', 'PHOTO', centred(300, 300))}><span className="text-xs">▨</span></Tool>
+        <Tool title="New layer (folder)" onClick={() => insertAt('Layer', 'Layer', [0, 0, W, H], { compSize: [W, H] })}><span className="text-amber-300">▣</span></Tool>
+        <Sep />
+        <Tool title={sel.length > 1 ? 'Align left edges' : 'Align to the left of the frame'} disabled={!sel.length} onClick={() => align('left')}><AlignIcon a="left" /></Tool>
+        <Tool title="Align centres horizontally" disabled={!sel.length} onClick={() => align('hcenter')}><AlignIcon a="hcenter" /></Tool>
+        <Tool title="Align right edges" disabled={!sel.length} onClick={() => align('right')}><AlignIcon a="right" /></Tool>
+        <Tool title="Align top edges" disabled={!sel.length} onClick={() => align('top')}><AlignIcon a="top" /></Tool>
+        <Tool title="Align centres vertically" disabled={!sel.length} onClick={() => align('vcenter')}><AlignIcon a="vcenter" /></Tool>
+        <Tool title="Align bottom edges" disabled={!sel.length} onClick={() => align('bottom')}><AlignIcon a="bottom" /></Tool>
+        <Tool title="Space evenly side by side (3+)" disabled={sel.length < 3} onClick={() => distribute(0)}><span className="text-xs">⫴</span></Tool>
+        <Tool title="Space evenly one under another (3+)" disabled={sel.length < 3} onClick={() => distribute(1)}><span className="rotate-90 text-xs">⫴</span></Tool>
+        <Sep />
+        <Tool title="Bring to front (Ctrl+Shift+])" disabled={!sel.length} onClick={() => arrange('front')}><span className="text-xs">⤒</span></Tool>
+        <Tool title="Bring forward (Ctrl+])" disabled={!one} onClick={() => arrange('forward')}><span className="text-xs">↑</span></Tool>
+        <Tool title="Send backward (Ctrl+[)" disabled={!one} onClick={() => arrange('backward')}><span className="text-xs">↓</span></Tool>
+        <Tool title="Send to back (Ctrl+Shift+[)" disabled={!sel.length} onClick={() => arrange('back')}><span className="text-xs">⤓</span></Tool>
+        <Sep />
+        <Tool title="Group into a layer (Ctrl+G)" disabled={!sel.length} onClick={group}><span className="text-[11px] font-semibold">GRP</span></Tool>
+        <Tool title="Ungroup (Ctrl+Shift+G)" disabled={one?.node.tag !== 'Layer'} onClick={ungroupSel}><span className="text-[11px] font-semibold">UNG</span></Tool>
+        <Tool title="Duplicate (Ctrl+D)" disabled={!sel.length} onClick={dup}>⧉</Tool>
+        <Tool title="Duplicate many, renumbered, with animations…" disabled={!sel.length} onClick={() => setDupOpen(true)}><span className="text-xs">⧉…</span></Tool>
+        <Tool title="Delete (Del)" disabled={!sel.length} onClick={del}>🗑</Tool>
+        <span className="ml-auto" />
+        <Tool title="Zoom out (Ctrl −)" onClick={() => canvas.current?.zoomBy(0.8)}>−</Tool>
+        <button className="w-14 rounded px-1 text-xs tabular-nums text-ink-300 hover:bg-ink-700" title="Fit (Ctrl+0)" onClick={() => canvas.current?.fit()}>{Math.round(zoom * 100)}%</button>
+        <Tool title="Zoom in (Ctrl +)" onClick={() => canvas.current?.zoomBy(1.25)}>+</Tool>
+        <Tool title="100% (Ctrl+1)" onClick={() => canvas.current?.zoomTo(1)}><span className="text-[11px]">1:1</span></Tool>
+        <Sep />
+        <select className="rounded bg-ink-900 px-1 py-1 text-xs text-ink-200" value={prefs.bg} onChange={(e) => setPrefs({ bg: e.target.value as CanvasBg })} title="Background of the frame">
+          <option value="grid">Grid 10 px</option><option value="gridlight">Grid, light</option><option value="checker">Checker</option><option value="dark">Black</option>
+        </select>
+        <label className="flex items-center gap-1 px-1 text-xs text-ink-300" title="Moving and resizing snap to the 10 px grid"><input type="checkbox" checked={prefs.grid} onChange={(e) => setPrefs({ grid: e.target.checked })} />Snap</label>
+        <label className="flex items-center gap-1 px-1 text-xs text-ink-300" title="Snap to the edges and centres of other elements (pink lines); hold Alt to move freely"><input type="checkbox" checked={prefs.guides} onChange={(e) => setPrefs({ guides: e.target.checked })} />Guides</label>
+        <label className="flex items-center gap-1 px-1 text-xs text-ink-300"><input type="checkbox" checked={prefs.showHidden} onChange={(e) => setPrefs({ showHidden: e.target.checked })} />Hidden</label>
+      </div>
+
+      <div className="flex flex-col gap-2 xl:flex-row">
+        {mode === 'advanced' && <div className="flex w-full shrink-0 flex-col gap-2 xl:w-60" style={{ height: canvasH }}>
+          <Layers els={els} sel={sel} setSel={setSel} onPng={(e) => png([e], true)}
+            onToggle={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (isVisible(n)) n.attrs.Visible = 'False'; else delete n.attrs.Visible; })}
+            onLock={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (n.attrs.Locked === 'True') n.attrs.Locked = 'False'; else n.attrs.Locked = 'True'; })}
+            onRename={(e, name) => { try { const r = clone(doc); renameElement(r, e.node.attrs.Name!, name); commit(r); } catch (err) { toast.error(err); } }}
+            onMove={(paths, to) => run(() => moveElements(doc, paths, to.layer, to.index))} />
+        </div>}
+        <div className="min-w-0 flex-1">
+          <Canvas ref={canvas} doc={doc} els={els} sel={sel} setSel={setSel} showHidden={prefs.showHidden} bg={prefs.bg} snap={{ grid: prefs.grid, guides: prefs.guides }}
+            images={images.get} redraw={images.version + fontsReady} height={canvasH} onZoom={setZoom}
+            onBoxes={(b, resize, key) => setBoxes(b, resize, key)}
+            onDropFiles={(files, at) => void uploadPictures(files, at)}
+            onDoubleClick={(e) => { setSel([pathKey(e.path)]); setRight('props'); setFocusTick((n) => n + 1); }} />
+          <p className="mt-1 text-[11px] text-ink-500">
+            Click selects · Shift/Ctrl adds · drag on empty space selects an area · Alt+click picks a layer or a locked element · drag handles to resize (Shift keeps proportions) ·
+            arrows nudge (Shift ×10) · Ctrl+wheel zooms, wheel or Space+drag pans · Ctrl+C/V/D/G · drop PNG files to add them. Preview is approximate; dashed boxes are picture fields filled by vMix.
+          </p>
         </div>
-        {mode === 'quick' ? <div className="w-full shrink-0 2xl:w-[28rem]">
+        {mode === 'quick' ? <div className="w-full shrink-0 xl:w-[26rem]">
           <QuickForm tpl={tpl} doc={doc} commit={commit} images={images.get} sel={sel} setSel={setSel} />
-        </div> : <div className="w-full shrink-0 space-y-3 2xl:w-[28rem]">
+        </div> : <div className="flex w-full shrink-0 flex-col gap-2 xl:w-80" style={{ maxHeight: canvasH }}>
           <nav className="flex gap-1 border-b border-ink-800">
-            {([['layers', 'Layers'], ['animations', 'Animations'], ['fields', 'vMix fields']] as [SideTab, string][]).map(([k, l]) => (
-              <button key={k} onClick={() => setSide(k)} className={cx('-mb-px border-b-2 px-3 py-1.5 text-sm font-semibold', side === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{l}</button>
+            {([['props', 'Properties'], ['animations', 'Animations'], ['fields', 'vMix fields']] as [RightTab, string][]).map(([k, l]) => (
+              <button key={k} onClick={() => setRight(k)} className={cx('-mb-px border-b-2 px-2.5 py-1.5 text-sm font-semibold', right === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{l}</button>
             ))}
           </nav>
-          {side === 'layers' && <>
-            <div className="flex flex-wrap gap-1">
-              <Button size="sm" disabled={!selInfos.length} onClick={() => setDupOpen(true)} title="Copies with renumbered names, offset and animations – e.g. one more sailor, race or bar">⧉ Duplicate…</Button>
-              <Button size="sm" disabled={!selInfos.length} onClick={onDelete}>🗑 Delete</Button>
-              <Button size="sm" disabled={!one} onClick={() => onReorder(-1)} title="Draw earlier (further back)">↓ Back</Button>
-              <Button size="sm" disabled={!one} onClick={() => onReorder(1)} title="Draw later (more in front)">↑ Front</Button>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="text-xs text-ink-400">PNG:</span>
-              <Button size="sm" disabled={!selInfos.length} onClick={() => png(selInfos, true)} title="The selected elements, cropped to what is drawn">⤓ Selected</Button>
-              <Button size="sm" onClick={pngAll} title="Every top-level layer as its own PNG, cropped to what is drawn">⤓ Every layer</Button>
-              <Button size="sm" variant="ghost" disabled={!selInfos.length} onClick={() => png(selInfos, false)} title="The selected elements on a transparent 1920×1080 frame, in place">⤓ Selected, full frame</Button>
-            </div>
-            <LayerTree els={els} sel={sel} setSel={setSel} onPng={(e) => png([e], true)} onToggle={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (isVisible(n)) n.attrs.Visible = 'False'; else delete n.attrs.Visible; })} />
-            {one ? <Properties key={pathKey(one.path)} info={one} doc={doc} tpl={tpl} images={images.get} mutate={mutate} commit={commit} />
-              : selInfos.length > 1 ? <MultiProperties infos={selInfos} mutateSel={mutateSel} /> : null}
-          </>}
-          {side === 'animations' && <Animations doc={doc} mutate={mutate} selNames={selInfos.map((e) => e.node.attrs.Name).filter(Boolean)} />}
-          {side === 'fields' && <Fields doc={doc} />}
+          <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
+            {right === 'props' && <>
+              {one ? <Properties key={pathKey(one.path)} info={one} doc={doc} tpl={tpl} images={images.get} mutate={mutate} commit={commit} focusTick={focusTick} />
+                : selInfos.length > 1 ? <MultiProperties infos={selInfos} mutateSel={mutateSel} />
+                : <div className="card space-y-2 p-3 text-xs text-ink-400">
+                    <p>Nothing selected. Click an element on the canvas or in Layers.</p>
+                    <p>Frame: {W} × {H} px · {els.length} elements</p>
+                  </div>}
+              <div className="card flex flex-wrap items-center gap-1 p-2">
+                <span className="text-xs text-ink-400">PNG:</span>
+                <Button size="sm" disabled={!selInfos.length} onClick={() => png(selInfos, true)} title="The selected elements, cropped to what is drawn">⤓ Selected</Button>
+                <Button size="sm" onClick={pngAll} title="Every top-level layer as its own PNG, cropped to what is drawn">⤓ Every layer</Button>
+                <Button size="sm" variant="ghost" disabled={!selInfos.length} onClick={() => png(selInfos, false)} title="The selected elements on a transparent full frame, in place">⤓ Full frame</Button>
+              </div>
+            </>}
+            {right === 'animations' && <Animations doc={doc} mutate={mutate} selNames={selInfos.map((e) => e.node.attrs.Name).filter(Boolean)} />}
+            {right === 'fields' && <Fields doc={doc} />}
+          </div>
         </div>}
       </div>
+      {pickOpen && <PicturePicker onClose={() => setPickOpen(false)} onPick={(s) => { setPickOpen(false); void addPicture(s, undefined, sourceName(s.replace(/^(upload|asset):/, '')).split('/').pop()); }} />}
       {saveOpen && <SaveTemplateDialog scenes={scenes} tpl={tpl} doc={doc} onClose={() => setSaveOpen(false)} onSaved={(m) => { setSaveOpen(false); onOpen(m.id); }} />}
       {dupOpen && <DuplicateDialog infos={selInfos} els={els} doc={doc} onClose={() => setDupOpen(false)} onApply={(o) => {
         try {
@@ -387,6 +561,14 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
       }} />}
     </div>
   );
+}
+
+function AlignIcon({ a }: { a: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' }) {
+  const d = {
+    left: 'M4 3v18M8 7h10v4H8zM8 14h6v4H8z', hcenter: 'M12 3v18M6 7h12v4H6zM8 14h8v4H8z', right: 'M20 3v18M6 7h10v4H6zM10 14h6v4h-6z',
+    top: 'M3 4h18M7 8h4v10H7zM14 8h4v6h-4z', vcenter: 'M3 12h18M7 6h4v12H7zM14 8h4v8h-4z', bottom: 'M3 20h18M7 6h4v10H7zM14 10h4v6h-4z',
+  }[a];
+  return <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d={d} /></svg>;
 }
 
 function GenerateBar({ tpl, doc }: { tpl: TemplateDoc; doc: GtNode }) {
@@ -620,85 +802,6 @@ function absBox(e: ElementInfo, doc: GtNode, els: ElementInfo[]): [number, numbe
   return [e.origin[0] + x, e.origin[1] + y, w, h];
 }
 
-function Preview({ doc, els, sel, setSel, showHidden, bg, images, redraw, onMove }: {
-  doc: GtNode; els: ElementInfo[]; sel: string[]; setSel: (s: string[]) => void; showHidden: boolean; bg: string;
-  images: (src: string) => Img | null; redraw: number; onMove: (dx: number, dy: number) => void;
-}) {
-  const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
-  const wrap = useRef<HTMLDivElement>(null);
-  const cv = useRef<HTMLCanvasElement>(null);
-  const [cw, setCw] = useState(960);
-  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  useEffect(() => {
-    const ro = new ResizeObserver(([e]) => setCw(Math.max(320, Math.floor(e.contentRect.width))));
-    if (wrap.current) ro.observe(wrap.current);
-    return () => ro.disconnect();
-  }, []);
-  const scale = cw / W;
-  const hiddenUnder = useCallback((e: ElementInfo) => {
-    if (!isVisible(e.node)) return true;
-    let p = e.parentPath;
-    while (p) { const pk = pathKey(p); const pe = els.find((x) => pathKey(x.path) === pk); if (!pe) break; if (!isVisible(pe.node)) return true; p = pe.parentPath; }
-    return false;
-  }, [els]);
-  useEffect(() => {
-    const c = cv.current;
-    if (!c) return;
-    const dpr = window.devicePixelRatio || 1;
-    c.width = Math.round(cw * dpr); c.height = Math.round(H * scale * dpr);
-    const ctx = c.getContext('2d')!;
-    ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    drawTitle(ctx, doc, { image: images, showHidden, placeholders: true, fallbackFont: 'Space Grotesk' });
-    ctx.lineWidth = 2 / scale;
-    for (const e of els) {
-      if (!sel.includes(pathKey(e.path))) continue;
-      const [x, y, w, h] = absBox(e, doc, els);
-      ctx.strokeStyle = '#38bdf8'; ctx.setLineDash([]);
-      ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = 'rgba(56,189,248,0.08)'; ctx.fillRect(x, y, w, h);
-    }
-  }, [doc, els, sel, showHidden, cw, scale, H, W, images, redraw]);
-
-  const pick = (ev: RPointerEvent<HTMLCanvasElement>): ElementInfo | null => {
-    const r = cv.current!.getBoundingClientRect();
-    const px = (ev.clientX - r.left) / scale, py = (ev.clientY - r.top) / scale;
-    for (let i = els.length - 1; i >= 0; i--) {
-      const e = els[i];
-      if (e.node.tag === 'Layer' && !ev.altKey) continue; // Alt+click picks layers
-      if (!showHidden && hiddenUnder(e)) continue;
-      const [x, y, w, h] = absBox(e, doc, els);
-      if (px >= x && px <= x + w && py >= y && py <= y + h) return e;
-    }
-    return null;
-  };
-  return (
-    <div ref={wrap} className={cx('overflow-hidden rounded-lg border border-ink-800', bg === 'checker' ? 'checker' : bg === 'light' ? 'bg-preview-light' : 'bg-preview-dark')}>
-      <canvas ref={cv} style={{ width: cw, height: H * scale, display: 'block', cursor: 'default', touchAction: 'none' }}
-        onPointerDown={(ev) => {
-          const e = pick(ev);
-          const k = e ? pathKey(e.path) : null;
-          if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { if (k) setSel(sel.includes(k) ? sel.filter((x) => x !== k) : [...sel, k]); return; }
-          if (!k) { setSel([]); return; }
-          if (!sel.includes(k)) setSel([k]);
-          drag.current = { x: ev.clientX, y: ev.clientY, moved: false };
-          (ev.target as HTMLCanvasElement).setPointerCapture(ev.pointerId);
-        }}
-        onPointerMove={(ev) => {
-          const d = drag.current;
-          if (!d) return;
-          const dx = Math.round((ev.clientX - d.x) / scale), dy = Math.round((ev.clientY - d.y) / scale);
-          if (!dx && !dy) return;
-          if (!d.moved && Math.abs(ev.clientX - d.x) + Math.abs(ev.clientY - d.y) < 4) return;
-          d.moved = true;
-          onMove(dx, dy);
-          d.x += dx * scale; d.y += dy * scale;
-        }}
-        onPointerUp={() => { drag.current = null; }} />
-    </div>
-  );
-}
-
 // ---------- layer tree ----------
 /**
  * Saves elements as a transparent PNG cropped to what is drawn, or on the whole 1920×1080 frame (keeps the position).
@@ -726,57 +829,6 @@ async function savePng(doc: GtNode, nodes: GtNode[], images: (src: string) => Im
   a.download = `${fileName.replace(/[\\/:*?"<>|]+/g, '_')}.png`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
-
-function LayerTree({ els, sel, setSel, onToggle, onPng }: { els: ElementInfo[]; sel: string[]; setSel: (s: string[]) => void; onToggle: (e: ElementInfo) => void; onPng: (e: ElementInfo) => void }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState('');
-  const lastClick = useRef<string | null>(null);
-  // GT lists the top-most element first
-  const rows = useMemo(() => {
-    const out: ElementInfo[] = [];
-    const kids = (parent: string | null) => els.filter((e) => (e.parentPath ? pathKey(e.parentPath) : null) === parent).reverse();
-    const walk = (parent: string | null, hiddenParent: boolean) => {
-      for (const e of kids(parent)) {
-        if (!hiddenParent) out.push(e);
-        walk(pathKey(e.path), hiddenParent || collapsed.has(e.node.attrs.Name ?? pathKey(e.path)));
-      }
-    };
-    walk(null, false);
-    const f = filter.trim().toLowerCase();
-    return f ? els.filter((e) => (e.node.attrs.Name ?? '').toLowerCase().includes(f)) : out;
-  }, [els, collapsed, filter]);
-  const click = (ev: React.MouseEvent, k: string) => {
-    if (ev.shiftKey && lastClick.current) {
-      const a = rows.findIndex((r) => pathKey(r.path) === lastClick.current), b = rows.findIndex((r) => pathKey(r.path) === k);
-      if (a >= 0 && b >= 0) { const range = rows.slice(Math.min(a, b), Math.max(a, b) + 1).map((r) => pathKey(r.path)); setSel([...new Set([...sel, ...range])]); return; }
-    }
-    if (ev.ctrlKey || ev.metaKey) setSel(sel.includes(k) ? sel.filter((x) => x !== k) : [...sel, k]);
-    else setSel([k]);
-    lastClick.current = k;
-  };
-  return (
-    <div className="card overflow-hidden">
-      <input className="w-full border-b border-ink-800 bg-transparent px-3 py-1.5 text-xs outline-none placeholder:text-ink-500" placeholder="Filter by name…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-      <ul className="max-h-[22rem] overflow-auto py-1 text-xs">
-        {rows.map((e) => {
-          const k = pathKey(e.path), name = e.node.attrs.Name ?? `(${e.node.tag})`, key = e.node.attrs.Name ?? k;
-          const isLayer = e.node.tag === 'Layer';
-          return (
-            <li key={k} className={cx('flex items-center gap-1 pr-2', sel.includes(k) ? 'bg-accent-600/30 text-ink-50' : 'hover:bg-ink-800')} style={{ paddingLeft: 6 + (filter ? 0 : e.depth * 14) }}>
-              <button className="w-4 text-ink-500" onClick={() => isLayer && setCollapsed((c) => { const n = new Set(c); if (n.has(key)) n.delete(key); else n.add(key); return n; })}>
-                {isLayer ? (collapsed.has(key) ? '▸' : '▾') : ''}
-              </button>
-              <span className="w-4 text-center text-ink-400">{TAG_ICON[e.node.tag] ?? '•'}</span>
-              <button className={cx('min-w-0 flex-1 truncate py-1 text-left', !isVisible(e.node) && 'text-ink-500 line-through decoration-ink-600')} onClick={(ev) => click(ev, k)}>{name}</button>
-              <button className="px-1 text-ink-500 hover:text-ink-100" title="Download as PNG (transparent, cropped to what is drawn)" onClick={() => onPng(e)}>⤓</button>
-              <button className={cx('px-1', isVisible(e.node) ? 'text-ink-300' : 'text-ink-600')} title={isVisible(e.node) ? 'Visible – click to hide' : 'Hidden – click to show'} onClick={() => onToggle(e)}>{isVisible(e.node) ? '👁' : '◌'}</button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
 }
 
 // ---------- properties ----------
@@ -816,11 +868,15 @@ function ColorRow({ label, node, part, mutateNode }: { label: string; node: GtNo
   );
 }
 
-function Properties({ info, doc, tpl, images, mutate, commit }: {
+/** The last double-click that moved the keyboard into a text box (each one does it once). */
+let handledFocus = 0;
+function Properties({ info, doc, tpl, images, mutate, commit, focusTick = 0 }: {
   info: ElementInfo; doc: GtNode; tpl: TemplateDoc; images: (src: string) => Img | null;
-  mutate: (fn: (r: GtNode) => void, key?: string) => void; commit: (r: GtNode, key?: string) => void;
+  mutate: (fn: (r: GtNode) => void, key?: string) => void; commit: (r: GtNode, key?: string) => void; focusTick?: number;
 }) {
   const n = info.node;
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (focusTick > handledFocus) { handledFocus = focusTick; textRef.current?.focus(); textRef.current?.select(); } }, [focusTick]);
   const toast = useToast();
   const [name, setName] = useState(n.attrs.Name ?? '');
   const [pick, setPick] = useState(false);
@@ -859,9 +915,10 @@ function Properties({ info, doc, tpl, images, mutate, commit }: {
       </div>
 
       {isText && <Section title="Text">
-        <textarea className={cx(small, 'min-h-[3.5rem]')} value={(n.attrs.Text ?? '').replace(/\r\n/g, '\n')} onChange={(e) => setAttr('Text', e.target.value.replace(/\r?\n/g, '\r\n') || null, 'Text')} />
+        <textarea ref={textRef} className={cx(small, 'min-h-[3.5rem]')} value={(n.attrs.Text ?? '').replace(/\r\n/g, '\n')} onChange={(e) => setAttr('Text', e.target.value.replace(/\r?\n/g, '\r\n') || null, 'Text')} />
         <div className="grid grid-cols-3 gap-2">
-          <label><span className="text-[11px] text-ink-500">Font</span><input className={small} value={n.attrs.FontFamily ?? ''} onChange={(e) => setAttr('FontFamily', e.target.value, 'FontFamily')} /></label>
+          <label><span className="text-[11px] text-ink-500">Font</span><input className={small} list="gt-fonts" value={n.attrs.FontFamily ?? ''} onChange={(e) => setAttr('FontFamily', e.target.value, 'FontFamily')} />
+            <datalist id="gt-fonts">{FONTS.map((f) => <option key={f} value={f} />)}</datalist></label>
           <Num label="Size" value={Number(n.attrs.FontSize ?? 24)} k="FontSize" onChange={(v) => setAttr('FontSize', fmtNum(v), 'FontSize')} />
           <label><span className="text-[11px] text-ink-500">Weight</span>
             <select className={small} value={n.attrs.FontWeight ?? 'Normal'} onChange={(e) => setAttr('FontWeight', e.target.value === 'Normal' ? null : e.target.value)}>

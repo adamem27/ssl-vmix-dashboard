@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { GtzipService, loadPackage, resourcePart, savePackage } from '../src/services/gtzip/gtzip.js';
-import { allNames, animationsOf, duplicate, elements, GtNode, parseXml, remove, renameElement, serializeXml, storyboards } from '../src/services/gtzip/model.js';
+import { allNames, animationsOf, duplicate, elements, groupElements, GtNode, insertElements, makeElement, moveElements, parseXml, pasteElements, remove, renameElement, serializeXml, storyboards, ungroup, uniqueName, vec } from '../src/services/gtzip/model.js';
 import { repeatGroups, setCount } from '../src/services/gtzip/params.js';
 import { zipStore } from '../src/services/xlsx.js';
 import { setup } from './helpers.js';
@@ -386,5 +386,34 @@ describe('gtzip data fields', () => {
     expect(r.bands.map((b) => b.name).sort()).toEqual(['PANEL', 'ROWBG 1', 'ROWBG 2']);
     const s = box(r.root, 'STATUS 1');
     expect(s[0]).toBeGreaterThan(box(r.root, 'RACE 1')[0] + 640);
+  });
+});
+
+describe('gtzip drawing tools', () => {
+  const doc = (): GtNode => ({ tag: 'Composition', attrs: { Width: '1920', Height: '1080' }, children: [] });
+  const abs = (r: GtNode, name: string) => { const e = elements(r).find((x) => x.node.attrs.Name === name)!; const [x, y] = vec(e.node.attrs.Location); return [e.origin[0] + x, e.origin[1] + y]; };
+  it('adds new elements with unique names, groups them into a layer and back without moving them', () => {
+    let r = doc();
+    r = insertElements(r, [makeElement('Rectangle', uniqueName(r, 'Box'), [100, 50, 200, 80])]).root;
+    r = insertElements(r, [makeElement('TextBlock', uniqueName(r, 'Box'), [120, 60, 160, 40], { text: 'HELLO' })]).root;
+    expect(elements(r).map((e) => e.node.attrs.Name)).toEqual(['Box', 'Box 2']);
+    const lay = insertElements(r, [makeElement('Layer', 'L', [300, 200, 0, 0])]);
+    r = moveElements(lay.root, [[1]], lay.added[0]).root;
+    expect(abs(r, 'Box 2')).toEqual([120, 60]);
+    expect(vec(elements(r).find((e) => e.node.attrs.Name === 'Box 2')!.node.attrs.Location).slice(0, 2)).toEqual([-180, -140]);
+    const g = groupElements(r, [[0]]);
+    expect(abs(g.root, 'Box')).toEqual([100, 50]);
+    expect(elements(g.root).find((e) => e.node.attrs.Name === 'Box')!.parentPath).toEqual(g.layer);
+    const u = ungroup(g.root, g.layer);
+    expect(elements(u.root).filter((e) => e.node.tag === 'Layer').map((e) => e.node.attrs.Name)).toEqual(['L']);
+    expect(abs(u.root, 'Box')).toEqual([100, 50]);
+    expect(() => moveElements(u.root, [elements(u.root).find((e) => e.node.attrs.Name === 'L')!.path], elements(u.root).find((e) => e.node.attrs.Name === 'L')!.path)).toThrow();
+  });
+  it('pastes copies with the next free names', () => {
+    let r = doc();
+    r = insertElements(r, [makeElement('Rectangle', 'BAR 1', [0, 0, 10, 10])]).root;
+    const p = pasteElements(r, [elements(r)[0].node], null, 10, 10);
+    expect(elements(p.root).map((e) => e.node.attrs.Name)).toEqual(['BAR 1', 'BAR 2']);
+    expect(abs(p.root, 'BAR 2')).toEqual([10, 10]);
   });
 });
