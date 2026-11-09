@@ -1,8 +1,14 @@
 {
-  "version": "1.0.93",
-  "commit": "03a1734",
-  "date": "2026-11-09T20:37:05Z",
+  "version": "1.0.94",
+  "commit": "678ce1c",
+  "date": "2026-11-09T20:58:52Z",
   "changes": [
+    {
+      "version": "1.0.94",
+      "commit": "678ce1c",
+      "date": "2026-11-09T20:58:52Z",
+      "text": "Lower thirds from Stream Deck/Companion: sailor, team and best-result keys with data-change swaps"
+    },
     {
       "version": "1.0.93",
       "commit": "03a1734",
