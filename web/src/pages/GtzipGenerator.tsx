@@ -5,7 +5,7 @@ import { api, ApiError } from '../api';
 import { Button, cx, Empty, ErrorBox, fmtBytes, fmtDateTime, Loading, Modal, useConfirm, useToast } from '../components/ui';
 import {
   ANIMATION_TYPES, animationsOf, bitmap, brush, clone, DIRECTIONS, duplicate, elements, ElementInfo, fields, fmtNum, GtNode,
-  groupElements, insertElements, INTERPOLATIONS, isVisible, makeElement, moveElements, NewKind, nodeAt, pasteElements, Path, pathKey, remove,
+  fitLayer, groupElements, insertElements, INTERPOLATIONS, isVisible, makeElement, moveElements, NewKind, nodeAt, pasteElements, Path, pathKey, remove,
   renameElement, reorder, setBitmapSource, setSolid, setVec, size, sourceName, storyboardLength, storyboards, ungroup, uniqueName, vec,
 } from '../../../server/src/services/gtzip/model';
 import { absBox as absBoxOf, Box, Canvas, CanvasApi, CanvasBg, topSelected, unionBox } from './gtzip/Canvas';
@@ -487,6 +487,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
         <Sep />
         <Tool title="Group into a layer (Ctrl+G)" disabled={!sel.length} onClick={group}><span className="text-[11px] font-semibold">GRP</span></Tool>
         <Tool title="Ungroup (Ctrl+Shift+G)" disabled={one?.node.tag !== 'Layer'} onClick={ungroupSel}><span className="text-[11px] font-semibold">UNG</span></Tool>
+        <Tool title="Cut the selected layer to the area of its elements" disabled={one?.node.tag !== 'Layer'} onClick={() => one && run(() => ({ root: fitLayer(doc, one.path), added: [one.path] }))}><span className="text-[11px] font-semibold">FIT</span></Tool>
         <Tool title="Duplicate (Ctrl+D)" disabled={!sel.length} onClick={dup}>⧉</Tool>
         <Tool title="Duplicate many, renumbered, with animations…" disabled={!sel.length} onClick={() => setDupOpen(true)}><span className="text-xs">⧉…</span></Tool>
         <Tool title="Delete (Del)" disabled={!sel.length} onClick={del}>🗑</Tool>

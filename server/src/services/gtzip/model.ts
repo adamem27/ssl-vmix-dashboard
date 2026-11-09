@@ -507,7 +507,24 @@ export function moveElements(root0: GtNode, paths: Path[], layer: Path | null, i
   return { root, added: pathsOf(root, moving.map((e) => e.node)) };
 }
 
-/** Puts elements of one composition into a new full-size layer, drawn where the top-most of them was. */
+/** Absolute boxes of elements (x, y, width, height on the frame). */
+function absBoxes(root: GtNode, paths: Path[]): [number, number, number, number][] {
+  const all = elements(root);
+  const byKey = new Map(all.map((e) => [pathKey(e.path), e]));
+  const frame: [number, number] = [Number(root.attrs.Width ?? 1920), Number(root.attrs.Height ?? 1080)];
+  return paths.map((p) => {
+    const e = byKey.get(pathKey(p))!;
+    const parent = e.parentPath ? byKey.get(pathKey(e.parentPath)) : null;
+    const [w, h] = size(e.node, parent ? size(parent.node, frame) : frame);
+    const [x, y] = vec(e.node.attrs.Location);
+    return [e.origin[0] + x, e.origin[1] + y, w, h];
+  });
+}
+
+/**
+ * Puts elements of one composition into a new layer, drawn where the top-most of them was. The layer is cut to the
+ * area its elements take, so it can be moved, aligned and animated as one block.
+ */
 export function groupElements(root0: GtNode, paths: Path[], name = 'Group'): { root: GtNode; layer: Path } {
   const sel = topMost(paths);
   if (!sel.length) throw new Error('Select what to group.');
@@ -516,14 +533,41 @@ export function groupElements(root0: GtNode, paths: Path[], name = 'Group'): { r
   const all = elements(root0);
   const info = all.find((e) => pathKey(e.path) === pathKey(sel[0]))!;
   const parentLayer = info.parentPath;
-  const comp = nodeAt(root0, sel[0].slice(0, -1))!;
-  const cw = Number(comp.attrs.Width ?? root0.attrs.Width ?? 1920), ch = Number(comp.attrs.Height ?? root0.attrs.Height ?? 1080);
+  const boxes = absBoxes(root0, sel);
+  const x0 = Math.floor(Math.min(...boxes.map((b) => b[0]))), y0 = Math.floor(Math.min(...boxes.map((b) => b[1])));
+  const x1 = Math.ceil(Math.max(...boxes.map((b) => b[0] + b[2]))), y1 = Math.ceil(Math.max(...boxes.map((b) => b[1] + b[3])));
+  const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
   const last = Math.max(...sel.map((p) => p[p.length - 1]));
-  const layerNode = makeElement('Layer', uniqueName(root0, name), [0, 0, cw, ch], { compSize: [cw, ch] });
+  // the layer's Location is inside its parent: subtract where the parent composition starts
+  const layerNode = makeElement('Layer', uniqueName(root0, name), [x0 - info.origin[0], y0 - info.origin[1], w, h], { compSize: [w, h] });
+  if (x0 === info.origin[0] && y0 === info.origin[1]) setVec(layerNode, 'Location', 0, 0);
   const ins = insertElements(root0, [layerNode], parentLayer, last + 1);
   const moved = moveElements(ins.root, sel, ins.added[0]);
   const layer = elements(moved.root).find((e) => e.node.attrs.Name === layerNode.attrs.Name)!.path;
   return { root: moved.root, layer };
+}
+
+/** Cuts a layer to the area its elements take (keeps them where they are on screen). */
+export function fitLayer(root0: GtNode, layer: Path): GtNode {
+  const all = elements(root0);
+  const info = all.find((e) => pathKey(e.path) === pathKey(layer));
+  if (!info || info.node.tag !== 'Layer') throw new Error('Select a layer.');
+  const kids = all.filter((e) => e.parentPath && pathKey(e.parentPath) === pathKey(layer));
+  if (!kids.length) throw new Error('The layer is empty.');
+  const boxes = absBoxes(root0, kids.map((k) => k.path));
+  const x0 = Math.floor(Math.min(...boxes.map((b) => b[0]))), y0 = Math.floor(Math.min(...boxes.map((b) => b[1])));
+  const x1 = Math.ceil(Math.max(...boxes.map((b) => b[0] + b[2]))), y1 = Math.ceil(Math.max(...boxes.map((b) => b[1] + b[3])));
+  const root = clone(root0);
+  const ln = nodeAt(root, layer)!;
+  const [lx, ly] = vec(ln.attrs.Location);
+  const ox = info.origin[0] + lx, oy = info.origin[1] + ly; // where the layer's inside starts now
+  const dx = x0 - ox, dy = y0 - oy;
+  setVec(ln, 'Location', lx + dx, ly + dy);
+  setVec(ln, 'Dimensions', x1 - x0, y1 - y0);
+  const comp = nodeAt(root, compositionPath(root, layer)!)!;
+  comp.attrs.Width = String(x1 - x0); comp.attrs.Height = String(y1 - y0);
+  for (const c of comp.children) if (isElement(c)) { const [x, y] = vec(c.attrs.Location); setVec(c, 'Location', x - dx, y - dy); }
+  return root;
 }
 
 /** Takes everything out of a layer into its parent, in place, and removes the empty layer. */

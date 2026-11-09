@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { GtzipService, loadPackage, resourcePart, savePackage } from '../src/services/gtzip/gtzip.js';
-import { allNames, animationsOf, duplicate, elements, groupElements, GtNode, insertElements, makeElement, moveElements, parseXml, pasteElements, remove, renameElement, serializeXml, storyboards, ungroup, uniqueName, vec } from '../src/services/gtzip/model.js';
+import { allNames, animationsOf, duplicate, elements, fitLayer, groupElements, GtNode, insertElements, makeElement, moveElements, parseXml, pasteElements, remove, renameElement, serializeXml, storyboards, ungroup, uniqueName, vec } from '../src/services/gtzip/model.js';
 import { repeatGroups, setCount } from '../src/services/gtzip/params.js';
 import { zipStore } from '../src/services/xlsx.js';
 import { setup } from './helpers.js';
@@ -403,11 +403,22 @@ describe('gtzip drawing tools', () => {
     expect(vec(elements(r).find((e) => e.node.attrs.Name === 'Box 2')!.node.attrs.Location).slice(0, 2)).toEqual([-180, -140]);
     const g = groupElements(r, [[0]]);
     expect(abs(g.root, 'Box')).toEqual([100, 50]);
+    const gl = elements(g.root).find((e) => e.node.tag === 'Layer' && e.node.attrs.Name === 'Group')!.node;
+    expect([gl.attrs.Location, gl.attrs.Dimensions]).toEqual(['100,50,0', '200,80,0']);
     expect(elements(g.root).find((e) => e.node.attrs.Name === 'Box')!.parentPath).toEqual(g.layer);
     const u = ungroup(g.root, g.layer);
     expect(elements(u.root).filter((e) => e.node.tag === 'Layer').map((e) => e.node.attrs.Name)).toEqual(['L']);
     expect(abs(u.root, 'Box')).toEqual([100, 50]);
     expect(() => moveElements(u.root, [elements(u.root).find((e) => e.node.attrs.Name === 'L')!.path], elements(u.root).find((e) => e.node.attrs.Name === 'L')!.path)).toThrow();
+  });
+  it('cuts a layer to its elements', () => {
+    let r = doc();
+    const lay = insertElements(r, [makeElement('Layer', 'L', [0, 0, 0, 0], { compSize: [1920, 1080] })]);
+    r = insertElements(lay.root, [makeElement('Rectangle', 'A', [300, 200, 50, 40]), makeElement('Rectangle', 'B', [400, 260, 20, 20])], lay.added[0]).root;
+    r = fitLayer(r, lay.added[0]);
+    const l = elements(r).find((e) => e.node.attrs.Name === 'L')!.node;
+    expect([l.attrs.Location, l.attrs.Dimensions]).toEqual(['300,200,0', '120,80,0']);
+    expect(abs(r, 'B')).toEqual([400, 260]);
   });
   it('pastes copies with the next free names', () => {
     let r = doc();
