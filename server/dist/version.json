@@ -1,8 +1,14 @@
 {
-  "version": "1.0.100",
-  "commit": "9ff241c",
-  "date": "2026-11-09T23:09:20Z",
+  "version": "1.0.101",
+  "commit": "edceb16",
+  "date": "2026-11-09T23:24:53Z",
   "changes": [
+    {
+      "version": "1.0.101",
+      "commit": "edceb16",
+      "date": "2026-11-09T23:24:53Z",
+      "text": "GTZIP generator as a design workspace: big zoomable artboard with a 10 px grid, rulers, handles, marquee, smart guides and snapping; toolbar to add text, shapes, pictures (dashboard or computer, drag and drop), layers, align, distribute, arrange, group; layers panel with drag and drop, lock and rename; Ctrl+C/V/X/D/G shortcuts"
+    },
     {
       "version": "1.0.100",
       "commit": "9ff241c",
@@ -476,12 +482,6 @@
       "commit": "e2026a4",
       "date": "2026-10-18T00:13:17Z",
       "text": "Start scripts stop a dashboard already running on port 4310"
-    },
-    {
-      "version": "1.0.5",
-      "commit": "f61b290",
-      "date": "2026-10-18T00:10:00Z",
-      "text": "Start scripts: README section, English startup log"
     }
   ]
 }

@@ -465,3 +465,173 @@ export function fields(root) {
         return [];
     });
 }
+/** A name not used yet: the base itself, else "base 2", "base 3", … */
+export function uniqueName(root, base, used = allNames(root)) {
+    const b = base.trim() || 'Element';
+    if (!used.has(b))
+        return b;
+    let n = 2;
+    while (used.has(`${b} ${n}`))
+        n++;
+    return `${b} ${n}`;
+}
+const brushHolder = (tag, part, color) => ({ tag: `${tag}.${part}`, attrs: {}, children: [{ tag: 'Brush', attrs: { Color: color }, children: [] }] });
+/** A new element in GT Title Designer's own form. `box` is x, y, width, height inside its composition. */
+export function makeElement(kind, name, box, o = {}) {
+    const [x, y, w, h] = box;
+    const n = { tag: kind, attrs: { Name: name }, children: [] };
+    if (kind === 'Layer') {
+        const [cw, ch] = o.compSize ?? [1920, 1080];
+        setVec(n, 'Dimensions', cw, ch);
+        if (x || y)
+            setVec(n, 'Location', x, y);
+        n.children.push({ tag: 'Layer.Composition', attrs: {}, children: [{ tag: 'Composition', attrs: { Width: String(cw), Height: String(ch) }, children: [] }] });
+        return n;
+    }
+    setVec(n, 'Dimensions', w, h);
+    setVec(n, 'Location', x, y);
+    if (kind === 'TextBlock') {
+        Object.assign(n.attrs, { Text: o.text ?? 'TEXT', FontFamily: o.font ?? 'General Sans', FontSize: fmtNum(o.fontSize ?? 48), VerticalAlign: 'Center' });
+        n.children.push(brushHolder(kind, 'Fill', o.color ?? '#FFFFFFFF'), brushHolder(kind, 'Stroke', '#FFFFFFFF'));
+    }
+    else if (kind === 'Rectangle' || kind === 'Ellipse') {
+        n.children.push(brushHolder(kind, 'Fill', o.color ?? '#FF0EA5E9'), brushHolder(kind, 'Stroke', '#FFFFFFFF'));
+    }
+    else if (kind === 'Image') {
+        n.children.push({ tag: 'Image.Bitmap', attrs: {}, children: [{ tag: 'Bitmap', attrs: o.source ? { Source: o.source } : {}, children: [] }] });
+    }
+    return n;
+}
+/** Path of the composition that holds a layer's elements (the root composition for null). */
+export function compositionPath(root, layer) {
+    if (!layer)
+        return [];
+    const n = nodeAt(root, layer);
+    if (!n || n.tag !== 'Layer')
+        return null;
+    const hi = n.children.findIndex((x) => x.tag === 'Layer.Composition');
+    if (hi < 0)
+        return null;
+    const ci = n.children[hi].children.findIndex((x) => x.tag === 'Composition');
+    return ci < 0 ? null : [...layer, hi, ci];
+}
+/** Absolute origin of a layer's composition (where its elements' Location 0,0 is). */
+function originOf(root, layer) {
+    if (!layer)
+        return [0, 0];
+    const e = elements(root).find((x) => pathKey(x.path) === pathKey(layer));
+    if (!e)
+        return [0, 0];
+    const [x, y] = vec(e.node.attrs.Location);
+    return [e.origin[0] + x, e.origin[1] + y];
+}
+/** Where an element goes to be drawn on top: after the last element (storyboards stay after the elements). */
+function topIndex(comp) {
+    let i = comp.children.length;
+    while (i > 0 && !isElement(comp.children[i - 1]))
+        i--;
+    return i;
+}
+const pathsOf = (root, nodes) => elements(root).filter((e) => nodes.includes(e.node)).map((e) => e.path);
+/** Puts new elements into a layer (null: the root) at `index` among its children (default: on top). */
+export function insertElements(root0, nodes, layer = null, index) {
+    const root = clone(root0);
+    const cp = compositionPath(root, layer);
+    const comp = cp ? nodeAt(root, cp) : null;
+    if (!comp)
+        throw new Error('That layer has no composition to put elements in.');
+    const at = index == null ? topIndex(comp) : Math.max(0, Math.min(comp.children.length, index));
+    const copies = nodes.map((n) => clone(n));
+    comp.children.splice(at, 0, ...copies);
+    return { root, added: pathsOf(root, copies) };
+}
+/** Top-most of the given paths (a path inside another selected one is dropped), in drawing order. */
+function topMost(paths) {
+    const keys = paths.map(pathKey);
+    return paths.filter((p) => !keys.some((k) => k !== pathKey(p) && pathKey(p).startsWith(k + '/'))).sort(cmpPath);
+}
+/**
+ * Moves elements into another layer (null: the root), keeping where they are on screen. They go in before the
+ * element now at `index` of that composition (default: on top), in their drawing order. A layer cannot go into itself.
+ */
+export function moveElements(root0, paths, layer, index) {
+    const sel = topMost(paths);
+    if (layer && sel.some((p) => pathKey(layer) === pathKey(p) || pathKey(layer).startsWith(pathKey(p) + '/')))
+        throw new Error('A layer cannot go inside itself.');
+    const root = clone(root0);
+    const cp = compositionPath(root, layer);
+    const comp = cp ? nodeAt(root, cp) : null;
+    if (!comp)
+        throw new Error('That layer has no composition to put elements in.');
+    const all = elements(root);
+    const to = originOf(root, layer);
+    const moving = sel.map((p) => all.find((e) => pathKey(e.path) === pathKey(p))).filter(Boolean);
+    const anchor = index != null && index < comp.children.length ? comp.children[index] : null;
+    for (const e of moving) {
+        const parent = nodeAt(root, e.path.slice(0, -1));
+        parent.children = parent.children.filter((c) => c !== e.node);
+        const [x, y] = vec(e.node.attrs.Location);
+        if (e.node.attrs.Location || e.origin[0] !== to[0] || e.origin[1] !== to[1])
+            setVec(e.node, 'Location', x + e.origin[0] - to[0], y + e.origin[1] - to[1]);
+    }
+    let at = anchor && moving.every((e) => e.node !== anchor) ? comp.children.indexOf(anchor) : topIndex(comp);
+    if (at < 0)
+        at = topIndex(comp);
+    comp.children.splice(at, 0, ...moving.map((e) => e.node));
+    return { root, added: pathsOf(root, moving.map((e) => e.node)) };
+}
+/** Puts elements of one composition into a new full-size layer, drawn where the top-most of them was. */
+export function groupElements(root0, paths, name = 'Group') {
+    const sel = topMost(paths);
+    if (!sel.length)
+        throw new Error('Select what to group.');
+    const parentKey = pathKey(sel[0].slice(0, -1));
+    if (sel.some((p) => pathKey(p.slice(0, -1)) !== parentKey))
+        throw new Error('Group elements that sit in the same layer.');
+    const all = elements(root0);
+    const info = all.find((e) => pathKey(e.path) === pathKey(sel[0]));
+    const parentLayer = info.parentPath;
+    const comp = nodeAt(root0, sel[0].slice(0, -1));
+    const cw = Number(comp.attrs.Width ?? root0.attrs.Width ?? 1920), ch = Number(comp.attrs.Height ?? root0.attrs.Height ?? 1080);
+    const last = Math.max(...sel.map((p) => p[p.length - 1]));
+    const layerNode = makeElement('Layer', uniqueName(root0, name), [0, 0, cw, ch], { compSize: [cw, ch] });
+    const ins = insertElements(root0, [layerNode], parentLayer, last + 1);
+    const moved = moveElements(ins.root, sel, ins.added[0]);
+    const layer = elements(moved.root).find((e) => e.node.attrs.Name === layerNode.attrs.Name).path;
+    return { root: moved.root, layer };
+}
+/** Takes everything out of a layer into its parent, in place, and removes the empty layer. */
+export function ungroup(root0, layer) {
+    const all = elements(root0);
+    const info = all.find((e) => pathKey(e.path) === pathKey(layer));
+    if (!info || info.node.tag !== 'Layer')
+        throw new Error('Select a layer to ungroup.');
+    const kids = all.filter((e) => e.parentPath && pathKey(e.parentPath) === pathKey(layer)).map((e) => e.path);
+    const name = info.node.attrs.Name;
+    const moved = moveElements(root0, kids, info.parentPath, layer[layer.length - 1] + 1);
+    const lp = elements(moved.root).find((e) => e.node.attrs.Name === name && e.node.tag === 'Layer').path;
+    const names = new Set(moved.added.map((p) => nodeAt(moved.root, p)?.attrs.Name).filter(Boolean));
+    const root = remove(moved.root, [lp]);
+    return { root, added: elements(root).filter((e) => names.has(e.node.attrs.Name) && pathKey(e.parentPath ?? []) === pathKey(info.parentPath ?? [])).map((e) => e.path) };
+}
+/** Pastes copied elements (with what is inside them) into a layer, moved by (dx, dy), with names made unique. */
+export function pasteElements(root0, nodes, layer, dx = 0, dy = 0) {
+    const used = allNames(root0);
+    const copies = nodes.map((n) => {
+        const c = clone(n);
+        const map = new Map();
+        for (const x of namedIn(c)) {
+            const nm = x.attrs.Name;
+            const { base, n: num } = splitNum(nm);
+            const next = num != null ? freeName(base, num + 1, used) : uniqueName(root0, nm, used);
+            used.add(next);
+            map.set(nm, next);
+        }
+        applyNameMap(c, map);
+        const [x, y] = vec(c.attrs.Location);
+        if (dx || dy)
+            setVec(c, 'Location', x + dx, y + dy);
+        return c;
+    });
+    return insertElements(root0, copies, layer);
+}
