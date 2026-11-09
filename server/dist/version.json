@@ -1,0 +1,391 @@
+{
+  "version": "1.0.75",
+  "commit": "8e9901c",
+  "date": "2026-11-09T00:32:50Z",
+  "changes": [
+    {
+      "version": "1.0.75",
+      "commit": "8e9901c",
+      "date": "2026-11-09T00:32:50Z",
+      "text": "Number every build (1.0.N) and show the version with a list of changes"
+    },
+    {
+      "version": "1.0.73",
+      "commit": "bcfef90",
+      "date": "2026-11-09T00:27:21Z",
+      "text": "Results: Send to vMix fills the overall results title through the vMix Web API"
+    },
+    {
+      "version": "1.0.72",
+      "commit": "9002079",
+      "date": "2026-11-09T00:11:41Z",
+      "text": "Commentator fits a 1920×1080 screen without scrolling: one-line header, groups and races in one row, standing and talking points in one line, compact team cards that fill the height"
+    },
+    {
+      "version": "1.0.71",
+      "commit": "607732d",
+      "date": "2026-11-08T23:31:56Z",
+      "text": "Commentator: the four teams of a group side by side in one row, standing and talking points above them"
+    },
+    {
+      "version": "1.0.70",
+      "commit": "f8f22e5",
+      "date": "2026-11-08T23:11:54Z",
+      "text": "Commentator screen: event, clock and weather on top, today's races with live/next status, groups with flags, the group's standing and talking points, team cards in team colours with ranking, rank and points, crew in line-up order with photos on hover"
+    },
+    {
+      "version": "1.0.68",
+      "commit": "8629882",
+      "date": "2026-11-08T22:45:07Z",
+      "text": "GTZIP generator: upload a .zip with a whole set of titles as templates"
+    },
+    {
+      "version": "1.0.67",
+      "commit": "98cfc89",
+      "date": "2026-11-08T22:42:12Z",
+      "text": "Panam colours: URU"
+    },
+    {
+      "version": "1.0.66",
+      "commit": "b7d9226",
+      "date": "2026-11-08T22:40:18Z",
+      "text": "README: Line-up sheet"
+    },
+    {
+      "version": "1.0.65",
+      "commit": "7b6d080",
+      "date": "2026-11-08T22:36:56Z",
+      "text": "Line-up sheet in Excel: one row per team with flag, emblem, line-up background and sponsors, then the places in the order set in the Line-up panel with number, names, position, captain and photo"
+    },
+    {
+      "version": "1.0.63",
+      "commit": "c2a237c",
+      "date": "2026-11-08T22:30:04Z",
+      "text": "GTZIP generator: add a data field the template lacks, fitted into the graphic"
+    },
+    {
+      "version": "1.0.62",
+      "commit": "a0e2974",
+      "date": "2026-11-08T22:23:21Z",
+      "text": "Announcements and People in their own Excel sheets (one row each), so adding one moves nothing in General"
+    },
+    {
+      "version": "1.0.61",
+      "commit": "f6e0043",
+      "date": "2026-11-08T22:11:29Z",
+      "text": "No heading in Welcome, Follow us and Announcements; line-up places bow to helm by default and reorderable by dragging (names still drag to swap sailors); General graphics in the order welcome, schedule, weather, announcements, tickers, race officials, follow us, people"
+    },
+    {
+      "version": "1.0.60",
+      "commit": "abee512",
+      "date": "2026-11-08T21:56:19Z",
+      "text": "Panam team colours from color_panam.ai (CUB, ESA, VEN, ANT, BER, MEX, PUR): all three versions set once per team, PNGs regenerate"
+    },
+    {
+      "version": "1.0.58",
+      "commit": "b7b3117",
+      "date": "2026-11-08T21:51:27Z",
+      "text": "GTZIP generator: keep the animations when rows are removed and fit them to the new number of rows"
+    },
+    {
+      "version": "1.0.56",
+      "commit": "588e135",
+      "date": "2026-11-08T21:42:40Z",
+      "text": "GTZIP generator: centred titles stay centred when rows are added or removed; generated files get readable layer names"
+    },
+    {
+      "version": "1.0.55",
+      "commit": "c2162b9",
+      "date": "2026-11-08T21:31:29Z",
+      "text": "Empty team backgrounds and lower thirds take the PNG generator files (Panel left, Square, Bar waves, Bar long); an operator's own file or a cleared place is left alone"
+    },
+    {
+      "version": "1.0.54",
+      "commit": "42c6e9a",
+      "date": "2026-11-08T21:31:29Z",
+      "text": "General sheet laid out in titled blocks: Event, Matchboard and Weather on top, each general graphic with its versions in columns, People, then today's schedule; empty rows between blocks, shaded titles"
+    },
+    {
+      "version": "1.0.52",
+      "commit": "4a07c58",
+      "date": "2026-11-08T21:26:42Z",
+      "text": "GTZIP scenes: race course in horizontal and vertical layout, each shown once (1x) or twice (2x)"
+    },
+    {
+      "version": "1.0.44",
+      "commit": "9253b15",
+      "date": "2026-11-08T21:22:08Z",
+      "text": "Chosen stage filters every tab: only its teams in Teams & crews, Declarations, PNG generator, Matchboard, Results, Commentator and the Fleets pool; JSON feeds follow the stage too"
+    },
+    {
+      "version": "1.0.47",
+      "commit": "dd5fba0",
+      "date": "2026-11-08T20:58:37Z",
+      "text": "GTZIP scenes: falstart and penalty bugs, recognise L-bar files with ticker and schedule/results"
+    },
+    {
+      "version": "1.0.43",
+      "commit": "cf54391",
+      "date": "2026-11-08T20:55:56Z",
+      "text": "Readable names in the assets folder; Excel workbook in four sheets (General, Teams, Sailors, Results) following the current stage"
+    },
+    {
+      "version": "1.0.46",
+      "commit": "a2fd2b2",
+      "date": "2026-11-08T20:50:46Z",
+      "text": "GTZIP generator: quick form – type how many rows, teams or sailors"
+    },
+    {
+      "version": "1.0.42",
+      "commit": "6f9c575",
+      "date": "2026-11-08T20:18:58Z",
+      "text": "Team profile icon right after the team code so it lines up in every row"
+    },
+    {
+      "version": "1.0.43",
+      "commit": "6411358",
+      "date": "2026-11-08T19:51:01Z",
+      "text": "GTZIP scenes: sailor lower third with sponsor, recognise delay and announcement files"
+    },
+    {
+      "version": "1.0.42",
+      "commit": "6e8d554",
+      "date": "2026-11-08T19:38:08Z",
+      "text": "GTZIP generator: scene list with variants, save edited state as a template"
+    },
+    {
+      "version": "1.0.41",
+      "commit": "ddc87b6",
+      "date": "2026-11-08T17:56:50Z",
+      "text": "General graphics versions (welcome, follow us, tickers, race officials, announcements), team line-ups with sync from declaration, Results tab"
+    },
+    {
+      "version": "1.0.40",
+      "commit": "9a9309c",
+      "date": "2026-11-08T17:46:50Z",
+      "text": "GTZIP generator tab: edit vMix GT titles and generate new .gtzip files (#4)"
+    },
+    {
+      "version": "1.0.39",
+      "commit": "5ad1f6a",
+      "date": "2026-11-08T17:09:24Z",
+      "text": "Team profile icon next to team names in Teams & crews, Fleets, PNG generator and Matchboard"
+    },
+    {
+      "version": "1.0.38",
+      "commit": "c4ad1b1",
+      "date": "2026-11-08T16:59:42Z",
+      "text": "Matchboard: rows are box standings (drag or arrows), starred teams fill the next round's linked rows"
+    },
+    {
+      "version": "1.0.37",
+      "commit": "12a3b38",
+      "date": "2026-11-08T16:42:51Z",
+      "text": "Matchboard editor in the PNG generator: editable texts, team picker with flags, highlights, PNG export"
+    },
+    {
+      "version": "1.0.36",
+      "commit": "8a8c2b5",
+      "date": "2026-11-08T16:11:37Z",
+      "text": "Fleet size, third personal best, nation ranking, declared weights, five standardised sponsor logos"
+    },
+    {
+      "version": "1.0.35",
+      "commit": "6c60c2a",
+      "date": "2026-11-08T00:34:44Z",
+      "text": "Bundled team flags and emblems"
+    },
+    {
+      "version": "1.0.34",
+      "commit": "fab9a3a",
+      "date": "2026-11-08T00:13:16Z",
+      "text": "Launcher: a launcher file that cannot be replaced no longer fails the update"
+    },
+    {
+      "version": "1.0.33",
+      "commit": "f574121",
+      "date": "2026-11-08T00:07:05Z",
+      "text": "SSL26 design: team gradients and orange stroke"
+    },
+    {
+      "version": "1.0.32",
+      "commit": "68538f0",
+      "date": "2026-11-07T22:13:10Z",
+      "text": "Crews from the official Florida rooming list"
+    },
+    {
+      "version": "1.0.31",
+      "commit": "43b6a14",
+      "date": "2026-11-07T21:50:13Z",
+      "text": "Matchboard update (7 Nov): QS H/I regrouped, QS J removed, R1 B with KOR and GRE; changed sets reset on next start"
+    },
+    {
+      "version": "1.0.30",
+      "commit": "7a8564f",
+      "date": "2026-11-07T21:09:47Z",
+      "text": "Readable dropdown options on Windows; full time zone list with Rio de Janeiro (America/Sao_Paulo)"
+    },
+    {
+      "version": "1.0.29",
+      "commit": "db96c47",
+      "date": "2026-11-07T21:04:28Z",
+      "text": "Workbook: overwrite in place when Windows will not replace a file vMix holds open"
+    },
+    {
+      "version": "1.0.28",
+      "commit": "d359281",
+      "date": "2026-11-07T19:57:43Z",
+      "text": "Windows launcher: never close silently, ignore stderr from node, CI test of the real start"
+    },
+    {
+      "version": "1.0.27",
+      "commit": "0bcab8c",
+      "date": "2026-11-07T19:31:08Z",
+      "text": "README: Windows package"
+    },
+    {
+      "version": "1.0.26",
+      "commit": "e6bbb11",
+      "date": "2026-11-07T19:28:30Z",
+      "text": "Form login instead of the browser password popup; Windows package can sync from an online dashboard"
+    },
+    {
+      "version": "1.0.25",
+      "commit": "09fef95",
+      "date": "2026-11-07T19:24:39Z",
+      "text": "Windows launcher: CI test that it downloads the release and starts"
+    },
+    {
+      "version": "1.0.24",
+      "commit": "972d5a0",
+      "date": "2026-11-07T19:22:09Z",
+      "text": "Windows package: build on windows-2022 so better-sqlite3 can compile"
+    },
+    {
+      "version": "1.0.23",
+      "commit": "7795bb1",
+      "date": "2026-11-07T19:20:21Z",
+      "text": "Self-updating Windows package: portable Node, prebuilt app, launcher that updates from the windows-latest release"
+    },
+    {
+      "version": "1.0.22",
+      "commit": "deba4c4",
+      "date": "2026-11-07T19:02:27Z",
+      "text": "Prebuilt deploy branch for hosting panels without npm workspaces (CloudLinux)"
+    },
+    {
+      "version": "1.0.21",
+      "commit": "3d863b0",
+      "date": "2026-11-07T18:07:14Z",
+      "text": "vMix sync: Windows autostart with self-restart, heartbeat badge in the dashboard"
+    },
+    {
+      "version": "1.0.20",
+      "commit": "6aa2cfc",
+      "date": "2026-10-22T14:54:39+02:00",
+      "text": "Generator: gradient stroke with per-element checkbox and angle (#3)"
+    },
+    {
+      "version": "1.0.18",
+      "commit": "9d9ccf4",
+      "date": "2026-10-22T12:33:12Z",
+      "text": "PNG generator: Copacabana waves and element sizes from gradienty.ai"
+    },
+    {
+      "version": "1.0.16",
+      "commit": "0cb8a0c",
+      "date": "2026-10-22T11:22:51Z",
+      "text": "PNG generator: wider number fields in the elements table"
+    },
+    {
+      "version": "1.0.15",
+      "commit": "e3fff57",
+      "date": "2026-10-22T11:21:12Z",
+      "text": "PNG generator: team gradients (V1–V3), rectangle elements with stroke and Copacabana waves, live preview and auto export"
+    },
+    {
+      "version": "1.0.14",
+      "commit": "ed9f4ec",
+      "date": "2026-10-19T10:32:59Z",
+      "text": "Add app.cjs startup file for Passenger-based Node hosting (DirectAdmin)"
+    },
+    {
+      "version": "1.0.13",
+      "commit": "2d229bd",
+      "date": "2026-10-19T09:57:54Z",
+      "text": "Online mode: password, Dockerfile and a sync program that mirrors files to the vMix machine"
+    },
+    {
+      "version": "1.0.12",
+      "commit": "e64b902",
+      "date": "2026-10-18T11:28:24Z",
+      "text": "Team pages: nicknames, captains and crews for all 61 teams; remove DEMO on start"
+    },
+    {
+      "version": "1.0.11",
+      "commit": "6503dde",
+      "date": "2026-10-18T11:17:59Z",
+      "text": "Commentator view: fleet tabs, four crews side by side, sailor hover card"
+    },
+    {
+      "version": "1.0.10",
+      "commit": "673909e",
+      "date": "2026-10-18T07:27:04Z",
+      "text": "XML with every sheet under one address for vMix (XPath per sheet)"
+    },
+    {
+      "version": "1.0.9",
+      "commit": "ebd9994",
+      "date": "2026-10-18T07:19:59Z",
+      "text": "One workbook for vMix: auto-updated .xlsx with a sheet per source"
+    },
+    {
+      "version": "1.0.8",
+      "commit": "0caf126",
+      "date": "2026-10-18T07:15:32Z",
+      "text": "Captains, weather, day schedule, people for lowerthirds, JSON grid view"
+    },
+    {
+      "version": "1.0.7",
+      "commit": "f98ebd1",
+      "date": "2026-10-18T00:21:10Z",
+      "text": "Simpler interface: one editable table, drag & drop graphics, JSON for vMix"
+    },
+    {
+      "version": "1.0.6",
+      "commit": "e2026a4",
+      "date": "2026-10-18T00:13:17Z",
+      "text": "Start scripts stop a dashboard already running on port 4310"
+    },
+    {
+      "version": "1.0.5",
+      "commit": "f61b290",
+      "date": "2026-10-18T00:10:00Z",
+      "text": "Start scripts: README section, English startup log"
+    },
+    {
+      "version": "1.0.4",
+      "commit": "6b15c68",
+      "date": "2026-10-18T00:07:46Z",
+      "text": "Add start scripts that update, build and start"
+    },
+    {
+      "version": "1.0.3",
+      "commit": "fec54d7",
+      "date": "2026-10-18T00:03:52Z",
+      "text": "English UI, live overview table and SSL Gold Cup 2026 matchboard"
+    },
+    {
+      "version": "1.0.2",
+      "commit": "f0315b2",
+      "date": "2026-10-17T23:46:44Z",
+      "text": "Wymagaj Node 22.12+ (Vite 8 / rolldown)"
+    },
+    {
+      "version": "1.0.1",
+      "commit": "f9cf3f0",
+      "date": "2026-10-17T23:33:27Z",
+      "text": "Pierwsza wersja dashboardu SSL vMix graphics"
+    }
+  ]
+}

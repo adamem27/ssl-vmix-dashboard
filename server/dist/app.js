@@ -26,6 +26,7 @@ import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
 import { jsonCaptains, jsonFleetSet, jsonIndex, jsonPeople, jsonSailors, jsonSchedule, jsonTeams, jsonWeather } from './services/jsonExport.js';
 import { todayIn } from './services/dates.js';
+import { versionInfo } from './version.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
@@ -80,7 +81,8 @@ export async function buildApp(deps) {
     }
     const ev = () => activeEvent(db);
     // ---------- meta ----------
-    app.get('/api/health', async () => ({ ok: true, time: nowIso() }));
+    app.get('/api/health', async () => ({ ok: true, time: nowIso(), version: versionInfo().version }));
+    app.get('/api/version', async () => versionInfo());
     app.get('/api/meta', async () => ({
         event: ev(),
         teamSlots: TEAM_SLOTS,
