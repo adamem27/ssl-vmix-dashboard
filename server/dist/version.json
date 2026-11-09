@@ -1,8 +1,14 @@
 {
-  "version": "1.0.105",
-  "commit": "2e17950",
-  "date": "2026-11-09T23:45:25Z",
+  "version": "1.0.106",
+  "commit": "db6156b",
+  "date": "2026-11-09T23:53:21Z",
   "changes": [
+    {
+      "version": "1.0.106",
+      "commit": "db6156b",
+      "date": "2026-11-09T23:53:21Z",
+      "text": "GTZIP generator: animation preview (In, Out, In→Out, data change) with timeline and scrubbing; full screen preview fixed and plays animations"
+    },
     {
       "version": "1.0.105",
       "commit": "2e17950",
@@ -476,12 +482,6 @@
       "commit": "6503dde",
       "date": "2026-10-18T11:17:59Z",
       "text": "Commentator view: fleet tabs, four crews side by side, sailor hover card"
-    },
-    {
-      "version": "1.0.10",
-      "commit": "673909e",
-      "date": "2026-10-18T07:27:04Z",
-      "text": "XML with every sheet under one address for vMix (XPath per sheet)"
     }
   ]
 }
