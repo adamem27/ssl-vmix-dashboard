@@ -5,7 +5,7 @@ import { setup } from './helpers.js';
 import { createTeam, updateTeam } from '../src/services/teams.js';
 import { encodePng } from '../src/services/png.js';
 import { inspectImage } from '../src/services/images.js';
-import { DEFAULT_STROKE_GRADIENT, ElementSpec, renderElement } from '../src/services/generator/render.js';
+import { DEFAULT_STROKE_GRADIENT, ElementSpec, neutralGradient, renderElement } from '../src/services/generator/render.js';
 import {
   createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate, setNeutral, getNeutral,
 } from '../src/services/generator/generator.js';
@@ -118,7 +118,7 @@ describe('PNG generator export', () => {
 
   it('renders the neutral set: every element black with the orange → yellow stroke, and lists it in /json/graphics', () => {
     const { db, ctx, exporter } = gen(true);
-    expect(getNeutral(db)).toEqual({ enabled: true, color: '#000000', strokeWidth: 1 });
+    expect(getNeutral(db)).toEqual({ enabled: true, color: '#1a1a1a', opacity: 80, strokeWidth: 1 });
     createTemplate(db, { ...STARTER_TEMPLATES[0], width: 40, height: 20, pattern: false });
     exporter.flush();
     const file = path.join(ctx.assetsDir, 'PNG generator', 'NEUTRAL', 'NEUTRAL_bar.png');
@@ -130,6 +130,8 @@ describe('PNG generator export', () => {
     expect(job.rel).toBe('PNG generator/NEUTRAL/NEUTRAL_bar.png');
     const r = renderElement({ ...el({ width: 40, height: 20 }), strokeWidth: 1, strokeGradient: true }, { angle: 0, stops: [{ pos: 0, color: '#000000', opacity: 100 }, { pos: 100, color: '#000000', opacity: 100 }] }, 1, DEFAULT_STROKE_GRADIENT);
     expect(px(r, 20, 10)).toEqual([0, 0, 0, 255]);
+    const see = renderElement(el({ width: 40, height: 20 }), neutralGradient('#1a1a1a', 80));
+    expect(px(see, 20, 10)).toEqual([26, 26, 26, 204]);
     expect(Math.max(...[[0, 0], [39, 0], [0, 19], [39, 19]].map(([x, y]) => px(r, x, y)[0]))).toBeGreaterThan(200);
     setNeutral(db, { enabled: false });
     exporter.flush();

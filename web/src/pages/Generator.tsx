@@ -91,9 +91,9 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
   const neutralRef = useRef(neutral);
   neutralRef.current = neutral;
   const neutralTeam = useMemo<TeamGradients>(() => {
-    const g = neutralGradient(neutral.color);
+    const g = neutralGradient(neutral.color, neutral.opacity);
     return { teamId: NEUTRAL_ID, code: NEUTRAL_CODE, name: 'Neutral', gradients: { 1: g, 2: g, 3: g } };
-  }, [neutral.color]);
+  }, [neutral.color, neutral.opacity]);
   const isNeutral = teamId === NEUTRAL_ID;
 
   const stage = useStageTeams();
@@ -233,7 +233,7 @@ function TeamList({ teams, selected, onSelect, neutral }: { teams: TeamGradients
             className={cx('flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm', selected === NEUTRAL_ID ? 'bg-ink-800 text-ink-50' : 'text-ink-300 hover:bg-ink-850')}>
             <span className="w-10 shrink-0 font-mono text-[10px] font-bold">{NEUTRAL_CODE}</span>
             <span className="h-5 flex-1 rounded-sm p-px" style={{ background: 'linear-gradient(135deg, #f28c06, transparent 50%, #fece00)' }}>
-              <span className="block h-full rounded-sm" style={{ background: neutral.color }} />
+              <span className="block h-full rounded-sm" style={{ background: neutral.color, opacity: neutral.opacity / 100 }} />
             </span>
             {!neutral.enabled && <span className="text-[10px] uppercase text-ink-500">off</span>}
           </button>
@@ -268,12 +268,15 @@ function NeutralPanel({ neutral, onChange }: { neutral: NeutralSettings; onChang
             <HexInput value={neutral.color} onChange={(color) => onChange({ color })} />
           </div>
         </Labeled>
+        <Labeled label="Opacity %">
+          <NumInput value={neutral.opacity} onChange={(opacity) => onChange({ opacity })} min={0} max={100} step={1} className="w-20" label="Neutral opacity" />
+        </Labeled>
         <Labeled label="Stroke width">
           <NumInput value={neutral.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} min={0} max={200} step={0.5} className="w-20" label="Neutral stroke width" />
         </Labeled>
       </div>
       <p className="mt-3 text-xs text-ink-400">
-        Every element in this colour with the orange → yellow stroke (the stroke gradient on the Elements tab). Elements that already have a stroke keep its width; the others get the width above.
+        As in finals-broadcast_ssl26_v2.ai: every element filled with this colour at this opacity (#1a1a1a at 80%, so the picture shows through), with the orange → yellow stroke at full strength (the stroke gradient on the Elements tab). Elements that already have a stroke keep its width; the others get the width above.
         Files go to <span className="font-mono">PNG generator/{NEUTRAL_CODE}/{NEUTRAL_CODE}_&lt;element&gt;.png</span> and appear in /json/graphics as the {NEUTRAL_CODE} row.
       </p>
     </Panel>

@@ -203,7 +203,7 @@ Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów
 
 ### Zestaw neutralny
 
-Na liście krajów w generatorze PNG jest na górze pozycja **NEUTRAL**: każdy element w jednym kolorze (domyślnie czarnym) z żółto-pomarańczową obwolutą (gradient obrysu z zakładki Elements). Elementy z własnym obrysem zachowują jego grubość, pozostałe dostają grubość ustawioną w panelu „Neutral set” (domyślnie 1 px). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Zestaw można wyłączyć jednym przełącznikiem.
+Na liście krajów w generatorze PNG jest na górze pozycja **NEUTRAL**: każdy element wypełniony półprzezroczyście jak w finals-broadcast_ssl26_v2.ai (#1a1a1a, krycie 80%) z żółto-pomarańczową obwolutą w pełnym kolorze (gradient obrysu z zakładki Elements). Elementy z własnym obrysem zachowują jego grubość, pozostałe dostają grubość ustawioną w panelu „Neutral set” (domyślnie 1 px). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Zestaw można wyłączyć jednym przełącznikiem.
 
 ## Floty
 

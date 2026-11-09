@@ -254,11 +254,14 @@ export function gradientVersions(colors: string[], angle = 0): Gradient[] {
   return gradientVersionsFrom({ angle, stops: c.map((color, i) => ({ pos: c.length === 1 ? 0 : (100 * i) / (c.length - 1), color, opacity: 100 })) });
 }
 
-/** The neutral set: every element in one flat colour (black by default) with the orange → yellow gradient stroke (obwoluta). */
-export interface NeutralSettings { enabled: boolean; color: string; strokeWidth: number }
-export const DEFAULT_NEUTRAL: NeutralSettings = { enabled: true, color: '#000000', strokeWidth: 1 };
+/**
+ * The neutral set as in finals-broadcast_ssl26_v2.ai: every element filled #1a1a1a at 80% opacity (see-through),
+ * with the orange → yellow gradient stroke (obwoluta) at full strength on top.
+ */
+export interface NeutralSettings { enabled: boolean; color: string; opacity: number; strokeWidth: number }
+export const DEFAULT_NEUTRAL: NeutralSettings = { enabled: true, color: '#1a1a1a', opacity: 80, strokeWidth: 1 };
 export const NEUTRAL_CODE = 'NEUTRAL';
 export const NEUTRAL_ID = 'neutral';
-export const neutralGradient = (color: string): Gradient => ({ angle: 0, stops: [{ pos: 0, color, opacity: 100 }, { pos: 100, color, opacity: 100 }] });
+export const neutralGradient = (color: string, opacity = 100): Gradient => ({ angle: 0, stops: [{ pos: 0, color, opacity }, { pos: 100, color, opacity }] });
 /** An element as drawn in the neutral set: its own stroke width if it has one, else the neutral one, always painted with the stroke gradient. */
 export const neutralSpec = <T extends ElementSpec>(el: T, n: NeutralSettings): T => ({ ...el, strokeGradient: true, strokeWidth: el.strokeWidth > 0 ? el.strokeWidth : n.strokeWidth });
