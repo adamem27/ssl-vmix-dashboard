@@ -32,7 +32,7 @@ function load(db, fleetId) {
     const seen = new Set(stored.map((x) => x.teamId));
     const rows = [...stored, ...f.teamIds.filter((id) => !seen.has(id)).map((teamId) => ({ teamId, races: [], points: '' }))]
         .map((x) => ({ teamId: x.teamId, races: Array.from({ length: races }, (_, i) => String(x.races?.[i] ?? '')), points: String(x.points ?? '') }));
-    return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows }, updatedAt: r?.updated_at ?? null };
+    return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
 }
 export function getResults(db, fleetId) {
     const f = fleetInfo(db, fleetId);
@@ -49,6 +49,8 @@ export function saveResults(db, fleetId, patch) {
         data.title = patch.title.slice(0, 120);
     if (patch.subtitle !== undefined)
         data.subtitle = patch.subtitle.slice(0, 120);
+    if (patch.vmixInput !== undefined)
+        data.vmixInput = patch.vmixInput.trim().slice(0, 120);
     if (patch.races !== undefined)
         data.races = Math.max(1, Math.min(MAX_RACES, Math.round(patch.races)));
     for (const p of patch.rows ?? []) {
@@ -78,9 +80,10 @@ export function sortResults(db, fleetId) {
     return saveResults(db, fleetId, { order });
 }
 export function clearResults(db, fleetId) {
-    fleetInfo(db, fleetId);
+    const { vmixInput } = load(db, fleetId).data;
     db.prepare('DELETE FROM results WHERE fleet_id = ?').run(fleetId);
-    return getResults(db, fleetId);
+    // the vMix input belongs to the graphic, not to the scores: it survives a clear
+    return vmixInput ? saveResults(db, fleetId, { vmixInput }) : getResults(db, fleetId);
 }
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 /**

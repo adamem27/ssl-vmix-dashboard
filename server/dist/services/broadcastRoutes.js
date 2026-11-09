@@ -7,6 +7,7 @@ import * as wb from './workbookSheets.js';
 import { todayIn } from './dates.js';
 import { getWeather, listSchedule } from './general.js';
 import { listGradients } from './generator/generator.js';
+import * as vx from './vmixResults.js';
 /** General graphics versions, team line-ups (Declarations and line-ups) and group results (Results tab). */
 export function registerBroadcastRoutes(app, ctx) {
     const { db } = ctx;
@@ -36,12 +37,21 @@ export function registerBroadcastRoutes(app, ctx) {
     // ---------- results ----------
     app.get('/api/results/set/:setId', async (req) => rs.listResults(db, req.params.setId));
     app.put('/api/results/:fleetId', async (req) => rs.saveResults(db, req.params.fleetId, z.object({
-        title: s(120), subtitle: s(120), races: z.number().int().min(1).max(rs.MAX_RACES),
+        title: s(120), subtitle: s(120), vmixInput: s(120), races: z.number().int().min(1).max(rs.MAX_RACES),
         rows: z.array(z.object({ teamId: s(64), races: z.array(s(12)).max(rs.MAX_RACES).optional(), points: s(12).optional() })).max(32),
         order: z.array(s(64)).max(32),
     }).partial().parse(req.body)));
     app.post('/api/results/:fleetId/sort', async (req) => rs.sortResults(db, req.params.fleetId));
     app.delete('/api/results/:fleetId', async (req) => rs.clearResults(db, req.params.fleetId));
+    // straight into the vMix title through the vMix Web API (no Data Source mapping)
+    app.post('/api/results/:fleetId/vmix', async (req) => {
+        const b = z.object({ input: s(120) }).partial().parse(req.body ?? {});
+        if (b.input !== undefined)
+            rs.saveResults(db, req.params.fleetId, { vmixInput: b.input });
+        return vx.pushResults(ctx, req.params.fleetId, rs.getResults(db, req.params.fleetId).vmixInput);
+    });
+    app.get('/api/settings/vmix', async () => ({ apiUrl: vx.vmixUrl(db), default: vx.DEFAULT_VMIX_URL }));
+    app.put('/api/settings/vmix', async (req) => vx.setVmixUrl(db, z.object({ apiUrl: s(200) }).parse(req.body).apiUrl));
     // ---------- current stage (decides which teams and groups go to the workbook) ----------
     const stageInfo = () => ({ current: wb.currentStage(db, ev().id), teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
     app.get('/api/stage', async () => stageInfo());
