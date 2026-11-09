@@ -205,6 +205,16 @@ Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów
 
 Kolumna **For** w tabeli elementów decyduje, w jakich barwach powstaje element: Teams (tylko drużyny), Neutral (tylko neutralne) albo Both (jedno i drugie). Elementy z „neutr” w nazwie lub nazwie pliku zostały przy aktualizacji jednorazowo oznaczone jako neutralne, pozostałe jako drużynowe. Neutralne elementy mają wypełnienie jak w finals-broadcast_ssl26_v2.ai (#1a1a1a, krycie 80%) i żółto-pomarańczową obwolutę w pełnym kolorze; wersja działa jak u drużyn (V1 pełna, V2 narasta, V3 narasta i zanika). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Kolumna **Gradient from** ustawia, z której strony zaczyna się gradient: lewa, prawa, góra albo dół (obwoluta obraca się razem z nim).
 
+## Show control (dwa Stream Decki)
+
+Zakładka **Show control** prowadzi wszystkie grafiki z dwóch Stream Decków XL. Deck 1 ma program (strona 1 „A BEFORE”, strona 2 „C–E AFTER / BREAK”), deck 2 wyścig (strona 11 „B RACE” z żeglarzami wybranej łódki według numeru na koszulce, strona 12 „EXTRAS”: komunikaty, bugi, L-bar, PiP, lineup LT). Dolny rząd jest wszędzie taki sam: HOME, ◀, ▶, FALLBACK, UNDO, ALL OUT, PANIC (drugie naciśnięcie w ciągu 3 s).
+
+- Każdy klawisz woła `/api/show/do?a=<akcja>`. Dashboard wpisuje dane do tytułu przez Web API vMixa i wpuszcza go na jego overlay: OV1 plansze, OV2 belki, OV3 bugi i ticker, OV4 scena przerwy, L-bar i ramki PiP. Plansza zdejmuje belkę i scenę przerwy, scena przerwy zdejmuje plansze i belki.
+- Co jest na wizji, dashboard czyta z vMixa (XML), więc kolory klawiszy zgadzają się z vMixem, a UNDO przywraca poprzedni stan overlayów.
+- Inputy są szukane po nazwie (`ssl_welcome`, `ssl_results_group_4`, `ssl_lineup_9`…; listę zmienisz w tabeli zakładki). Przycisk „Add placeholders” dodaje brakujące jako inputy Image z przezroczystym PNG. Dashboard nie zmienia niczego innego w vMixie, w tym ustawień wyjść.
+- Scena przerwy `ssl_break` to input z warstwami. Dashboard co kilka sekund wstawia na zmianę day schedule i wyniki grup do warstwy planszy (`SetMultiViewOverlay`). Przycisk TICKER przełącza tekst tickera między wersją „przed wyścigiem” i „koniec dnia” (General graphics → Tickers).
+- Pliki stron Companiona (5 plików, w tym FALLBACK, który steruje vMixem bez dashboardu) pobierasz z zakładki i importujesz w Companion → Import / Export.
+
 ## Lowerthirdy ze Stream Decka (Companion)
 
 Zakładka **Lower thirds** to te same klawisze co na Stream Decku: kraj wybiera drużynę, pozycja na łódce pokazuje żeglarza z dzisiejszego składu (zdjęcie, flaga, emblem, imię i nazwisko, numer i pozycja), NEXT RESULT przełącza tylko dolną linię na kolejne best results, TEAM pokazuje drużynę, OUT zdejmuje grafikę.

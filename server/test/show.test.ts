@@ -39,6 +39,8 @@ const TITLES = {
   ssl_lineup_9: ['PitNAME.Text', 'PitSURNAME.Text', 'PitNUMBER.Text', 'Flag.Source'],
   lowerthird_photo: ['Top text.Text', 'Bottom text.Text', 'PHOTO.Source', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
   lowerthird_no_photo: ['Top text.Text', 'Bottom text.Text', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
+  ssl_lt_lineup5: ['NAME 1.Text', 'NAME 2.Text', 'NAME 3.Text', 'NAME 4.Text', 'NAME 5.Text', 'Flag.Source'],
+  ssl_lt_team_q: ['Top text.Text', 'Bottom text.Text'],
 };
 
 function race() {
@@ -106,6 +108,35 @@ describe('show control', () => {
     await show.run('lineup:1');
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitSURNAME.Text&Value=RUIZ');
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
+  });
+
+  it('splits the lineup lower third into the first five and the rest, then goes out; shows a qualified team', async () => {
+    const { s, ev, teams } = race();
+    saveLineup(s.ctx, ev, teams[0], { rows: [
+      { slot: 'Tactician', firstName: 'A', lastName: 'Tac', number: '1' }, { slot: 'Helm', firstName: 'B', lastName: 'Hel', number: '2' },
+      { slot: 'Main', firstName: 'C', lastName: 'Mai', number: '3' }, { slot: 'Trimmer1', firstName: 'D', lastName: 'Tr2', number: '4' },
+      { slot: 'Trimmer', firstName: 'E', lastName: 'Tr1', number: '5' }, { slot: 'Grinder', firstName: 'F', lastName: 'Gri', number: '6' },
+      { slot: 'Bow', firstName: 'G', lastName: 'Bow', number: '7' },
+    ] });
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:lineup5');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=TAC');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 5.Text&Value=TR1');
+    expect(v.overlays[2]).toBe('9');
+    v.calls.length = 0;
+    await show.run('show:lineup5');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=GRI');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 2.Text&Value=RUIZ');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 3.Text&Value=BOW');
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 4.Text&Value=');
+    expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
+    await show.run('show:lineup5');
+    expect(v.overlays[2]).toBe('');
+
+    await show.run('qualified:2');
+    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=QUALIFIED');
+    expect(v.overlays[2]).toBe('10');
   });
 
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {

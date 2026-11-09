@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
@@ -8,6 +10,8 @@ import { listGraphicSets, tickerText } from './graphicSets.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, LowerThirds, LtSailor } from './lowerthirds.js';
 import { listTeams } from './teams.js';
+import { encodePng } from './png.js';
+import { joinVmixPath } from './paths.js';
 import { findInput, parseVmixXml, pushResults, VmixInput, vmixUrl } from './vmixResults.js';
 
 /**
@@ -36,6 +40,7 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'course', label: 'Race course', kind: 'board', overlay: 1, inputs: ['ssl_course'] },
   { id: 'officials', label: 'Race officials', kind: 'board', overlay: 1, inputs: ['ssl_officials'] },
   { id: 'weather', label: 'Weather', kind: 'board', overlay: 1, inputs: ['ssl_weather'] },
+  { id: 'teamq', label: 'Team LT qualified', kind: 'lt', overlay: 2, inputs: ['ssl_lt_team_q'] },
   { id: 'comm', label: 'Commentator LT', kind: 'lt', overlay: 2, inputs: ['ssl_lt_comm_photo', 'ssl_lt_comm_nophoto'] },
   { id: 'lineup5', label: 'Lineup LT (5 sailors)', kind: 'lt', overlay: 2, inputs: ['ssl_lt_lineup5'] },
   { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 3, inputs: ['ssl_bug'] },
@@ -70,8 +75,8 @@ export const showConfigSchema = z.object({
   vmixForCompanion: z.string().default(''),
   /** write key texts and colours into Companion (HTTP remote control) */
   labels: z.boolean().default(true),
-  /** places shown on the 5-sailor lineup lower third, in this order */
-  lineup5: z.array(z.string()).default(['Tactician', 'Helm', 'Main', 'Trimmer1', 'Trimmer']),
+  /** places on the lineup lower third, in this order: the first 5, then the rest on the second press */
+  lineup5: z.array(z.string()).default(['Tactician', 'Helm', 'Main', 'Trimmer1', 'Trimmer', 'Grinder', 'Pit', 'Midbow', 'Bow']),
 });
 export type ShowConfig = z.infer<typeof showConfigSchema>;
 
@@ -98,8 +103,9 @@ export interface ShowState {
   undo: Record<string, string>[]; // overlay → input key, newest last
   last: { at: string; action: string; error: string | null } | null;
   bug: string; // announcement shown on the bug
+  lineupPart: number; // 0 = off, 1 = first five, 2 = the rest
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '' };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', lineupPart: 0 };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -138,7 +144,8 @@ export function deckPages(cfg: ShowConfig): DeckPage[] {
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:raceresults', 'RACE\\nRESULTS', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board')),
+        row8(k('show:raceresults', 'RACE\\nRESULTS', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board'),
+          k('qualified:1', 'QUALIFIED\\nBOAT 1', 'team'), k('qualified:2', 'QUALIFIED\\nBOAT 2', 'team'), k('qualified:3', 'QUALIFIED\\nBOAT 3', 'team'), k('qualified:4', 'QUALIFIED\\nBOAT 4', 'team'), k('ltout', 'LT OUT', 'lt')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
           k('tickermode', 'TICKER:\\nNEXT RACE', 'mode')),
         row8(k('bug:thanks', 'THANKS FOR\\nWATCHING', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug')),
@@ -314,17 +321,71 @@ export class Show {
     } else if (g.id === 'ticker') {
       await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
     } else if (g.id === 'lineup5') {
-      const b = this.boats()[this.state.boat - 1];
-      if (!b) throw badRequest('Pick a boat first.');
-      const all = crewOf(this.ctx, b.id);
-      const crew = this.config.lineup5.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s && !!(s.lastName || s.firstName)).slice(0, 5);
-      const f = new Map<string, string>();
-      crew.forEach((s, i) => { f.set(`NAME ${i + 1}.Text`, s.lastName.toUpperCase()); f.set(`NUMBER ${i + 1}.Text`, s.number); f.set(`POSITION ${i + 1}.Text`, s.position.toUpperCase()); });
-      const t = listTeams(this.ctx).find((x) => x.id === b.id);
-      f.set('Flag.Source', img((t?.assets as Record<string, Asset>)?.flag_big));
-      await this.set(input, f);
+      await this.set(input, this.lineupPartFields(1));
     }
     void ev;
+  }
+
+  /** The lineup lower third: the places in the set order, split into the first five and the rest. */
+  lineupParts(): LtSailor[][] {
+    const b = this.boats()[this.state.boat - 1];
+    if (!b) throw badRequest('Pick a boat first.');
+    const all = crewOf(this.ctx, b.id).filter((s) => s.lastName || s.firstName);
+    const order = this.config.lineup5;
+    const crew = [...order.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s), ...all.filter((s) => !order.includes(s.slot))];
+    return [crew.slice(0, 5), crew.slice(5)].filter((p) => p.length);
+  }
+  lineupPartFields(part: number) {
+    const b = this.boats()[this.state.boat - 1];
+    const crew = this.lineupParts()[part - 1] ?? [];
+    const f = new Map<string, string>();
+    for (let i = 0; i < 5; i++) {
+      const s = crew[i];
+      f.set(`NAME ${i + 1}.Text`, s ? s.lastName.toUpperCase() : '');
+      f.set(`FIRSTNAME ${i + 1}.Text`, s ? s.firstName.toUpperCase() : '');
+      f.set(`NUMBER ${i + 1}.Text`, s?.number ?? '');
+      f.set(`POSITION ${i + 1}.Text`, s ? s.position.toUpperCase() : '');
+      f.set(`PHOTO ${i + 1}.Source`, s?.photo ?? '');
+    }
+    const t = listTeams(this.ctx).find((x) => x.id === b?.id);
+    f.set('Flag.Source', img((t?.assets as Record<string, Asset>)?.flag_big));
+    return f;
+  }
+  /** First press: the first five come in; second: the rest swap in (data change); third: out. */
+  async lineupLt() {
+    const g = this.graphic('lineup5');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const on = snap.overlays[g.overlay] === input.number;
+    const parts = this.lineupParts().length;
+    const part = on ? this.state.lineupPart + 1 : 1;
+    if (on && part > parts) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      this.patchState({ lineupPart: 0 });
+      return { out: 'lineup5' };
+    }
+    await this.set(input, this.lineupPartFields(part));
+    if (!on) await this.bringIn(g, input, snap);
+    this.patchState({ lineupPart: part });
+    return { in: 'lineup5', part, of: parts };
+  }
+
+  /** Team lower third, qualified version: its own title, team fields like the team lower third. */
+  async qualified(boat: number) {
+    const b = this.boat(boat);
+    const g = this.graphic('teamq');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const lt = getLtConfig(this.ctx.db);
+    const t = listTeams(this.ctx).find((x) => x.id === b.id)!;
+    const a = t.assets as Record<string, Asset>;
+    await this.set(input, new Map([
+      [`${lt.fields.top}.Text`, t.name.toUpperCase()], [`${lt.fields.bottom}.Text`, 'QUALIFIED'],
+      [`${lt.fields.flag}.Source`, img(a[lt.flagSlot])], [`${lt.fields.emblem}.Source`, img(a[lt.emblemSlot])], [`${lt.fields.bar}.Source`, img(a[lt.barSlot])],
+    ]));
+    await this.bringIn({ ...g, overlay: lt.overlay }, input, snap);
+    return { in: 'teamq', team: b.code };
   }
 
   tickerText() {
@@ -518,7 +579,8 @@ export class Show {
   }
   private async dispatch(kind: string, arg: string): Promise<unknown> {
     switch (kind) {
-      case 'show': return this.toggle(arg);
+      case 'show': return arg === 'lineup5' ? this.lineupLt() : this.toggle(arg);
+      case 'qualified': return this.qualified(Number(arg));
       case 'comm': return this.commentator(arg);
       case 'anthem': return this.lt.showTeam(this.boat(Number(arg)).code);
       case 'lineup': return this.lineup(Number(arg));
@@ -553,9 +615,9 @@ export class Show {
     const boats = this.boats();
     const ov = ctxt?.overlays ?? {};
     const isOn = (id: string) => { if (!ctxt) return false; const g = this.graphics().find((x) => x.id === id); const i = g && this.resolve(g, ctxt.inputs); return !!(g && i && ov[g.overlay] === i.number); };
-    if (kind === 'anthem' || kind === 'lineup' || kind === 'boat') {
+    if (kind === 'anthem' || kind === 'lineup' || kind === 'boat' || kind === 'qualified') {
       const b = boats[Number(arg) - 1];
-      text = b ? (kind === 'boat' ? `BOAT ${arg}\\n${b.code}` : `${kind === 'anthem' ? 'ANTHEM' : 'LINEUP'}\\n${b.code}`) : `${key.text}\\n—`;
+      text = b ? (kind === 'boat' ? `BOAT ${arg}\\n${b.code}` : `${({ anthem: 'ANTHEM', lineup: 'LINEUP', qualified: 'QUALIFIED' } as Record<string, string>)[kind]}\\n${b.code}`) : `${key.text}\\n—`;
       empty = !b;
       if (kind === 'boat') active = st.boat === Number(arg);
     } else if (kind === 'sailor') {
@@ -572,6 +634,7 @@ export class Show {
     else if (kind === 'rotate') { text = st.rotating ? 'ROTATION\\n⏸ STOP' : 'ROTATION\\n▶ START'; active = st.rotating; }
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
+    if (key.action === 'show:lineup5' && st.lineupPart) text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
     if (kind === 'break') onAir = isOn('break');
     const colours: Record<string, string> = { board: '#1e3a8a', lt: '#166534', bug: '#a16207', scene: '#0f766e', team: '#1e3a5f', sailor: '#27303f', nav: '#3f3f46', safety: '#7c2d12', mode: '#4c1d95' };
     let bg = colours[key.kind] ?? '#3f3f46';
@@ -633,23 +696,33 @@ export class Show {
   start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }
   stop() { if (this.timer) clearInterval(this.timer); this.stopRotation(); }
 
-  /** Placeholders: every registry input missing in vMix gets a Colour input with that name. */
+  /**
+   * Placeholders: every registry input missing in vMix gets an Image input with that name: a transparent 1920×1080 PNG
+   * with a small orange corner mark. Only inputs are added; nothing else in vMix changes. Replace it later with the
+   * GTZIP title and give the title the same name.
+   */
   async addPlaceholders() {
     const { inputs } = await this.snapshot();
     const added: string[] = [];
+    const dir = path.join(this.ctx.assetsDir, 'placeholders');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'placeholder.png');
+    if (!fs.existsSync(file)) fs.writeFileSync(file, encodePng(1920, 1080, (x, y) => (x < 24 && y < 24 ? [245, 158, 11, 255] : [0, 0, 0, 0])));
+    const root = getSetting(this.ctx.db, 'paths.vmixAssetsRoot');
+    const vmixPath = root ? joinVmixPath(root, 'placeholders/placeholder.png') : file;
     for (const g of this.graphics()) {
       if (this.resolve(g, inputs)) continue;
-      const name = g.inputs.map((x) => x.replace('{n}', String(this.boats().length || 4)).replace('{crew}', '')).find((x) => !x.includes('{') && !/_$/.test(x));
+      const name = g.inputs.map((x) => x.replace('{n}', String(this.boats().length || 4)).replace('{crew}', '9')).find((x) => !x.includes('{'));
       if (!name) continue;
-      await this.vmix(`?Function=AddInput&Value=${encodeURIComponent('Colour|#00000000')}`);
+      await this.vmix(`?Function=AddInput&Value=${encodeURIComponent(`Image|${vmixPath}`)}`);
       const after = parseVmixXml(await this.vmix(''));
       const fresh = after.find((i) => !inputs.some((o) => o.key === i.key));
-      if (!fresh) throw badRequest('vMix did not add the placeholder input.');
+      if (!fresh) throw badRequest(`vMix did not add the placeholder image (${vmixPath}). Check the vMix assets folder in Settings → Files and paths.`);
       await this.vmix(`?Function=SetInputName&Input=${encodeURIComponent(fresh.key || fresh.number)}&Value=${encodeURIComponent(name)}`);
       inputs.push({ ...fresh, title: name });
       added.push(name);
     }
-    return { added };
+    return { added, image: vmixPath };
   }
 }
 
