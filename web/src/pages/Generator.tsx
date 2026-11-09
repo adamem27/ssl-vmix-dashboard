@@ -608,6 +608,7 @@ function TemplateAcrossTeams({ template, teams, bg, onPick }: { template: Templa
 // ---------- elements ----------
 function ElementsPanel({ templates, patch, onReload, preview, newScope }: { templates: Template[]; patch: (id: string, p: Partial<Template>) => void; onReload: () => void; preview: (t: Template) => ReactNode; newScope: Scope }) {
   const toast = useToast();
+  const strokeGradient = useContext(StrokeGradientCtx);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allOpen = templates.length > 0 && templates.every((t) => open.has(t.id));
@@ -631,7 +632,7 @@ function ElementsPanel({ templates, patch, onReload, preview, newScope }: { temp
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
       scope: newScope, name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0,
-      strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
+      strokeWidth: 1, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: true, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
   const th = 'px-1.5 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-500';
@@ -712,7 +713,9 @@ function ElementsPanel({ templates, patch, onReload, preview, newScope }: { temp
                 <td className="px-1.5">{num(t, 'strokeWidth', 'w-16', 0, 200)}</td>
                 <td className="px-1.5">
                   <div className="flex items-center gap-1">
-                    <input type="color" value={t.strokeColor} disabled={t.strokeGradient} onChange={(e) => patch(t.id, { strokeColor: e.target.value })} className="h-7 w-8 cursor-pointer rounded border border-ink-700 bg-transparent disabled:cursor-default disabled:opacity-30" aria-label="Stroke colour" />
+                    {t.strokeGradient
+                      ? <span className="checker block h-7 w-8 overflow-hidden rounded border border-ink-700" title="Painted with the stroke gradient (orange → yellow, below)"><span className="block h-full" style={{ background: cssGradient(strokeGradient, 90 - t.strokeAngle) }} /></span>
+                      : <input type="color" value={t.strokeColor} onChange={(e) => patch(t.id, { strokeColor: e.target.value })} className="h-7 w-8 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stroke colour" title="Solid stroke colour; tick Gradient for the orange → yellow stroke" />}
                     {num(t, 'strokeOpacity', 'w-16', 0, 100)}
                   </div>
                 </td>
