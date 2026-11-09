@@ -11,7 +11,7 @@ interface Config {
 interface State { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
 interface Key { action: string; text: string; active: boolean; onAir: boolean; page: number; row: number; col: number }
 interface Sailor { slot: string; label: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; photo: string; best: string[] }
-interface LtData { config: Config; state: State; teams: { id: string; code: string; name: string }[]; keys: Key[][]; crew: Sailor[]; teamSlots: { key: string; label: string }[] }
+interface LtData { config: Config; state: State; teams: { id: string; code: string; name: string }[]; keys: Key[][]; crew: Sailor[]; teamSlots: { key: string; label: string }[]; last: { at: string; what: string; error: string | null } | null }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
   return (
@@ -52,6 +52,11 @@ function LowerThirds({ data }: { data: LtData }) {
         <span className={cx('rounded px-2 py-1 text-xs font-bold', st.onAir ? 'bg-red-700 text-white' : 'bg-ink-800 text-ink-400')}>{st.onAir ? `ON AIR · ${showing}` : 'Off air'}</span>
         {st.onAir && st.input && <span className="text-xs text-ink-500">{st.input}</span>}
       </>}>
+        {data.last && (
+          <div className={cx('mb-3 rounded px-3 py-2 text-sm', data.last.error ? 'bg-red-950/60 text-red-200' : 'bg-ink-900 text-ink-400')}>
+            Last key press ({new Date(data.last.at).toLocaleTimeString()}, {decodeURIComponent(data.last.what)}): {data.last.error ?? 'OK'}
+          </div>
+        )}
         <p className="mb-3 text-sm text-ink-400">
           The same keys as on the Stream Deck. A country picks the team, a place shows whoever sails there in today's line-up, NEXT RESULT changes only the line under the name
           (position → best results), OUT takes the graphic off. When the lower third is on air, changes only swap the data, so the title's change animations play.
