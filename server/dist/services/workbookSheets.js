@@ -91,8 +91,8 @@ export function generalSheet(ctx, eventId, today) {
     const ev = db.prepare('SELECT name FROM events WHERE id = ?').get(eventId);
     const root = getSetting(db, 'paths.vmixAssetsRoot');
     const w = getWeather(db);
-    const weather = [['Location', 'location'], ['Conditions', 'conditions'], ['Air temperature', 'air_temp'], ['Water temperature', 'water_temp'],
-        ['Wind speed', 'wind_speed'], ['Wind gusts', 'wind_gust'], ['Wind direction', 'wind_direction'], ['Wind unit', 'wind_unit'], ['Note', 'note']];
+    const weather = [['Forecast', 'forecast'], ['Air temperature', 'air_temp'], ['Water temperature', 'water_temp'],
+        ['Wind speed', 'wind_speed'], ['Wind direction', 'wind_direction'], ['Wind degrees', 'wind_degrees'], ['Wind unit', 'wind_unit']];
     const left = block(row, 0, 'EVENT', null, [['Name', ev?.name ?? ''], ['Stage', currentStage(db, eventId)?.name ?? ''], ['Date', today]]) + 1;
     const h = Math.max(left + block(row + left, 0, 'MATCHBOARD', null, [['Image', root ? joinVmixPath(root, MATCHBOARD_REL) : path.join(ctx.assetsDir, ...MATCHBOARD_REL.split('/'))]]), block(row, 3, 'WEATHER', null, weather.map(([label, k]) => [label, w[k] ?? ''])));
     row += h + 1;
@@ -173,7 +173,7 @@ export function teamsSheet(ctx, eventId, today) {
     const { stage, teams } = stageTeams(ctx, eventId);
     const ov = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t]));
     const root = getSetting(db, 'paths.vmixAssetsRoot');
-    const templates = listTemplates(db).filter((t) => t.enabled);
+    const templates = listTemplates(db).filter((t) => t.enabled && t.scope === 'teams');
     const outputs = new Set(listOutputs(db).map((o) => o.rel));
     return teams.map(({ t, group, place }) => {
         const row = {};

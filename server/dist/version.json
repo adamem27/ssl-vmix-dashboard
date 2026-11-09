@@ -1,8 +1,14 @@
 {
-  "version": "1.0.90",
-  "commit": "fd7d955",
-  "date": "2026-11-09T15:55:47Z",
+  "version": "1.0.91",
+  "commit": "c99e735",
+  "date": "2026-11-09T19:14:07Z",
   "changes": [
+    {
+      "version": "1.0.91",
+      "commit": "c99e735",
+      "date": "2026-11-09T19:14:07Z",
+      "text": "Weather: forecast instead of conditions, wind direction in degrees, no location/gusts/note. PNG generator: elements are for teams or neutral (never both), gradient from any side, neutral versions V1-V3, table scrollbar above the open preview"
+    },
     {
       "version": "1.0.90",
       "commit": "fd7d955",

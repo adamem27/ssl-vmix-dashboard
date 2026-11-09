@@ -3,13 +3,17 @@ import { listAssets, removeAllForOwner } from './assets.js';
 import { assertDate } from './declarations.js';
 import { notFound } from './errors.js';
 // ---------- weather (one current record) ----------
-export const WEATHER_FIELDS = ['location', 'conditions', 'air_temp', 'water_temp', 'wind_speed', 'wind_gust', 'wind_direction', 'wind_unit', 'note'];
+/** wind_degrees is the direction in degrees as typed (e.g. 050), next to the compass point in wind_direction. */
+export const WEATHER_FIELDS = ['forecast', 'air_temp', 'water_temp', 'wind_speed', 'wind_direction', 'wind_degrees', 'wind_unit'];
 export function getWeather(db) {
     let v = {};
     try {
         v = JSON.parse(getSetting(db, 'weather') || '{}');
     }
     catch { /* reset below */ }
+    const old = v;
+    if (v.forecast === undefined && old.conditions)
+        v.forecast = old.conditions; // renamed from conditions
     const out = Object.fromEntries(WEATHER_FIELDS.map((k) => [k, String(v[k] ?? '')]));
     if (!out.wind_unit)
         out.wind_unit = 'kn';

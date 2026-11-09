@@ -6,7 +6,7 @@ import { getSetting, newId, nowIso, setSetting } from '../../db/db.js';
 import { badRequest, notFound } from '../errors.js';
 import { encodePng } from '../png.js';
 import { joinVmixPath } from '../paths.js';
-import { DEFAULT_NEUTRAL, DEFAULT_STROKE_GRADIENT, gradientVersions, gradientVersionsFrom, NEUTRAL_CODE, NEUTRAL_ID, neutralGradient, neutralSpec, renderElement } from './render.js';
+import { DEFAULT_NEUTRAL, DEFAULT_STROKE_GRADIENT, gradientVersions, gradientVersionsFrom, NEUTRAL_CODE, NEUTRAL_ID, neutralGradients, neutralSpec, renderElement } from './render.js';
 export { NEUTRAL_CODE, NEUTRAL_ID } from './render.js';
 export const VARIANTS = [1, 2, 3];
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
@@ -30,6 +30,9 @@ const templateFields = {
     cutSides: z.enum(['both', 'left', 'right']),
     opacity: pct,
     flip: z.boolean(),
+    gradientFrom: z.enum(['left', 'right', 'top', 'bottom']).optional(),
+    /** which colours the element is made in: the teams' gradients or the neutral set (never both) */
+    scope: z.enum(['teams', 'neutral']),
     angleOffset: z.number().min(-360).max(360),
     strokeWidth: z.number().min(0).max(200),
     strokeColor: hex,
@@ -42,7 +45,7 @@ const templateFields = {
     enabled: z.boolean(),
 };
 /** Stored elements from before the gradient stroke get its defaults. */
-export const templateSchema = z.object({ ...templateFields, corner: templateFields.corner.default('round'), cutX: templateFields.cutX.default(0), cutY: templateFields.cutY.default(0), cutSides: templateFields.cutSides.default('both'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
+export const templateSchema = z.object({ ...templateFields, scope: templateFields.scope.default('teams'), corner: templateFields.corner.default('round'), cutX: templateFields.cutX.default(0), cutY: templateFields.cutY.default(0), cutSides: templateFields.cutSides.default('both'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
 export const templatePatchSchema = z.object(templateFields).partial();
 const nameKey = (s) => s.replace(/[^\w.-]+/g, '_');
 // ---------- templates ----------
@@ -188,7 +191,7 @@ export function plannedJobs(ctx) {
     for (const team of listGradients(ctx.db)) {
         if (!team.code.trim())
             continue;
-        for (const t of templates) {
+        for (const t of templates.filter((x) => x.scope === 'teams')) {
             const g = team.gradients[t.variant];
             if (!g)
                 continue;
@@ -200,8 +203,9 @@ export function plannedJobs(ctx) {
     }
     const neutral = getNeutral(ctx.db);
     if (neutral.enabled) {
-        const g = neutralGradient(neutral.color, neutral.opacity);
-        for (const t of templates) {
+        const versions = neutralGradients(neutral.color, neutral.opacity);
+        for (const t of templates.filter((x) => x.scope === 'neutral')) {
+            const g = versions[t.variant - 1] ?? versions[0];
             const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...own } = t;
             const spec = neutralSpec(own, neutral);
             const hash = createHash('sha1').update(JSON.stringify(['neutral', spec, g, t.pattern ? WAVES_VERSION : null, spec.strokeWidth > 0 ? strokeGradient : null])).digest('hex');
@@ -356,7 +360,7 @@ export class GeneratorExporter {
     }
 }
 // ---------- defaults ----------
-const ELEMENT_DEFAULTS = { radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
+const ELEMENT_DEFAULTS = { scope: 'teams', radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
 /** The 1px gradient ring the panels and the waves bar have (orange→yellow since finals-broadcast_ssl26_v2). */
 const AI_STROKE = { strokeWidth: 1, strokeGradient: true };
 /** Starting elements: artboard sizes, corner radii and waves (10% black; 53.3% size on the small ones) from gradienty.ai. */
@@ -501,9 +505,24 @@ export function applySsl26Design(db) {
         setSetting(db, 'generator.design', TEAM_GRADIENTS_VERSION);
     })();
 }
+/**
+ * Since v1.0.91 an element is made either in the team colours or in the neutral set, not both. Once, elements
+ * named or filed as neutral become neutral-only; every other element stays a team element.
+ */
+export function splitNeutralElements(db) {
+    if (getSetting(db, 'generator.scopeSplit') === 'true')
+        return;
+    db.transaction(() => {
+        for (const t of listTemplates(db))
+            if (/neutr/i.test(`${t.name} ${t.fileName}`) && t.scope !== 'neutral')
+                updateTemplate(db, t.id, { scope: 'neutral' });
+        setSetting(db, 'generator.scopeSplit', 'true');
+    })();
+}
 /** First start of the generator: starter elements, and gradients for teams that match the board. */
 export function seedGenerator(db) {
     upgradeStarterTemplates(db);
+    splitNeutralElements(db);
     if (getSetting(db, 'generator.seeded') !== 'true')
         seedStarters(db);
     applySsl26Design(db);
