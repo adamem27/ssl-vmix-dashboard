@@ -207,7 +207,7 @@ Kolumna **For** w tabeli elementów decyduje, w jakich barwach powstaje element:
 
 ## Show control (dwa Stream Decki)
 
-Zakładka **Show control** prowadzi wszystkie grafiki z dwóch Stream Decków XL. Deck 1 ma program (strona 1 „A BEFORE”, strona 2 „C–E AFTER / BREAK”), deck 2 wyścig (strona 11 „B RACE” z żeglarzami wybranej łódki według numeru na koszulce, strona 12 „EXTRAS”: komunikaty, bugi, L-bar, PiP, lineup LT). Dolny rząd jest wszędzie taki sam: HOME, ◀, ▶, FALLBACK, UNDO, ALL OUT, PANIC (drugie naciśnięcie w ciągu 3 s).
+Zakładka **Show control** prowadzi wszystkie grafiki z dwóch Stream Decków XL. Deck 1 ma program (strona 1 „A BEFORE”, strona 2 „C–E AFTER / BREAK”), deck 2 wyścig (strona 11 „B RACE” z drużynami grupy z Fleets i żeglarzami wybranej drużyny według numeru na koszulce, strona 12 „EXTRAS”: komunikaty, bugi, L-bar, PiP, lineup LT). Dolny rząd jest wszędzie taki sam: HOME, ◀, ▶, FALLBACK, UNDO, ALL OUT, PANIC (drugie naciśnięcie w ciągu 3 s).
 
 - Każdy klawisz woła `/api/show/do?a=<akcja>`. Dashboard wpisuje dane do tytułu przez Web API vMixa i wpuszcza go na jego overlay: OV1 plansze, OV2 belki, OV3 bugi i ticker, OV4 scena przerwy, L-bar i ramki PiP. Plansza zdejmuje belkę i scenę przerwy, scena przerwy zdejmuje plansze i belki.
 - Co jest na wizji, dashboard czyta z vMixa (XML), więc kolory klawiszy zgadzają się z vMixem, a UNDO przywraca poprzedni stan overlayów.

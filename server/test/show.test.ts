@@ -64,7 +64,7 @@ describe('show control', () => {
     const { s } = race();
     const v = fakeVmix(TITLES);
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    await show.run('anthem:1'); // team lower third of BOAT 1 on the lower-third channel (overlay 2)
+    await show.run('anthem:1'); // team lower third of team 1 on the lower-third channel (overlay 2)
     expect(v.calls.at(-1)).toMatch(/^\?Function=OverlayInput2In&Input=k8$/);
     v.calls.length = 0;
     await show.run('show:welcome');

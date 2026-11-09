@@ -59,7 +59,7 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
 export const showConfigSchema = z.object({
   /** input names per graphic id (comma separated alternatives), overriding the defaults */
   inputs: z.record(z.string(), z.string()).default({}),
-  /** the fleet (group) racing now: its teams are BOAT 1–4 in fleet order */
+  /** the fleet (group) racing now: its teams are teams 1–4 on the keys, in fleet order */
   fleetId: z.string().default(''),
   /** the race of that group whose times at the marks the Race results board shows */
   race: z.number().int().min(1).max(12).default(1),
@@ -138,8 +138,8 @@ export function deckPages(cfg: ShowConfig): DeckPage[] {
       deck: 1, name: 'A BEFORE', page: p1, keys: [
         row8(k('show:welcome', 'WELCOME', 'board'), k('comm:host', 'HOST\\nLT', 'lt'), k('comm:guest', 'GUEST\\nLT', 'lt'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'),
           k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:compare', 'TEAM\\nCOMPARE', 'board'), k('boardout', 'BOARD\\nOUT', 'board')),
-        row8(k('anthem:1', 'ANTHEM\\nBOAT 1', 'team'), k('anthem:2', 'ANTHEM\\nBOAT 2', 'team'), k('anthem:3', 'ANTHEM\\nBOAT 3', 'team'), k('anthem:4', 'ANTHEM\\nBOAT 4', 'team'),
-          k('lineup:1', 'LINEUP\\nBOAT 1', 'board'), k('lineup:2', 'LINEUP\\nBOAT 2', 'board'), k('lineup:3', 'LINEUP\\nBOAT 3', 'board'), k('lineup:4', 'LINEUP\\nBOAT 4', 'board')),
+        row8(k('anthem:1', 'ANTHEM\\nTEAM 1', 'team'), k('anthem:2', 'ANTHEM\\nTEAM 2', 'team'), k('anthem:3', 'ANTHEM\\nTEAM 3', 'team'), k('anthem:4', 'ANTHEM\\nTEAM 4', 'team'),
+          k('lineup:1', 'LINEUP\\nTEAM 1', 'board'), k('lineup:2', 'LINEUP\\nTEAM 2', 'board'), k('lineup:3', 'LINEUP\\nTEAM 3', 'board'), k('lineup:4', 'LINEUP\\nTEAM 4', 'board')),
         row8(k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('comm:water', 'ON-WATER\\nLT', 'lt'),
           k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt')),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
@@ -148,7 +148,7 @@ export function deckPages(cfg: ShowConfig): DeckPage[] {
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
         row8(k('show:raceresults', 'RACE\\nRESULTS', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board'),
-          k('qualified:1', 'QUALIFIED\\nBOAT 1', 'team'), k('qualified:2', 'QUALIFIED\\nBOAT 2', 'team'), k('qualified:3', 'QUALIFIED\\nBOAT 3', 'team'), k('qualified:4', 'QUALIFIED\\nBOAT 4', 'team'), k('ltout', 'LT OUT', 'lt')),
+          k('qualified:1', 'QUALIFIED\\nTEAM 1', 'team'), k('qualified:2', 'QUALIFIED\\nTEAM 2', 'team'), k('qualified:3', 'QUALIFIED\\nTEAM 3', 'team'), k('qualified:4', 'QUALIFIED\\nTEAM 4', 'team'), k('ltout', 'LT OUT', 'lt')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
           k('tickermode', 'TICKER:\\nNEXT RACE', 'mode')),
         row8(k('bug:thanks', 'THANKS FOR\\nWATCHING', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug')),
@@ -157,7 +157,7 @@ export function deckPages(cfg: ShowConfig): DeckPage[] {
     },
     {
       deck: 2, name: 'B RACE', page: p2, keys: [
-        row8(k('boat:1', 'BOAT 1', 'team'), k('boat:2', 'BOAT 2', 'team'), k('boat:3', 'BOAT 3', 'team'), k('boat:4', 'BOAT 4', 'team'),
+        row8(k('boat:1', 'TEAM 1', 'team'), k('boat:2', 'TEAM 2', 'team'), k('boat:3', 'TEAM 3', 'team'), k('boat:4', 'TEAM 4', 'team'),
           k('photo', 'PHOTO\\nAUTO', 'mode'), k('next', 'NEXT\\nRESULT', 'lt'), k('teamlt', 'TEAM LT', 'lt'), k('ltout', 'LT OUT', 'lt')),
         row8(...Array.from({ length: 8 }, (_, i) => k(`sailor:${i + 1}`, '—', 'sailor'))),
         row8(...Array.from({ length: 8 }, (_, i) => k(`sailor:${i + 9}`, '—', 'sailor'))),
@@ -202,7 +202,7 @@ export class Show {
   }
   graphic(id: string) { const g = this.graphics().find((x) => x.id === id); if (!g) throw notFound(`Graphic ${id}`); return g; }
 
-  /** The teams of the race now, BOAT 1–4 in fleet order. */
+  /** The teams of the race now, in fleet order (team keys 1–4). */
   boats(): { id: string; code: string; name: string }[] {
     const cfg = this.config;
     if (!cfg.fleetId) return [];
@@ -214,7 +214,7 @@ export class Show {
     }
     return [];
   }
-  boat(n: number) { const b = this.boats()[n - 1]; if (!b) throw badRequest(`No team on BOAT ${n}. Pick the race (group) on the Show control tab.`); return b; }
+  boat(n: number) { const b = this.boats()[n - 1]; if (!b) throw badRequest(`The group has no team ${n}. Pick the race (group) on the Show control tab.`); return b; }
 
   /** Sailors of the selected boat with a name, by shirt number. */
   sailors(): LtSailor[] {
@@ -482,7 +482,7 @@ export class Show {
   async sailor(index: number | null, shirt?: string) {
     const list = this.sailors();
     const s = shirt ? list.find((x) => x.number === shirt) : list[(index ?? 0) - 1];
-    if (!s) throw badRequest(shirt ? `No sailor with number ${shirt} on BOAT ${this.state.boat}.` : 'No sailor on this key.');
+    if (!s) throw badRequest(shirt ? `No sailor with number ${shirt} in ${this.boats()[this.state.boat - 1]?.code ?? 'this team'}.` : 'No sailor on this key.');
     const b = this.boat(this.state.boat);
     const mode = this.state.photo;
     const cfg = getLtConfig(this.ctx.db);
@@ -624,7 +624,7 @@ export class Show {
     const isOn = (id: string) => { if (!ctxt) return false; const g = this.graphics().find((x) => x.id === id); const i = g && this.resolve(g, ctxt.inputs); return !!(g && i && ov[g.overlay] === i.number); };
     if (kind === 'anthem' || kind === 'lineup' || kind === 'boat' || kind === 'qualified') {
       const b = boats[Number(arg) - 1];
-      text = b ? (kind === 'boat' ? `BOAT ${arg}\\n${b.code}` : `${({ anthem: 'ANTHEM', lineup: 'LINEUP', qualified: 'QUALIFIED' } as Record<string, string>)[kind]}\\n${b.code}`) : `${key.text}\\n—`;
+      text = b ? (kind === 'boat' ? `${b.code}\\n${b.name.toUpperCase().slice(0, 12)}` : `${({ anthem: 'ANTHEM', lineup: 'LINEUP', qualified: 'QUALIFIED' } as Record<string, string>)[kind]}\\n${b.code}`) : `${key.text}\\n—`;
       empty = !b;
       if (kind === 'boat') active = st.boat === Number(arg);
     } else if (kind === 'sailor') {

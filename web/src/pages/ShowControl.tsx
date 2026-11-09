@@ -69,7 +69,7 @@ function Show({ data }: { data: ShowData }) {
           </div>
         )}
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (boats, sailors by shirt number, announcements, extras).
+          Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (teams of the group, sailors by shirt number, announcements, extras).
           A key brings its graphic in and a second press takes it out. Red = on air (read from vMix), orange = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -125,11 +125,11 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
     <Panel title="Race now" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-2">
-          {sel('Group racing now (BOAT 1–4 in its order)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets)}
+          {sel('Group racing now (its teams go on the team keys)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets)}
           <label className="block text-xs text-ink-400">Race on the RACE RESULTS key (times at marks on the Results tab)
             <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
           </label>
-          <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>BOAT {i + 1} · {b.code}</span>)}</div>
+          <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>{b.code} · {b.name}</span>)}</div>
           <label className="block text-xs text-ink-400">Lineup LT (5 sailors): places in order
             <input className="input mt-1 w-72 py-1 text-sm" value={c.lineup5.join(', ')} onChange={(e) => setC({ ...c, lineup5: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
           </label>
