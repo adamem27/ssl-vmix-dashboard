@@ -98,6 +98,13 @@ function roundedRectSdf(px, py, hw, hh, r) {
     const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
     return Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0) - r;
 }
+/** Signed distance to a rectangle whose corners are cut off at 45°, `c` px along each edge. */
+function cutRectSdf(px, py, hw, hh, c) {
+    const ax = Math.abs(px), ay = Math.abs(py);
+    const qx = ax - hw, qy = ay - hh;
+    const box = Math.sqrt(Math.max(qx, 0) ** 2 + Math.max(qy, 0) ** 2) + Math.min(Math.max(qx, qy), 0);
+    return c > 0 ? Math.max(box, (ax + ay - (hw + hh - c)) / Math.SQRT2) : box;
+}
 /**
  * Draw an element. `scale` shrinks everything (sizes, radius, stroke, pattern) for quick previews;
  * the export always uses scale 1.
@@ -108,6 +115,7 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
     const data = new Uint8ClampedArray(W * H * 4);
     const hw = W / 2, hh = H / 2;
     const radius = Math.max(0, Math.min(el.radius * scale, hw, hh));
+    const cut = el.corner === 'cut';
     const strokeW = Math.max(0, el.strokeWidth * scale);
     const [sr, sg, sb] = parseHex(el.strokeColor);
     const strokeA = clamp01(el.strokeOpacity / 100);
@@ -131,7 +139,7 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
         const cy = y + 0.5 - hh;
         for (let x = 0; x < W; x++) {
             const cx = x + 0.5 - hw;
-            const d = roundedRectSdf(cx, cy, hw, hh, radius);
+            const d = cut ? cutRectSdf(cx, cy, hw, hh, radius) : roundedRectSdf(cx, cy, hw, hh, radius);
             const cover = clamp01(0.5 - d);
             if (cover <= 0)
                 continue;
