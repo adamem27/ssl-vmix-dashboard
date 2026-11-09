@@ -1,8 +1,14 @@
 {
-  "version": "1.0.87",
-  "commit": "21d178d",
-  "date": "2026-11-09T13:22:22+01:00",
+  "version": "1.0.88",
+  "commit": "05a4848",
+  "date": "2026-11-09T15:27:03Z",
   "changes": [
+    {
+      "version": "1.0.88",
+      "commit": "05a4848",
+      "date": "2026-11-09T15:27:03Z",
+      "text": "PNG generator: one tab for elements and team colours, element table on top with an expandable preview per row"
+    },
     {
       "version": "1.0.86",
       "commit": "3d96e97",
