@@ -37,7 +37,9 @@ describe('online mode', () => {
     fs.writeFileSync(path.join(ctx.assetsDir, 'teams', 'BRA', 'flag.png'), 'png');
     fs.writeFileSync(path.join(ctx.assetsDir, 'ssl-vmix.xlsx.tmp'), 'partial');
     const m = (await app.inject({ url: '/api/mirror/manifest' })).json();
-    expect(m.files.map((f: any) => f.path)).toEqual(['teams/BRA/flag.png']);
+    // the race flags that come with the app are synced to the vMix PC too
+    expect(m.files.map((f: any) => f.path).filter((p: string) => !p.startsWith('race-flags/'))).toEqual(['teams/BRA/flag.png']);
+    expect(m.files.some((f: any) => f.path === 'race-flags/AP_postponed.png')).toBe(true);
     expect((await app.inject({ url: '/api/mirror/file?path=teams/BRA/flag.png' })).body).toBe('png');
     expect((await app.inject({ url: '/api/mirror/file?path=../test.sqlite' })).statusCode).toBe(404);
   });

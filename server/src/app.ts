@@ -45,6 +45,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { db, sync } = deps;
   const ctx: AssetCtx = { db, assetsDir: deps.assetsDir };
   fs.mkdirSync(deps.assetsDir, { recursive: true });
+  seedRaceFlags(deps.assetsDir);
   const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir });
   const matchboard = deps.matchboard ?? new mb.MatchboardExporter({ db, assetsDir: deps.assetsDir });
 
@@ -502,4 +503,18 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     });
   }
   return app;
+}
+
+/**
+ * Race signal flags (SSL style, rounded squares) that ship with the app, copied once into the assets folder as
+ * race-flags/*.png, so the GTZIP generator and vMix titles can use them like any other picture. Files already there stay.
+ */
+export function seedRaceFlags(assetsDir: string) {
+  const src = path.join(mb.fixturesDir(), 'race-flags');
+  if (!fs.existsSync(src)) return;
+  const dst = path.join(assetsDir, 'race-flags');
+  try {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const f of fs.readdirSync(src)) if (f.endsWith('.png') && !fs.existsSync(path.join(dst, f))) fs.copyFileSync(path.join(src, f), path.join(dst, f));
+  } catch { /* read-only assets folder: the flags are simply not offered */ }
 }

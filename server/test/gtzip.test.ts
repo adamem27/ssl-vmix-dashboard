@@ -428,3 +428,15 @@ describe('gtzip drawing tools', () => {
     expect(abs(p.root, 'BAR 2')).toEqual([10, 10]);
   });
 });
+
+describe('race flags', () => {
+  it('come with the app and are copied into the assets folder', async () => {
+    const os = await import('node:os');
+    const { seedRaceFlags } = await import('../src/app.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flags-'));
+    seedRaceFlags(dir);
+    const files = fs.readdirSync(path.join(dir, 'race-flags'));
+    expect(files).toContain('AP_postponed.png');
+    expect(files.length).toBeGreaterThanOrEqual(28);
+  });
+});

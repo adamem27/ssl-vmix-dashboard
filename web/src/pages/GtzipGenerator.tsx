@@ -1096,6 +1096,7 @@ function PicturePicker({ onClose, onPick }: { onClose: () => void; onPick: (sour
             try { onPick((await api.upload<{ source: string }>('/api/gtzip/images', file)).source); } catch (err) { toast.error(err); } finally { setBusy(false); }
           }} />
           <span className="text-xs text-ink-500">or pick a file from the dashboard (PNG generator, team graphics…)</span>
+          <Button size="sm" variant={f === 'race-flags/' ? 'primary' : 'ghost'} onClick={() => setF(f === 'race-flags/' ? '' : 'race-flags/')} title="Race signal flags (AP, N, X, First substitute…) that come with the app">🚩 Race flags</Button>
           <input className={cx(small, 'ml-auto w-56')} placeholder="Search, e.g. POL or PNG generator/" value={f} onChange={(e) => setF(e.target.value)} />
         </div>
         {q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} /> : (
