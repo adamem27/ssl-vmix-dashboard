@@ -27,6 +27,8 @@ export interface ElementSpec {
   opacity: number;
   /** mirror the gradient left ↔ right */
   flip: boolean;
+  /** where the gradient starts: left (default), right (= flip), top or bottom; unset means left, or right when flip is on */
+  gradientFrom?: 'left' | 'right' | 'top' | 'bottom';
   /** added to the gradient angle */
   angleOffset: number;
   strokeWidth: number;
@@ -210,16 +212,19 @@ export function renderElement(el: ElementSpec, gradient: Gradient, scale = 1, st
   const elA = clamp01(el.opacity / 100);
 
   // Gradient line through the centre, long enough that 0 and 100 touch opposite corners (as in CSS/Illustrator).
-  let ang = ((gradient.angle + el.angleOffset) * Math.PI) / 180;
-  let dx = Math.cos(ang), dy = -Math.sin(ang);
-  if (el.flip) dx = -dx;
+  const ang = ((gradient.angle + el.angleOffset) * Math.PI) / 180;
+  const from = el.gradientFrom ?? (el.flip ? 'right' : 'left');
+  // left → right is the drawn direction; right mirrors it, top/bottom turn it a quarter (the stroke turns with it)
+  const orient = (x: number, y: number): [number, number] =>
+    from === 'right' ? [-x, y] : from === 'top' ? [-y, x] : from === 'bottom' ? [y, -x] : [x, y];
+  const [dx, dy] = orient(Math.cos(ang), -Math.sin(ang));
   const len = Math.abs(W * dx) + Math.abs(H * dy) || 1;
   const lut = gradientLut(gradient);
 
   // Gradient stroke: its own axis and angle, mirrored with the element.
   const sLut = el.strokeGradient && strokeGradient ? gradientLut(strokeGradient) : null;
   const sAng = (el.strokeAngle * Math.PI) / 180;
-  const sdx = (el.flip ? -1 : 1) * Math.cos(sAng), sdy = -Math.sin(sAng);
+  const [sdx, sdy] = orient(Math.cos(sAng), -Math.sin(sAng));
   const sLen = Math.abs(W * sdx) + Math.abs(H * sdy) || 1;
 
   const usePattern = el.pattern && el.patternOpacity > 0;
@@ -335,3 +340,5 @@ export const NEUTRAL_ID = 'neutral';
 export const neutralGradient = (color: string, opacity = 100): Gradient => ({ angle: 0, stops: [{ pos: 0, color, opacity }, { pos: 100, color, opacity }] });
 /** An element as drawn in the neutral set: its own stroke width if it has one, else the neutral one, always painted with the stroke gradient. */
 export const neutralSpec = <T extends ElementSpec>(el: T, n: NeutralSettings): T => ({ ...el, strokeGradient: true, strokeWidth: el.strokeWidth > 0 ? el.strokeWidth : n.strokeWidth });
+/** The neutral colour as the three versions, like a team: V1 flat, V2 fading in, V3 fading in and out. */
+export const neutralGradients = (color: string, opacity = 100): Gradient[] => gradientVersionsFrom(neutralGradient(color, opacity));

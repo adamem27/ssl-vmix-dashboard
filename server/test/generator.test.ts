@@ -7,7 +7,7 @@ import { encodePng } from '../src/services/png.js';
 import { inspectImage } from '../src/services/images.js';
 import { DEFAULT_STROKE_GRADIENT, ElementSpec, neutralGradient, renderElement } from '../src/services/generator/render.js';
 import {
-  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate, setNeutral, getNeutral,
+  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate, setNeutral, getNeutral, splitNeutralElements,
 } from '../src/services/generator/generator.js';
 
 const el = (p: Partial<ElementSpec> = {}): ElementSpec => ({
@@ -144,12 +144,20 @@ describe('PNG generator export', () => {
   it('renders the neutral set: every element black with the orange → yellow stroke, and lists it in /json/graphics', () => {
     const { db, ctx, exporter } = gen(true);
     expect(getNeutral(db)).toEqual({ enabled: true, color: '#1a1a1a', opacity: 80, strokeWidth: 1 });
-    createTemplate(db, { ...STARTER_TEMPLATES[0], width: 40, height: 20, pattern: false });
+    const pol = createTeam(db, { name: 'Poland', code: 'POL' });
+    setGradient(db, pol, 1, redBlue);
+    createTemplate(db, { ...STARTER_TEMPLATES[0], width: 40, height: 20, pattern: false, scope: 'neutral' });
+    createTemplate(db, { ...STARTER_TEMPLATES[0], fileName: 'team_bar', width: 40, height: 20, pattern: false });
+    exporter.flush();
+    // each element is made only in its own colours
+    expect(listOutputs(db).map((o) => o.rel).sort()).toEqual(['PNG generator/NEUTRAL/NEUTRAL_bar.png', 'PNG generator/POL/POL_team_bar.png']);
+    db.prepare("DELETE FROM teams").run();
     exporter.flush();
     const file = path.join(ctx.assetsDir, 'PNG generator', 'NEUTRAL', 'NEUTRAL_bar.png');
     expect(fs.existsSync(file)).toBe(true);
     expect(listOutputs(db).map((o) => o.teamId)).toEqual(['neutral']);
     expect(jsonGraphics(db, ctx.assetsDir).map((r) => r.code)).toEqual(['NEUTRAL']);
+    expect(jsonGraphics(db, ctx.assetsDir)[0].team_bar).toBe('');
     // the job draws black inside and the gradient stroke at the corner
     const job = listOutputs(db)[0];
     expect(job.rel).toBe('PNG generator/NEUTRAL/NEUTRAL_bar.png');
@@ -162,6 +170,29 @@ describe('PNG generator export', () => {
     exporter.flush();
     expect(fs.existsSync(file)).toBe(false);
     expect(jsonGraphics(db, ctx.assetsDir)).toEqual([]);
+  });
+
+  it('makes elements named neutral neutral-only, once', () => {
+    const { db } = gen(true);
+    createTemplate(db, { ...STARTER_TEMPLATES[0] });
+    const n = createTemplate(db, { ...STARTER_TEMPLATES[0], name: 'Bar neutral', fileName: 'bar_n' });
+    splitNeutralElements(db);
+    expect(listTemplates(db).map((t) => [t.fileName, t.scope])).toEqual([['bar', 'teams'], ['bar_n', 'neutral']]);
+    updateTemplate(db, n.id, { scope: 'teams' });
+    splitNeutralElements(db);
+    expect(listTemplates(db).find((t) => t.id === n.id)?.scope).toBe('teams');
+  });
+
+  it('starts the gradient on any side: left, right, top or bottom', () => {
+    const square = (gradientFrom: ElementSpec['gradientFrom']) => renderElement(el({ width: 20, height: 20, gradientFrom }), redBlue);
+    const red = (r: { width: number; data: Uint8ClampedArray }, x: number, y: number) => px(r, x, y)[0];
+    expect(red(square('left'), 0, 10)).toBeGreaterThan(200);
+    expect(red(square('right'), 19, 10)).toBeGreaterThan(200);
+    expect(red(square('top'), 10, 0)).toBeGreaterThan(200);
+    expect(red(square('top'), 10, 19)).toBeLessThan(50);
+    expect(red(square('bottom'), 10, 19)).toBeGreaterThan(200);
+    // flip without a side still means right
+    expect(red(renderElement(el({ width: 20, height: 20, flip: true }), redBlue), 19, 10)).toBeGreaterThan(200);
   });
 
   it('skips elements whose gradient version the team has not set', () => {

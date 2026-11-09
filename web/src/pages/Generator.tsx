@@ -5,10 +5,13 @@ import { MatchboardTab } from './Matchboard';
 import { TeamProfileLink } from '../components/TeamProfileLink';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
-import { ElementSpec, Gradient, GradientStop, NEUTRAL_CODE, NEUTRAL_ID, NeutralSettings, neutralGradient, neutralSpec, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
+import { ElementSpec, Gradient, GradientStop, NEUTRAL_CODE, NEUTRAL_ID, NeutralSettings, neutralGradients, neutralSpec, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
 import { useStageTeams } from '../components/StagePicker';
 
-interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean }
+type Scope = 'teams' | 'neutral';
+interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean; scope: Scope }
+type From = NonNullable<ElementSpec['gradientFrom']>;
+const fromOf = (t: ElementSpec): From => t.gradientFrom ?? (t.flip ? 'right' : 'left');
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
 interface GenStatus { autoExport: boolean; folder: string; pending: number; files: number; lastWriteAt: string | null; error: string | null }
 interface Output { rel: string; teamId: string; templateId: string; updatedAt: string }
@@ -90,8 +93,8 @@ function Generator({ state }: { state: GenState }) {
   const neutralRef = useRef(neutral);
   neutralRef.current = neutral;
   const neutralTeam = useMemo<TeamGradients>(() => {
-    const g = neutralGradient(neutral.color, neutral.opacity);
-    return { teamId: NEUTRAL_ID, code: NEUTRAL_CODE, name: 'Neutral', gradients: { 1: g, 2: g, 3: g } };
+    const [v1, v2, v3] = neutralGradients(neutral.color, neutral.opacity);
+    return { teamId: NEUTRAL_ID, code: NEUTRAL_CODE, name: 'Neutral', gradients: { 1: v1, 2: v2, 3: v3 } };
   }, [neutral.color, neutral.opacity]);
   const isNeutral = teamId === NEUTRAL_ID;
 
@@ -132,8 +135,8 @@ function Generator({ state }: { state: GenState }) {
     <StrokeGradientCtx.Provider value={strokeGradient}>
     <div className="space-y-3">
       <ExportBar state={state} />
-      <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} preview={(t) => (
-        <ElementPreview template={t} team={team} teams={shown} neutral={isNeutral ? neutral : undefined} bg={bg} setBg={setBg}
+      <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} newScope={isNeutral ? 'neutral' : 'teams'} preview={(t) => (
+        <ElementPreview template={t} team={t.scope === 'neutral' ? neutralTeam : isNeutral ? null : team} teams={shown} neutral={t.scope === 'neutral' ? neutral : undefined} bg={bg} setBg={setBg}
           onPick={(id) => setTeamId(id)} />
       )} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
@@ -147,12 +150,12 @@ function Generator({ state }: { state: GenState }) {
           <Panel title="Preview" right={<>
             <select className="input w-auto py-1 text-xs" value={view} onChange={(e) => setView(e.target.value)} aria-label="Preview">
               <option value="team">{team ? `${team.code}: all elements` : 'All elements'}</option>
-              {templates.map((t) => <option key={t.id} value={t.id}>{t.name}: all teams</option>)}
+              {templates.filter((t) => t.scope === 'teams').map((t) => <option key={t.id} value={t.id}>{t.name}: all teams</option>)}
             </select>
             <BgToggle bg={bg} setBg={setBg} />
           </>}>
             {view === 'team'
-              ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
+              ? <TeamPreview team={team} templates={templates.filter((t) => t.scope === (isNeutral ? 'neutral' : 'teams'))} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={shown} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
@@ -276,7 +279,7 @@ function NeutralPanel({ neutral, onChange }: { neutral: NeutralSettings; onChang
         </Labeled>
       </div>
       <p className="mt-3 text-xs text-ink-400">
-        As in finals-broadcast_ssl26_v2.ai: every element filled with this colour at this opacity (#1a1a1a at 80%, so the picture shows through), with the orange → yellow stroke at full strength (the stroke gradient on the Elements tab). Elements that already have a stroke keep its width; the others get the width above.
+        As in finals-broadcast_ssl26_v2.ai: neutral elements (“For: Neutral” in the table above) are filled with this colour at this opacity (#1a1a1a at 80%, so the picture shows through), with the orange → yellow stroke at full strength. Their version works as for teams: V1 flat, V2 fading in, V3 fading in and out, from the side set in “Gradient from”. The stroke uses the stroke gradient below; elements that already have a stroke keep its width, the others get the width above.
         Files go to <span className="font-mono">PNG generator/{NEUTRAL_CODE}/{NEUTRAL_CODE}_&lt;element&gt;.png</span> and appear in /json/graphics as the {NEUTRAL_CODE} row.
       </p>
     </Panel>
@@ -464,19 +467,67 @@ function HexInput({ value, onChange }: { value: string; onChange: (hex: string) 
   );
 }
 
+/**
+ * A horizontal scrollbar for another element, kept in step with it both ways. Placed above an open preview so the
+ * wide elements table can be scrolled without going down past the preview.
+ */
+function ScrollProxy({ target }: { target: React.RefObject<HTMLDivElement | null> }) {
+  const track = useRef<HTMLDivElement>(null);
+  const [m, setM] = useState({ left: 0, scroll: 1, client: 1 });
+  useEffect(() => {
+    const t = target.current;
+    if (!t) return;
+    const read = () => setM({ left: t.scrollLeft, scroll: t.scrollWidth, client: t.clientWidth });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(t);
+    if (t.firstElementChild) ro.observe(t.firstElementChild);
+    t.addEventListener('scroll', read);
+    return () => { ro.disconnect(); t.removeEventListener('scroll', read); };
+  }, [target]);
+  const max = Math.max(1, m.scroll - m.client);
+  const thumb = Math.max(8, (m.client / m.scroll) * 100); // % of the track
+  const pos = (m.left / max) * (100 - thumb);
+  const go = (clientX: number, grab: number) => {
+    const tr = track.current?.getBoundingClientRect(), t = target.current;
+    if (!tr || !t) return;
+    const f = (clientX - tr.left - grab) / (tr.width * (1 - thumb / 100));
+    t.scrollLeft = Math.max(0, Math.min(1, f)) * max;
+  };
+  const onDown = (e: RPointerEvent<HTMLDivElement>) => {
+    const tr = track.current!.getBoundingClientRect();
+    const thumbLeft = tr.left + (pos / 100) * tr.width, thumbW = (thumb / 100) * tr.width;
+    const grab = e.clientX >= thumbLeft && e.clientX <= thumbLeft + thumbW ? e.clientX - thumbLeft : thumbW / 2;
+    go(e.clientX, grab);
+    const move = (ev: PointerEvent) => go(ev.clientX, grab);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    e.preventDefault();
+  };
+  return (
+    <div ref={track} onPointerDown={onDown} role="scrollbar" aria-orientation="horizontal" aria-valuenow={Math.round((m.left / max) * 100)}
+      aria-label="Scroll the elements table" title="Scroll the elements table"
+      className="relative mb-2 h-2.5 cursor-pointer select-none rounded-full bg-ink-950/70 ring-1 ring-ink-800">
+      <div className="absolute inset-y-0 rounded-full bg-ink-600 hover:bg-ink-500" style={{ left: `${pos}%`, width: `${thumb}%` }} />
+    </div>
+  );
+}
+
 // ---------- previews ----------
 /** The expanded row of the elements table: the element for the selected team, large, then for every team. */
 function ElementPreview({ template: t, team, teams, neutral, bg, setBg, onPick }: {
   template: Template; team: TeamGradients | null; teams: TeamGradients[]; neutral?: NeutralSettings; bg: Bg; setBg: (b: Bg) => void; onPick: (teamId: string) => void;
 }) {
   const g = team?.gradients[t.variant] ?? null;
+  const teamsOnly = t.scope !== 'neutral';
   return (
     <div className="space-y-3 pt-1">
       <div className="flex flex-wrap items-start gap-4">
         <figure className="min-w-0">
           <div className={cx('grid min-h-[60px] place-items-center rounded p-3 ring-1 ring-ink-700', bgClass(bg))}>
             {g ? <Canvas spec={neutral ? neutralSpec(specOf(t), neutral) : specOf(t)} gradient={g} maxW={960} maxH={340} />
-              : <span className="px-3 py-2 text-xs text-ink-500">{team ? `${team.code}: V${t.variant} not set` : 'No team selected'}</span>}
+              : <span className="px-3 py-2 text-xs text-ink-500">{team ? `${team.code}: V${t.variant} not set` : 'Pick a team on the left to see it large'}</span>}
           </div>
           <figcaption className="mt-1 flex items-center gap-2 text-xs">
             <span className="font-mono font-bold text-ink-200">{team?.code}</span>
@@ -486,7 +537,8 @@ function ElementPreview({ template: t, team, teams, neutral, bg, setBg, onPick }
         </figure>
         <div className="ml-auto"><BgToggle bg={bg} setBg={setBg} /></div>
       </div>
-      <TemplateAcrossTeams template={t} teams={teams} bg={bg} onPick={onPick} />
+      {teamsOnly ? <TemplateAcrossTeams template={t} teams={teams} bg={bg} onPick={onPick} />
+        : <p className="text-xs text-ink-500">A neutral element: made only in the neutral colours, never for the teams.</p>}
     </div>
   );
 }
@@ -509,7 +561,7 @@ const specOf = (t: Template): ElementSpec => t;
 
 function TeamPreview({ team, templates, bg, variant, neutral }: { team: TeamGradients | null; templates: Template[]; bg: Bg; variant: number; neutral?: NeutralSettings }) {
   if (!team) return null;
-  if (!templates.length) return <p className="text-sm text-ink-400">Add an element below.</p>;
+  if (!templates.length) return <p className="text-sm text-ink-400">{neutral ? 'No neutral elements yet: set “For” to Neutral in the elements table, or add one with NEUTRAL selected.' : 'No team elements yet: add one in the elements table.'}</p>;
   return (
     <div className="flex flex-wrap items-end gap-4">
       {templates.map((t) => {
@@ -553,7 +605,7 @@ function TemplateAcrossTeams({ template, teams, bg, onPick }: { template: Templa
 }
 
 // ---------- elements ----------
-function ElementsPanel({ templates, patch, onReload, preview }: { templates: Template[]; patch: (id: string, p: Partial<Template>) => void; onReload: () => void; preview: (t: Template) => ReactNode }) {
+function ElementsPanel({ templates, patch, onReload, preview, newScope }: { templates: Template[]; patch: (id: string, p: Partial<Template>) => void; onReload: () => void; preview: (t: Template) => ReactNode; newScope: Scope }) {
   const toast = useToast();
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -561,11 +613,13 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
   // the preview row spans the whole (scrollable) table; keep its content as wide as the visible part
   const scroller = useRef<HTMLDivElement>(null);
   const [viewW, setViewW] = useState(0);
+  const [overflows, setOverflows] = useState(false);
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setViewW(el.clientWidth));
+    const ro = new ResizeObserver(() => { setViewW(el.clientWidth); setOverflows(el.scrollWidth > el.clientWidth + 1); });
     ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
     return () => ro.disconnect();
   }, []);
   const { ask, dialog } = useConfirm();
@@ -575,7 +629,7 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
     let n = templates.length + 1;
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
-      name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0,
+      scope: newScope, name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0,
       strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
@@ -586,16 +640,16 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
   return (
     <Panel title="PNG elements" right={<>
       <Button size="sm" variant="ghost" onClick={() => setOpen(allOpen ? new Set() : new Set(templates.map((t) => t.id)))}>{allOpen ? 'Collapse all' : 'Expand all'}</Button>
-      <Button size="sm" onClick={add}>+ Element</Button>
+      <Button size="sm" onClick={add} title={newScope === 'neutral' ? 'New neutral element (NEUTRAL is selected)' : 'New team element'}>+ {newScope === 'neutral' ? 'Neutral element' : 'Element'}</Button>
     </>}>
       {dialog}
-      <div ref={scroller} className="overflow-x-auto">
+      <div ref={scroller} className={cx('overflow-x-auto', open.size > 0 && overflows && '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden')}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-800">
-              <th className={th} /><th className={th}>On</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
+              <th className={th} /><th className={th}>On</th><th className={th}>For</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
               <th className={th}>W</th><th className={th}>H</th><th className={th}>Corners</th><th className={th}>Opacity %</th>
-              <th className={th}>Flip</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th><th className={th}>Gradient</th><th className={th}>Stroke ∠</th>
+              <th className={th}>Gradient from</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th><th className={th}>Gradient</th><th className={th}>Stroke ∠</th>
               <th className={th}>Waves</th><th className={th}>Waves %</th><th className={th}>Waves size %</th><th className={th} />
             </tr>
           </thead>
@@ -608,6 +662,12 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
                     className={cx('grid h-7 w-7 place-items-center rounded text-ink-400 transition-transform hover:bg-ink-800 hover:text-ink-100', open.has(t.id) && 'rotate-90 text-accent-300')}>▸</button>
                 </td>
                 <td className="px-1.5"><input type="checkbox" checked={t.enabled} onChange={(e) => patch(t.id, { enabled: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Enabled" /></td>
+                <td className="px-1.5">
+                  <select className={cx('input w-auto px-1.5 py-1', t.scope === 'neutral' && 'text-amber-300')} value={t.scope} onChange={(e) => patch(t.id, { scope: e.target.value as Scope })} aria-label="Made for" title="Teams: one PNG per team in its colours. Neutral: one PNG in the neutral colours only.">
+                    <option value="teams">Teams</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                </td>
                 <td className="px-1.5"><TextInput className="w-28" value={t.name} label="Name" onChange={(name) => name.trim() && patch(t.id, { name })} /></td>
                 <td className="px-1.5"><TextInput className="w-28 font-mono" value={t.fileName} label="File name" onChange={(fileName) => /^[\w.-]+$/.test(fileName) && patch(t.id, { fileName })} /></td>
                 <td className="px-1.5">
@@ -638,7 +698,14 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
                   </div>
                 </td>
                 <td className="px-1.5">{num(t, 'opacity', 'w-16', 0, 100)}</td>
-                <td className="px-1.5"><input type="checkbox" checked={t.flip} onChange={(e) => patch(t.id, { flip: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Flip" /></td>
+                <td className="px-1.5">
+                  <select className="input w-auto px-1.5 py-1" value={fromOf(t)} onChange={(e) => { const v = e.target.value as From; patch(t.id, { gradientFrom: v, flip: v === 'right' }); }} aria-label="Gradient from" title="Where the gradient (and its fade) starts">
+                    <option value="left">→ Left</option>
+                    <option value="right">← Right</option>
+                    <option value="top">↓ Top</option>
+                    <option value="bottom">↑ Bottom</option>
+                  </select>
+                </td>
                 <td className="px-1.5">{num(t, 'angleOffset', 'w-16', -360, 360)}</td>
                 <td className="px-1.5">{num(t, 'strokeWidth', 'w-16', 0, 200)}</td>
                 <td className="px-1.5">
@@ -661,7 +728,10 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
                 </td>
               </tr>
               {open.has(t.id) && (
-                <tr className="border-b border-ink-850 bg-ink-900/60"><td colSpan={19} className="pb-3"><div className="sticky left-0 px-3" style={viewW ? { width: viewW } : undefined}>{preview(t)}</div></td></tr>
+                <tr className="border-b border-ink-850 bg-ink-900/60"><td colSpan={20} className="pb-3"><div className="sticky left-0 px-3" style={viewW ? { width: viewW } : undefined}>
+                  {overflows && <ScrollProxy target={scroller} />}
+                  {preview(t)}
+                </div></td></tr>
               )}
               </Fragment>
             ))}

@@ -21,6 +21,14 @@ describe('general graphics and captains', () => {
     const ev = activeEvent(db).id;
     gen.setWeather(db, { wind_speed: '12', wind_direction: 'NW' });
     expect(gen.getWeather(db)).toMatchObject({ wind_speed: '12', wind_direction: 'NW', wind_unit: 'kn' });
+    gen.setWeather(db, { wind_degrees: '050', forecast: 'Sunny', location: 'gone', note: 'gone' });
+    const w = gen.getWeather(db) as unknown as Record<string, string>;
+    expect(w).toMatchObject({ wind_degrees: '050', forecast: 'Sunny' });
+    expect(w.location).toBeUndefined();
+    expect(w.note).toBeUndefined();
+    // a value saved as conditions before the rename shows as the forecast
+    db.prepare("UPDATE settings SET value = ? WHERE key = 'weather'").run(JSON.stringify({ conditions: 'Rain' }));
+    expect(gen.getWeather(db).forecast).toBe('Rain');
     gen.createScheduleItem(db, ev, { date: '2026-11-19', time: '14:00', race: 'Race 2' });
     gen.createScheduleItem(db, ev, { date: '2026-11-19', time: '13:00', race: 'Race 1' });
     expect(gen.listSchedule(db, ev, '2026-11-19').map((r) => r.race)).toEqual(['Race 1', 'Race 2']);

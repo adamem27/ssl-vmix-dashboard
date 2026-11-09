@@ -69,16 +69,18 @@ function WeatherPanel() {
   const select = (k: string, label: string, opts: string[]) => field(label, <SelectCell value={d[k]} options={opts} onSave={(v) => save(k, v)} label={label} className="text-ink-50" />);
   return (
     <Panel title="Weather">
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-9">
-        {text('location', 'Location')}
-        {select('conditions', 'Conditions', CONDITIONS)}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-7">
+        {select('forecast', 'Forecast', CONDITIONS)}
         {text('air_temp', 'Air °C', '24')}
         {text('water_temp', 'Water °C', '21')}
         {text('wind_speed', 'Wind', '12')}
-        {text('wind_gust', 'Gusts', '16')}
-        {select('wind_direction', 'Direction', DIRECTIONS)}
+        {field('Direction', (
+          <div className="flex items-center gap-1">
+            <div className="min-w-0 flex-1"><SelectCell value={d.wind_direction} options={DIRECTIONS} onSave={(v) => save('wind_direction', v)} label="Direction" className="text-ink-50" /></div>
+            <div className="w-16 shrink-0" title="Direction in degrees, e.g. 050"><Cell value={d.wind_degrees} onSave={(v) => save('wind_degrees', v)} label="Direction in degrees" placeholder="050°" className="font-mono text-ink-50" /></div>
+          </div>
+        ))}
         {select('wind_unit', 'Unit', WIND_UNITS)}
-        {text('note', 'Note')}
       </div>
     </Panel>
   );

@@ -17,7 +17,7 @@ interface Stop { pos: number; color: string; opacity: number }
 interface Gradient { angle: number; stops: Stop[] }
 interface LineupPlace { label: string; number: string; firstName: string; lastName: string; position: string; captain: boolean; sailorId: string | null }
 interface Standing { fleetId: string; fleetName: string; title: string; subtitle: string; races: number; rows: { teamId: string; races: string[]; total: string }[] }
-interface Weather { location: string; conditions: string; air_temp: string; water_temp: string; wind_speed: string; wind_gust: string; wind_direction: string; wind_unit: string; note: string }
+interface Weather { forecast: string; air_temp: string; water_temp: string; wind_speed: string; wind_direction: string; wind_degrees: string; wind_unit: string }
 interface CommentatorData {
   event: { name: string; timezone: string }; stage: { id: string; name: string } | null; date: string;
   weather: Weather; schedule: { id: string; time: string; race: string; fleet: string; status: string; note: string }[];
@@ -127,18 +127,18 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
   const w = x?.weather;
   const unit = w?.wind_unit || 'kn';
   const chips: [string, string, string][] = w ? ([
-    ['Wind', w.wind_speed ? `${w.wind_speed}${w.wind_gust ? `–${w.wind_gust}` : ''} ${unit}` : '', '💨'],
-    ['Direction', w.wind_direction, '🧭'],
+    ['Wind', w.wind_speed ? `${w.wind_speed} ${unit}` : '', '💨'],
+    ['Direction', [w.wind_direction, w.wind_degrees && `${w.wind_degrees}°`].filter(Boolean).join(' '), '🧭'],
     ['Air', w.air_temp ? `${w.air_temp}°C` : '', '🌡'],
     ['Water', w.water_temp ? `${w.water_temp}°C` : '', '🌊'],
-    ['Sky', w.conditions, '⛅'],
+    ['Forecast', w.forecast, '⛅'],
   ] as [string, string, string][]).filter(([, v]) => v) : [];
   return (
     <header className="card flex items-center gap-x-5 px-3 py-1.5">
       <div className="min-w-0">
         <div className="truncate text-base font-black uppercase leading-tight tracking-wide text-ink-50">{x?.event.name || 'Event'}</div>
         <div className="flex items-center gap-2 text-xs text-ink-400">
-          <span>{x ? fmtDate(x.date) : ''}{w?.location ? ` · ${w.location}` : ''}</span>
+          <span>{x ? fmtDate(x.date) : ''}</span>
           <select className="input w-auto py-0.5 text-xs" value={activeSet} onChange={(e) => onSet(e.target.value)} aria-label="Stage">
             {sets.map((s) => <option key={s.id} value={s.id}>{s.name}{x?.stage?.id === s.id ? ' (current)' : ''}</option>)}
           </select>
@@ -151,7 +151,6 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
             <span className="mr-1 text-xs">{icon}</span><b className="text-ink-100">{value}</b>
           </li>
         ))}
-        {w?.note && <li className="min-w-0 truncate rounded-md border border-amber-900/60 bg-amber-950/30 px-2 py-1 text-xs text-amber-200" title={w.note}>{w.note}</li>}
       </ul>
     </header>
   );
