@@ -4,7 +4,7 @@ import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; breakFleets: string[]; breakLayer: number; rotateSeconds: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLayer: number; rotateSeconds: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
 }
 interface KeyLook { action: string; text: string; kind: string; bg: string; onAir: boolean; active: boolean; empty: boolean }
@@ -126,6 +126,9 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-2">
           {sel('Group racing now (BOAT 1–4 in its order)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets)}
+          <label className="block text-xs text-ink-400">Race on the RACE RESULTS key (times at marks on the Results tab)
+            <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
+          </label>
           <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>BOAT {i + 1} · {b.code}</span>)}</div>
           <label className="block text-xs text-ink-400">Lineup LT (5 sailors): places in order
             <input className="input mt-1 w-72 py-1 text-sm" value={c.lineup5.join(', ')} onChange={(e) => setC({ ...c, lineup5: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />

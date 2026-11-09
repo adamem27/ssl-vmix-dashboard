@@ -11,6 +11,7 @@ import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, LowerThirds, LtSailor } from './lowerthirds.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
+import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
 import { findInput, parseVmixXml, pushResults, VmixInput, vmixUrl } from './vmixResults.js';
 
@@ -60,6 +61,8 @@ export const showConfigSchema = z.object({
   inputs: z.record(z.string(), z.string()).default({}),
   /** the fleet (group) racing now: its teams are BOAT 1–4 in fleet order */
   fleetId: z.string().default(''),
+  /** the race of that group whose times at the marks the Race results board shows */
+  race: z.number().int().min(1).max(12).default(1),
   /** fleets shown in turn in the break scene (empty: every fleet of the race's set) */
   breakFleets: z.array(z.string()).default([]),
   breakLayer: z.number().int().min(1).max(10).default(3),
@@ -315,7 +318,11 @@ export class Show {
   /** The data of a graphic, set right before it comes in. */
   private async fill(g: Graphic, input: VmixInput) {
     const ev = activeEvent(this.ctx.db).id;
-    if (g.id === 'results' || g.id === 'raceresults') {
+    if (g.id === 'raceresults') {
+      if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
+      const rows = Math.max(0, ...input.fields.map((f) => Number(f.match(/^TEAM (\d+)\.Text$/i)?.[1] ?? 0)));
+      await this.set(input, raceRunFields(this.ctx, this.config.fleetId, this.config.race, rows));
+    } else if (g.id === 'results') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
       await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
     } else if (g.id === 'ticker') {

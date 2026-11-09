@@ -338,4 +338,18 @@ CREATE TABLE results (
 );
 `,
   },
+  {
+    version: 8,
+    name: 'race results with times at marks',
+    sql: `
+-- One race of a group: mark names and each team's times at the marks, in finish order, as JSON.
+CREATE TABLE race_runs (
+  fleet_id TEXT NOT NULL REFERENCES fleets(id) ON DELETE CASCADE,
+  race INTEGER NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (fleet_id, race)
+);
+`,
+  },
 ];
