@@ -15,7 +15,7 @@ const MAX_H = 360;
 
 interface Rgba { width: number; height: number; data: Uint8Array }
 
-function decode(buf: Buffer): Rgba {
+export function decode(buf: Buffer): Rgba {
   if (buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47) {
     const png = PNG.sync.read(buf);
     return { width: png.width, height: png.height, data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.length) };
@@ -24,7 +24,7 @@ function decode(buf: Buffer): Rgba {
     const j = jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 1024 });
     return { width: j.width, height: j.height, data: j.data };
   }
-  throw badRequest('Sponsor logos must be PNG or JPG.');
+  throw badRequest('Images must be PNG or JPG.');
 }
 
 const px = (img: Rgba, x: number, y: number) => (y * img.width + x) * 4;
