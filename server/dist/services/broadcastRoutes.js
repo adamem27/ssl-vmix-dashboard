@@ -3,6 +3,8 @@ import { activeEvent } from '../db/db.js';
 import * as gs from './graphicSets.js';
 import * as lu from './lineups.js';
 import * as rs from './results.js';
+import * as rr from './raceRuns.js';
+import { getShowConfig, setShowConfig } from './show.js';
 import * as wb from './workbookSheets.js';
 import { todayIn } from './dates.js';
 import { getWeather, listSchedule } from './general.js';
@@ -50,6 +52,20 @@ export function registerBroadcastRoutes(app, ctx) {
             rs.saveResults(db, req.params.fleetId, { vmixInput: b.input });
         return vx.pushResults(ctx, req.params.fleetId, rs.getResults(db, req.params.fleetId).vmixInput);
     });
+    const raceNo = (v) => z.coerce.number().int().min(1).max(rs.MAX_RACES).parse(v);
+    app.get('/api/races/:fleetId/:race', async (req) => rr.getRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
+    app.put('/api/races/:fleetId/:race', async (req) => {
+        const race = raceNo(req.params.race);
+        const r = rr.saveRaceRun(db, req.params.fleetId, race, z.object({
+            marks: z.array(s(16)).max(rr.MAX_MARKS),
+            rows: z.array(z.object({ teamId: s(64), times: z.array(s(12)).max(rr.MAX_MARKS).optional(), points: s(12).optional() })).max(32),
+        }).partial().parse(req.body));
+        // typing a race of the group on air makes it the race the Race results key shows
+        if (getShowConfig(db).fleetId === req.params.fleetId)
+            setShowConfig(db, { race });
+        return r;
+    });
+    app.delete('/api/races/:fleetId/:race', async (req) => rr.clearRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
     app.get('/api/settings/vmix', async () => ({ apiUrl: vx.vmixUrl(db), default: vx.DEFAULT_VMIX_URL }));
     app.put('/api/settings/vmix', async (req) => vx.setVmixUrl(db, z.object({ apiUrl: s(200) }).parse(req.body).apiUrl));
     // ---------- current stage (decides which teams and groups go to the workbook) ----------

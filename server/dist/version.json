@@ -1,8 +1,14 @@
 {
-  "version": "1.0.98",
-  "commit": "f3bb699",
-  "date": "2026-11-09T22:51:03Z",
+  "version": "1.0.99",
+  "commit": "95ed05a",
+  "date": "2026-11-09T23:00:56Z",
   "changes": [
+    {
+      "version": "1.0.99",
+      "commit": "95ed05a",
+      "date": "2026-11-09T23:00:56Z",
+      "text": "Race results with times at marks: one race per group typed on the Results tab, sorted by finish, gap to the winner, points into the overall table, filled into the race results title by the RACE RESULTS key"
+    },
     {
       "version": "1.0.98",
       "commit": "f3bb699",
@@ -476,12 +482,6 @@
       "commit": "6b15c68",
       "date": "2026-10-18T00:07:46Z",
       "text": "Add start scripts that update, build and start"
-    },
-    {
-      "version": "1.0.3",
-      "commit": "fec54d7",
-      "date": "2026-10-18T00:03:52Z",
-      "text": "English UI, live overview table and SSL Gold Cup 2026 matchboard"
     }
   ]
 }
