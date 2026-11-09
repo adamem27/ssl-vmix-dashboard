@@ -165,8 +165,22 @@ function CompanionHelp({ config, pages }: { config: Config; pages: number }) {
   return (
     <Panel title="Setting up Companion">
       <ol className="list-decimal space-y-2 pl-5 text-sm text-ink-300">
-        <li>In Companion add the connection <b>Generic HTTP</b> (no address needed).</li>
-        <li>On page {config.companionPage}, make one key with the action <b>GET</b> and this URL, then copy that key onto every key of {pages > 1 ? `pages ${config.companionPage}–${config.companionPage + pages - 1}` : 'the page'} (Companion fills in each key's own page, row and column):{url(keyUrl)}</li>
+        <li>
+          Download the Companion file for each page and import it in Companion (<b>Import / Export → Import</b>, pick the file, choose the page to put it on).
+          Each file brings a <b>Generic HTTP</b> connection and every key with its action; on the second file, map that connection to the one you already have.
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Array.from({ length: pages }, (_, i) => (
+              <a key={i} className="rounded bg-ink-800 px-3 py-1.5 text-xs font-semibold text-ink-100 hover:bg-ink-700" href={`/api/lt/companion/${i + 1}?base=${encodeURIComponent(origin)}`} download>
+                Page {config.companionPage + i} (.companionconfig)
+              </a>
+            ))}
+          </div>
+          <details className="mt-2 text-ink-400">
+            <summary className="cursor-pointer">Or set the keys up by hand</summary>
+            <p className="mt-1">Add the connection Generic HTTP, make one key with the action <b>GET</b> and this URL, then copy it onto every key of {pages > 1 ? `pages ${config.companionPage}–${config.companionPage + pages - 1}` : 'the page'} (Companion fills in each key's own page, row and column):</p>
+            {url(keyUrl)}
+          </details>
+        </li>
         <li>In Companion Settings → Protocols turn on <b>HTTP remote control</b>, and type Companion's address above. The dashboard then writes each key's text and colour itself: country codes, places with today's names, the selected country in orange and what is on air in red.</li>
         <li>In vMix add the two lower third GTZIPs as inputs (names as above) and turn on Settings → Web Controller.</li>
       </ol>

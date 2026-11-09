@@ -4,7 +4,7 @@ import { saveLineup } from '../src/services/lineups.js';
 import { activeEvent } from '../src/db/db.js';
 import { updateSailor } from '../src/services/sailors.js';
 import { updateTeam } from '../src/services/teams.js';
-import { LowerThirds, setLtConfig } from '../src/services/lowerthirds.js';
+import { companionPageExport, getLtConfig, LowerThirds, setLtConfig } from '../src/services/lowerthirds.js';
 
 const fields = ['Bar.Source', 'PHOTO.Source', 'Bottom text.Text', 'Top text.Text', 'Flag.Source', 'Emblem.Source'];
 const input = (n: number, title: string, f: string[]) =>
@@ -90,6 +90,21 @@ describe('lower thirds', () => {
     await lt.press(1, 0, 1);
     expect(lt.state.teamId).toBeTruthy();
     expect(lt.layout()[0][1].active).toBe(true);
+  });
+
+  it('builds a Companion page file whose keys call their own actions', () => {
+    const s = setup();
+    seedTeam(s.db, 'BRA', []);
+    setLtConfig(s.db, { rows: 4, cols: 8, companionPage: 3 });
+    const lt = new LowerThirds(s.ctx, fakeVmix().fetcher);
+    const f: any = companionPageExport(lt.layout()[0], 'http://10.0.0.5:4000/', getLtConfig(s.db), 0);
+    expect(f).toMatchObject({ version: 4, type: 'page', oldPageNumber: 3, page: { gridSize: { maxColumn: 7, maxRow: 3 } } });
+    expect(f.instances.ssl_dashboard_lt.instance_type).toBe('generic-http');
+    const url = (r: number, c: number) => f.page.controls[r][c].steps[0].action_sets.down[0].options.url;
+    expect(url(0, 0)).toBe('http://10.0.0.5:4000/api/lt/pick?team=BRA');
+    expect(url(1, 0)).toMatch(/\/api\/lt\/sailor\?place=/);
+    expect(url(3, 2)).toBe('http://10.0.0.5:4000/api/lt/out');
+    expect(f.page.controls[0][0].style.text).toBe('BRA');
   });
 
   it('sends the key labels to Companion, only the ones that changed', async () => {
