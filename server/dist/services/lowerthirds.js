@@ -326,7 +326,7 @@ export class LowerThirds {
         let n = 0;
         try {
             for (const k of this.layout().flat()) {
-                const bg = k.onAir ? '#b91c1c' : k.active ? '#d97706' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
+                const bg = keyColour(k);
                 const q = `text=${encodeURIComponent(k.text)}&bgcolor=${encodeURIComponent(bg)}&color=${encodeURIComponent('#ffffff')}&size=auto`;
                 const id = `${k.page}/${k.row}/${k.col}`;
                 if (this.labels.get(id) === q)
@@ -347,4 +347,54 @@ export class LowerThirds {
     start(ms = 15000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }
     stop() { if (this.timer)
         clearInterval(this.timer); }
+}
+export const keyColour = (k) => k.onAir ? '#b91c1c' : k.active ? '#d97706' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
+/** The dashboard URL a key calls; it names the action itself, so the key keeps working wherever it sits in Companion. */
+export function keyUrl(base, action) {
+    const [kind, arg] = action.split(':');
+    const b = base.replace(/\/+$/, '');
+    if (kind === 'team')
+        return `${b}/api/lt/pick?team=${encodeURIComponent(arg)}`;
+    if (kind === 'place')
+        return `${b}/api/lt/sailor?place=${encodeURIComponent(arg)}`;
+    if (kind === 'showteam')
+        return `${b}/api/lt/showteam`;
+    return `${b}/api/lt/${kind}`;
+}
+/**
+ * One Companion page export (.companionconfig, export format 4 from Companion 3.2, which every later
+ * Companion upgrades on import): a Generic HTTP connection and every key of that page with its GET.
+ */
+export function companionPageExport(keys, base, cfg, pageIndex) {
+    const conn = 'ssl_dashboard_lt';
+    const controls = {};
+    keys.forEach((k, i) => {
+        (controls[k.row] ??= {})[k.col] = {
+            type: 'button',
+            style: {
+                text: k.text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center',
+                color: 0xffffff, bgcolor: parseInt(keyColour({ ...k, active: false, onAir: false }).slice(1), 16), show_topbar: 'default',
+            },
+            options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
+            feedbacks: [],
+            steps: {
+                0: {
+                    action_sets: { down: [{ id: `lt${pageIndex}_${i}`, action: 'get', instance: conn, options: { url: keyUrl(base, k.action), header: '' }, delay: 0 }], up: [] },
+                    options: { runWhileHeld: [] },
+                },
+            },
+        };
+    });
+    return {
+        version: 4,
+        type: 'page',
+        page: { name: `Lower thirds ${pageIndex + 1}`, controls, gridSize: { minColumn: 0, maxColumn: cfg.cols - 1, minRow: 0, maxRow: cfg.rows - 1 } },
+        instances: {
+            [conn]: {
+                instance_type: 'generic-http', label: 'ssl_dashboard_lt', enabled: true, isFirstInit: false, lastUpgradeIndex: -1, sortOrder: 0,
+                config: { prefix: '', proxyAddress: '', rejectUnauthorized: true },
+            },
+        },
+        oldPageNumber: cfg.companionPage + pageIndex,
+    };
 }
