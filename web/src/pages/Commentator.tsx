@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
@@ -70,42 +70,44 @@ export function CommentatorPage() {
   const hasScores = !!standing?.rows.some((r) => r.total !== '');
   const pickFleetByName = (name: string) => { const f = fleets.find((ff) => norm(ff.name) === norm(name) || norm(name).endsWith(norm(ff.name))); if (f) setFleetId(f.id); };
 
+  const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
+  // Sized for a 1920×1080 screen with the browser bars: everything fits the window; a long crew list scrolls inside its card.
   return (
-    <div className="mx-auto max-w-[1900px] space-y-3 px-4 py-3 lg:px-6">
+    <div className="mx-auto flex h-[calc(100vh-53px)] max-w-[1920px] flex-col gap-2 px-3 py-2">
       <TopStrip x={x} tz={tz} sets={sets.data ?? []} activeSet={activeSet} onSet={(id) => { setSetId(id); setFleetId(''); }} />
-      {x && x.schedule.length > 0 && <ScheduleStrip items={x.schedule} current={fleet?.name ?? ''} onPick={pickFleetByName} />}
-
-      <nav className="flex flex-wrap gap-1.5" aria-label="Groups">
-        {fleets.map((f, i) => (
-          <button key={f.id} onClick={() => setFleetId(f.id)} title={`Key ${i + 1}`}
-            className={cx('flex items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors', f.id === fleet?.id ? 'border-accent-500 bg-accent-500/15' : 'border-ink-800 bg-ink-900 hover:border-ink-600')}>
-            <span className={cx('text-sm font-black tracking-wide', f.id === fleet?.id ? 'text-accent-200' : 'text-ink-200')}>{f.name}</span>
-            <span className="flex -space-x-1">
-              {f.positions.map((tid, j) => { const t = tid ? teamById.get(tid) : undefined; const fl = t && flagOf(t); return fl ? <img key={j} src={fl} alt={t!.code} title={t!.code} className="h-3.5 w-5 rounded-[2px] object-cover ring-1 ring-ink-950" /> : null; })}
-            </span>
-            <span className="text-[10px] tabular-nums text-ink-500">{i + 1}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="flex min-w-0 items-center gap-2">
+        <nav className="flex shrink-0 gap-1" aria-label="Groups">
+          {fleets.map((f, i) => (
+            <button key={f.id} onClick={() => setFleetId(f.id)} title={`Key ${i + 1}`}
+              className={cx('flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors', f.id === fleet?.id ? 'border-accent-500 bg-accent-500/15' : 'border-ink-800 bg-ink-900 hover:border-ink-600')}>
+              <span className={cx('text-sm font-black tracking-wide', f.id === fleet?.id ? 'text-accent-200' : 'text-ink-200')}>{f.name}</span>
+              <span className="flex -space-x-1">
+                {f.positions.map((tid, j) => { const t = tid ? teamById.get(tid) : undefined; const fl = t && flagOf(t); return fl ? <img key={j} src={fl} alt={t!.code} title={t!.code} className="h-3 w-[18px] rounded-[2px] object-cover ring-1 ring-ink-950" /> : null; })}
+              </span>
+            </button>
+          ))}
+        </nav>
+        {x && x.schedule.length > 0 && <ScheduleStrip items={x.schedule} current={fleet?.name ?? ''} onPick={pickFleetByName} />}
+      </div>
 
       {sets.isLoading || detail.isLoading || data.isLoading ? <Loading /> : sets.error || detail.error || data.error ? <ErrorBox error={sets.error ?? detail.error ?? data.error} /> : !fleet ? (
         <Empty title="No groups in this stage" />
       ) : (
-        <div className="space-y-3">
-          {/* the four teams side by side; the standing and talking points sit above them */}
-          <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)]">
-            <StandingCard standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={fleet.name} />
-            <FactsCard teams={fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t)} />
+        <>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+            <StandingLine standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={fleet.name} />
+            <FactsLine teams={groupTeams} />
           </div>
-          <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
             {fleet.positions.map((tid, i) => {
               const team = tid ? teamById.get(tid) : undefined;
+              const st = standing?.rows.find((r) => r.teamId === tid);
               return team
-                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} rank={hasScores ? rankOf.get(team.id) : undefined} onHover={setHover} />
+                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} rank={hasScores ? rankOf.get(team.id) : undefined} races={hasScores ? st?.races.filter((v) => v !== '') : undefined} onHover={setHover} />
                 : <EmptyCard key={i} place={i + 1} label={fleet.placeholders?.[i] ?? null} />;
             })}
           </div>
-        </div>
+        </>
       )}
       {hover && <SailorPopup h={hover} />}
     </div>
@@ -118,7 +120,7 @@ function Clock({ tz }: { tz: string }) {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   let s = '';
   try { s = now.toLocaleTimeString('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit' }); } catch { s = now.toLocaleTimeString('en-GB'); }
-  return <span className="font-mono text-3xl font-black tabular-nums text-ink-50">{s}</span>;
+  return <span className="font-mono text-2xl font-black tabular-nums text-ink-50">{s}</span>;
 }
 
 function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: string; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void }) {
@@ -132,9 +134,9 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
     ['Sky', w.conditions, '⛅'],
   ] as [string, string, string][]).filter(([, v]) => v) : [];
   return (
-    <header className="card flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+    <header className="card flex items-center gap-x-5 px-3 py-1.5">
       <div className="min-w-0">
-        <div className="truncate text-lg font-black uppercase tracking-wide text-ink-50">{x?.event.name || 'Event'}</div>
+        <div className="truncate text-base font-black uppercase leading-tight tracking-wide text-ink-50">{x?.event.name || 'Event'}</div>
         <div className="flex items-center gap-2 text-xs text-ink-400">
           <span>{x ? fmtDate(x.date) : ''}{w?.location ? ` · ${w.location}` : ''}</span>
           <select className="input w-auto py-0.5 text-xs" value={activeSet} onChange={(e) => onSet(e.target.value)} aria-label="Stage">
@@ -143,14 +145,13 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
         </div>
       </div>
       <Clock tz={tz} />
-      <ul className="ml-auto flex flex-wrap gap-2" aria-label="Weather">
+      <ul className="ml-auto flex min-w-0 items-center gap-1.5" aria-label="Weather">
         {chips.map(([label, value, icon]) => (
-          <li key={label} className="rounded-lg border border-ink-800 bg-ink-950/50 px-3 py-1.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">{icon} {label}</div>
-            <div className="text-sm font-bold text-ink-100">{value}</div>
+          <li key={label} className="shrink-0 rounded-md border border-ink-800 bg-ink-950/50 px-2 py-1 text-sm" title={label}>
+            <span className="mr-1 text-xs">{icon}</span><b className="text-ink-100">{value}</b>
           </li>
         ))}
-        {w?.note && <li className="max-w-xs rounded-lg border border-amber-900/60 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200">{w.note}</li>}
+        {w?.note && <li className="min-w-0 truncate rounded-md border border-amber-900/60 bg-amber-950/30 px-2 py-1 text-xs text-amber-200" title={w.note}>{w.note}</li>}
       </ul>
     </header>
   );
@@ -159,21 +160,19 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
 // ---------- today's races ----------
 function ScheduleStrip({ items, current, onPick }: { items: CommentatorData['schedule']; current: string; onPick: (fleet: string) => void }) {
   return (
-    <ol className="flex gap-2 overflow-x-auto pb-1" aria-label="Today's races">
+    <ol className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto" aria-label="Today's races">
       {items.map((it) => {
         const tone = statusTone(it.status);
         const mine = !!current && norm(it.fleet).endsWith(norm(current));
         return (
           <li key={it.id} className="shrink-0">
             <button onClick={() => it.fleet && onPick(it.fleet)} title={it.note || undefined}
-              className={cx('flex min-w-[150px] flex-col rounded-lg border px-3 py-1.5 text-left',
+              className={cx('flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1 text-left text-sm',
                 tone === 'live' ? 'border-red-600 bg-red-950/50' : tone === 'next' ? 'border-sky-600 bg-sky-950/40' : tone === 'done' ? 'border-ink-800 bg-ink-950/30 opacity-60' : 'border-ink-800 bg-ink-900',
                 mine && 'ring-2 ring-accent-500/60')}>
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-sm font-bold tabular-nums text-ink-100">{it.time || '—'}</span>
-                {it.status && <span className={cx('rounded px-1.5 text-[10px] font-bold uppercase', tone === 'live' ? 'animate-pulse bg-red-600 text-white' : tone === 'next' ? 'bg-sky-600 text-white' : 'bg-ink-800 text-ink-300')}>{it.status}</span>}
-              </span>
-              <span className="text-sm font-semibold text-ink-50">{it.race}</span>
+              <span className="font-mono font-bold tabular-nums text-ink-100">{it.time || '—'}</span>
+              {it.status && <span className={cx('rounded px-1 text-[10px] font-bold uppercase', tone === 'live' ? 'animate-pulse bg-red-600 text-white' : tone === 'next' ? 'bg-sky-600 text-white' : 'bg-ink-800 text-ink-300')}>{it.status}</span>}
+              <span className="font-semibold text-ink-50">{it.race}</span>
               {it.fleet && <span className="text-xs text-ink-400">{it.fleet}</span>}
             </button>
           </li>
@@ -183,62 +182,49 @@ function ScheduleStrip({ items, current, onPick }: { items: CommentatorData['sch
   );
 }
 
-// ---------- standing ----------
-function StandingCard({ standing, teamById, colours, hasScores, fleetName }: { standing?: Standing; teamById: Map<string, OverviewTeam>; colours: Record<string, Gradient | null>; hasScores: boolean; fleetName: string }) {
-  if (!standing) return null;
-  const racesWithScores = Array.from({ length: standing.races }, (_, i) => i).filter((i) => standing.rows.some((r) => (r.races[i] ?? '') !== ''));
+// ---------- standing and talking points, one line each ----------
+function StandingLine({ standing, teamById, colours, hasScores, fleetName }: { standing?: Standing; teamById: Map<string, OverviewTeam>; colours: Record<string, Gradient | null>; hasScores: boolean; fleetName: string }) {
+  if (!standing || !hasScores) return <span className="text-xs text-ink-500">{standing?.title || fleetName}: no scores yet</span>;
+  const raced = Array.from({ length: standing.races }, (_, i) => i).filter((i) => standing.rows.some((r) => (r.races[i] ?? '') !== '')).length;
   return (
-    <section className="card overflow-hidden">
-      <header className="border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-black uppercase tracking-wide text-ink-100">{standing.title || fleetName}</h2>
-        <p className="text-xs text-ink-500">{standing.subtitle || (hasScores ? `Overall after ${racesWithScores.length} race${racesWithScores.length === 1 ? '' : 's'}` : 'No scores yet: order of the group')}</p>
-      </header>
-      <table className="w-full text-sm">
-        <tbody>
-          {standing.rows.map((r, i) => {
-            const t = teamById.get(r.teamId);
-            const fl = t && flagOf(t);
-            return (
-              <tr key={r.teamId} className={cx('border-b border-ink-800/60 last:border-0', hasScores && i === 0 && 'bg-amber-500/10')}>
-                <td className="w-8 py-1.5 pl-3 text-center font-black tabular-nums text-ink-300">{hasScores ? i + 1 : ''}</td>
-                <td className="w-1.5 p-0"><div className="h-7 w-1.5 rounded-full" style={{ background: css(colours[r.teamId], 180) ?? '#334155' }} /></td>
-                <td className="w-9 py-1.5 pl-2">{fl ? <img src={fl} alt="" className="h-4 w-6 rounded-[2px] object-cover" /> : null}</td>
-                <td className="py-1.5 font-mono font-black text-ink-50">{t?.code ?? '?'}</td>
-                {racesWithScores.map((j) => <td key={j} className="w-7 py-1.5 text-center text-xs tabular-nums text-ink-400" title={`R${j + 1}`}>{r.races[j]}</td>)}
-                <td className="w-12 py-1.5 pr-3 text-right font-black tabular-nums text-ink-50">{r.total}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </section>
+    <div className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0 text-xs font-bold uppercase text-ink-400">{standing.title || fleetName} · after {raced} race{raced === 1 ? '' : 's'}</span>
+      {standing.rows.filter((r) => r.total !== '').map((r, i) => {
+        const t = teamById.get(r.teamId);
+        const fl = t && flagOf(t);
+        return (
+          <span key={r.teamId} className={cx('flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-sm', i === 0 ? 'border-amber-700/70 bg-amber-500/10' : 'border-ink-800 bg-ink-900')}>
+            <b className="tabular-nums text-ink-300">{i + 1}</b>
+            <span className="h-3.5 w-1 rounded-full" style={{ background: css(colours[r.teamId], 180) ?? '#334155' }} />
+            {fl && <img src={fl} alt="" className="h-3 w-[18px] rounded-[2px] object-cover" />}
+            <b className="font-mono text-ink-50">{t?.code ?? '?'}</b>
+            <b className="tabular-nums text-accent-200">{r.total}</b>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
-// ---------- talking points ----------
-function FactsCard({ teams }: { teams: OverviewTeam[] }) {
+function FactsLine({ teams }: { teams: OverviewTeam[] }) {
   if (!teams.length) return null;
   const ranked = teams.filter((t) => Number(t.ranking) > 0).sort((a, b) => Number(a.ranking) - Number(b.ranking));
   const weighed = teams.filter((t) => Number(String(t.declaration?.totalWeight ?? '').replace(',', '.')) > 0)
     .map((t) => ({ t, w: Number(String(t.declaration!.totalWeight).replace(',', '.')) })).sort((a, b) => a.w - b.w);
-  const declared = teams.filter((t) => t.declaration).length;
   const facts: [string, string][] = [];
-  if (ranked.length) facts.push(['Best ranked', `${ranked[0].code} · #${ranked[0].ranking}`]);
-  if (ranked.length > 1) facts.push(['Lowest ranked', `${ranked[ranked.length - 1].code} · #${ranked[ranked.length - 1].ranking}`]);
-  if (weighed.length > 1) { facts.push(['Heaviest crew', `${weighed[weighed.length - 1].t.code} · ${weighed[weighed.length - 1].w} kg`]); facts.push(['Lightest crew', `${weighed[0].t.code} · ${weighed[0].w} kg`]); }
-  facts.push(['Crews declared today', `${declared} of ${teams.length}`]);
+  if (ranked.length) facts.push(['Best ranked', `${ranked[0].code} #${ranked[0].ranking}`]);
+  if (ranked.length > 1) facts.push(['Lowest ranked', `${ranked[ranked.length - 1].code} #${ranked[ranked.length - 1].ranking}`]);
+  if (weighed.length > 1) { facts.push(['Heaviest', `${weighed[weighed.length - 1].t.code} ${weighed[weighed.length - 1].w} kg`]); facts.push(['Lightest', `${weighed[0].t.code} ${weighed[0].w} kg`]); }
+  facts.push(['Declared today', `${teams.filter((t) => t.declaration).length}/${teams.length}`]);
   return (
-    <section className="card px-3 py-2">
-      <h2 className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-500">Talking points</h2>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        {facts.map(([k, v]) => <Fragment key={k}><dt className="text-ink-400">{k}</dt><dd className="text-right font-semibold text-ink-100">{v}</dd></Fragment>)}
-      </dl>
-    </section>
+    <ul className="ml-auto flex flex-wrap items-center gap-1.5 text-xs" aria-label="Talking points">
+      {facts.map(([k, v]) => <li key={k} className="rounded-md bg-ink-900 px-1.5 py-0.5"><span className="text-ink-500">{k} </span><b className="text-ink-100">{v}</b></li>)}
+    </ul>
   );
 }
 
 // ---------- team ----------
-function TeamCard({ team, colour, lineup, rank, onHover }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; rank?: { rank: number; total: string }; onHover: (h: Hover | null) => void }) {
+function TeamCard({ team, colour, lineup, rank, races, onHover }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; rank?: { rank: number; total: string }; races?: string[]; onHover: (h: Hover | null) => void }) {
   const flag = flagOf(team);
   const declared = !!team.declaration;
   const byId = new Map(team.sailors.map((s) => [s.id, s]));
@@ -254,38 +240,41 @@ function TeamCard({ team, colour, lineup, rank, onHover }: { team: OverviewTeam;
     ];
   const bg = css(colour);
   return (
-    <section className="card overflow-hidden">
-      <header className="relative px-3 py-2.5" style={bg ? { background: bg } : undefined}>
+    <section className="card flex min-h-0 flex-col overflow-hidden">
+      <header className="relative shrink-0 px-2.5 py-1.5" style={bg ? { background: bg } : undefined}>
         <div className="absolute inset-0 bg-gradient-to-r from-ink-950/80 via-ink-950/55 to-ink-950/20" aria-hidden />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-11 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-ink-950/60 shadow">
+          <div className="flex h-9 w-[54px] shrink-0 items-center justify-center overflow-hidden rounded bg-ink-950/60 shadow">
             {flag ? <img src={flag} alt="" className="max-h-full max-w-full object-contain" /> : null}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-2xl font-black text-white drop-shadow">{team.code}</span>
+              <span className="font-mono text-xl font-black leading-none text-white drop-shadow">{team.code}</span>
               <span className="truncate text-sm font-semibold text-white/90">{team.name}</span>
             </div>
-            {team.nickname && <div className="truncate text-xs font-bold uppercase tracking-wide text-white/80">“{team.nickname}”</div>}
-            {captain && <div className="truncate text-xs text-amber-200">★ Captain {captain.firstName} {captain.lastName}</div>}
+            <div className="truncate text-xs">
+              {team.nickname && <span className="font-bold uppercase tracking-wide text-white/80">“{team.nickname}” </span>}
+              {captain && <span className="text-amber-200">★ {captain.firstName} {captain.lastName}</span>}
+            </div>
           </div>
           {rank && (
-            <div className="shrink-0 rounded-lg bg-ink-950/70 px-2.5 py-1 text-center">
-              <div className="text-[10px] font-bold uppercase text-ink-400">Rank</div>
-              <div className="text-xl font-black leading-none tabular-nums text-white">{rank.rank}</div>
-              {rank.total && <div className="text-[10px] tabular-nums text-ink-300">{rank.total} pts</div>}
+            <div className="shrink-0 rounded-md bg-ink-950/70 px-2 py-0.5 text-center" title="Rank in the group">
+              <div className="text-lg font-black leading-tight tabular-nums text-white">{rank.rank}</div>
+              {rank.total && <div className="text-[10px] leading-tight tabular-nums text-ink-300">{rank.total} pts</div>}
             </div>
           )}
         </div>
       </header>
-      <div className="flex flex-wrap gap-1.5 border-b border-ink-800 bg-ink-900/60 px-3 py-1.5 text-[11px]">
-        {team.ranking && <Chip label="World ranking" value={`#${team.ranking}`} />}
-        {team.rankingPoints && <Chip label="Points" value={team.rankingPoints} />}
-        {team.declaration?.totalWeight && <Chip label="Crew weight" value={`${team.declaration.totalWeight} kg`} />}
-        {team.place && <Chip label={team.place.fleetName} value={`seed ${team.place.position}`} />}
+      <div className="flex shrink-0 flex-wrap gap-1 border-b border-ink-800 bg-ink-900/60 px-2 py-1 text-[11px]">
+        {team.ranking && <Chip label="Rank" value={`#${team.ranking}`} />}
+        {team.rankingPoints && <Chip label="Pts" value={team.rankingPoints} />}
+        {team.declaration?.totalWeight && <Chip label="Crew" value={`${team.declaration.totalWeight} kg`} />}
+        {team.place && <Chip label="Seed" value={String(team.place.position)} />}
+        {races?.length ? <Chip label="Races" value={races.join(' · ')} /> : null}
         <span className={cx('ml-auto rounded px-1.5 py-0.5 font-semibold uppercase', source === 'Roster' ? 'bg-ink-800 text-ink-400' : 'bg-emerald-950/70 text-emerald-300')}>{source}</span>
       </div>
-      <table className="w-full text-sm">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+      <table className="w-full text-[13px]">
         <tbody>
           {lines.map((l) => (
             <tr key={l.key} className={cx('cursor-default border-b border-ink-800/60 last:border-0 hover:bg-ink-800', l.captain && 'bg-amber-500/10')}
@@ -296,18 +285,19 @@ function TeamCard({ team, colour, lineup, rank, onHover }: { team: OverviewTeam;
                 onHover({ sailor: l.sailor, team, place: l.place, x: flip ? r.left : r.right, y: r.top, flip });
               }}
               onMouseLeave={() => onHover(null)}>
-              <td className="w-10 py-1.5 pl-3 font-mono font-bold tabular-nums text-ink-400">{l.number}</td>
-              <td className="py-1.5 font-semibold text-ink-50">
+              <td className="w-8 py-[3px] pl-2 font-mono font-bold tabular-nums text-ink-400">{l.number}</td>
+              <td className="truncate py-[3px] font-semibold text-ink-50">
                 {l.captain && <span className="mr-1 text-amber-400">★</span>}
                 {l.first} <span className="uppercase">{l.last}</span>
                 {l.sailor?.photo?.previewUrl && <span className="ml-1 text-[10px] text-ink-600" title="Photo on hover">●</span>}
               </td>
-              <td className="py-1.5 pr-3 text-right text-xs uppercase text-ink-400">{l.label && l.label.toUpperCase() !== l.position.toUpperCase() ? <><span className="text-ink-500">{l.label} · </span>{l.position}</> : l.position || l.label}</td>
+              <td className="whitespace-nowrap py-[3px] pr-2 text-right text-[11px] uppercase text-ink-400">{l.label && l.label.toUpperCase() !== l.position.toUpperCase() ? <><span className="text-ink-500">{l.label} · </span>{l.position}</> : l.position || l.label}</td>
             </tr>
           ))}
           {!lines.length && <tr><td className="px-3 py-4 text-center text-ink-600">No crew yet</td></tr>}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }
@@ -318,7 +308,7 @@ function Chip({ label, value }: { label: string; value: string }) {
 
 function EmptyCard({ place, label }: { place: number; label: string | null }) {
   return (
-    <section className="card flex min-h-[160px] flex-col items-center justify-center border-dashed text-ink-500">
+    <section className="card flex flex-col items-center justify-center border-dashed text-ink-500">
       <span className="text-xs font-bold tabular-nums">Place {place}</span>
       <span className="mt-1 font-mono text-lg font-bold text-ink-400">{label ?? 'To be decided'}</span>
     </section>
