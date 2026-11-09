@@ -98,12 +98,79 @@ function roundedRectSdf(px, py, hw, hh, r) {
     const ox = Math.max(qx, 0), oy = Math.max(qy, 0);
     return Math.sqrt(ox * ox + oy * oy) + Math.min(Math.max(qx, qy), 0) - r;
 }
-/** Signed distance to a rectangle whose corners are cut off at 45°, `c` px along each edge. */
-function cutRectSdf(px, py, hw, hh, c) {
-    const ax = Math.abs(px), ay = Math.abs(py);
-    const qx = ax - hw, qy = ay - hh;
-    const box = Math.sqrt(Math.max(qx, 0) ** 2 + Math.max(qy, 0) ** 2) + Math.min(Math.max(qx, qy), 0);
-    return c > 0 ? Math.max(box, (ax + ay - (hw + hh - c)) / Math.SQRT2) : box;
+/** The outline of a cut element: a convex polygon around the centre (y grows down), clockwise, without repeated points. */
+export function cutPolygon(hw, hh, cutX, cutY, sides = 'both') {
+    const cx = Math.max(0, Math.min(cutX, hw)), cy = Math.max(0, Math.min(cutY, hh));
+    const L = sides !== 'right' && cx > 0 && cy > 0, R = sides !== 'left' && cx > 0 && cy > 0;
+    const p = [];
+    if (L)
+        p.push([-hw, -hh + cy], [-hw + cx, -hh]);
+    else
+        p.push([-hw, -hh]);
+    if (R)
+        p.push([hw - cx, -hh], [hw, -hh + cy], [hw, hh - cy], [hw - cx, hh]);
+    else
+        p.push([hw, -hh], [hw, hh]);
+    if (L)
+        p.push([-hw + cx, hh], [-hw, hh - cy]);
+    else
+        p.push([-hw, hh]);
+    return p.filter((q, k) => { const n = p[(k + 1) % p.length]; return Math.hypot(q[0] - n[0], q[1] - n[1]) > 1e-6; });
+}
+/** The polygon moved inwards by r (each edge shifted along its normal); null if it collapses. */
+function insetPolygon(p, r) {
+    if (r <= 0)
+        return p;
+    const n = p.length;
+    const lines = p.map((a, k) => {
+        const b = p[(k + 1) % n];
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        const nx = -(b[1] - a[1]) / len, ny = (b[0] - a[0]) / len; // inward for clockwise order with y down
+        return { a: [a[0] + nx * r, a[1] + ny * r], d: [(b[0] - a[0]) / len, (b[1] - a[1]) / len] };
+    });
+    const out = [];
+    for (let k = 0; k < n; k++) {
+        const l1 = lines[(k + n - 1) % n], l2 = lines[k];
+        const den = l1.d[0] * l2.d[1] - l1.d[1] * l2.d[0];
+        if (Math.abs(den) < 1e-9) {
+            out.push(l2.a);
+            continue;
+        }
+        const t = ((l2.a[0] - l1.a[0]) * l2.d[1] - (l2.a[1] - l1.a[1]) * l2.d[0]) / den;
+        out.push([l1.a[0] + l1.d[0] * t, l1.a[1] + l1.d[1] * t]);
+    }
+    // still the same way round, and every edge still points where it did: otherwise r is too big
+    for (let k = 0; k < n; k++) {
+        const a = out[k], b = out[(k + 1) % n];
+        if ((b[0] - a[0]) * lines[k].d[0] + (b[1] - a[1]) * lines[k].d[1] < -1e-6)
+            return null;
+    }
+    return out;
+}
+/** Exact signed distance to a convex polygon (negative inside). */
+function polygonSdf(x, y, p) {
+    let best = Infinity, inside = true;
+    for (let k = 0; k < p.length; k++) {
+        const a = p[k], b = p[(k + 1) % p.length];
+        const ex = b[0] - a[0], ey = b[1] - a[1], wx = x - a[0], wy = y - a[1];
+        const ll = ex * ex + ey * ey;
+        const t = ll > 0 ? Math.max(0, Math.min(1, (wx * ex + wy * ey) / ll)) : 0;
+        const dx = wx - ex * t, dy = wy - ey * t;
+        best = Math.min(best, dx * dx + dy * dy);
+        if (ex * wy - ey * wx < 0)
+            inside = false; // left of a clockwise (y down) edge is outside
+    }
+    return inside ? -Math.sqrt(best) : Math.sqrt(best);
+}
+/** A cut outline with its vertices rounded by r (r shrinks if the shape is too narrow for it). */
+function cutShape(hw, hh, el, scale, r) {
+    const poly = cutPolygon(hw, hh, (el.cutX ?? 0) * scale, (el.cutY ?? 0) * scale, el.cutSides ?? 'both');
+    for (let rr = r; rr > 0.01; rr /= 1.25) {
+        const inner = insetPolygon(poly, rr);
+        if (inner)
+            return { poly: inner, r: rr };
+    }
+    return { poly, r: 0 };
 }
 /**
  * Draw an element. `scale` shrinks everything (sizes, radius, stroke, pattern) for quick previews;
@@ -115,7 +182,7 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
     const data = new Uint8ClampedArray(W * H * 4);
     const hw = W / 2, hh = H / 2;
     const radius = Math.max(0, Math.min(el.radius * scale, hw, hh));
-    const cut = el.corner === 'cut';
+    const cut = el.corner === 'cut' ? cutShape(hw, hh, el, scale, Math.max(0, el.radius * scale)) : null;
     const strokeW = Math.max(0, el.strokeWidth * scale);
     const [sr, sg, sb] = parseHex(el.strokeColor);
     const strokeA = clamp01(el.strokeOpacity / 100);
@@ -139,7 +206,7 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
         const cy = y + 0.5 - hh;
         for (let x = 0; x < W; x++) {
             const cx = x + 0.5 - hw;
-            const d = cut ? cutRectSdf(cx, cy, hw, hh, radius) : roundedRectSdf(cx, cy, hw, hh, radius);
+            const d = cut ? polygonSdf(cx, cy, cut.poly) - cut.r : roundedRectSdf(cx, cy, hw, hh, radius);
             const cover = clamp01(0.5 - d);
             if (cover <= 0)
                 continue;

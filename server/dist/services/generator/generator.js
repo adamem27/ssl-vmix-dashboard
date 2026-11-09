@@ -25,6 +25,9 @@ const templateFields = {
     height: z.number().int().min(1).max(4096),
     radius: z.number().min(0).max(2048),
     corner: z.enum(['round', 'cut']),
+    cutX: z.number().min(0).max(4096),
+    cutY: z.number().min(0).max(4096),
+    cutSides: z.enum(['both', 'left', 'right']),
     opacity: pct,
     flip: z.boolean(),
     angleOffset: z.number().min(-360).max(360),
@@ -39,13 +42,19 @@ const templateFields = {
     enabled: z.boolean(),
 };
 /** Stored elements from before the gradient stroke get its defaults. */
-export const templateSchema = z.object({ ...templateFields, corner: templateFields.corner.default('round'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
+export const templateSchema = z.object({ ...templateFields, corner: templateFields.corner.default('round'), cutX: templateFields.cutX.default(0), cutY: templateFields.cutY.default(0), cutSides: templateFields.cutSides.default('both'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
 export const templatePatchSchema = z.object(templateFields).partial();
 const nameKey = (s) => s.replace(/[^\w.-]+/g, '_');
 // ---------- templates ----------
 export function listTemplates(db) {
     return db.prepare('SELECT id, sort, spec FROM gen_templates ORDER BY sort, created_at').all()
-        .map((r) => ({ ...templateSchema.parse(JSON.parse(r.spec)), id: r.id, sort: r.sort }));
+        .map((r) => {
+        const raw = JSON.parse(r.spec);
+        // the first cut (v1.0.89) used the radius as a 45° cut: keep how those elements look
+        if (raw.corner === 'cut' && raw.cutX === undefined)
+            Object.assign(raw, { cutX: raw.radius, cutY: raw.radius, radius: 0 });
+        return { ...templateSchema.parse(raw), id: r.id, sort: r.sort };
+    });
 }
 function getTemplate(db, id) {
     const t = listTemplates(db).find((x) => x.id === id);
@@ -347,7 +356,7 @@ export class GeneratorExporter {
     }
 }
 // ---------- defaults ----------
-const ELEMENT_DEFAULTS = { radius: 0, corner: 'round', opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
+const ELEMENT_DEFAULTS = { radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
 /** The 1px gradient ring the panels and the waves bar have (orange→yellow since finals-broadcast_ssl26_v2). */
 const AI_STROKE = { strokeWidth: 1, strokeGradient: true };
 /** Starting elements: artboard sizes, corner radii and waves (10% black; 53.3% size on the small ones) from gradienty.ai. */

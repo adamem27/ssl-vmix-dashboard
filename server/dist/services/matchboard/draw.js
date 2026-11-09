@@ -115,7 +115,7 @@ export function drawMatchboard(ctx, input) {
             if (!img) {
                 // the element's own look (radius, waves, stroke) at the row's size
                 const k = w / spec.width;
-                img = input.toImage(renderElement({ ...spec, width: w, height: h, radius: spec.radius * k, strokeWidth: spec.strokeWidth * k, patternScale: spec.patternScale * k }, team.gradient, 1, spec.strokeGradient ? input.strokeGradient : null));
+                img = input.toImage(renderElement({ ...spec, width: w, height: h, radius: spec.radius * k, cutX: (spec.cutX ?? 0) * k, cutY: (spec.cutY ?? 0) * k, strokeWidth: spec.strokeWidth * k, patternScale: spec.patternScale * k }, team.gradient, 1, spec.strokeGradient ? input.strokeGradient : null));
                 input.cache?.set(key, img);
             }
             ctx.drawImage(img, s.x, s.y, s.w, s.h);

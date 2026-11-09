@@ -1,8 +1,14 @@
 {
-  "version": "1.0.89",
-  "commit": "c40bc4a",
-  "date": "2026-11-09T15:36:47Z",
+  "version": "1.0.90",
+  "commit": "fd7d955",
+  "date": "2026-11-09T15:55:47Z",
   "changes": [
+    {
+      "version": "1.0.90",
+      "commit": "fd7d955",
+      "date": "2026-11-09T15:55:47Z",
+      "text": "PNG generator: cut corners of any length and slope with rounded vertices, one or both ends, up to a point"
+    },
     {
       "version": "1.0.89",
       "commit": "c40bc4a",
