@@ -52,13 +52,26 @@ describe('PNG renderer', () => {
   it('cuts corners straight across when the corner shape is cut', () => {
     const red = { angle: 0, stops: [{ pos: 0, color: '#ff0000', opacity: 100 }, { pos: 100, color: '#ff0000', opacity: 100 }] };
     const round = renderElement(el({ width: 40, height: 40, radius: 10 }), red);
-    const cut = renderElement(el({ width: 40, height: 40, radius: 10, corner: 'cut' }), red);
+    const cut = renderElement(el({ width: 40, height: 40, corner: 'cut', cutX: 10, cutY: 10 }), red);
     expect(px(cut, 0, 0)[3]).toBe(0);
     expect(px(cut, 4, 4)[3]).toBe(0); // beyond the 45° cut
     expect(px(round, 4, 4)[3]).toBeGreaterThan(0); // inside the rounded corner
     expect(px(cut, 6, 6)[3]).toBe(255);
     expect(px(cut, 10, 0)[3]).toBeGreaterThan(0); // the cut ends 10 px along the edge
     expect(px(cut, 20, 20)[3]).toBe(255);
+  });
+
+  it('makes a pointed end with rounded vertices (cut the full height on one side)', () => {
+    const red = { angle: 0, stops: [{ pos: 0, color: '#ff0000', opacity: 100 }, { pos: 100, color: '#ff0000', opacity: 100 }] };
+    const sharp = renderElement(el({ width: 100, height: 60, corner: 'cut', cutX: 30, cutY: 30, cutSides: 'right' }), red);
+    const soft = renderElement(el({ width: 100, height: 60, corner: 'cut', cutX: 30, cutY: 30, cutSides: 'right', radius: 8 }), red);
+    expect(px(sharp, 0, 0)[3]).toBe(255); // left end is not cut
+    expect(px(soft, 0, 0)[3]).toBe(0); // …but its corner is rounded
+    expect(px(sharp, 99, 30)[3]).toBeGreaterThan(100); // the point reaches the edge
+    expect(px(soft, 99, 30)[3]).toBe(0); // rounded point stops short
+    expect(px(soft, 90, 30)[3]).toBe(255);
+    expect(px(sharp, 95, 5)[3]).toBe(0); // outside the slope
+    expect(px(sharp, 60, 5)[3]).toBe(255);
   });
 
   it('paints the stroke with the stroke gradient along its own angle', () => {

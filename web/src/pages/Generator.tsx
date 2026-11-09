@@ -575,7 +575,7 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
     let n = templates.length + 1;
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
-      name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', opacity: 100, flip: false, angleOffset: 0,
+      name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0,
       strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
@@ -619,11 +619,22 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
                 <td className="px-1.5">{num(t, 'height', 'w-[4.5rem]', 1)}</td>
                 <td className="px-1.5">
                   <div className="flex items-center gap-1">
-                    <select className="input w-auto px-1.5 py-1" value={t.corner ?? 'round'} onChange={(e) => patch(t.id, { corner: e.target.value as 'round' | 'cut' })} aria-label="Corner shape" title="Rounded or cut corners; the number is the radius or how far the cut reaches along each edge (px)">
+                    <select className="input w-auto px-1.5 py-1" value={t.corner ?? 'round'} onChange={(e) => patch(t.id, e.target.value === 'cut' && !t.cutX && !t.cutY ? { corner: 'cut', cutX: Math.round(t.height / 3), cutY: Math.round(t.height / 3) } : { corner: e.target.value as 'round' | 'cut' })} aria-label="Corner shape" title="Rounded or cut corners; the number is the radius or how far the cut reaches along each edge (px)">
                       <option value="round">◜ Round</option>
                       <option value="cut">◸ Cut</option>
                     </select>
-                    {num(t, 'radius')}
+                    <span title={t.corner === 'cut' ? 'Rounding of every vertex (px)' : 'Corner radius (px)'}>{num(t, 'radius')}</span>
+                    {t.corner === 'cut' && <>
+                      <span title="How far the cut reaches along the top and bottom edge (px)" className="flex items-center gap-0.5 text-[10px] text-ink-500">↔{num(t, 'cutX', 'w-16')}</span>
+                      <span title="How far the cut reaches along the side edge (px); half the height or more makes a point" className="flex items-center gap-0.5 text-[10px] text-ink-500">↕{num(t, 'cutY', 'w-16')}</span>
+                      <select className="input w-auto px-1.5 py-1" value={t.cutSides ?? 'both'} onChange={(e) => patch(t.id, { cutSides: e.target.value as 'both' | 'left' | 'right' })} aria-label="Cut ends" title="Which ends are cut">
+                        <option value="both">Both ends</option>
+                        <option value="left">Left end</option>
+                        <option value="right">Right end</option>
+                      </select>
+                      <button className="whitespace-nowrap rounded px-1.5 py-1 text-[10px] text-ink-400 hover:bg-ink-800 hover:text-ink-100" title="Cut the full height: the end becomes a point"
+                        onClick={() => patch(t.id, { cutY: Math.ceil(t.height / 2) })}>▷ point</button>
+                    </>}
                   </div>
                 </td>
                 <td className="px-1.5">{num(t, 'opacity', 'w-16', 0, 100)}</td>
