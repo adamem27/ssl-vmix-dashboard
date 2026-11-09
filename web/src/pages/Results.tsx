@@ -8,7 +8,7 @@ import { TeamProfileLink } from '../components/TeamProfileLink';
 import { useStage } from '../components/StagePicker';
 
 interface RRow { teamId: string; races: string[]; points: string; autoPoints: string; total: string }
-interface Group { fleetId: string; fleetName: string; setId: string; setName: string; title: string; subtitle: string; races: number; rows: RRow[]; updatedAt: string | null }
+interface Group { fleetId: string; fleetName: string; setId: string; setName: string; title: string; subtitle: string; vmixInput: string; races: number; rows: RRow[]; updatedAt: string | null }
 const MAX_RACES = 12;
 
 /** Overall results of every group (fleet) of a fleet set, for the results table graphic. */
@@ -71,6 +71,15 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
     const [x] = ids.splice(from, 1); ids.splice(to, 0, x);
     void put({ order: ids });
   };
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    setSending(true);
+    try {
+      const r = await api.post<{ input: string; number: string; sent: number; teams: number; rowsInTitle: number; tooMany: boolean }>(`/api/results/${g.fleetId}/vmix`);
+      if (r.tooMany) toast.error(`${r.teams} teams but the title “${r.input}” has ${r.rowsInTitle} rows: the last ones are not shown.`);
+      else toast.ok(`Sent to vMix input ${r.number} “${r.input}” (${r.sent} fields)`);
+    } catch (e) { toast.error(e); } finally { setSending(false); }
+  };
   const setRace = (r: RRow, i: number, v: string) => { const races = [...r.races]; races[i] = v.trim(); void put({ rows: [{ teamId: r.teamId, races }] }); };
 
   return (
@@ -88,6 +97,12 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
         </div>
         <Button size="sm" onClick={sort} title="Order the teams by points, highest first">Sort by points</Button>
         <Button size="sm" variant="ghost" onClick={clear}>Clear</Button>
+        <div className="flex items-end gap-1 border-l border-ink-800 pl-2">
+          <label className="w-48"><span className="label">vMix input</span>
+            <SaveInput value={g.vmixInput} onSave={(vmixInput) => put({ vmixInput })} label="vMix input" placeholder="name or number in vMix" maxLength={120} className="text-xs" /></label>
+          <Button size="sm" variant="primary" busy={sending} disabled={!g.vmixInput.trim()} onClick={send}
+            title="Fills the vMix title with this table: subtitle, race headers, places, flags, teams, races and points">Send to vMix</Button>
+        </div>
       </header>
       {!g.rows.length ? <p className="px-4 py-6 text-sm text-ink-500">No teams in this fleet yet. Put teams in it on the Fleets page.</p> : (
         <div className="overflow-x-auto">
