@@ -1,4 +1,4 @@
-import { createContext, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, Fragment, PointerEvent as RPointerEvent, ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { MatchboardTab } from './Matchboard';
@@ -45,32 +45,31 @@ function colorAt(g: Gradient, pos: number): GradientStop {
   return { pos, color: toHex([0, 1, 2].map((k) => ca[k] + (cb[k] - ca[k]) * f) as [number, number, number]), opacity: Math.round(a.opacity + (b.opacity - a.opacity) * f) };
 }
 
-type GenTab = 'colours' | 'elements' | 'matchboard';
+type GenTab = 'elements' | 'matchboard';
 const TABS: [GenTab, string, string][] = [
-  ['colours', 'Team colours', 'Gradients V1–V3 of each team'],
-  ['elements', 'Elements', 'Sizes and look of the exported PNGs'],
+  ['elements', 'Elements & team colours', 'The exported PNGs and the gradients V1–V3 of each team'],
   ['matchboard', 'Matchboard', 'Bracket graphic with teams, texts and highlights'],
 ];
 
 export function GeneratorPage() {
   const [params, setParams] = useSearchParams();
-  const tab = (TABS.find(([k]) => k === params.get('tab'))?.[0] ?? 'colours') as GenTab;
+  const tab = (TABS.find(([k]) => k === params.get('tab'))?.[0] ?? 'elements') as GenTab;
   const q = useQuery({ queryKey: ['generator'], queryFn: () => api.get<GenState>('/api/generator'), refetchOnWindowFocus: false });
   return (
     <div className="space-y-3">
       <nav className="flex flex-wrap gap-1 border-b border-ink-800" aria-label="PNG generator sections">
         {TABS.map(([k, label, hint]) => (
-          <button key={k} title={hint} onClick={() => setParams(k === 'colours' ? {} : { tab: k }, { replace: true })}
+          <button key={k} title={hint} onClick={() => setParams(k === 'elements' ? {} : { tab: k }, { replace: true })}
             className={cx('-mb-px border-b-2 px-4 py-2 text-sm font-semibold', tab === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{label}</button>
         ))}
       </nav>
       {tab === 'matchboard' ? <MatchboardTab />
-        : q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : <Generator state={q.data!} tab={tab} />}
+        : q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : <Generator state={q.data!} />}
     </div>
   );
 }
 
-function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements' }) {
+function Generator({ state }: { state: GenState }) {
   const qc = useQueryClient();
   const toast = useToast();
   const debounce = useDebouncer(350);
@@ -133,11 +132,15 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
     <StrokeGradientCtx.Provider value={strokeGradient}>
     <div className="space-y-3">
       <ExportBar state={state} />
+      <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} preview={(t) => (
+        <ElementPreview template={t} team={team} teams={shown} neutral={isNeutral ? neutral : undefined} bg={bg} setBg={setBg}
+          onPick={(id) => setTeamId(id)} />
+      )} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
         <TeamList teams={shown} selected={teamId} onSelect={setTeamId} neutral={neutral} />
         <div className="min-w-0 space-y-3">
-          {tab === 'colours' && isNeutral && <NeutralPanel neutral={neutral} onChange={setNeutral} />}
-          {tab === 'colours' && !isNeutral && (team ? (
+          {isNeutral && <NeutralPanel neutral={neutral} onChange={setNeutral} />}
+          {!isNeutral && (team ? (
             <GradientPanel key={team.teamId} team={team} teams={shown} variant={variant} setVariant={setVariant}
               onChange={(g, immediate) => setGradient(team.teamId, variant, g, immediate)} onReload={refresh} />
           ) : <section className="card p-6 text-sm text-ink-400">No teams yet.</section>)}
@@ -152,10 +155,7 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
               ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={shown} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
-          {tab === 'elements' && <>
-            <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} />
-            <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
-          </>}
+          <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
         </div>
       </div>
     </div>
@@ -465,6 +465,32 @@ function HexInput({ value, onChange }: { value: string; onChange: (hex: string) 
 }
 
 // ---------- previews ----------
+/** The expanded row of the elements table: the element for the selected team, large, then for every team. */
+function ElementPreview({ template: t, team, teams, neutral, bg, setBg, onPick }: {
+  template: Template; team: TeamGradients | null; teams: TeamGradients[]; neutral?: NeutralSettings; bg: Bg; setBg: (b: Bg) => void; onPick: (teamId: string) => void;
+}) {
+  const g = team?.gradients[t.variant] ?? null;
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex flex-wrap items-start gap-4">
+        <figure className="min-w-0">
+          <div className={cx('grid min-h-[60px] place-items-center rounded p-3 ring-1 ring-ink-700', bgClass(bg))}>
+            {g ? <Canvas spec={neutral ? neutralSpec(specOf(t), neutral) : specOf(t)} gradient={g} maxW={960} maxH={340} />
+              : <span className="px-3 py-2 text-xs text-ink-500">{team ? `${team.code}: V${t.variant} not set` : 'No team selected'}</span>}
+          </div>
+          <figcaption className="mt-1 flex items-center gap-2 text-xs">
+            <span className="font-mono font-bold text-ink-200">{team?.code}</span>
+            <span className="text-ink-500">{t.width}×{t.height} · V{t.variant} · {t.fileName}.png</span>
+            {g && team && <a className="ml-auto text-ink-400 hover:text-accent-300" href={`/api/generator/png?team=${team.teamId}&template=${t.id}`}>↓ Download</a>}
+          </figcaption>
+        </figure>
+        <div className="ml-auto"><BgToggle bg={bg} setBg={setBg} /></div>
+      </div>
+      <TemplateAcrossTeams template={t} teams={teams} bg={bg} onPick={onPick} />
+    </div>
+  );
+}
+
 function Canvas({ spec, gradient, maxW, maxH }: { spec: ElementSpec; gradient: Gradient; maxW: number; maxH: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const strokeGradient = useContext(StrokeGradientCtx);
@@ -527,8 +553,21 @@ function TemplateAcrossTeams({ template, teams, bg, onPick }: { template: Templa
 }
 
 // ---------- elements ----------
-function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; patch: (id: string, p: Partial<Template>) => void; onReload: () => void }) {
+function ElementsPanel({ templates, patch, onReload, preview }: { templates: Template[]; patch: (id: string, p: Partial<Template>) => void; onReload: () => void; preview: (t: Template) => ReactNode }) {
   const toast = useToast();
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const toggle = (id: string) => setOpen((o) => { const n = new Set(o); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const allOpen = templates.length > 0 && templates.every((t) => open.has(t.id));
+  // the preview row spans the whole (scrollable) table; keep its content as wide as the visible part
+  const scroller = useRef<HTMLDivElement>(null);
+  const [viewW, setViewW] = useState(0);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setViewW(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const { ask, dialog } = useConfirm();
   const act = async (fn: () => Promise<unknown>) => { try { await fn(); onReload(); } catch (e) { toast.error(e); } };
   const add = () => act(() => {
@@ -545,13 +584,16 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
     <NumInput className={w} min={min} max={max} value={t[k] as number} label={String(k)} onChange={(n) => patch(t.id, { [k]: n })} />
   );
   return (
-    <Panel title="PNG elements" right={<Button size="sm" onClick={add}>+ Element</Button>}>
+    <Panel title="PNG elements" right={<>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(allOpen ? new Set() : new Set(templates.map((t) => t.id)))}>{allOpen ? 'Collapse all' : 'Expand all'}</Button>
+      <Button size="sm" onClick={add}>+ Element</Button>
+    </>}>
       {dialog}
-      <div className="overflow-x-auto">
+      <div ref={scroller} className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-800">
-              <th className={th}>On</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
+              <th className={th} /><th className={th}>On</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
               <th className={th}>W</th><th className={th}>H</th><th className={th}>Radius</th><th className={th}>Opacity %</th>
               <th className={th}>Flip</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th><th className={th}>Gradient</th><th className={th}>Stroke ∠</th>
               <th className={th}>Waves</th><th className={th}>Waves %</th><th className={th}>Waves size %</th><th className={th} />
@@ -559,7 +601,12 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
           </thead>
           <tbody>
             {templates.map((t, i) => (
-              <tr key={t.id} className="border-b border-ink-850 align-middle">
+              <Fragment key={t.id}>
+              <tr className={cx('align-middle', open.has(t.id) ? 'bg-ink-900/60' : 'border-b border-ink-850')}>
+                <td className="pl-1">
+                  <button onClick={() => toggle(t.id)} aria-expanded={open.has(t.id)} title={open.has(t.id) ? 'Hide preview' : 'Show preview'}
+                    className={cx('grid h-7 w-7 place-items-center rounded text-ink-400 transition-transform hover:bg-ink-800 hover:text-ink-100', open.has(t.id) && 'rotate-90 text-accent-300')}>▸</button>
+                </td>
                 <td className="px-1.5"><input type="checkbox" checked={t.enabled} onChange={(e) => patch(t.id, { enabled: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Enabled" /></td>
                 <td className="px-1.5"><TextInput className="w-28" value={t.name} label="Name" onChange={(name) => name.trim() && patch(t.id, { name })} /></td>
                 <td className="px-1.5"><TextInput className="w-28 font-mono" value={t.fileName} label="File name" onChange={(fileName) => /^[\w.-]+$/.test(fileName) && patch(t.id, { fileName })} /></td>
@@ -594,6 +641,10 @@ function ElementsPanel({ templates, patch, onReload }: { templates: Template[]; 
                     onClick={async () => { if (await ask(`Delete “${t.name}”?`, 'Its PNG files are removed for every team.', 'Delete')) void act(() => api.del(`/api/generator/templates/${t.id}`)); }}>✕</button>
                 </td>
               </tr>
+              {open.has(t.id) && (
+                <tr className="border-b border-ink-850 bg-ink-900/60"><td colSpan={19} className="pb-3"><div className="sticky left-0 px-3" style={viewW ? { width: viewW } : undefined}>{preview(t)}</div></td></tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>
