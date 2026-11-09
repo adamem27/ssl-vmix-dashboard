@@ -1,8 +1,14 @@
 {
-  "version": "1.0.92",
-  "commit": "7b25d3f",
-  "date": "2026-11-09T19:24:55Z",
+  "version": "1.0.93",
+  "commit": "03a1734",
+  "date": "2026-11-09T20:37:05Z",
   "changes": [
+    {
+      "version": "1.0.93",
+      "commit": "03a1734",
+      "date": "2026-11-09T20:37:05Z",
+      "text": "PNG generator: the stroke swatch shows the orange-yellow gradient when Gradient is ticked; new elements get the gradient stroke"
+    },
     {
       "version": "1.0.92",
       "commit": "7b25d3f",
