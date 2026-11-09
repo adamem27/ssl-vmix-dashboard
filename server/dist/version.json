@@ -1,8 +1,14 @@
 {
-  "version": "1.0.85",
-  "commit": "0ba7991",
-  "date": "2026-11-09T13:12:06+01:00",
+  "version": "1.0.87",
+  "commit": "21d178d",
+  "date": "2026-11-09T13:22:22+01:00",
   "changes": [
+    {
+      "version": "1.0.86",
+      "commit": "3d96e97",
+      "date": "2026-11-09T12:22:17Z",
+      "text": "GTZIP generator: layer PNGs are cropped to what is drawn (full frame stays as an option)"
+    },
     {
       "version": "1.0.84",
       "commit": "5f935fc",
