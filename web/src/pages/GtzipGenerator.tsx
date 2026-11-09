@@ -267,13 +267,13 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
   const png = async (infos: ElementInfo[], crop: boolean) => {
     if (!infos.length) return;
     const label = infos.length === 1 ? (infos[0].node.attrs.Name || infos[0].node.tag) : `${infos.length} elements`;
-    try { await savePng(doc, infos.map((e) => e.node), images.get, `${base} - ${label}${crop ? ' (cropped)' : ''}`, crop); }
+    try { await savePng(doc, infos.map((e) => e.node), images.get, `${base} - ${label}${crop ? '' : ' (full frame)'}`, crop); }
     catch (e) { toast.error(e); }
   };
   const pngAll = async () => {
     const top = els.filter((e) => !e.parentPath);
     for (const e of top) {
-      try { await savePng(doc, [e.node], images.get, `${base} - ${e.node.attrs.Name || e.node.tag}`, false); } catch (err) { toast.error(err); }
+      try { await savePng(doc, [e.node], images.get, `${base} - ${e.node.attrs.Name || e.node.tag}`, true); } catch (err) { toast.error(err); }
       await new Promise((r) => setTimeout(r, 250)); // browsers drop downloads fired all at once
     }
     toast.ok(`${top.length} PNG files saved (one per top-level layer).`);
@@ -363,11 +363,11 @@ function Editor({ tpl, scenes, onOpen }: { tpl: TemplateDoc; scenes: SceneDef[];
             </div>
             <div className="flex flex-wrap items-center gap-1">
               <span className="text-xs text-ink-400">PNG:</span>
-              <Button size="sm" disabled={!selInfos.length} onClick={() => png(selInfos, false)} title="The selected elements on a transparent 1920×1080 frame, in place">⤓ Selected</Button>
-              <Button size="sm" disabled={!selInfos.length} onClick={() => png(selInfos, true)} title="The selected elements, cropped to what is drawn">⤓ Selected, cropped</Button>
-              <Button size="sm" onClick={pngAll} title="Every top-level layer as its own PNG (full frame)">⤓ Every layer</Button>
+              <Button size="sm" disabled={!selInfos.length} onClick={() => png(selInfos, true)} title="The selected elements, cropped to what is drawn">⤓ Selected</Button>
+              <Button size="sm" onClick={pngAll} title="Every top-level layer as its own PNG, cropped to what is drawn">⤓ Every layer</Button>
+              <Button size="sm" variant="ghost" disabled={!selInfos.length} onClick={() => png(selInfos, false)} title="The selected elements on a transparent 1920×1080 frame, in place">⤓ Selected, full frame</Button>
             </div>
-            <LayerTree els={els} sel={sel} setSel={setSel} onPng={(e) => png([e], false)} onToggle={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (isVisible(n)) n.attrs.Visible = 'False'; else delete n.attrs.Visible; })} />
+            <LayerTree els={els} sel={sel} setSel={setSel} onPng={(e) => png([e], true)} onToggle={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (isVisible(n)) n.attrs.Visible = 'False'; else delete n.attrs.Visible; })} />
             {one ? <Properties key={pathKey(one.path)} info={one} doc={doc} tpl={tpl} images={images.get} mutate={mutate} commit={commit} />
               : selInfos.length > 1 ? <MultiProperties infos={selInfos} mutateSel={mutateSel} /> : null}
           </>}
@@ -701,8 +701,7 @@ function Preview({ doc, els, sel, setSel, showHidden, bg, images, redraw, onMove
 
 // ---------- layer tree ----------
 /**
- * Saves elements as a transparent PNG: the whole 1920×1080 frame (keeps the position, ready to lay over the title)
- * or cropped to what is drawn.
+ * Saves elements as a transparent PNG cropped to what is drawn, or on the whole 1920×1080 frame (keeps the position).
  */
 async function savePng(doc: GtNode, nodes: GtNode[], images: (src: string) => Img | null, fileName: string, crop: boolean) {
   const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
@@ -770,7 +769,7 @@ function LayerTree({ els, sel, setSel, onToggle, onPng }: { els: ElementInfo[]; 
               </button>
               <span className="w-4 text-center text-ink-400">{TAG_ICON[e.node.tag] ?? '•'}</span>
               <button className={cx('min-w-0 flex-1 truncate py-1 text-left', !isVisible(e.node) && 'text-ink-500 line-through decoration-ink-600')} onClick={(ev) => click(ev, k)}>{name}</button>
-              <button className="px-1 text-ink-500 hover:text-ink-100" title="Download as PNG (transparent, full frame)" onClick={() => onPng(e)}>⤓</button>
+              <button className="px-1 text-ink-500 hover:text-ink-100" title="Download as PNG (transparent, cropped to what is drawn)" onClick={() => onPng(e)}>⤓</button>
               <button className={cx('px-1', isVisible(e.node) ? 'text-ink-300' : 'text-ink-600')} title={isVisible(e.node) ? 'Visible – click to hide' : 'Hidden – click to show'} onClick={() => onToggle(e)}>{isVisible(e.node) ? '👁' : '◌'}</button>
             </li>
           );
