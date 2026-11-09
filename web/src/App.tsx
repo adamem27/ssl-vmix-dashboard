@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api, Meta } from './api';
@@ -95,41 +96,52 @@ function NavIcon({ name }: { name: string }) {
 
 /** Tabs grouped by what they are for; each group has its own colour (class names spelled out for Tailwind). */
 const NAV_GROUPS = [
-  { label: 'On air', tone: { head: 'text-rose-400', icon: 'text-rose-400', active: 'bg-rose-500/15 text-rose-100 border-rose-400' }, items: [
+  { label: 'On air', tone: { head: 'text-rose-400', bar: 'bg-rose-400', icon: 'text-rose-400', active: 'bg-rose-500/15 text-rose-100 border-rose-400' }, items: [
     { to: '/vmix/show', label: 'Show control', icon: 'live' },
     { to: '/vmix/lowerthirds', label: 'Lower thirds', icon: 'lower' },
   ] },
-  { label: 'Data', tone: { head: 'text-sky-400', icon: 'text-sky-400', active: 'bg-sky-500/15 text-sky-100 border-sky-400' }, items: [
+  { label: 'Data', tone: { head: 'text-sky-400', bar: 'bg-sky-400', icon: 'text-sky-400', active: 'bg-sky-500/15 text-sky-100 border-sky-400' }, items: [
     { to: '/vmix/overview', label: 'Teams & crews', icon: 'teams' },
     { to: '/vmix/fleets', label: 'Fleets', icon: 'fleets' },
     { to: '/vmix/declarations', label: 'Declarations and line-ups', icon: 'declarations' },
     { to: '/vmix/results', label: 'Results', icon: 'results' },
   ] },
-  { label: 'Graphics', tone: { head: 'text-violet-400', icon: 'text-violet-400', active: 'bg-violet-500/15 text-violet-100 border-violet-400' }, items: [
+  { label: 'Graphics', tone: { head: 'text-violet-400', bar: 'bg-violet-400', icon: 'text-violet-400', active: 'bg-violet-500/15 text-violet-100 border-violet-400' }, items: [
     { to: '/vmix/general', label: 'General graphics', icon: 'general' },
     { to: '/vmix/generator', label: 'PNG generator', icon: 'png' },
     { to: '/vmix/gtzip', label: 'GTZIP generator', icon: 'gtzip' },
   ] },
-  { label: 'Output & setup', tone: { head: 'text-emerald-400', icon: 'text-emerald-400', active: 'bg-emerald-500/15 text-emerald-100 border-emerald-400' }, items: [
+  { label: 'Output & setup', tone: { head: 'text-emerald-400', bar: 'bg-emerald-400', icon: 'text-emerald-400', active: 'bg-emerald-500/15 text-emerald-100 border-emerald-400' }, items: [
     { to: '/vmix/json', label: 'JSON', icon: 'json' },
     { to: '/vmix/settings', label: 'Settings', icon: 'settings' },
   ] },
 ];
 
+const NAV_KEY = 'nav-collapsed';
 function VmixLayout() {
+  // the menu folds to icons so wide pages (GTZIP generator, Show control) get the room
+  const [small, setSmallState] = useState(() => { try { return localStorage.getItem(NAV_KEY) === '1'; } catch { return false; } });
+  const setSmall = (v: boolean) => { setSmallState(v); try { localStorage.setItem(NAV_KEY, v ? '1' : '0'); } catch { /* storage unavailable */ } };
   return (
-    <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 md:flex-row lg:px-6">
-      <nav aria-label="vMix graphics" className="md:sticky md:top-[64px] md:h-fit md:w-52 md:shrink-0">
-        <div className="flex gap-3 overflow-x-auto md:flex-col md:gap-4">
+    <div className={cx('mx-auto flex flex-col gap-4 px-4 py-4 md:flex-row lg:px-6', small ? 'max-w-[2400px]' : 'max-w-[1800px]')}>
+      <nav aria-label="vMix graphics" className={cx('md:sticky md:top-[64px] md:h-fit md:shrink-0', small ? 'md:w-12' : 'md:w-52')}>
+        <button onClick={() => setSmall(!small)} title={small ? 'Show the menu' : 'Fold the menu to icons'} aria-label={small ? 'Show the menu' : 'Fold the menu'}
+          className={cx('mb-2 hidden items-center gap-2 rounded-md px-3 py-1.5 text-xs text-ink-400 hover:bg-ink-900 hover:text-ink-100 md:flex', small && 'justify-center px-0')}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d={small ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} /></svg>
+          {!small && 'Fold menu'}
+        </button>
+        <div className={cx('flex gap-3 overflow-x-auto md:flex-col', small ? 'md:gap-2' : 'md:gap-4')}>
           {NAV_GROUPS.map((g) => (
             <section key={g.label} className="shrink-0">
-              <h2 className={cx('mb-1 px-3 text-[10px] font-bold uppercase tracking-widest', g.tone.head)}>{g.label}</h2>
+              {small ? <div className={cx('mx-auto mb-1 hidden h-0.5 w-6 rounded md:block', g.tone.bar)} title={g.label} />
+                : <h2 className={cx('mb-1 px-3 text-[10px] font-bold uppercase tracking-widest', g.tone.head)}>{g.label}</h2>}
               <ul className="flex gap-1 md:flex-col">
                 {g.items.map((it) => (
                   <li key={it.to}>
-                    <NavLink to={it.to} className={({ isActive }) => cx('flex items-center gap-2.5 whitespace-nowrap rounded-md border-l-2 px-3 py-2 text-sm font-medium md:whitespace-normal',
+                    <NavLink to={it.to} title={small ? it.label : undefined} className={({ isActive }) => cx('flex items-center gap-2.5 whitespace-nowrap rounded-md border-l-2 py-2 text-sm font-medium md:whitespace-normal',
+                      small ? 'px-3 md:justify-center md:px-0' : 'px-3',
                       isActive ? g.tone.active : 'border-transparent text-ink-300 hover:bg-ink-900 hover:text-ink-50')}>
-                      {({ isActive }) => <><span className={isActive ? undefined : g.tone.icon}><NavIcon name={it.icon} /></span><span className="leading-tight">{it.label}</span></>}
+                      {({ isActive }) => <><span className={isActive ? undefined : g.tone.icon}><NavIcon name={it.icon} /></span><span className={cx('leading-tight', small && 'md:hidden')}>{it.label}</span></>}
                     </NavLink>
                   </li>
                 ))}

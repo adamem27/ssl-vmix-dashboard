@@ -233,8 +233,9 @@ const MODE_KEY = 'gtzip-mode';
 
 type RightTab = 'props' | 'animations' | 'fields';
 const VIEW_KEY = 'gtzip-view-v1';
-interface ViewPrefs { bg: CanvasBg; grid: boolean; guides: boolean; showHidden: boolean }
-const readView = (): ViewPrefs => { try { return { bg: 'grid', grid: true, guides: true, showHidden: false, ...JSON.parse(localStorage.getItem(VIEW_KEY) || '{}') }; } catch { return { bg: 'grid', grid: true, guides: true, showHidden: false }; } };
+interface ViewPrefs { bg: CanvasBg; grid: boolean; guides: boolean; showHidden: boolean; layers: boolean; panel: boolean }
+const VIEW_DEFAULTS: ViewPrefs = { bg: 'grid', grid: true, guides: true, showHidden: false, layers: true, panel: true };
+const readView = (): ViewPrefs => { try { return { ...VIEW_DEFAULTS, ...JSON.parse(localStorage.getItem(VIEW_KEY) || '{}') }; } catch { return VIEW_DEFAULTS; } };
 /** Copied elements, shared by every open title in this tab. */
 let clipboard: GtNode[] = [];
 const FONTS = ['General Sans', 'Space Grotesk', 'Arial', 'Segoe UI', 'Montserrat', 'Roboto', 'Bebas Neue', 'Oswald'];
@@ -257,6 +258,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
   const [saveOpen, setSaveOpen] = useState(false);
   const [pickOpen, setPickOpen] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
+  const [full, setFull] = useState(false);
   const [zoom, setZoom] = useState(0.5);
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'quick' ? 'quick' : 'advanced'; } catch { return 'advanced'; } });
   const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ } };
@@ -406,6 +408,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
       if (mod && (k === '=' || k === '+')) { e.preventDefault(); canvas.current?.zoomBy(1.25); return; }
       if (mod && k === '-') { e.preventDefault(); canvas.current?.zoomBy(0.8); return; }
       if (k === 'escape') { setSel([]); return; }
+      if (k === 'f' && !mod) { e.preventDefault(); setFull(true); return; }
       if (!selInfos.length) return;
       if (mod && k === 'c') { e.preventDefault(); toast.ok(`${copy()} copied`); return; }
       if (mod && k === 'x') { e.preventDefault(); copy(); del(); return; }
@@ -488,6 +491,14 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
         <Tool title="Duplicate many, renumbered, with animations…" disabled={!sel.length} onClick={() => setDupOpen(true)}><span className="text-xs">⧉…</span></Tool>
         <Tool title="Delete (Del)" disabled={!sel.length} onClick={del}>🗑</Tool>
         <span className="ml-auto" />
+        {mode === 'advanced' && <>
+          <button className={cx(tb, 'text-xs', prefs.layers && 'bg-ink-700')} title="Show or hide the Layers panel" onClick={() => setPrefs({ layers: !prefs.layers })}>Layers</button>
+          <button className={cx(tb, 'text-xs', prefs.panel && 'bg-ink-700')} title="Show or hide the Properties panel" onClick={() => setPrefs({ panel: !prefs.panel })}>Properties</button>
+        </>}
+        <Tool title="Full screen preview (F)" onClick={() => setFull(true)}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+        </Tool>
+        <Sep />
         <Tool title="Zoom out (Ctrl −)" onClick={() => canvas.current?.zoomBy(0.8)}>−</Tool>
         <button className="w-14 rounded px-1 text-xs tabular-nums text-ink-300 hover:bg-ink-700" title="Fit (Ctrl+0)" onClick={() => canvas.current?.fit()}>{Math.round(zoom * 100)}%</button>
         <Tool title="Zoom in (Ctrl +)" onClick={() => canvas.current?.zoomBy(1.25)}>+</Tool>
@@ -502,7 +513,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
       </div>
 
       <div className="flex flex-col gap-2 xl:flex-row">
-        {mode === 'advanced' && <div className="flex w-full shrink-0 flex-col gap-2 xl:w-60" style={{ height: canvasH }}>
+        {mode === 'advanced' && prefs.layers && <div className="flex w-full shrink-0 flex-col gap-2 xl:w-60" style={{ height: canvasH }}>
           <Layers els={els} sel={sel} setSel={setSel} onPng={(e) => png([e], true)}
             onToggle={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (isVisible(n)) n.attrs.Visible = 'False'; else delete n.attrs.Visible; })}
             onLock={(e) => mutate((r) => { const n = nodeAt(r, e.path)!; if (n.attrs.Locked === 'True') n.attrs.Locked = 'False'; else n.attrs.Locked = 'True'; })}
@@ -522,7 +533,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
         </div>
         {mode === 'quick' ? <div className="w-full shrink-0 xl:w-[26rem]">
           <QuickForm tpl={tpl} doc={doc} commit={commit} images={images.get} sel={sel} setSel={setSel} />
-        </div> : <div className="flex w-full shrink-0 flex-col gap-2 xl:w-80" style={{ maxHeight: canvasH }}>
+        </div> : prefs.panel && <div className="flex w-full shrink-0 flex-col gap-2 xl:w-80" style={{ maxHeight: canvasH }}>
           <nav className="flex gap-1 border-b border-ink-800">
             {([['props', 'Properties'], ['animations', 'Animations'], ['fields', 'vMix fields']] as [RightTab, string][]).map(([k, l]) => (
               <button key={k} onClick={() => setRight(k)} className={cx('-mb-px border-b-2 px-2.5 py-1.5 text-sm font-semibold', right === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{l}</button>
@@ -548,6 +559,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
           </div>
         </div>}
       </div>
+      {full && <FullPreview doc={doc} images={images.get} redraw={images.version + fontsReady} onClose={() => setFull(false)} />}
       {pickOpen && <PicturePicker onClose={() => setPickOpen(false)} onPick={(s) => { setPickOpen(false); void addPicture(s, undefined, sourceName(s.replace(/^(upload|asset):/, '')).split('/').pop()); }} />}
       {saveOpen && <SaveTemplateDialog scenes={scenes} tpl={tpl} doc={doc} onClose={() => setSaveOpen(false)} onSaved={(m) => { setSaveOpen(false); onOpen(m.id); }} />}
       {dupOpen && <DuplicateDialog infos={selInfos} els={els} doc={doc} onClose={() => setDupOpen(false)} onApply={(o) => {
@@ -559,6 +571,51 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
           toast.ok(`${r.added.length} element${r.added.length === 1 ? '' : 's'} added.`);
         } catch (e) { toast.error(e); }
       }} />}
+    </div>
+  );
+}
+
+/** The title alone on the whole screen, as on air: no grid, no selection. Esc or a click closes it. */
+function FullPreview({ doc, images, redraw, onClose }: { doc: GtNode; images: (src: string) => Img | null; redraw: number; onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const cv = useRef<HTMLCanvasElement>(null);
+  const [bg, setBg] = useState<'black' | 'checker' | 'grey'>('black');
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight });
+  const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
+  useEffect(() => {
+    const el = box.current;
+    el?.requestFullscreen?.().catch(() => { /* the overlay still covers the window */ });
+    const onFs = () => { if (!document.fullscreenElement) onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); e.stopPropagation(); };
+    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight });
+    document.addEventListener('fullscreenchange', onFs);
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', onResize);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    };
+  }, [onClose]);
+  const z = Math.min(size.w / W, size.h / H);
+  useEffect(() => {
+    const c = cv.current;
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    c.width = Math.round(W * z * dpr); c.height = Math.round(H * z * dpr);
+    const ctx = c.getContext('2d')!;
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    drawTitle(ctx, doc, { image: images, fallbackFont: 'Space Grotesk' });
+  }, [doc, images, redraw, z, W, H]);
+  return (
+    <div ref={box} className={cx('fixed inset-0 z-[100] grid place-items-center', bg === 'black' ? 'bg-black' : bg === 'grey' ? 'bg-[#3a3f4b]' : 'checker')} onClick={onClose}>
+      <canvas ref={cv} style={{ width: W * z, height: H * z }} />
+      <div className="absolute right-3 top-3 flex gap-1 rounded-md bg-black/60 p-1 text-xs text-white/80" onClick={(e) => e.stopPropagation()}>
+        {(['black', 'grey', 'checker'] as const).map((b) => <button key={b} onClick={() => setBg(b)} className={cx('rounded px-2 py-1', bg === b ? 'bg-white/20 text-white' : 'hover:bg-white/10')}>{b}</button>)}
+        <button onClick={onClose} className="rounded px-2 py-1 hover:bg-white/10" title="Esc">✕ Close</button>
+      </div>
     </div>
   );
 }
