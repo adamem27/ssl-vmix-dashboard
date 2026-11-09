@@ -7,14 +7,31 @@ import { TEAM_SLOTS } from './slots.js';
  */
 export function registerLowerThirdRoutes(app, ctx, lt) {
     const { db } = ctx;
-    const both = (url, handler) => { app.get(url, handler); app.post(url, handler); };
+    // the last key press and what came of it, so the dashboard can show why a Stream Deck key did nothing
+    let last = null;
+    const both = (url, handler) => {
+        const h = async (req) => {
+            const what = String(req.url ?? url).replace(/^\/api\/lt\//, '');
+            try {
+                const r = await handler(req);
+                last = { at: new Date().toISOString(), what, error: null };
+                return r;
+            }
+            catch (e) {
+                last = { at: new Date().toISOString(), what, error: String(e?.message ?? e) };
+                throw e;
+            }
+        };
+        app.get(url, h);
+        app.post(url, h);
+    };
     const q = (req, k) => String(req.query?.[k] ?? req.body?.[k] ?? '').trim();
     app.get('/api/lt', async () => {
         const state = getLtState(db);
         return {
             config: getLtConfig(db), state, teams: ltTeams(ctx), keys: lt.layout(),
             crew: state.teamId ? crewOf(ctx, state.teamId) : [],
-            teamSlots: TEAM_SLOTS,
+            teamSlots: TEAM_SLOTS, last,
         };
     });
     app.put('/api/lt/config', async (req) => {

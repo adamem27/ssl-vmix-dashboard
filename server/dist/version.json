@@ -1,8 +1,14 @@
 {
-  "version": "1.0.95",
-  "commit": "d4b3017",
-  "date": "2026-11-09T21:27:40Z",
+  "version": "1.0.96",
+  "commit": "24b40ed",
+  "date": "2026-11-09T21:47:36Z",
   "changes": [
+    {
+      "version": "1.0.96",
+      "commit": "24b40ed",
+      "date": "2026-11-09T21:47:36Z",
+      "text": "Lower thirds: show the last key press and its error on the tab"
+    },
     {
       "version": "1.0.95",
       "commit": "d4b3017",
