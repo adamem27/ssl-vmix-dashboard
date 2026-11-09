@@ -120,6 +120,12 @@ describe('current stage in the API', () => {
     expect((await app.inject({ method: 'PUT', url: '/api/stage', payload: { setId } })).json().teamIds).toEqual([a.teamId]);
     expect((await app.inject({ url: '/json/teams' })).json().map((r: { code: string }) => r.code)).toEqual(['BRN']);
     expect((await app.inject({ url: '/json/sailors' })).json().map((r: { team_code: string }) => r.team_code)).toEqual(['BRN']);
+    // commentator: the stage's groups with their standing and line-ups in one call
+    saveLineup(s.ctx, eventId, a.teamId, { rows: [{ slot: 'Helm', firstName: 'Ali', lastName: 'Hassan', number: '7' }] });
+    const c = (await app.inject({ url: '/api/commentator' })).json();
+    expect(c.setId).toBe(setId);
+    expect(c.results.map((g: { fleetName: string }) => g.fleetName)).toEqual(['Group A']);
+    expect(c.lineups[a.teamId].map((p: { label: string; lastName: string }) => [p.label, p.lastName])).toEqual([['Helm', 'Hassan']]);
     await app.close();
   });
 });
