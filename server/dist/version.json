@@ -1,8 +1,14 @@
 {
-  "version": "1.0.102",
-  "commit": "00230a1",
-  "date": "2026-11-09T23:25:48Z",
+  "version": "1.0.103",
+  "commit": "751a43e",
+  "date": "2026-11-09T23:33:50Z",
   "changes": [
+    {
+      "version": "1.0.103",
+      "commit": "751a43e",
+      "date": "2026-11-09T23:33:50Z",
+      "text": "Fold the left menu to icons; GTZIP generator: hide Layers or Properties for a bigger canvas, full screen preview (F)"
+    },
     {
       "version": "1.0.102",
       "commit": "00230a1",
@@ -476,12 +482,6 @@
       "commit": "0caf126",
       "date": "2026-10-18T07:15:32Z",
       "text": "Captains, weather, day schedule, people for lowerthirds, JSON grid view"
-    },
-    {
-      "version": "1.0.7",
-      "commit": "f98ebd1",
-      "date": "2026-10-18T00:21:10Z",
-      "text": "Simpler interface: one editable table, drag & drop graphics, JSON for vMix"
     }
   ]
 }
