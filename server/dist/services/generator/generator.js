@@ -6,7 +6,8 @@ import { getSetting, newId, nowIso, setSetting } from '../../db/db.js';
 import { badRequest, notFound } from '../errors.js';
 import { encodePng } from '../png.js';
 import { joinVmixPath } from '../paths.js';
-import { DEFAULT_STROKE_GRADIENT, gradientVersions, gradientVersionsFrom, renderElement } from './render.js';
+import { DEFAULT_NEUTRAL, DEFAULT_STROKE_GRADIENT, gradientVersions, gradientVersionsFrom, NEUTRAL_CODE, NEUTRAL_ID, neutralGradient, neutralSpec, renderElement } from './render.js';
+export { NEUTRAL_CODE, NEUTRAL_ID } from './render.js';
 export const VARIANTS = [1, 2, 3];
 /** Generated files live in their own folder inside assets, so vmix-sync mirrors them to the vMix machine. */
 export const GENERATED_DIR = 'PNG generator';
@@ -146,6 +147,21 @@ export function setStrokeGradient(db, g) {
     setSetting(db, 'generator.strokeGradient', JSON.stringify(spec));
     return spec;
 }
+// ---------- neutral set (black with the gradient stroke) ----------
+export const neutralSchema = z.object({ enabled: z.boolean(), color: hex, strokeWidth: z.number().min(0).max(200) });
+export function getNeutral(db) {
+    try {
+        return neutralSchema.parse({ ...DEFAULT_NEUTRAL, ...JSON.parse(getSetting(db, 'generator.neutral')) });
+    }
+    catch {
+        return DEFAULT_NEUTRAL;
+    }
+}
+export function setNeutral(db, patch) {
+    const n = neutralSchema.parse({ ...getNeutral(db), ...patch });
+    setSetting(db, 'generator.neutral', JSON.stringify(n));
+    return n;
+}
 // ---------- outputs ----------
 /** Bump when the waves drawing changes so every file with waves is rendered again. */
 const WAVES_VERSION = 'gradienty.ai-1';
@@ -166,6 +182,16 @@ export function plannedJobs(ctx) {
             const stroke = t.strokeGradient && t.strokeWidth > 0 ? strokeGradient : null;
             const hash = createHash('sha1').update(JSON.stringify([spec, g, t.pattern ? WAVES_VERSION : null, stroke])).digest('hex');
             jobs.push({ rel: outputRel(team.code, t.fileName), teamId: team.teamId, code: team.code, templateId: t.id, spec, gradient: g, hash });
+        }
+    }
+    const neutral = getNeutral(ctx.db);
+    if (neutral.enabled) {
+        const g = neutralGradient(neutral.color);
+        for (const t of templates) {
+            const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...own } = t;
+            const spec = neutralSpec(own, neutral);
+            const hash = createHash('sha1').update(JSON.stringify(['neutral', spec, g, t.pattern ? WAVES_VERSION : null, spec.strokeWidth > 0 ? strokeGradient : null])).digest('hex');
+            jobs.push({ rel: outputRel(NEUTRAL_CODE, t.fileName), teamId: NEUTRAL_ID, code: NEUTRAL_CODE, templateId: t.id, spec, gradient: g, hash });
         }
     }
     return jobs;
@@ -192,7 +218,10 @@ export function jsonGraphics(db, assetsDir) {
     const root = getSetting(db, 'paths.vmixAssetsRoot');
     const templates = listTemplates(db).filter((t) => t.enabled);
     const outputs = new Set(listOutputs(db).map((o) => o.rel));
-    return listGradients(db).filter((t) => t.code.trim() && Object.values(t.gradients).some(Boolean)).map((t) => {
+    const teams = listGradients(db).filter((t) => t.code.trim() && Object.values(t.gradients).some(Boolean));
+    if (getNeutral(db).enabled)
+        teams.push({ code: NEUTRAL_CODE, name: 'Neutral' });
+    return teams.map((t) => {
         const row = { code: t.code, name: t.name };
         for (const tp of templates) {
             const rel = outputRel(t.code, tp.fileName);

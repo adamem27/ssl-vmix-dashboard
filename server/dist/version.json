@@ -1,8 +1,14 @@
 {
-  "version": "1.0.77",
-  "commit": "8183f59",
-  "date": "2026-11-09T01:45:49+01:00",
+  "version": "1.0.78",
+  "commit": "1cc9b2b",
+  "date": "2026-11-09T00:48:45Z",
   "changes": [
+    {
+      "version": "1.0.78",
+      "commit": "1cc9b2b",
+      "date": "2026-11-09T00:48:45Z",
+      "text": "PNG generator: neutral set, every element black with the orange-yellow stroke"
+    },
     {
       "version": "1.0.76",
       "commit": "745c9f1",

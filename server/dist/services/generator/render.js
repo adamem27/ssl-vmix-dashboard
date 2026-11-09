@@ -223,3 +223,9 @@ export function gradientVersions(colors, angle = 0) {
     const c = colors.filter(Boolean);
     return gradientVersionsFrom({ angle, stops: c.map((color, i) => ({ pos: c.length === 1 ? 0 : (100 * i) / (c.length - 1), color, opacity: 100 })) });
 }
+export const DEFAULT_NEUTRAL = { enabled: true, color: '#000000', strokeWidth: 1 };
+export const NEUTRAL_CODE = 'NEUTRAL';
+export const NEUTRAL_ID = 'neutral';
+export const neutralGradient = (color) => ({ angle: 0, stops: [{ pos: 0, color, opacity: 100 }, { pos: 100, color, opacity: 100 }] });
+/** An element as drawn in the neutral set: its own stroke width if it has one, else the neutral one, always painted with the stroke gradient. */
+export const neutralSpec = (el, n) => ({ ...el, strokeGradient: true, strokeWidth: el.strokeWidth > 0 ? el.strokeWidth : n.strokeWidth });

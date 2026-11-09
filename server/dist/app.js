@@ -396,6 +396,7 @@ export async function buildApp(deps) {
         outputs: pngGen.listOutputs(db),
         vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'),
         strokeGradient: pngGen.getStrokeGradient(db),
+        neutral: pngGen.getNeutral(db),
     });
     app.get('/api/generator', async () => genState());
     app.get('/api/generator/status', async () => ({ status: generator.status(), outputs: pngGen.listOutputs(db) }));
@@ -426,6 +427,7 @@ export async function buildApp(deps) {
     app.put('/api/generator/stroke-gradient', async (req) => ({
         strokeGradient: pngGen.setStrokeGradient(db, z.object({ gradient: pngGen.gradientSchema.nullable() }).parse(req.body).gradient),
     }));
+    app.put('/api/generator/neutral', async (req) => ({ neutral: pngGen.setNeutral(db, pngGen.neutralSchema.partial().parse(req.body)) }));
     app.put('/api/generator/settings', async (req) => {
         setSetting(db, 'generator.autoExport', String(z.object({ autoExport: z.boolean() }).parse(req.body).autoExport));
         return generator.status();
@@ -444,7 +446,10 @@ export async function buildApp(deps) {
         const entries = pngGen.listOutputs(db).map((o) => [o.rel.slice(pngGen.GENERATED_DIR.length + 1), fs.readFileSync(path.join(deps.assetsDir, ...o.rel.split('/')))]);
         return reply.type('application/zip').header('Content-Disposition', 'attachment; filename="ssl-generated-png.zip"').send(zipStore(entries));
     });
-    app.get('/json/graphics', async () => inStage(pngGen.jsonGraphics(db, deps.assetsDir), (r) => r.code));
+    app.get('/json/graphics', async () => {
+        const rows = pngGen.jsonGraphics(db, deps.assetsDir);
+        return [...inStage(rows.filter((r) => r.code !== pngGen.NEUTRAL_CODE), (r) => r.code), ...rows.filter((r) => r.code === pngGen.NEUTRAL_CODE)];
+    });
     // ---------- matchboard ----------
     const mbState = async () => ({ layout: mb.loadLayout(), state: mb.getState(db), status: matchboard.status(), fonts: await matchboard.fonts() });
     app.get('/api/matchboard', mbState);
