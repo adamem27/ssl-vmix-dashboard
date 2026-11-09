@@ -17,6 +17,8 @@ export interface DrawOpts {
   placeholders?: boolean;
   /** Family used when the title's font is not available. */
   fallbackFont?: string;
+  /** Draw only these elements (with what is inside them), e.g. to save one layer as a PNG. Hidden ones are drawn too. */
+  only?: GtNode[];
 }
 
 const WEIGHT: Record<string, number> = { Thin: 100, ExtraLight: 200, Light: 300, Normal: 400, Regular: 400, Medium: 500, SemiBold: 600, DemiBold: 600, Bold: 700, ExtraBold: 800, Black: 900 };
@@ -51,14 +53,31 @@ export function drawTitle(ctx: any, root: GtNode, o: DrawOpts) {
   const W = Number(root.attrs.Width ?? 1920), H = Number(root.attrs.Height ?? 1080);
   const maskNames = new Set<string>();
   for (const e of elements(root)) for (const h of e.node.children) if (h.tag.endsWith('.Mask')) for (const m of h.children) if (m.attrs.Object) maskNames.add(m.attrs.Object);
-  drawComposition(ctx, root, 0, 0, W, H, o, maskNames);
+  let filter: Filter | null = null;
+  if (o.only?.length) {
+    // the containers on the way to each chosen element are drawn as frames (position, clip, opacity) only
+    const along = new Set<GtNode>();
+    const walk = (n: GtNode, trail: GtNode[]) => {
+      if (o.only!.includes(n)) for (const t of trail) along.add(t);
+      for (const c of n.children) walk(c, [...trail, n]);
+    };
+    walk(root, []);
+    filter = { chosen: new Set(o.only), along };
+  }
+  drawComposition(ctx, root, 0, 0, W, H, o, maskNames, filter);
 }
 
-function drawComposition(ctx: any, comp: GtNode, ox: number, oy: number, pw: number, ph: number, o: DrawOpts, maskNames: Set<string>) {
+interface Filter { chosen: Set<GtNode>; along: Set<GtNode> }
+
+function drawComposition(ctx: any, comp: GtNode, ox: number, oy: number, pw: number, ph: number, o: DrawOpts, maskNames: Set<string>, filter: Filter | null = null) {
   const byName = new Map<string, GtNode>();
   for (const c of comp.children) if (c.attrs.Name) byName.set(c.attrs.Name, c);
   for (const n of comp.children) {
-    const hidden = !isVisible(n);
+    // with a filter: a chosen element is drawn whole (filter off inside it), a container on the way only as a frame
+    const chosen = !!filter?.chosen.has(n);
+    if (filter && !chosen && !filter.along.has(n)) continue;
+    const inner = chosen ? null : filter;
+    const hidden = !filter && !isVisible(n);
     if (hidden && !o.showHidden) continue;
     if (n.tag === 'Rectangle' && maskNames.has(n.attrs.Name)) continue;
     const [lx, ly] = vec(n.attrs.Location);
@@ -77,8 +96,8 @@ function drawComposition(ctx: any, comp: GtNode, ox: number, oy: number, pw: num
     }
     if (n.tag === 'Layer') {
       ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-      const inner = innerComposition(n);
-      if (inner) drawComposition(ctx, inner, x, y, w, h, o, maskNames);
+      const sub = innerComposition(n);
+      if (sub) drawComposition(ctx, sub, x, y, w, h, o, maskNames, inner);
     } else if (n.tag === 'Image') {
       const b = bitmap(n);
       const im = b?.attrs.Source ? o.image(b.attrs.Source) : null;
