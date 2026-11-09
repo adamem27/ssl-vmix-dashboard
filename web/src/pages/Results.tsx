@@ -75,8 +75,9 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
   const send = async () => {
     setSending(true);
     try {
-      const r = await api.post<{ input: string; number: string; sent: number; teams: number; rowsInTitle: number; tooMany: boolean }>(`/api/results/${g.fleetId}/vmix`);
+      const r = await api.post<{ input: string; number: string; sent: number; teams: number; rowsInTitle: number; tooMany: boolean; cols: number; racesHidden: number }>(`/api/results/${g.fleetId}/vmix`);
       if (r.tooMany) toast.error(`${r.teams} teams but the title “${r.input}” has ${r.rowsInTitle} rows: the last ones are not shown.`);
+      else if (r.racesHidden) toast.error(`The title has ${r.cols} race columns: only the last ${r.cols} races are shown.`);
       else toast.ok(`Sent to vMix input ${r.number} “${r.input}” (${r.sent} fields)`);
     } catch (e) { toast.error(e); } finally { setSending(false); }
   };
