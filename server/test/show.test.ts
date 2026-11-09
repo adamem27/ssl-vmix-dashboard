@@ -1,0 +1,145 @@
+import { describe, expect, it } from 'vitest';
+import { setup, seedTeam } from './helpers.js';
+import { activeEvent } from '../src/db/db.js';
+import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
+import { saveLineup } from '../src/services/lineups.js';
+import { createGraphicSet } from '../src/services/graphicSets.js';
+import { LowerThirds } from '../src/services/lowerthirds.js';
+import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
+
+/** A fake vMix with named inputs and four overlay channels. */
+function fakeVmix(titles: Record<string, string[]>) {
+  const calls: string[] = [];
+  const names = Object.keys(titles);
+  const overlays: Record<number, string> = {};
+  const num = (k: string) => String(names.indexOf(k) + 1);
+  const fetcher = async (url: string) => {
+    const q = decodeURIComponent(url.split('/api/')[1] ?? '');
+    if (q === '') {
+      const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="GT" title="${n}">${titles[n].map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}"></image>` : `<text index="0" name="${f}">x</text>`)).join('')}</input>`).join('');
+      const ov = [1, 2, 3, 4].map((n) => `<overlay number="${n}">${overlays[n] ?? ''}</overlay>`).join('');
+      return { ok: true, status: 200, text: async () => `<vmix><inputs>${inputs}</inputs><overlays>${ov}</overlays></vmix>` };
+    }
+    calls.push(q);
+    const m = q.match(/Function=OverlayInput(\d)In&Input=k?(\d+)/);
+    if (m) overlays[Number(m[1])] = m[2];
+    const o = q.match(/Function=OverlayInput(\d)(Out|Off)$/);
+    if (o) overlays[Number(o[1])] = '';
+    return { ok: true, status: 200, text: async () => '' };
+  };
+  return { calls, fetcher, overlays, num };
+}
+
+const TITLES = {
+  ssl_welcome: ['Title.Text'],
+  ssl_schedule: ['DayText.Text'],
+  ssl_results_group_4: ['SUBTITLE.Text', 'TEAM 1.Text'],
+  ssl_bug: ['TEXT.Text'],
+  ssl_break: [],
+  ssl_lineup_9: ['PitNAME.Text', 'PitSURNAME.Text', 'PitNUMBER.Text', 'Flag.Source'],
+  lowerthird_photo: ['Top text.Text', 'Bottom text.Text', 'PHOTO.Source', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
+  lowerthird_no_photo: ['Top text.Text', 'Bottom text.Text', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
+};
+
+function race() {
+  const s = setup();
+  const ev = activeEvent(s.db).id;
+  const teams = ['ESP', 'BRA', 'GBR', 'ITA'].map((c) => seedTeam(s.db, c, []).teamId);
+  const setId = createSet(s.db, ev, 'Group stage', 2, 4);
+  const [f1, f2] = getSetDetail(s.db, setId).fleets;
+  teams.forEach((t, i) => placeTeam(s.db, setId, { teamId: t, fleetId: f1.id, position: i + 1 }));
+  setShowConfig(s.db, { fleetId: f1.id });
+  saveLineup(s.ctx, ev, teams[0], { rows: [
+    { slot: 'Pit', firstName: 'Ana', lastName: 'Ruiz', number: '12' },
+    { slot: 'Helm', firstName: 'Jordi', lastName: 'Xammar', number: '3' },
+    { slot: 'Bow', firstName: 'Nil', lastName: 'Pons', number: '' },
+  ] });
+  return { s, ev, teams, f1, f2 };
+}
+
+describe('show control', () => {
+  it('toggles a board on overlay 1 and takes a lower third off when a board comes in', async () => {
+    const { s } = race();
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('anthem:1'); // team lower third of BOAT 1 on the lower-third channel (overlay 2)
+    expect(v.calls.at(-1)).toMatch(/^\?Function=OverlayInput2In&Input=k8$/);
+    v.calls.length = 0;
+    await show.run('show:welcome');
+    expect(v.calls).toEqual(['?Function=OverlayInput2Out', '?Function=OverlayInput1In&Input=k1']);
+    v.calls.length = 0;
+    await show.run('show:welcome');
+    expect(v.calls).toEqual(['?Function=OverlayInput1Out']);
+  });
+
+  it('picks the variant by the number of boats, fills results and undoes', async () => {
+    const { s } = race();
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:results');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TEAM 1.Text&Value=TEAM ESP');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k3');
+    await show.run('show:welcome');
+    expect(v.overlays[1]).toBe('1');
+    await show.run('undo');
+    expect(v.overlays[1]).toBe('3');
+  });
+
+  it('shows announcements on the bug, sorts sailors by shirt number and fills a lineup', async () => {
+    const { s, ev } = race();
+    createGraphicSet(s.db, ev, 'announcement', 'General recall', { text: 'GENERAL RECALL' });
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const n = show.announcements().findIndex((a) => a.data.text === 'GENERAL RECALL') + 1;
+    await show.run(`bug:${n}`);
+    expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=GENERAL RECALL');
+    expect(v.overlays[3]).toBe('4');
+
+    expect(show.sailors().map((x) => x.number)).toEqual(['3', '12', '']);
+    v.calls.length = 0;
+    await show.run('sailor:2');
+    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Ana RUIZ');
+    await show.run('shirt:3');
+    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Jordi XAMMAR');
+
+    v.calls.length = 0;
+    await show.run('lineup:1');
+    expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitSURNAME.Text&Value=RUIZ');
+    expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
+  });
+
+  it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
+    const { s } = race();
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:welcome');
+    expect(await show.run('panic')).toEqual({ armed: true });
+    expect(v.overlays[1]).toBe('1');
+    await show.run('panic');
+    expect(v.overlays[1]).toBe('');
+
+    await show.run('show:break');
+    expect(v.overlays[4]).toBe('5');
+    show.stopRotation();
+    v.calls.length = 0;
+    await show.run('nextslide');
+    expect(v.calls.at(-1)).toBe('?Function=SetMultiViewOverlay&Input=k5&Value=3,k3');
+    await show.run('tickermode');
+    expect(show.state.tickerMode).toBe('end');
+  });
+
+  it('builds Companion page files: two pages per deck and a fallback straight to vMix', () => {
+    const { s } = race();
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const cfg = show.config;
+    const files = companionFiles(cfg, 'http://10.0.0.5:4310', 'http://10.0.0.5:8088', show.graphics());
+    expect(files.map((f) => f.page)).toEqual([1, 2, 11, 12, 20]);
+    const p1: any = files[0].file;
+    expect(p1.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
+    expect(p1.page.controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
+    const fb: any = files[4].file;
+    expect(fb.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
+    // every page keeps the safety row in the same place
+    for (const p of deckPages(cfg)) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+  });
+});

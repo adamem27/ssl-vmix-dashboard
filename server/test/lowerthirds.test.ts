@@ -4,6 +4,7 @@ import { saveLineup } from '../src/services/lineups.js';
 import { activeEvent } from '../src/db/db.js';
 import { updateSailor } from '../src/services/sailors.js';
 import { updateTeam } from '../src/services/teams.js';
+import { setSetting } from '../src/db/db.js';
 import { companionPageExport, getLtConfig, LowerThirds, setLtConfig } from '../src/services/lowerthirds.js';
 
 const fields = ['Bar.Source', 'PHOTO.Source', 'Bottom text.Text', 'Top text.Text', 'Flag.Source', 'Emblem.Source'];
@@ -16,13 +17,13 @@ function fakeVmix() {
   const fetcher = async (url: string) => {
     const q = decodeURIComponent(url.split('/api/')[1] ?? '');
     if (q === '') {
-      const xml = `<vmix><inputs>${input(1, 'lowerthird_photo', fields)}${input(2, 'lowerthird_no_photo', fields.filter((f) => f !== 'PHOTO.Source'))}</inputs><overlays><overlay number="1">${overlay}</overlay></overlays></vmix>`;
+      const xml = `<vmix><inputs>${input(1, 'lowerthird_photo', fields)}${input(2, 'lowerthird_no_photo', fields.filter((f) => f !== 'PHOTO.Source'))}</inputs><overlays><overlay number="2">${overlay}</overlay></overlays></vmix>`;
       return { ok: true, status: 200, text: async () => xml };
     }
     calls.push(q);
-    const m = q.match(/Function=OverlayInput1In&Input=k(\d)/);
+    const m = q.match(/Function=OverlayInput2In&Input=k(\d)/);
     if (m) overlay = m[1];
-    if (q.includes('OverlayInput1Out')) overlay = '';
+    if (q.includes('OverlayInput2Out')) overlay = '';
     return { ok: true, status: 200, text: async () => '' };
   };
   return { calls, fetcher };
@@ -49,7 +50,7 @@ describe('lower thirds', () => {
     expect(r).toMatchObject({ kind: 'sailor', slot: 'Pit', cameIn: true, input: 'lowerthird_no_photo' });
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Martine GRAEL');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9  I  PIT');
-    expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k2');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput2In&Input=k2');
 
     // best results: only Bottom text changes, no transition
     v.calls.length = 0;
@@ -72,7 +73,7 @@ describe('lower thirds', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=THE CANARIES');
 
     await lt.out();
-    expect(v.calls.at(-1)).toBe('?Function=OverlayInput1Out');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput2Out');
     expect(lt.state.onAir).toBe(false);
   });
 
@@ -111,6 +112,7 @@ describe('lower thirds', () => {
     const s = setup();
     seedTeam(s.db, 'BRA', []);
     setLtConfig(s.db, { companionUrl: 'http://127.0.0.1:8000/', rows: 4, cols: 8 });
+    setSetting(s.db, 'show.config', JSON.stringify({ labels: false })); // Show control owns the keys otherwise
     const urls: string[] = [];
     const lt = new LowerThirds(s.ctx, async (u: string) => { urls.push(u); return { ok: true, status: 200, text: async () => '' }; });
     await lt.pushLabels();

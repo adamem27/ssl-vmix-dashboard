@@ -23,6 +23,8 @@ import { GtzipService } from './services/gtzip/gtzip.js';
 import { registerGtzipRoutes } from './services/gtzip/routes.js';
 import { registerBroadcastRoutes } from './services/broadcastRoutes.js';
 import { LowerThirds } from './services/lowerthirds.js';
+import { Show } from './services/show.js';
+import { registerShowRoutes } from './services/showRoutes.js';
 import { registerLowerThirdRoutes } from './services/lowerthirdRoutes.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
@@ -34,7 +36,7 @@ import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
 
-export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter; matchboard?: mb.MatchboardExporter; lowerThirds?: LowerThirds }
+export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter; matchboard?: mb.MatchboardExporter; lowerThirds?: LowerThirds; show?: Show }
 
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -469,7 +471,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
   // ---------- GTZIP generator ----------
   registerBroadcastRoutes(app, ctx);
-  registerLowerThirdRoutes(app, ctx, deps.lowerThirds ?? new LowerThirds(ctx));
+  const lt = deps.lowerThirds ?? new LowerThirds(ctx);
+  registerLowerThirdRoutes(app, ctx, lt);
+  registerShowRoutes(app, ctx, deps.show ?? new Show(ctx, lt));
   registerGtzipRoutes(app, new GtzipService(ctx, () => getSetting(db, 'paths.vmixAssetsRoot') || null, () => matchboard.fonts()));
 
   // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
