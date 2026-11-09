@@ -201,6 +201,10 @@ Eksport: przy włączonym **Auto export** pliki zapisują się w ciągu kilku se
 
 Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów z `gradienty.ai` (929×75, 851×390 ×2, 802×102, 1130×75, 289×40, 210×134) i gradienty 11 drużyn odczytane z tej tablicy (MAR, MOZ, SEY, TAH, AUT, EST, SLO, BEL, LTU, NOR, SRB). Pozostałe drużyny czekają na swoje kolory.
 
+### Zestaw neutralny
+
+Na liście krajów w generatorze PNG jest na górze pozycja **NEUTRAL**: każdy element w jednym kolorze (domyślnie czarnym) z żółto-pomarańczową obwolutą (gradient obrysu z zakładki Elements). Elementy z własnym obrysem zachowują jego grubość, pozostałe dostają grubość ustawioną w panelu „Neutral set” (domyślnie 1 px). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Zestaw można wyłączyć jednym przełącznikiem.
+
 ## Floty
 
 Zestaw flot (runda) należy do wydarzenia; drużyna może być w jednym miejscu danego zestawu, a różne zestawy dzielą te same drużyny inaczej. Flota ma cztery uporządkowane miejsca (ograniczenie także w bazie). Niepełna flota jest oznaczona jako niekompletna. Upuszczenie na zajęte miejsce otwiera wybór: jawna zamiana albo wolne miejsce. Alternatywy dla przeciągania: listy wyboru w pustych miejscach, ↑ ↓, przeniesienie do innej floty, ✕. Przeciąganie działa też z klawiatury (Tab do drużyny, spacja, strzałki, spacja).

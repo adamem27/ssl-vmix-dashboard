@@ -5,14 +5,14 @@ import { MatchboardTab } from './Matchboard';
 import { TeamProfileLink } from '../components/TeamProfileLink';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
-import { ElementSpec, Gradient, GradientStop, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
+import { ElementSpec, Gradient, GradientStop, NEUTRAL_CODE, NEUTRAL_ID, NeutralSettings, neutralGradient, neutralSpec, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
 import { useStageTeams } from '../components/StagePicker';
 
 interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean }
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
 interface GenStatus { autoExport: boolean; folder: string; pending: number; files: number; lastWriteAt: string | null; error: string | null }
 interface Output { rel: string; teamId: string; templateId: string; updatedAt: string }
-interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string; strokeGradient: Gradient }
+interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string; strokeGradient: Gradient; neutral: NeutralSettings }
 
 /** The shared gradient that elements with a gradient stroke are painted with. */
 const StrokeGradientCtx = createContext<Gradient | null>(null);
@@ -86,11 +86,20 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
   useEffect(() => setTeams(state.teams), [state.teams]);
   useEffect(() => setTemplates(state.templates), [state.templates]);
   useEffect(() => setStrokeDraft(state.strokeGradient), [state.strokeGradient]);
+  const [neutral, setNeutralDraft] = useState(state.neutral);
+  useEffect(() => setNeutralDraft(state.neutral), [state.neutral]);
+  const neutralRef = useRef(neutral);
+  neutralRef.current = neutral;
+  const neutralTeam = useMemo<TeamGradients>(() => {
+    const g = neutralGradient(neutral.color);
+    return { teamId: NEUTRAL_ID, code: NEUTRAL_CODE, name: 'Neutral', gradients: { 1: g, 2: g, 3: g } };
+  }, [neutral.color]);
+  const isNeutral = teamId === NEUTRAL_ID;
 
   const stage = useStageTeams();
   const shown = useMemo(() => teams.filter((t) => stage.inStage(t.teamId)), [teams, stage]);
-  useEffect(() => { if (shown.length && !shown.some((t) => t.teamId === teamId)) setTeamId(shown[0].teamId); }, [shown, teamId]);
-  const team = shown.find((t) => t.teamId === teamId) ?? null;
+  useEffect(() => { if (shown.length && teamId !== NEUTRAL_ID && !shown.some((t) => t.teamId === teamId)) setTeamId(shown[0].teamId); }, [shown, teamId]);
+  const team = isNeutral ? neutralTeam : shown.find((t) => t.teamId === teamId) ?? null;
   const refresh = () => qc.invalidateQueries({ queryKey: ['generator'] });
 
   const setGradient = (tid: string, v: number, g: Gradient | null, immediate = false) => {
@@ -103,6 +112,11 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
     const save = () => api.put<{ strokeGradient: Gradient }>('/api/generator/stroke-gradient', { gradient: g })
       .then((r) => { if (!g) setStrokeDraft(r.strokeGradient); }).catch((e) => { toast.error(e); refresh(); });
     if (g) debounce('stroke', save); else void save();
+  };
+  const setNeutral = (patch: Partial<NeutralSettings>) => {
+    neutralRef.current = { ...neutralRef.current, ...patch };
+    setNeutralDraft(neutralRef.current);
+    debounce('neutral', () => api.put('/api/generator/neutral', neutralRef.current).catch((e) => { toast.error(e); refresh(); }));
   };
   const patchTemplate = (id: string, patch: Partial<Template>) => {
     setTemplates((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -120,9 +134,10 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
     <div className="space-y-3">
       <ExportBar state={state} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
-        <TeamList teams={shown} selected={teamId} onSelect={setTeamId} />
+        <TeamList teams={shown} selected={teamId} onSelect={setTeamId} neutral={neutral} />
         <div className="min-w-0 space-y-3">
-          {tab === 'colours' && (team ? (
+          {tab === 'colours' && isNeutral && <NeutralPanel neutral={neutral} onChange={setNeutral} />}
+          {tab === 'colours' && !isNeutral && (team ? (
             <GradientPanel key={team.teamId} team={team} teams={shown} variant={variant} setVariant={setVariant}
               onChange={(g, immediate) => setGradient(team.teamId, variant, g, immediate)} onReload={refresh} />
           ) : <section className="card p-6 text-sm text-ink-400">No teams yet.</section>)}
@@ -134,7 +149,7 @@ function Generator({ state, tab }: { state: GenState; tab: 'colours' | 'elements
             <BgToggle bg={bg} setBg={setBg} />
           </>}>
             {view === 'team'
-              ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} />
+              ? <TeamPreview team={team} templates={templates} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={shown} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           {tab === 'elements' && <>
@@ -206,13 +221,23 @@ function ExportBar({ state }: { state: GenState }) {
 }
 
 // ---------- teams ----------
-function TeamList({ teams, selected, onSelect }: { teams: TeamGradients[]; selected: string; onSelect: (id: string) => void }) {
+function TeamList({ teams, selected, onSelect, neutral }: { teams: TeamGradients[]; selected: string; onSelect: (id: string) => void; neutral: NeutralSettings }) {
   const [q, setQ] = useState('');
   const list = teams.filter((t) => !q || `${t.code} ${t.name}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <section className="card flex max-h-[calc(100vh-150px)] flex-col lg:sticky lg:top-[72px]">
       <div className="border-b border-ink-800 p-2"><input className="input py-1 text-sm" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search teams" /></div>
       <ul className="min-h-0 flex-1 overflow-y-auto p-1">
+        <li className="mb-1 border-b border-ink-800 pb-1">
+          <button onClick={() => onSelect(NEUTRAL_ID)} title="Every element in one colour with the orange → yellow stroke"
+            className={cx('flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm', selected === NEUTRAL_ID ? 'bg-ink-800 text-ink-50' : 'text-ink-300 hover:bg-ink-850')}>
+            <span className="w-10 shrink-0 font-mono text-[10px] font-bold">{NEUTRAL_CODE}</span>
+            <span className="h-5 flex-1 rounded-sm p-px" style={{ background: 'linear-gradient(135deg, #f28c06, transparent 50%, #fece00)' }}>
+              <span className="block h-full rounded-sm" style={{ background: neutral.color }} />
+            </span>
+            {!neutral.enabled && <span className="text-[10px] uppercase text-ink-500">off</span>}
+          </button>
+        </li>
         {list.map((t) => (
           <li key={t.teamId}>
             <button onClick={() => onSelect(t.teamId)} className={cx('flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm', t.teamId === selected ? 'bg-ink-800 text-ink-50' : 'text-ink-300 hover:bg-ink-850')}>
@@ -225,6 +250,33 @@ function TeamList({ teams, selected, onSelect }: { teams: TeamGradients[]; selec
         ))}
       </ul>
     </section>
+  );
+}
+
+/** The neutral set: on/off, its colour and the stroke width of elements that have no stroke of their own. */
+function NeutralPanel({ neutral, onChange }: { neutral: NeutralSettings; onChange: (p: Partial<NeutralSettings>) => void }) {
+  return (
+    <Panel title="Neutral set">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={neutral.enabled} onChange={(e) => onChange({ enabled: e.target.checked })} className="h-4 w-4 accent-sky-500" />
+          Generate neutral PNGs
+        </label>
+        <Labeled label="Colour">
+          <div className="flex items-center gap-2">
+            <input type="color" value={neutral.color} onChange={(e) => onChange({ color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Neutral colour" />
+            <HexInput value={neutral.color} onChange={(color) => onChange({ color })} />
+          </div>
+        </Labeled>
+        <Labeled label="Stroke width">
+          <NumInput value={neutral.strokeWidth} onChange={(strokeWidth) => onChange({ strokeWidth })} min={0} max={200} step={0.5} className="w-20" label="Neutral stroke width" />
+        </Labeled>
+      </div>
+      <p className="mt-3 text-xs text-ink-400">
+        Every element in this colour with the orange → yellow stroke (the stroke gradient on the Elements tab). Elements that already have a stroke keep its width; the others get the width above.
+        Files go to <span className="font-mono">PNG generator/{NEUTRAL_CODE}/{NEUTRAL_CODE}_&lt;element&gt;.png</span> and appear in /json/graphics as the {NEUTRAL_CODE} row.
+      </p>
+    </Panel>
   );
 }
 
@@ -426,7 +478,7 @@ function Canvas({ spec, gradient, maxW, maxH }: { spec: ElementSpec; gradient: G
 
 const specOf = (t: Template): ElementSpec => t;
 
-function TeamPreview({ team, templates, bg, variant }: { team: TeamGradients | null; templates: Template[]; bg: Bg; variant: number }) {
+function TeamPreview({ team, templates, bg, variant, neutral }: { team: TeamGradients | null; templates: Template[]; bg: Bg; variant: number; neutral?: NeutralSettings }) {
   if (!team) return null;
   if (!templates.length) return <p className="text-sm text-ink-400">Add an element below.</p>;
   return (
@@ -436,7 +488,7 @@ function TeamPreview({ team, templates, bg, variant }: { team: TeamGradients | n
         return (
           <figure key={t.id} className={cx('min-w-[120px]', !t.enabled && 'opacity-40')}>
             <div className={cx('grid min-h-[48px] place-items-center rounded p-2 ring-1', bgClass(bg), t.variant === variant ? 'ring-accent-500/70' : 'ring-ink-700')}>
-              {g ? <Canvas spec={specOf(t)} gradient={g} maxW={420} maxH={220} /> : <span className="px-3 py-2 text-xs text-ink-500">V{t.variant} not set</span>}
+              {g ? <Canvas spec={neutral ? neutralSpec(specOf(t), neutral) : specOf(t)} gradient={g} maxW={420} maxH={220} /> : <span className="px-3 py-2 text-xs text-ink-500">V{t.variant} not set</span>}
             </div>
             <figcaption className="mt-1 flex items-center gap-2 text-xs">
               <span className="font-semibold text-ink-200">{t.name}</span>
