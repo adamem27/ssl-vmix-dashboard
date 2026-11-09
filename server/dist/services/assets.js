@@ -4,6 +4,7 @@ import { getSetting, newId, nowIso } from '../db/db.js';
 import { inspectImage, kindLabel } from './images.js';
 import { allowedKinds, isSponsorSlot, slotsFor } from './slots.js';
 import { normalizeLogo } from './logo.js';
+import { FLAG_SLOTS, roundFlag } from './flagShape.js';
 import { joinVmixPath, localCandidate, readIfExists, validateEnteredPath } from './paths.js';
 import { badRequest, notFound } from './errors.js';
 export function assetDto(ctx, r) {
@@ -151,7 +152,7 @@ function removeStoredFile(ctx, rel) {
     }
     catch { /* already gone */ }
 }
-export function saveUpload(ctx, owner, ownerId, slot, buf, filename) {
+export function saveUpload(ctx, owner, ownerId, slot, buf, filename, opts = {}) {
     assertSlot(owner, slot);
     if (!ownerExists(ctx.db, owner, ownerId))
         throw notFound(OWNER_LABEL[owner]);
@@ -160,6 +161,9 @@ export function saveUpload(ctx, owner, ownerId, slot, buf, filename) {
     // Sponsor logos (PNG or JPG) are evened out onto one standard transparent PNG canvas.
     if (isSponsorSlot(owner, slot))
         buf = normalizeLogo(buf);
+    // Flags always get rounded corners (never square on air).
+    if (owner === 'team' && FLAG_SLOTS.includes(slot) && !opts.flagRounded)
+        buf = roundFlag(buf);
     const info = inspectImage(buf);
     const kinds = allowedKinds(owner);
     if (!info || !kinds.includes(info.kind)) {

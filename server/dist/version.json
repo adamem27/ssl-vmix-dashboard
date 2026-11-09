@@ -1,8 +1,14 @@
 {
-  "version": "1.0.78",
-  "commit": "1cc9b2b",
-  "date": "2026-11-09T00:48:45Z",
+  "version": "1.0.80",
+  "commit": "2265ee5",
+  "date": "2026-11-09T02:03:36+01:00",
   "changes": [
+    {
+      "version": "1.0.79",
+      "commit": "da9be5d",
+      "date": "2026-11-09T01:03:30Z",
+      "text": "Flags always have rounded corners, as in the designs"
+    },
     {
       "version": "1.0.78",
       "commit": "1cc9b2b",

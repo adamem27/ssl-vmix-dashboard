@@ -11,7 +11,7 @@ export const LOGO_CANVAS = { width: 800, height: 400 };
 const LOGO_SIDE = 300;
 const MAX_W = 760;
 const MAX_H = 360;
-function decode(buf) {
+export function decode(buf) {
     if (buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47) {
         const png = PNG.sync.read(buf);
         return { width: png.width, height: png.height, data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.length) };
@@ -20,7 +20,7 @@ function decode(buf) {
         const j = jpeg.decode(buf, { useTArray: true, formatAsRGBA: true, maxMemoryUsageInMB: 1024 });
         return { width: j.width, height: j.height, data: j.data };
     }
-    throw badRequest('Sponsor logos must be PNG or JPG.');
+    throw badRequest('Images must be PNG or JPG.');
 }
 const px = (img, x, y) => (y * img.width + x) * 4;
 /**
