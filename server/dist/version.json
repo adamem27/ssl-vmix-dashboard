@@ -1,8 +1,14 @@
 {
-  "version": "1.0.101",
-  "commit": "edceb16",
-  "date": "2026-11-09T23:24:53Z",
+  "version": "1.0.102",
+  "commit": "00230a1",
+  "date": "2026-11-09T23:25:48Z",
   "changes": [
+    {
+      "version": "1.0.102",
+      "commit": "00230a1",
+      "date": "2026-11-09T23:25:48Z",
+      "text": "Show control: team keys show the group's teams (code and name) instead of BOAT 1–4"
+    },
     {
       "version": "1.0.101",
       "commit": "edceb16",
@@ -476,12 +482,6 @@
       "commit": "f98ebd1",
       "date": "2026-10-18T00:21:10Z",
       "text": "Simpler interface: one editable table, drag & drop graphics, JSON for vMix"
-    },
-    {
-      "version": "1.0.6",
-      "commit": "e2026a4",
-      "date": "2026-10-18T00:13:17Z",
-      "text": "Start scripts stop a dashboard already running on port 4310"
     }
   ]
 }
