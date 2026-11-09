@@ -8,7 +8,8 @@ import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../componen
 import { ElementSpec, Gradient, GradientStop, NEUTRAL_CODE, NEUTRAL_ID, NeutralSettings, neutralGradients, neutralSpec, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
 import { useStageTeams } from '../components/StagePicker';
 
-type Scope = 'teams' | 'neutral';
+type Scope = 'teams' | 'neutral' | 'both';
+const forScope = (t: { scope: Scope }, neutral: boolean) => t.scope === 'both' || t.scope === (neutral ? 'neutral' : 'teams');
 interface Template extends ElementSpec { id: string; sort: number; name: string; fileName: string; variant: number; enabled: boolean; scope: Scope }
 type From = NonNullable<ElementSpec['gradientFrom']>;
 const fromOf = (t: ElementSpec): From => t.gradientFrom ?? (t.flip ? 'right' : 'left');
@@ -136,7 +137,7 @@ function Generator({ state }: { state: GenState }) {
     <div className="space-y-3">
       <ExportBar state={state} />
       <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} newScope={isNeutral ? 'neutral' : 'teams'} preview={(t) => (
-        <ElementPreview template={t} team={t.scope === 'neutral' ? neutralTeam : isNeutral ? null : team} teams={shown} neutral={t.scope === 'neutral' ? neutral : undefined} bg={bg} setBg={setBg}
+        <ElementPreview template={t} team={t.scope === 'neutral' || (t.scope === 'both' && isNeutral) ? neutralTeam : isNeutral ? null : team} teams={shown} neutral={t.scope === 'neutral' || (t.scope === 'both' && isNeutral) ? neutral : undefined} bg={bg} setBg={setBg}
           onPick={(id) => setTeamId(id)} />
       )} />
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
@@ -150,12 +151,12 @@ function Generator({ state }: { state: GenState }) {
           <Panel title="Preview" right={<>
             <select className="input w-auto py-1 text-xs" value={view} onChange={(e) => setView(e.target.value)} aria-label="Preview">
               <option value="team">{team ? `${team.code}: all elements` : 'All elements'}</option>
-              {templates.filter((t) => t.scope === 'teams').map((t) => <option key={t.id} value={t.id}>{t.name}: all teams</option>)}
+              {templates.filter((t) => t.scope !== 'neutral').map((t) => <option key={t.id} value={t.id}>{t.name}: all teams</option>)}
             </select>
             <BgToggle bg={bg} setBg={setBg} />
           </>}>
             {view === 'team'
-              ? <TeamPreview team={team} templates={templates.filter((t) => t.scope === (isNeutral ? 'neutral' : 'teams'))} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
+              ? <TeamPreview team={team} templates={templates.filter((t) => forScope(t, isNeutral))} bg={bg} variant={variant} neutral={isNeutral ? neutral : undefined} />
               : <TemplateAcrossTeams template={templates.find((t) => t.id === view)} teams={shown} bg={bg} onPick={(id) => { setTeamId(id); setView('team'); }} />}
           </Panel>
           <StrokeGradientPanel g={strokeGradient} onChange={setStrokeGradient} used={templates.filter((t) => t.strokeGradient && t.strokeWidth > 0).length} />
@@ -538,7 +539,7 @@ function ElementPreview({ template: t, team, teams, neutral, bg, setBg, onPick }
         <div className="ml-auto"><BgToggle bg={bg} setBg={setBg} /></div>
       </div>
       {teamsOnly ? <TemplateAcrossTeams template={t} teams={teams} bg={bg} onPick={onPick} />
-        : <p className="text-xs text-ink-500">A neutral element: made only in the neutral colours, never for the teams.</p>}
+        : <p className="text-xs text-ink-500">A neutral element: made only in the neutral colours, never for the teams. Choose “Both” in For to make it for the teams too.</p>}
     </div>
   );
 }
@@ -663,9 +664,10 @@ function ElementsPanel({ templates, patch, onReload, preview, newScope }: { temp
                 </td>
                 <td className="px-1.5"><input type="checkbox" checked={t.enabled} onChange={(e) => patch(t.id, { enabled: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Enabled" /></td>
                 <td className="px-1.5">
-                  <select className={cx('input w-auto px-1.5 py-1', t.scope === 'neutral' && 'text-amber-300')} value={t.scope} onChange={(e) => patch(t.id, { scope: e.target.value as Scope })} aria-label="Made for" title="Teams: one PNG per team in its colours. Neutral: one PNG in the neutral colours only.">
+                  <select className={cx('input w-auto px-1.5 py-1', t.scope === 'neutral' && 'text-amber-300', t.scope === 'both' && 'text-sky-300')} value={t.scope} onChange={(e) => patch(t.id, { scope: e.target.value as Scope })} aria-label="Made for" title="Teams: one PNG per team in its colours. Neutral: one PNG in the neutral colours only. Both: the team PNGs and the neutral one.">
                     <option value="teams">Teams</option>
                     <option value="neutral">Neutral</option>
+                    <option value="both">Both</option>
                   </select>
                 </td>
                 <td className="px-1.5"><TextInput className="w-28" value={t.name} label="Name" onChange={(name) => name.trim() && patch(t.id, { name })} /></td>

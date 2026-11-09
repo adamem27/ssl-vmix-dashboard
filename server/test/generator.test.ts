@@ -7,7 +7,7 @@ import { encodePng } from '../src/services/png.js';
 import { inspectImage } from '../src/services/images.js';
 import { DEFAULT_STROKE_GRADIENT, ElementSpec, neutralGradient, renderElement } from '../src/services/generator/render.js';
 import {
-  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate, setNeutral, getNeutral, splitNeutralElements,
+  createTemplate, GeneratorExporter, getStrokeGradient, setStrokeGradient, listTemplates, upgradeStarterTemplates, jsonGraphics, listGradients, listOutputs, seedGenerator, setGradient, TEAM_GRADIENTS_SSL26, setGradientsFromColors, STARTER_TEMPLATES, updateTemplate, setNeutral, getNeutral, splitNeutralElements, deleteTemplate,
 } from '../src/services/generator/generator.js';
 
 const el = (p: Partial<ElementSpec> = {}): ElementSpec => ({
@@ -151,6 +151,10 @@ describe('PNG generator export', () => {
     exporter.flush();
     // each element is made only in its own colours
     expect(listOutputs(db).map((o) => o.rel).sort()).toEqual(['PNG generator/NEUTRAL/NEUTRAL_bar.png', 'PNG generator/POL/POL_team_bar.png']);
+    const both = createTemplate(db, { ...STARTER_TEMPLATES[0], fileName: 'both_bar', width: 40, height: 20, pattern: false, scope: 'both' });
+    exporter.flush();
+    expect(listOutputs(db).map((o) => o.rel).filter((r) => r.includes('both_bar')).sort()).toEqual(['PNG generator/NEUTRAL/NEUTRAL_both_bar.png', 'PNG generator/POL/POL_both_bar.png']);
+    deleteTemplate(db, both.id);
     db.prepare("DELETE FROM teams").run();
     exporter.flush();
     const file = path.join(ctx.assetsDir, 'PNG generator', 'NEUTRAL', 'NEUTRAL_bar.png');

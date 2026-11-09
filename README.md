@@ -203,7 +203,7 @@ Na start generator dodaje 7 elementów z wymiarami i zaokrągleniami artboardów
 
 ### Zestaw neutralny
 
-Każdy element jest robiony albo w barwach drużyn, albo w barwach neutralnych (kolumna **For** w tabeli elementów), nigdy w obu. Elementy z „neutr” w nazwie lub nazwie pliku zostały przy aktualizacji jednorazowo oznaczone jako neutralne, pozostałe jako drużynowe. Neutralne elementy mają wypełnienie jak w finals-broadcast_ssl26_v2.ai (#1a1a1a, krycie 80%) i żółto-pomarańczową obwolutę w pełnym kolorze; wersja działa jak u drużyn (V1 pełna, V2 narasta, V3 narasta i zanika). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Kolumna **Gradient from** ustawia, z której strony zaczyna się gradient: lewa, prawa, góra albo dół (obwoluta obraca się razem z nim).
+Kolumna **For** w tabeli elementów decyduje, w jakich barwach powstaje element: Teams (tylko drużyny), Neutral (tylko neutralne) albo Both (jedno i drugie). Elementy z „neutr” w nazwie lub nazwie pliku zostały przy aktualizacji jednorazowo oznaczone jako neutralne, pozostałe jako drużynowe. Neutralne elementy mają wypełnienie jak w finals-broadcast_ssl26_v2.ai (#1a1a1a, krycie 80%) i żółto-pomarańczową obwolutę w pełnym kolorze; wersja działa jak u drużyn (V1 pełna, V2 narasta, V3 narasta i zanika). Pliki trafiają do `PNG generator/NEUTRAL/NEUTRAL_<element>.png` i są w `/json/graphics` jako wiersz `NEUTRAL`. Kolumna **Gradient from** ustawia, z której strony zaczyna się gradient: lewa, prawa, góra albo dół (obwoluta obraca się razem z nim).
 
 ## Floty
 

@@ -33,8 +33,8 @@ const templateFields = {
   opacity: pct,
   flip: z.boolean(),
   gradientFrom: z.enum(['left', 'right', 'top', 'bottom']).optional(),
-  /** which colours the element is made in: the teams' gradients or the neutral set (never both) */
-  scope: z.enum(['teams', 'neutral']),
+  /** which colours the element is made in: the teams' gradients, the neutral set, or both */
+  scope: z.enum(['teams', 'neutral', 'both']),
   angleOffset: z.number().min(-360).max(360),
   strokeWidth: z.number().min(0).max(200),
   strokeColor: hex,
@@ -194,7 +194,7 @@ export function plannedJobs(ctx: GenCtx): Job[] {
   const jobs: Job[] = [];
   for (const team of listGradients(ctx.db)) {
     if (!team.code.trim()) continue;
-    for (const t of templates.filter((x) => x.scope === 'teams')) {
+    for (const t of templates.filter((x) => x.scope !== 'neutral')) {
       const g = team.gradients[t.variant];
       if (!g) continue;
       const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...spec } = t;
@@ -206,7 +206,7 @@ export function plannedJobs(ctx: GenCtx): Job[] {
   const neutral = getNeutral(ctx.db);
   if (neutral.enabled) {
     const versions = neutralGradients(neutral.color, neutral.opacity);
-    for (const t of templates.filter((x) => x.scope === 'neutral')) {
+    for (const t of templates.filter((x) => x.scope !== 'teams')) {
       const g = versions[t.variant - 1] ?? versions[0];
       const { id: _id, sort: _s, name: _n, fileName: _f, enabled: _e, variant: _v, ...own } = t;
       const spec = neutralSpec(own, neutral);
