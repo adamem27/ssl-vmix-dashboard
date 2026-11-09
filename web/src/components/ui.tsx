@@ -1,4 +1,5 @@
 import { ButtonHTMLAttributes, createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export function cx(...c: (string | false | null | undefined)[]) { return c.filter(Boolean).join(' '); }
 
@@ -88,17 +89,20 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  // Portal to <body>: a parent with backdrop-filter/transform (e.g. the sticky header) would otherwise
+  // become the containing block for `fixed`, pushing the dialog off screen.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={cx('card max-h-[90vh] w-full overflow-auto shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}>
-        <div className="flex items-center justify-between border-b border-ink-800 px-5 py-3">
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={cx('card flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden shadow-2xl', wide ? 'max-w-4xl' : 'max-w-lg')}>
+        <div className="flex shrink-0 items-center justify-between border-b border-ink-800 px-5 py-3">
           <h2 className="text-base font-semibold">{title}</h2>
           <button onClick={onClose} className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-100" aria-label="Close">✕</button>
         </div>
-        <div className="p-5">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-ink-800 px-5 py-3">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-auto p-5">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-ink-800 px-5 py-3">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
