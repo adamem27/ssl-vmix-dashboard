@@ -1,8 +1,14 @@
 {
-  "version": "1.0.75",
-  "commit": "8e9901c",
-  "date": "2026-11-09T00:32:50Z",
+  "version": "1.0.77",
+  "commit": "8183f59",
+  "date": "2026-11-09T01:45:49+01:00",
   "changes": [
+    {
+      "version": "1.0.76",
+      "commit": "745c9f1",
+      "date": "2026-11-09T00:45:45Z",
+      "text": "Send to vMix fills race columns from the right, next to Points"
+    },
     {
       "version": "1.0.75",
       "commit": "8e9901c",

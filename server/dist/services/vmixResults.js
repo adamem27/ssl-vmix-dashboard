@@ -7,6 +7,7 @@ import { listTeams } from './teams.js';
  * (SetText / SetImage), so the title needs no Data Source mapping. Field names follow the
  * Group_overall_results_* titles: SUBTITLE, LOCATION, H1…, and per row n POS n, FLAG n, TEAM n,
  * R1 n…, POINTS n. Only fields the input really has are set; rows past the group are emptied.
+ * Race columns are filled from the right, so fewer races still sit next to Points.
  */
 export const DEFAULT_VMIX_URL = 'http://127.0.0.1:8088';
 const KEY = 'vmix.apiUrl';
@@ -20,23 +21,33 @@ export function setVmixUrl(db, url) {
 }
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 /** The values for every field the results title can have: `NAME.Text` or `NAME.Source` → value. */
-export function resultFields(ctx, fleetId, rowsInTitle = 12) {
+export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
     const g = getResults(ctx.db, fleetId);
     const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
     const f = new Map();
     f.set('SUBTITLE.Text', g.title);
     if (g.subtitle.trim())
         f.set('LOCATION.Text', g.subtitle);
-    for (let j = 1; j <= 12; j++)
-        f.set(`H${j}.Text`, j <= g.races ? `R${j}` : '');
+    // race columns stand at the right, next to Points: with 4 races in a 6-column title,
+    // R1…R4 go to columns 3…6 and columns 1–2 stay empty; more races than columns show the last ones
+    const c = cols || g.races;
+    const shown = Math.min(g.races, c);
+    const first = g.races - shown; // index of the first race shown
+    const raceAt = (col) => { const k = col - (c - shown) - 1; return k >= 0 && k < shown ? first + k : -1; };
+    for (let j = 1; j <= 12; j++) {
+        const k = j <= c ? raceAt(j) : -1;
+        f.set(`H${j}.Text`, k >= 0 ? `R${k + 1}` : '');
+    }
     for (let n = 1; n <= Math.max(rowsInTitle, g.rows.length); n++) {
         const r = g.rows[n - 1];
         const t = r ? teams.get(r.teamId) : undefined;
         f.set(`POS ${n}.Text`, r ? String(n) : '');
         f.set(`TEAM ${n}.Text`, (t?.name ?? '').toUpperCase());
         f.set(`FLAG ${n}.Source`, img(t?.assets.flag_small));
-        for (let j = 1; j <= 12; j++)
-            f.set(`R${j} ${n}.Text`, r && j <= g.races ? r.races[j - 1] ?? '' : '');
+        for (let j = 1; j <= 12; j++) {
+            const k = j <= c ? raceAt(j) : -1;
+            f.set(`R${j} ${n}.Text`, r && k >= 0 ? r.races[k] ?? '' : '');
+        }
         f.set(`POINTS ${n}.Text`, r ? r.total : '');
     }
     return f;
@@ -83,7 +94,8 @@ export async function pushResults(ctx, fleetId, inputName, fetcher = fetch) {
     if (!input)
         throw badRequest(`vMix has no input “${inputName}”. Use the input's name or number as shown in vMix.`);
     const rowsInTitle = Math.max(0, ...input.fields.map((f) => Number(f.match(/^TEAM (\d+)\.Text$/)?.[1] ?? 0)));
-    const fields = resultFields(ctx, fleetId, rowsInTitle);
+    const cols = Math.max(0, ...input.fields.map((f) => Number(f.match(/^R(\d+) 1\.Text$/)?.[1] ?? 0)));
+    const fields = resultFields(ctx, fleetId, rowsInTitle, cols);
     const has = new Set(input.fields);
     let sent = 0;
     for (const [name, value] of fields) {
@@ -94,5 +106,5 @@ export async function pushResults(ctx, fleetId, inputName, fetcher = fetch) {
         sent++;
     }
     const g = getResults(ctx.db, fleetId);
-    return { input: input.title, number: input.number, sent, teams: g.rows.length, rowsInTitle, tooMany: g.rows.length > rowsInTitle };
+    return { input: input.title, number: input.number, sent, teams: g.rows.length, rowsInTitle, tooMany: g.rows.length > rowsInTitle, cols, races: g.races, racesHidden: Math.max(0, g.races - cols) };
 }
