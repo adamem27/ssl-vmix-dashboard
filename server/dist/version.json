@@ -1,8 +1,14 @@
 {
-  "version": "1.0.91",
-  "commit": "c99e735",
-  "date": "2026-11-09T19:14:07Z",
+  "version": "1.0.92",
+  "commit": "7b25d3f",
+  "date": "2026-11-09T19:24:55Z",
   "changes": [
+    {
+      "version": "1.0.92",
+      "commit": "7b25d3f",
+      "date": "2026-11-09T19:24:55Z",
+      "text": "PNG generator: an element can be made for both the teams and the neutral set"
+    },
     {
       "version": "1.0.91",
       "commit": "c99e735",

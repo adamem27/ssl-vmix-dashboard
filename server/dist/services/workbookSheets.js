@@ -173,7 +173,7 @@ export function teamsSheet(ctx, eventId, today) {
     const { stage, teams } = stageTeams(ctx, eventId);
     const ov = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t]));
     const root = getSetting(db, 'paths.vmixAssetsRoot');
-    const templates = listTemplates(db).filter((t) => t.enabled && t.scope === 'teams');
+    const templates = listTemplates(db).filter((t) => t.enabled && t.scope !== 'neutral');
     const outputs = new Set(listOutputs(db).map((o) => o.rel));
     return teams.map(({ t, group, place }) => {
         const row = {};
