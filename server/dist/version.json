@@ -1,8 +1,14 @@
 {
-  "version": "1.0.97",
-  "commit": "6e7901a",
-  "date": "2026-11-09T22:45:54Z",
+  "version": "1.0.98",
+  "commit": "f3bb699",
+  "date": "2026-11-09T22:51:03Z",
   "changes": [
+    {
+      "version": "1.0.98",
+      "commit": "f3bb699",
+      "date": "2026-11-09T22:51:03Z",
+      "text": "Show control: lineup lower third in two parts, qualified team keys, placeholders as Image inputs, README"
+    },
     {
       "version": "1.0.97",
       "commit": "6e7901a",
@@ -476,12 +482,6 @@
       "commit": "fec54d7",
       "date": "2026-10-18T00:03:52Z",
       "text": "English UI, live overview table and SSL Gold Cup 2026 matchboard"
-    },
-    {
-      "version": "1.0.2",
-      "commit": "f0315b2",
-      "date": "2026-10-17T23:46:44Z",
-      "text": "Wymagaj Node 22.12+ (Vite 8 / rolldown)"
     }
   ]
 }
