@@ -9,7 +9,7 @@ import { listTeams } from './teams.js';
  * The row order is the standing; it can be sorted by points or moved by hand.
  */
 export interface ResultRow { teamId: string; races: string[]; points: string }
-export interface ResultData { title: string; subtitle: string; races: number; rows: ResultRow[] }
+export interface ResultData { title: string; subtitle: string; races: number; rows: ResultRow[]; vmixInput: string }
 export const MAX_RACES = 12;
 
 const num = (v: string) => { const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) ? n : 0; };
@@ -39,7 +39,7 @@ function load(db: DB, fleetId: string): { data: ResultData; updatedAt: string | 
   const seen = new Set(stored.map((x) => x.teamId));
   const rows = [...stored, ...f.teamIds.filter((id) => !seen.has(id)).map((teamId) => ({ teamId, races: [], points: '' }))]
     .map((x) => ({ teamId: x.teamId, races: Array.from({ length: races }, (_, i) => String(x.races?.[i] ?? '')), points: String(x.points ?? '') }));
-  return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows }, updatedAt: r?.updated_at ?? null };
+  return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
 }
 
 export function getResults(db: DB, fleetId: string) {
@@ -53,10 +53,11 @@ export function listResults(db: DB, setId: string) {
   return fleets.map((f) => getResults(db, f.id));
 }
 
-export function saveResults(db: DB, fleetId: string, patch: { title?: string; subtitle?: string; races?: number; rows?: { teamId: string; races?: string[]; points?: string }[]; order?: string[] }) {
+export function saveResults(db: DB, fleetId: string, patch: { title?: string; subtitle?: string; vmixInput?: string; races?: number; rows?: { teamId: string; races?: string[]; points?: string }[]; order?: string[] }) {
   const { data } = load(db, fleetId);
   if (patch.title !== undefined) data.title = patch.title.slice(0, 120);
   if (patch.subtitle !== undefined) data.subtitle = patch.subtitle.slice(0, 120);
+  if (patch.vmixInput !== undefined) data.vmixInput = patch.vmixInput.trim().slice(0, 120);
   if (patch.races !== undefined) data.races = Math.max(1, Math.min(MAX_RACES, Math.round(patch.races)));
   for (const p of patch.rows ?? []) {
     const r = data.rows.find((x) => x.teamId === p.teamId);
@@ -83,9 +84,10 @@ export function sortResults(db: DB, fleetId: string) {
 }
 
 export function clearResults(db: DB, fleetId: string) {
-  fleetInfo(db, fleetId);
+  const { vmixInput } = load(db, fleetId).data;
   db.prepare('DELETE FROM results WHERE fleet_id = ?').run(fleetId);
-  return getResults(db, fleetId);
+  // the vMix input belongs to the graphic, not to the scores: it survives a clear
+  return vmixInput ? saveResults(db, fleetId, { vmixInput }) : getResults(db, fleetId);
 }
 
 type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: string | null } | undefined | null;

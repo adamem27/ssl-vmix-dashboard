@@ -245,7 +245,30 @@ function PathsSection({ info }: { info: SettingsInfo }) {
         </Field>
         <Button type="submit" variant="primary" busy={busy} disabled={root === info.paths.vmixAssetsRoot}>Save</Button>
       </form>
+      <VmixAddress />
     </Section>
+  );
+}
+
+/** Where the dashboard reaches the vMix Web API (Results → Send to vMix). */
+function VmixAddress() {
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['vmix-url'], queryFn: () => api.get<{ apiUrl: string; default: string }>('/api/settings/vmix') });
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const value = url ?? q.data?.apiUrl ?? '';
+  const save = async (e: FormEvent) => {
+    e.preventDefault(); setBusy(true);
+    try { const r = await api.put<{ apiUrl: string }>('/api/settings/vmix', { apiUrl: value }); setUrl(r.apiUrl); q.refetch(); toast.ok('vMix address saved'); }
+    catch (err) { toast.error(err); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={save} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+      <Field label="vMix Web API address (vMix: Settings → Web Controller)">
+        <input className="input font-mono text-xs" value={value} onChange={(e) => setUrl(e.target.value)} placeholder={q.data?.default ?? 'http://127.0.0.1:8088'} />
+      </Field>
+      <Button type="submit" variant="primary" busy={busy} disabled={!q.data || value === q.data.apiUrl}>Save</Button>
+    </form>
   );
 }
 
