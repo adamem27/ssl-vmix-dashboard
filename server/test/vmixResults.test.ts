@@ -41,6 +41,17 @@ describe('results to vMix', () => {
     expect(r).toMatchObject({ number: '2', rowsInTitle: 3, teams: 2, tooMany: false });
     expect(calls.some((u) => u.includes('Function=SetImage') && u.includes('FLAG%201.Source'))).toBe(true);
 
+    // race columns fill from the right: one race sits in the last column, next to Points
+    const again = async () => { calls.length = 0; const res = await pushResults(ctx, fleetId, '2', fake); return { res, m: new Map(calls.slice(1).map((u) => { const q = new URL(u).searchParams; return [q.get('SelectedName')!, q.get('Value')!]; })) }; };
+    rs.saveResults(db, fleetId, { races: 1 });
+    let x = await again();
+    expect([x.m.get('H1.Text'), x.m.get('H2.Text'), x.m.get('R1 1.Text'), x.m.get('R2 1.Text')]).toEqual(['', 'R1', '', '4']);
+    // more races than columns: the last ones are shown
+    rs.saveResults(db, fleetId, { races: 3, rows: [{ teamId: b.teamId, races: ['4', '4', '1'] }] });
+    x = await again();
+    expect([x.m.get('H1.Text'), x.m.get('H2.Text'), x.m.get('R1 1.Text'), x.m.get('R2 1.Text')]).toEqual(['R2', 'R3', '4', '1']);
+    expect(x.res).toMatchObject({ cols: 2, races: 3, racesHidden: 1 });
+
     await expect(pushResults(ctx, fleetId, 'Nope', fake)).rejects.toThrow(/no input/);
     await expect(pushResults(ctx, fleetId, '2', async () => { throw new Error('ECONNREFUSED'); })).rejects.toThrow(/Web Controller/);
     expect(() => setVmixUrl(db, 'not a url')).toThrow();
