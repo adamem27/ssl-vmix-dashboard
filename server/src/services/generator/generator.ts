@@ -26,6 +26,7 @@ const templateFields = {
   width: z.number().int().min(1).max(4096),
   height: z.number().int().min(1).max(4096),
   radius: z.number().min(0).max(2048),
+  corner: z.enum(['round', 'cut']),
   opacity: pct,
   flip: z.boolean(),
   angleOffset: z.number().min(-360).max(360),
@@ -40,7 +41,7 @@ const templateFields = {
   enabled: z.boolean(),
 };
 /** Stored elements from before the gradient stroke get its defaults. */
-export const templateSchema = z.object({ ...templateFields, strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
+export const templateSchema = z.object({ ...templateFields, corner: templateFields.corner.default('round'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
 export const templatePatchSchema = z.object(templateFields).partial();
 export type Template = z.infer<typeof templateSchema> & { id: string; sort: number };
 
@@ -337,7 +338,7 @@ export class GeneratorExporter {
 }
 
 // ---------- defaults ----------
-const ELEMENT_DEFAULTS = { radius: 0, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
+const ELEMENT_DEFAULTS = { radius: 0, corner: 'round' as const, opacity: 100, flip: false, angleOffset: 0, strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true };
 /** The 1px gradient ring the panels and the waves bar have (orange→yellow since finals-broadcast_ssl26_v2). */
 const AI_STROKE = { strokeWidth: 1, strokeGradient: true };
 

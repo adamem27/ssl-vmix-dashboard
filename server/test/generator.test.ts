@@ -49,6 +49,18 @@ describe('PNG renderer', () => {
     expect(px(r, 20, 10)[1]).toBeLessThan(50);
   });
 
+  it('cuts corners straight across when the corner shape is cut', () => {
+    const red = { angle: 0, stops: [{ pos: 0, color: '#ff0000', opacity: 100 }, { pos: 100, color: '#ff0000', opacity: 100 }] };
+    const round = renderElement(el({ width: 40, height: 40, radius: 10 }), red);
+    const cut = renderElement(el({ width: 40, height: 40, radius: 10, corner: 'cut' }), red);
+    expect(px(cut, 0, 0)[3]).toBe(0);
+    expect(px(cut, 4, 4)[3]).toBe(0); // beyond the 45° cut
+    expect(px(round, 4, 4)[3]).toBeGreaterThan(0); // inside the rounded corner
+    expect(px(cut, 6, 6)[3]).toBe(255);
+    expect(px(cut, 10, 0)[3]).toBeGreaterThan(0); // the cut ends 10 px along the edge
+    expect(px(cut, 20, 20)[3]).toBe(255);
+  });
+
   it('paints the stroke with the stroke gradient along its own angle', () => {
     const greenBlue = { angle: 0, stops: [{ pos: 0, color: '#00ff00', opacity: 100 }, { pos: 100, color: '#0000ff', opacity: 100 }] };
     const spec = el({ width: 100, height: 20, strokeWidth: 2, strokeColor: '#ffffff', strokeGradient: true, strokeAngle: 0 });

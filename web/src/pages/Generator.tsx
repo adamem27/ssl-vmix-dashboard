@@ -575,7 +575,7 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
     let n = templates.length + 1;
     while (names.has(`element_${n}`)) n++;
     return api.post('/api/generator/templates', {
-      name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, opacity: 100, flip: false, angleOffset: 0,
+      name: `Element ${n}`, fileName: `element_${n}`, variant: 1, width: 600, height: 80, radius: 0, corner: 'round', opacity: 100, flip: false, angleOffset: 0,
       strokeWidth: 0, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: false, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true,
     });
   });
@@ -594,7 +594,7 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
           <thead>
             <tr className="border-b border-ink-800">
               <th className={th} /><th className={th}>On</th><th className={th}>Name</th><th className={th}>File</th><th className={th}>Ver.</th>
-              <th className={th}>W</th><th className={th}>H</th><th className={th}>Radius</th><th className={th}>Opacity %</th>
+              <th className={th}>W</th><th className={th}>H</th><th className={th}>Corners</th><th className={th}>Opacity %</th>
               <th className={th}>Flip</th><th className={th}>Angle +</th><th className={th}>Stroke px</th><th className={th}>Stroke</th><th className={th}>Gradient</th><th className={th}>Stroke ∠</th>
               <th className={th}>Waves</th><th className={th}>Waves %</th><th className={th}>Waves size %</th><th className={th} />
             </tr>
@@ -617,7 +617,15 @@ function ElementsPanel({ templates, patch, onReload, preview }: { templates: Tem
                 </td>
                 <td className="px-1.5">{num(t, 'width', 'w-[4.5rem]', 1)}</td>
                 <td className="px-1.5">{num(t, 'height', 'w-[4.5rem]', 1)}</td>
-                <td className="px-1.5">{num(t, 'radius')}</td>
+                <td className="px-1.5">
+                  <div className="flex items-center gap-1">
+                    <select className="input w-auto px-1.5 py-1" value={t.corner ?? 'round'} onChange={(e) => patch(t.id, { corner: e.target.value as 'round' | 'cut' })} aria-label="Corner shape" title="Rounded or cut corners; the number is the radius or how far the cut reaches along each edge (px)">
+                      <option value="round">◜ Round</option>
+                      <option value="cut">◸ Cut</option>
+                    </select>
+                    {num(t, 'radius')}
+                  </div>
+                </td>
                 <td className="px-1.5">{num(t, 'opacity', 'w-16', 0, 100)}</td>
                 <td className="px-1.5"><input type="checkbox" checked={t.flip} onChange={(e) => patch(t.id, { flip: e.target.checked })} className="h-4 w-4 accent-sky-500" aria-label="Flip" /></td>
                 <td className="px-1.5">{num(t, 'angleOffset', 'w-16', -360, 360)}</td>
