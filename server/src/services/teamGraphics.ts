@@ -40,7 +40,8 @@ export function applyTeamGraphics(ctx: AssetCtx, dir = graphicsDir()): TeamGraph
     let any = false;
     for (const [slot, file] of Object.entries(filesFor(dir, code))) {
       if (!fs.existsSync(file)) continue;
-      saveUpload(ctx, 'team', t.id, slot, fs.readFileSync(file), `${code}_${slot}.png`);
+      // the bundled flags are stored with rounded corners already
+      saveUpload(ctx, 'team', t.id, slot, fs.readFileSync(file), `${code}_${slot}.png`, { flagRounded: true });
       res.files++; any = true;
     }
     if (!fs.existsSync(path.join(dir, 'flags', `${code}_big.png`))) res.withoutFlag.push(code);

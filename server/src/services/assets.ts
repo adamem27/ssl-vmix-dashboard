@@ -4,6 +4,7 @@ import { DB, getSetting, newId, nowIso } from '../db/db.js';
 import { inspectImage, kindLabel } from './images.js';
 import { allowedKinds, isSponsorSlot, OwnerType, slotsFor } from './slots.js';
 import { normalizeLogo } from './logo.js';
+import { FLAG_SLOTS, roundFlag } from './flagShape.js';
 import { joinVmixPath, localCandidate, readIfExists, validateEnteredPath } from './paths.js';
 import { badRequest, notFound } from './errors.js';
 
@@ -154,12 +155,14 @@ function removeStoredFile(ctx: AssetCtx, rel: string | null) {
   try { fs.unlinkSync(p); } catch { /* already gone */ }
 }
 
-export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, buf: Buffer, filename: string): AssetDto {
+export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slot: string, buf: Buffer, filename: string, opts: { flagRounded?: boolean } = {}): AssetDto {
   assertSlot(owner, slot);
   if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(OWNER_LABEL[owner]);
   if (!buf.length) throw badRequest('The file is empty.');
   // Sponsor logos (PNG or JPG) are evened out onto one standard transparent PNG canvas.
   if (isSponsorSlot(owner, slot)) buf = normalizeLogo(buf);
+  // Flags always get rounded corners (never square on air).
+  if (owner === 'team' && FLAG_SLOTS.includes(slot) && !opts.flagRounded) buf = roundFlag(buf);
   const info = inspectImage(buf);
   const kinds = allowedKinds(owner);
   if (!info || !kinds.includes(info.kind)) {
