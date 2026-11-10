@@ -701,6 +701,7 @@ function ElementsPanel({ templates, patch, onReload, preview, newScope }: { temp
                       <option value="cut">◸ Cut</option>
                     </select>
                     <span title={t.corner === 'cut' ? 'Rounding of every vertex (px)' : 'Corner radius (px)'}>{num(t, 'radius')}</span>
+                    {t.corner !== 'cut' && <span title="Notch across the bottom (px): the shape sits on a bar, only its bottom corners reach down (line-up photo box); 0 = none" className="flex items-center gap-0.5 text-[10px] text-ink-500">⌓{num({ ...t, notch: t.notch ?? 0 }, 'notch', 'w-14')}</span>}
                     {t.corner === 'cut' && <>
                       <span title="How far the cut reaches along the top and bottom edge (px)" className="flex items-center gap-0.5 text-[10px] text-ink-500">↔{num(t, 'cutX', 'w-16')}</span>
                       <span title="How far the cut reaches along the side edge (px); half the height or more makes a point" className="flex items-center gap-0.5 text-[10px] text-ink-500">↕{num(t, 'cutY', 'w-16')}</span>

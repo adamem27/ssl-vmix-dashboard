@@ -34,7 +34,8 @@ export const MAX_EXTRA = 6;
 const extraSlot = (n: number) => slot(`Sailor${n}`, `Sailor ${n}`, '');
 
 export interface LineupRow { slot: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; captain: boolean }
-export interface LineupData { title: string; teamName: string; extra: number; rows: LineupRow[]; order?: string[] }
+/** photoSide: which way the team's photo boxes face in the line-up (lineup_photo_left / _right from the PNG generator) */
+export interface LineupData { title: string; teamName: string; photoSide?: 'left' | 'right'; extra: number; rows: LineupRow[]; order?: string[] }
 
 export const slotDefs = (extra: number) => [...LINEUP_SLOTS, ...Array.from({ length: Math.max(0, Math.min(MAX_EXTRA, extra)) }, (_, i) => extraSlot(10 + i))];
 
@@ -48,7 +49,7 @@ function normalize(raw: Partial<LineupData>): LineupData {
   const order = (raw.order ?? []).filter((k, i, a) => defs.some((d) => d.key === k) && a.indexOf(k) === i);
   const ordered = [...order.map((k) => defs.find((d) => d.key === k)!), ...defs.filter((d) => !order.includes(d.key))];
   return {
-    title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', extra,
+    title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', photoSide: raw.photoSide === 'right' ? 'right' : 'left', extra,
     rows: ordered.map((d) => {
       const r = byKey.get(d.key);
       return r ? { ...emptyRow(d), ...r, slot: d.key, captain: !!r.captain } : emptyRow(d);
@@ -78,10 +79,10 @@ export function getLineup(ctx: AssetCtx, eventId: string, teamId: string) {
   return { teamId, ...l, slots: slotDefs(l.data.extra).map((d) => ({ key: d.key, label: d.label, position: d.position })) };
 }
 
-export function saveLineup(ctx: AssetCtx, eventId: string, teamId: string, patch: { title?: string; teamName?: string; extra?: number; rows?: Partial<LineupRow>[]; order?: string[] }) {
+export function saveLineup(ctx: AssetCtx, eventId: string, teamId: string, patch: { title?: string; teamName?: string; photoSide?: 'left' | 'right'; extra?: number; rows?: Partial<LineupRow>[]; order?: string[] }) {
   getTeam(ctx, teamId);
   const cur = loadLineup(ctx.db, eventId, teamId).data;
-  const next: Partial<LineupData> = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
+  const next: Partial<LineupData> = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.photoSide !== undefined && { photoSide: patch.photoSide }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
   const rows = new Map(cur.rows.map((r) => [r.slot, r]));
   for (const p of patch.rows ?? []) {
     if (!p.slot) continue;
@@ -152,7 +153,7 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
     if (!d) break;
     placed.set(d.key, { slot: d.key, ...c, position: (c.position || d.position).toUpperCase() });
   }
-  const data = normalize({ title: cur.title, teamName: cur.teamName, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
+  const data = normalize({ title: cur.title, teamName: cur.teamName, photoSide: cur.photoSide, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
   store(ctx.db, eventId, teamId, data, date);
   return { synced: true as const, sailors: crew.length };
 }

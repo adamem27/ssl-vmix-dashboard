@@ -7,7 +7,7 @@ import { SaveInput } from '../components/fields';
 interface Row { slot: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; captain: boolean }
 interface Lineup {
   teamId: string; exists: boolean; syncedAt: string | null; syncedDate: string | null; updatedAt: string | null;
-  data: { title: string; teamName: string; extra: number; rows: Row[]; order?: string[] };
+  data: { title: string; teamName: string; photoSide?: 'left' | 'right'; extra: number; rows: Row[]; order?: string[] };
   slots: { key: string; label: string; position: string }[];
 }
 const MAX_EXTRA = 6;
@@ -91,6 +91,11 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
           <SaveInput value={l.data.title} onSave={(title) => put({ title })} label="Title" maxLength={60} /></label>
         <label className="w-64"><span className="label">Team name</span>
           <SaveInput value={l.data.teamName} onSave={(teamName) => put({ teamName })} label="Team name" placeholder={team.data?.name} maxLength={80} /></label>
+        <label className="w-40"><span className="label">Photo boxes</span>
+          <select className="input py-1 text-sm" value={l.data.photoSide ?? 'left'} onChange={(e) => put({ photoSide: e.target.value as 'left' | 'right' })} aria-label="Photo boxes side" title="Which PNG from the generator goes behind each photo: Lineup photo left (colour on the left) or right (mirrored)">
+            <option value="left">◧ Colour left</option>
+            <option value="right">◨ Colour right</option>
+          </select></label>
         <p className="mb-1 text-xs text-ink-500">In Excel: title and team name in “Teams”, places in “Sailors” (Line-up place). Surnames go in capitals. Drag a place by ⠿ to change the order; drag a sailor’s name onto another place to swap sailors.</p>
       </div>
       <div className="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -666,8 +666,11 @@ export class Show {
       f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
       f.set(`${fl.photo}.Source`, s?.photo ?? '');
     }
-    // the box behind each photo (HelmBG, Trimmer1BG…): the team's square from the PNG generator, when there is one
-    const square = teamPictureFor(this.ctx, team, { w: 211, h: 135, key: 'lineupphoto', like: /lineup|photobg|square/ });
+    // the box behind each photo (HelmBG, Trimmer1BG…): the team's lineup_photo_left/right from the PNG generator, when there is one
+    // left: colour on the left (the team's Line-up tab picks the side); the right one mirrors it
+    const side = lu.photoSide === 'right' ? 'right' : 'left';
+    const square = teamPictureFor(this.ctx, team, { w: 211, h: 135, key: `lineupphoto${side}`, exact: true })
+      ?? teamPictureFor(this.ctx, team, { w: 211, h: 135, key: 'lineupphoto', like: /lineup|photobg|square/ });
     if (square) for (const x of input.fields) if (/^\w+BG\.Source$/i.test(x) && !/^BG\.Source$/i.test(x)) f.set(x, square);
     await this.set(input, f);
     await this.bringIn(g, input, snap);
