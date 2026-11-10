@@ -1,8 +1,14 @@
 {
-  "version": "1.0.115",
-  "commit": "0a09836",
-  "date": "2026-11-10T15:49:04Z",
+  "version": "1.0.116",
+  "commit": "6b043ce",
+  "date": "2026-11-10T16:18:13Z",
   "changes": [
+    {
+      "version": "1.0.116",
+      "commit": "6b043ce",
+      "date": "2026-11-10T16:18:13Z",
+      "text": "GTZIP: a layer's composition takes the layer's size"
+    },
     {
       "version": "1.0.115",
       "commit": "0a09836",
@@ -476,12 +482,6 @@
       "commit": "7795bb1",
       "date": "2026-11-07T19:20:21Z",
       "text": "Self-updating Windows package: portable Node, prebuilt app, launcher that updates from the windows-latest release"
-    },
-    {
-      "version": "1.0.22",
-      "commit": "deba4c4",
-      "date": "2026-11-07T19:02:27Z",
-      "text": "Prebuilt deploy branch for hosting panels without npm workspaces (CloudLinux)"
     }
   ]
 }
