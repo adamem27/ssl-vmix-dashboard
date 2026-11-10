@@ -1,8 +1,14 @@
 {
-  "version": "1.0.106",
-  "commit": "db6156b",
-  "date": "2026-11-09T23:53:21Z",
+  "version": "1.0.107",
+  "commit": "e12870c",
+  "date": "2026-11-10T01:05:09Z",
   "changes": [
+    {
+      "version": "1.0.107",
+      "commit": "e12870c",
+      "date": "2026-11-10T01:05:09Z",
+      "text": "Commentator screen online: read-only link fed by the venue PC (#17)"
+    },
     {
       "version": "1.0.106",
       "commit": "db6156b",
@@ -476,12 +482,6 @@
       "commit": "e64b902",
       "date": "2026-10-18T11:28:24Z",
       "text": "Team pages: nicknames, captains and crews for all 61 teams; remove DEMO on start"
-    },
-    {
-      "version": "1.0.11",
-      "commit": "6503dde",
-      "date": "2026-10-18T11:17:59Z",
-      "text": "Commentator view: fleet tabs, four crews side by side, sailor hover card"
     }
   ]
 }
