@@ -5,7 +5,7 @@ import { badRequest } from './errors.js';
 import { getWeather, listPeople, listSchedule } from './general.js';
 import { listOutputs, listTemplates, outputRel } from './generator/generator.js';
 import { GRAPHIC_KINDS, listGraphicSets, tickerMessages, tickerText } from './graphicSets.js';
-import { groupLabel, tickerAuto } from './groups.js';
+import { currentGroup, groupLabel, nextRace, tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
 import { overview } from './overview.js';
@@ -287,6 +287,45 @@ export function resultsSheet(ctx: AssetCtx, eventId: string): Record<string, str
   return rows;
 }
 
+// ---------- Racing now ----------
+/**
+ * Racing now: ONE row about the group picked at the top of the dashboard, with columns named as the fields of the
+ * titles (Team comparison: T1Name, T1Nick, T1Rank, T1Weight, T1Captain, T1Flag …; standings: POS 1, TEAM 1, POINTS 1 …).
+ * A vMix title bound to this row shows whichever group is racing: change the group in the dashboard, the title follows.
+ */
+export function nowSheet(ctx: AssetCtx, eventId: string, today: string): Record<string, string>[] {
+  const { db } = ctx;
+  const g = currentGroup(db);
+  const ev = db.prepare('SELECT name, timezone FROM events WHERE id = ?').get(eventId) as { name: string; timezone: string } | undefined;
+  const stage = g ? (db.prepare('SELECT name FROM fleet_sets WHERE id = ?').get(g.setId) as { name: string } | undefined) : undefined;
+  const row: Record<string, string> = {
+    Stage: stage?.name ?? '', Group: g?.label ?? '', 'Group letter': g?.letter ?? '', 'Next race': g ? nextRace(db, eventId, ev?.timezone ?? 'UTC') : '',
+    TITLE: (ev?.name ?? '').toUpperCase(), SUBTITLE: g?.label ?? '',
+  };
+  const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
+  const ov = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t]));
+  const slots = g ? (db.prepare('SELECT team_id AS teamId, position FROM fleet_slots WHERE fleet_id = ? ORDER BY position').all(g.id) as { teamId: string; position: number }[]) : [];
+  for (let n = 1; n <= 4; n++) {
+    const t = teams.get(slots.find((x) => x.position === n)?.teamId ?? '');
+    const captain = t ? loadLineup(db, eventId, t.id).data.rows.find((r) => r.captain) : undefined;
+    Object.assign(row, {
+      [`T${n}Code`]: t?.code ?? '', [`T${n}Name`]: (t?.name ?? '').toUpperCase(), [`T${n}Nick`]: t?.nickname ?? '', [`T${n}Rank`]: t?.ranking ?? '',
+      [`T${n}Weight`]: t ? ov.get(t.id)?.declaration?.totalWeight ?? '' : '', [`T${n}Captain`]: captain ? `${captain.firstName} ${captain.lastName}`.trim() : '',
+      [`T${n}Flag`]: img(t?.assets.flag_small),
+    });
+  }
+  const res = g ? listResults(db, g.setId).find((x) => x.fleetId === g.id) : undefined;
+  for (let n = 1; n <= 4; n++) {
+    const r = res?.rows[n - 1];
+    const t = r ? teams.get(r.teamId) : undefined;
+    row[`POS ${n}`] = r ? String(n) : '';
+    row[`TEAM ${n}`] = t?.code ?? '';
+    row[`POINTS ${n}`] = r?.total ?? '';
+    for (let j = 1; j <= 6; j++) row[`R${j} ${n}`] = r && res && j <= res.races ? r.races[j - 1] ?? '' : '';
+  }
+  return [row];
+}
+
 export const SHEETS = [
   { name: 'General', key: 'general' },
   { name: 'Teams', key: 'teams' },
@@ -295,6 +334,7 @@ export const SHEETS = [
   { name: 'Results', key: 'results' },
   { name: 'Announcements', key: 'announcements' },
   { name: 'People', key: 'people' },
+  { name: 'Racing now', key: 'now' },
 ] as const;
 
 export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: string): SheetRows {
@@ -305,6 +345,7 @@ export function sheetRows(ctx: AssetCtx, eventId: string, today: string, key: st
   if (key === 'results') return resultsSheet(ctx, eventId);
   if (key === 'announcements') return announcementsSheet(ctx, eventId);
   if (key === 'people') return peopleSheet(ctx, eventId);
+  if (key === 'now') return nowSheet(ctx, eventId, today);
   throw badRequest(`Unknown sheet: ${key}`);
 }
 

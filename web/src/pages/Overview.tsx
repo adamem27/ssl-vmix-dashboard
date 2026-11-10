@@ -80,8 +80,8 @@ export function OverviewPage() {
           <input type="date" className="input w-40 py-1.5 text-sm" value={day} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Day" />
           <Button size="sm" variant="ghost" onClick={() => setDate(shiftDate(day, 1))} aria-label="Next day">›</Button>
         </div>
-        <select className="input w-60 py-1.5 text-sm" value={validSet} onChange={(e) => setSetId(e.target.value)} aria-label="Fleet set">
-          <option value="">{stage.stage ? `Fleet set: stage (${stage.stage.name})` : 'Fleet set: none'}</option>
+        <select className="input w-60 py-1.5 text-sm" value={validSet} onChange={(e) => setSetId(e.target.value)} aria-label="Stage">
+          <option value="">{stage.stage ? `Stage: ${stage.stage.name}` : 'Stage: none'}</option>
           {(sets.data ?? []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
         <div className="ml-auto flex gap-2">
@@ -100,7 +100,7 @@ export function OverviewPage() {
                 <th className="px-2 py-2">Team</th>
                 <th className="px-2 py-2">Nickname</th>
                 <th className="w-16 px-2 py-2" title="Nation ranking (worldofsailors.com), editable">Rank</th>
-                <th className="w-40 px-2 py-2">Fleet</th>
+                <th className="w-40 px-2 py-2">Group</th>
                 {meta.data!.teamSlots.map((s) => <th key={s.key} className="w-12 px-0.5 py-2 text-center" title={s.label}>{SHORT[s.key] ?? s.label}</th>)}
                 <th className="w-14 px-2 py-2 text-right">Crew</th>
                 <th className="w-24 px-2 py-2">Declared</th>

@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
@@ -219,7 +220,8 @@ function useConfig(data: ShowData, onSaved: () => void) {
   const [c, setC] = useState(data.config);
   useEffect(() => setC(data.config), [JSON.stringify(data.config)]);
   const dirty = JSON.stringify(c) !== JSON.stringify(data.config);
-  const save = async () => { try { const { keys: _k, kindColours: _c, ...rest } = c; await api.put('/api/show/config', rest); toast.ok('Saved'); onSaved(); } catch (e) { toast.error(e); } };
+  const qcc = useQueryClient();
+  const save = async () => { try { const { keys: _k, kindColours: _c, ...rest } = c; await api.put('/api/show/config', rest); qcc.invalidateQueries({ queryKey: ['stage'] }); toast.ok('Saved'); onSaved(); } catch (e) { toast.error(e); } };
   return { c, setC, dirty, save };
 }
 
@@ -236,7 +238,7 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
     <Panel title="Race now" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-2">
-          {sel('Group racing now (its teams go on the team keys)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets)}
+          {sel('Group racing now (also at the top, next to Stage; its teams go on the team keys)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets.map((f) => ({ ...f, name: groupLabel(f.name) === f.name.toUpperCase() ? f.name : `${groupLabel(f.name)} (${f.name})` })))}
           <label className="block text-xs text-ink-400">Race on the RACE RESULTS key (times at marks on the Results tab)
             <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
           </label>
@@ -253,7 +255,7 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
         <div className="space-y-2">
           <label className="block text-xs text-ink-400">Break scene: board layer<input type="number" min={1} max={10} className="input mt-1 w-20 py-1 text-sm" value={c.breakLayer} onChange={(e) => setC({ ...c, breakLayer: Number(e.target.value) || 3 })} /></label>
           <label className="block text-xs text-ink-400">Rotation every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 12 })} /></label>
-          <p className="text-xs text-ink-500">The break scene rotates the day schedule and the results of every group of the race's fleet set.</p>
+          <p className="text-xs text-ink-500">The break scene rotates the day schedule and the results of every group of the stage.</p>
         </div>
       </div>
       {data.sailors.length > 0 && (
@@ -279,7 +281,7 @@ function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
       <Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>
     </>}>
       <p className="mb-2 text-sm text-ink-400">
-        Keys find their inputs by name. The first name that exists in vMix is used; {'{n}'} is the number of boats and {'{crew}'} the crew size (the nearest bigger lineup title is taken).
+        Keys find their inputs by name. The first name that exists in vMix is used; {'{n}'} is the number of teams and {'{crew}'} the crew size (the nearest bigger lineup title is taken).
         A placeholder is an empty input with the right name: replace it with the GTZIP later and give the title the same name, nothing else changes.
       </p>
       <table className="w-full text-sm">

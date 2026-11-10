@@ -95,6 +95,6 @@ describe('fleets', () => {
     fleets.placeTeam(db, set2, { teamId: teams[0], fleetId: g1, position: 4 });
     expect(fleets.getSetDetail(db, setId).fleets[0].positions[0]).toBe(teams[0]);
     expect(fleets.getSetDetail(db, set2).fleets[0].positions[3]).toBe(teams[0]);
-    expect(() => fleets.placeTeam(db, set2, { teamId: teams[1], fleetId: f1, position: 2 })).toThrow(/different fleet set/);
+    expect(() => fleets.placeTeam(db, set2, { teamId: teams[1], fleetId: f1, position: 2 })).toThrow(/different stage/);
   });
 });

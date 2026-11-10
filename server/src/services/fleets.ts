@@ -30,12 +30,12 @@ export function createSet(db: DB, eventId: string, name: string, fleetCount = 0,
 
 export function renameSet(db: DB, setId: string, name: string) {
   const r = db.prepare('UPDATE fleet_sets SET name = ?, updated_at = ? WHERE id = ?').run(name, nowIso(), setId);
-  if (!r.changes) throw notFound('Fleet set');
+  if (!r.changes) throw notFound('Stage');
 }
 
 export function deleteSet(db: DB, setId: string) {
   const r = db.prepare('DELETE FROM fleet_sets WHERE id = ?').run(setId);
-  if (!r.changes) throw notFound('Fleet set');
+  if (!r.changes) throw notFound('Stage');
 }
 
 function touchSet(db: DB, setId: string) {
@@ -43,11 +43,11 @@ function touchSet(db: DB, setId: string) {
 }
 
 function assertSize(size: number) {
-  if (!Number.isInteger(size) || size < MIN_FLEET_SIZE || size > MAX_FLEET_SIZE) throw badRequest(`Teams per fleet must be between ${MIN_FLEET_SIZE} and ${MAX_FLEET_SIZE}.`);
+  if (!Number.isInteger(size) || size < MIN_FLEET_SIZE || size > MAX_FLEET_SIZE) throw badRequest(`Teams per group must be between ${MIN_FLEET_SIZE} and ${MAX_FLEET_SIZE}.`);
 }
 
 export function createFleet(db: DB, setId: string, name: string, size = FLEET_SIZE) {
-  if (!db.prepare('SELECT 1 FROM fleet_sets WHERE id = ?').get(setId)) throw notFound('Fleet set');
+  if (!db.prepare('SELECT 1 FROM fleet_sets WHERE id = ?').get(setId)) throw notFound('Stage');
   assertSize(size);
   const t = nowIso();
   const id = newId();
@@ -69,7 +69,7 @@ export function setFleetSize(db: DB, fleetId: string, size: number) {
   assertSize(size);
   const f = getFleet(db, fleetId);
   const over = db.prepare('SELECT position FROM fleet_slots WHERE fleet_id = ? AND position > ? ORDER BY position').all(fleetId, size) as { position: number }[];
-  if (over.length) throw conflict(`Places ${over.map((o) => o.position).join(', ')} still have teams. Move them out first, then make the fleet smaller.`);
+  if (over.length) throw conflict(`Places ${over.map((o) => o.position).join(', ')} still have teams. Move them out first, then make the group smaller.`);
   db.prepare('UPDATE fleets SET size = ?, updated_at = ? WHERE id = ?').run(size, nowIso(), fleetId);
   touchSet(db, f.fleet_set_id);
 }
@@ -105,13 +105,13 @@ export function moveFleet(db: DB, fleetId: string, direction: -1 | 1) {
 
 function getFleet(db: DB, fleetId: string) {
   const f = db.prepare('SELECT * FROM fleets WHERE id = ?').get(fleetId) as FleetRow | undefined;
-  if (!f) throw notFound('Fleet');
+  if (!f) throw notFound('Group');
   return f;
 }
 
 export function getSetDetail(db: DB, setId: string) {
   const set = db.prepare('SELECT id, name, event_id AS eventId, updated_at AS updatedAt FROM fleet_sets WHERE id = ?').get(setId);
-  if (!set) throw notFound('Fleet set');
+  if (!set) throw notFound('Stage');
   const fleets = db.prepare('SELECT * FROM fleets WHERE fleet_set_id = ? ORDER BY sort, created_at').all(setId) as FleetRow[];
   const slots = db.prepare('SELECT * FROM fleet_slots WHERE fleet_set_id = ?').all(setId) as SlotRow[];
   return {
@@ -139,8 +139,8 @@ export interface PlaceInput { teamId: string; fleetId: string; position: number;
 export function placeTeam(db: DB, setId: string, input: PlaceInput) {
   const { teamId, fleetId, position } = input;
   const fleet = getFleet(db, fleetId);
-  if (!Number.isInteger(position) || position < 1 || position > fleet.size) throw badRequest(`Fleet position must be between 1 and ${fleet.size}.`);
-  if (fleet.fleet_set_id !== setId) throw badRequest('This fleet belongs to a different fleet set.');
+  if (!Number.isInteger(position) || position < 1 || position > fleet.size) throw badRequest(`Group place must be between 1 and ${fleet.size}.`);
+  if (fleet.fleet_set_id !== setId) throw badRequest('This group belongs to a different stage.');
   if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId)) throw notFound('Team');
 
   return db.transaction(() => {

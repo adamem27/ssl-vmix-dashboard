@@ -34,10 +34,10 @@ export function ResultsPage() {
         </div>
       </div>
       {!sets.data?.length ? (
-        <Empty title="No groups yet" action={<Link to="/vmix/fleets" className="text-accent-300 hover:underline">Create fleets</Link>}>Results follow the fleets: every fleet of a fleet set is a group here.</Empty>
+        <Empty title="No groups yet" action={<Link to="/vmix/groups" className="text-accent-300 hover:underline">Create groups</Link>}>Results follow the groups of each stage.</Empty>
       ) : (
         <>
-          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Fleet set">
+          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Stage">
             {sets.data.filter((s) => !stage.data?.current || s.id === stage.data.current.id || s.id === params.get('set')).map((s) => (
               <button key={s.id} role="tab" aria-selected={s.id === setId} onClick={() => setParams({ set: s.id }, { replace: true })}
                 className={cx('rounded-md border px-3 py-1.5 text-sm', s.id === setId ? 'border-accent-500 bg-accent-500/15 text-accent-300' : 'border-ink-700 text-ink-300 hover:bg-ink-800')}>{s.name}</button>
@@ -46,7 +46,7 @@ export function ResultsPage() {
           {groups.isLoading ? <Loading /> : groups.error ? <ErrorBox error={groups.error} onRetry={() => groups.refetch()} /> : (
             <div className="grid gap-4 2xl:grid-cols-2">
               {groups.data!.map((g) => <GroupCard key={g.fleetId} g={g} teamById={teamById} />)}
-              {!groups.data!.length && <Empty title="This fleet set has no fleets" />}
+              {!groups.data!.length && <Empty title="This stage has no groups" />}
             </div>
           )}
         </>
@@ -105,7 +105,7 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
             title="Fills the vMix title with this table: subtitle, race headers, places, flags, teams, races and points">Send to vMix</Button>
         </div>
       </header>
-      {!g.rows.length ? <p className="px-4 py-6 text-sm text-ink-500">No teams in this fleet yet. Put teams in it on the Fleets page.</p> : (
+      {!g.rows.length ? <p className="px-4 py-6 text-sm text-ink-500">No teams in this group yet. Put teams in it on the Groups page.</p> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-[10px] uppercase tracking-wide text-ink-500">
@@ -226,7 +226,7 @@ function RaceRunPanel({ g, teamById }: { g: Group; teamById: Map<string, Team> }
         </div>
       )}
       <p className="px-3 pb-2 pt-1 text-[11px] text-ink-500">
-        Times as m:ss or h:mm:ss. Rows sort by the finish; points are boats − place + 1 unless typed, and land in R{race} of the table above. Typing a race of the group on air makes it the one the RACE RESULTS key shows.
+        Times as m:ss or h:mm:ss. Rows sort by the finish; points are teams − place + 1 unless typed, and land in R{race} of the table above. Typing a race of the group on air makes it the one the RACE RESULTS key shows.
       </p>
       {dialog}
     </div>

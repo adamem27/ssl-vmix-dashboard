@@ -73,7 +73,7 @@ export function FleetsPage() {
 
   const unassign = async (teamId: string) => {
     if (!setId) return;
-    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId })); toast.ok(`${tName(teamId)} removed from the fleet (still in the team database)`); }
+    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId })); toast.ok(`${tName(teamId)} removed from the group (still in the team database)`); }
     catch (e) { toast.error(e); }
   };
 
@@ -100,14 +100,14 @@ export function FleetsPage() {
     try {
       if (nameModal.mode === 'newSet') {
         const r = await api.post<FleetSetDetail>('/api/fleet-sets', { name: value, fleetCount: 0 });
-        qc.invalidateQueries({ queryKey: ['fleet-sets'] }); setSetId(r.set.id); toast.ok(`Fleet set “${value}” created`);
+        qc.invalidateQueries({ queryKey: ['fleet-sets'] }); setSetId(r.set.id); toast.ok(`Stage “${value}” created`);
       } else if (nameModal.mode === 'renameSet') {
-        refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { name: value })); toast.ok('Fleet set renamed');
+        refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { name: value })); toast.ok('Stage renamed');
       } else if (nameModal.mode === 'newFleet') {
         const size = d?.fleets[d.fleets.length - 1]?.size ?? 4;
-        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value, size })); toast.ok(`Fleet “${value}” added (${size} teams)`);
+        refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/fleets`, { name: value, size })); toast.ok(`Group “${value}” added (${size} teams)`);
       } else {
-        await api.patch(`/api/fleets/${nameModal.id}`, { name: value }); refresh(); toast.ok('Fleet renamed');
+        await api.patch(`/api/fleets/${nameModal.id}`, { name: value }); refresh(); toast.ok('Group renamed');
       }
       setNameModal(null);
     } catch (e) { toast.error(e); }
@@ -115,17 +115,17 @@ export function FleetsPage() {
 
   const deleteSet = async () => {
     const s = sets.data?.find((x) => x.id === setId);
-    if (!s || !(await ask('Delete fleet set?', <>Set <b>{s.name}</b> and all its fleets will be deleted. Teams stay in the database.</>, 'Delete set'))) return;
-    try { await api.del(`/api/fleet-sets/${s.id}`); setSetId(null); qc.invalidateQueries({ queryKey: ['fleet-sets'] }); toast.ok('Fleet set deleted'); } catch (e) { toast.error(e); }
+    if (!s || !(await ask('Delete stage?', <>Stage <b>{s.name}</b> and all its groups will be deleted. Teams stay in the database.</>, 'Delete stage'))) return;
+    try { await api.del(`/api/fleet-sets/${s.id}`); setSetId(null); qc.invalidateQueries({ queryKey: ['fleet-sets'] }); toast.ok('Stage deleted'); } catch (e) { toast.error(e); }
   };
   const deleteFleet = async (f: FleetSetDetail['fleets'][number]) => {
-    if (!(await ask('Delete fleet?', <>Fleet <b>{f.name}</b> will be deleted{f.filled ? ` and ${f.filled} team(s) will return to available teams` : ''}.</>, 'Delete fleet'))) return;
-    try { await api.del(`/api/fleets/${f.id}`); refresh(); toast.ok('Fleet deleted'); } catch (e) { toast.error(e); }
+    if (!(await ask('Delete group?', <>Group <b>{f.name}</b> will be deleted{f.filled ? ` and ${f.filled} team(s) will return to available teams` : ''}.</>, 'Delete group'))) return;
+    try { await api.del(`/api/fleets/${f.id}`); refresh(); toast.ok('Group deleted'); } catch (e) { toast.error(e); }
   };
   const resize = async (f: FleetSetDetail['fleets'][number] | null, size: number) => {
     try {
       if (f) { await api.patch(`/api/fleets/${f.id}`, { size }); refresh(); toast.ok(`${f.name}: ${size} teams`); }
-      else { refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { fleetSize: size })); toast.ok(`Every fleet in this set: ${size} teams`); }
+      else { refresh(await api.patch<FleetSetDetail>(`/api/fleet-sets/${setId}`, { fleetSize: size })); toast.ok(`Every group of this stage: ${size} teams`); }
     } catch (e) { toast.error(e); }
   };
   const moveFleet = async (id: string, direction: -1 | 1) => {
@@ -139,10 +139,10 @@ export function FleetsPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="mr-auto">
-          <h1 className="text-2xl font-bold">Fleets</h1>
+          <h1 className="text-2xl font-bold">Groups</h1>
         </div>
         {!!sets.data?.length && (
-          <Field label="Fleet set / round">
+          <Field label="Stage">
             <select className="input w-64" value={setId ?? ''} onChange={(e) => setSetId(e.target.value)}>
               {sets.data.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.assignedCount} teams)</option>)}
             </select>
@@ -154,8 +154,8 @@ export function FleetsPage() {
       </div>
 
       {!sets.data?.length ? (
-        <Empty title="No fleet sets yet" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: 'Round 1' })}>Create the first set</Button>}>
-          A set is one split of teams into fleets (e.g. a qualifying round). Different sets can split the same teams differently.
+        <Empty title="No stages yet" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: 'Round 1' })}>Create the first stage</Button>}>
+          A stage is one split of teams into groups (e.g. the Qualifying Series). Different stages can split the same teams differently.
         </Empty>
       ) : detail.isLoading ? <Loading /> : detail.error ? <ErrorBox error={detail.error} /> : d && (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragTeam(null)}>
@@ -181,17 +181,17 @@ export function FleetsPage() {
 
             <div>
               <div className="mb-2 flex items-center gap-3">
-                <span className="text-sm text-ink-400">{d.fleets.length} fleets · {d.fleets.filter((f) => !f.complete).length} incomplete</span>
+                <span className="text-sm text-ink-400">{d.fleets.length} groups · {d.fleets.filter((f) => !f.complete).length} incomplete</span>
                 {!!d.fleets.length && (
                   <label className="flex items-center gap-1.5 text-xs text-ink-400">
-                    All fleets:
-                    <SizeSelect value={d.fleets.every((f) => f.size === d.fleets[0].size) ? d.fleets[0].size : 0} onChange={(n) => resize(null, n)} label="Teams in every fleet of this set" />
+                    All groups:
+                    <SizeSelect value={d.fleets.every((f) => f.size === d.fleets[0].size) ? d.fleets[0].size : 0} onChange={(n) => resize(null, n)} label="Teams in every group of this stage" />
                   </label>
                 )}
-                <Button size="sm" className="ml-auto" variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: `Fleet ${d.fleets.length + 1}` })}>+ Add fleet</Button>
+                <Button size="sm" className="ml-auto" variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: `Group ${String.fromCharCode(65 + d.fleets.length)}` })}>+ Add group</Button>
               </div>
               {!d.fleets.length ? (
-                <Empty title="This set has no fleets" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: 'Fleet 1' })}>Add fleet</Button>} />
+                <Empty title="This stage has no groups" action={<Button variant="primary" onClick={() => setNameModal({ mode: 'newFleet', initial: 'Group A' })}>Add group</Button>} />
               ) : (
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
                   {d.fleets.map((f, fi) => (
@@ -201,10 +201,10 @@ export function FleetsPage() {
                         <Badge tone={f.complete ? 'ok' : 'warn'}>{f.complete ? 'Complete' : `Incomplete ${f.filled}/${f.size}`}</Badge>
                         <SizeSelect value={f.size} onChange={(n) => resize(f, n)} label={`Teams in ${f.name}`} />
                         <div className="ml-auto flex">
-                          <IconBtn label="Move fleet left" disabled={fi === 0} onClick={() => moveFleet(f.id, -1)}>←</IconBtn>
-                          <IconBtn label="Move fleet right" disabled={fi === d.fleets.length - 1} onClick={() => moveFleet(f.id, 1)}>→</IconBtn>
-                          <IconBtn label="Rename fleet" onClick={() => setNameModal({ mode: 'renameFleet', id: f.id, initial: f.name })}>✎</IconBtn>
-                          <IconBtn label="Delete fleet" onClick={() => deleteFleet(f)}>🗑</IconBtn>
+                          <IconBtn label="Move group left" disabled={fi === 0} onClick={() => moveFleet(f.id, -1)}>←</IconBtn>
+                          <IconBtn label="Move group right" disabled={fi === d.fleets.length - 1} onClick={() => moveFleet(f.id, 1)}>→</IconBtn>
+                          <IconBtn label="Rename group" onClick={() => setNameModal({ mode: 'renameFleet', id: f.id, initial: f.name })}>✎</IconBtn>
+                          <IconBtn label="Delete group" onClick={() => deleteFleet(f)}>🗑</IconBtn>
                         </div>
                       </header>
                       <ol className="space-y-1.5 p-2">
@@ -216,12 +216,12 @@ export function FleetsPage() {
                                 <div className="min-w-0 flex-1"><TeamChip team={teamById.get(tid)} compact /></div>
                                 <IconBtn label="Move up" disabled={i === 0} onClick={() => place(tid, f.id, i, 'swap')}>↑</IconBtn>
                                 <IconBtn label="Move down" disabled={i === f.size - 1} onClick={() => place(tid, f.id, i + 2, 'swap')}>↓</IconBtn>
-                                <select className="w-8 cursor-pointer rounded bg-transparent text-xs text-ink-400 hover:bg-ink-800" aria-label={`Move ${tName(tid)} to another fleet`} value=""
+                                <select className="w-8 cursor-pointer rounded bg-transparent text-xs text-ink-400 hover:bg-ink-800" aria-label={`Move ${tName(tid)} to another group`} value=""
                                   onChange={(e) => { if (e.target.value) void place(tid, e.target.value, undefined); }}>
                                   <option value="">⇄</option>
                                   {d.fleets.filter((o) => o.id !== f.id).map((o) => <option key={o.id} value={o.id} disabled={o.complete}>{o.name}{o.complete ? ' (full)' : ''}</option>)}
                                 </select>
-                                <IconBtn label={`Remove ${tName(tid)} from the fleet`} onClick={() => unassign(tid)}>✕</IconBtn>
+                                <IconBtn label={`Remove ${tName(tid)} from the group`} onClick={() => unassign(tid)}>✕</IconBtn>
                               </>
                             ) : (
                               <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Choose a team for place ${i + 1} in ${f.name}`}
@@ -230,7 +230,7 @@ export function FleetsPage() {
                                 <optgroup label="Available">
                                   {offered.filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>
-                                <optgroup label="Move from another fleet">
+                                <optgroup label="Move from another group">
                                   {(teams.data ?? []).filter((t) => assigned.has(t.id) && !f.positions.includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name} ({locate(t.id)?.fleetName})</option>)}
                                 </optgroup>
                               </select>
@@ -320,7 +320,7 @@ function NameModal({ state, onClose, onSave }: { state: { mode: string; initial:
   const [v, setV] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (state) setV(state.initial); }, [state]);
-  const titles: Record<string, string> = { newSet: 'New fleet set', renameSet: 'Set name', newFleet: 'New fleet', renameFleet: 'Fleet name' };
+  const titles: Record<string, string> = { newSet: 'New stage', renameSet: 'Stage name', newFleet: 'New group', renameFleet: 'Group name' };
   return (
     <Modal open={!!state} onClose={onClose} title={state ? titles[state.mode] : ''}>
       <form onSubmit={async (e) => { e.preventDefault(); setBusy(true); await onSave(v.trim()); setBusy(false); }} className="space-y-4">

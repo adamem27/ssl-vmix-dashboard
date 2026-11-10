@@ -25,7 +25,7 @@ describe('general graphics versions', () => {
     gs.seedGraphicSets(db, eventId);
     expect(gs.listGraphicSets(db, eventId, 'welcome')).toHaveLength(0); // deleting is respected
     const names = allSheets(ctx).map((s) => s.name);
-    expect(names).toEqual(['General', 'Teams', 'Sailors', 'Line-up', 'Results', 'Announcements', 'People']);
+    expect(names).toEqual(['General', 'Teams', 'Sailors', 'Line-up', 'Results', 'Announcements', 'People', 'Racing now']);
   });
 
   it('has fixed tickers that need only their changing parts, filled from the group racing now', () => {

@@ -283,7 +283,7 @@ function PresetSection() {
     try {
       const r = await api.post<NonNullable<typeof result>>('/api/presets/ssl-gold-cup-2026');
       setResult(r); qc.invalidateQueries();
-      toast.ok(`Matchboard loaded: ${r.teamsCreated} teams and ${r.setsCreated} fleet sets added`);
+      toast.ok(`Matchboard loaded: ${r.teamsCreated} teams and ${r.setsCreated} stages added`);
     } catch (e) { toast.error(e); } finally { setBusy(false); }
   };
   return (
@@ -293,7 +293,7 @@ function PresetSection() {
       </div>
       {result && (
         <p className="mt-2 text-sm text-ink-300">
-          {result.teamsCreated} teams added, {result.teamsExisting} already existed. {result.setsCreated} fleet sets added
+          {result.teamsCreated} teams added, {result.teamsExisting} already existed. {result.setsCreated} stages added
           {result.setsSkipped.length ? `, skipped because they exist: ${result.setsSkipped.join(', ')}` : ''}.
         </p>
       )}
@@ -317,7 +317,7 @@ function DemoSection({ hasDemo }: { hasDemo: boolean }) {
         <Button variant="primary" busy={busy === 'seed'} disabled={hasDemo} onClick={() => call('seed', '/api/demo/seed', 'DEMO data added')}>Load demo data</Button>
         <Button busy={busy === 'imp'} disabled={!hasDemo} onClick={() => call('imp', '/api/sync/demo-import', 'Test declaration page imported (DEMO)')}>Import test declaration page (DEMO)</Button>
         <Button variant="danger" busy={busy === 'rm'} disabled={!hasDemo} onClick={async () => {
-          if (await ask('Remove demo data?', 'All teams and sailors labelled DEMO, their graphics, declarations and the demo fleet set will be deleted. Your own data is not touched.', 'Remove demo data')) await call('rm', '/api/demo/remove', 'DEMO data removed');
+          if (await ask('Remove demo data?', 'All teams and sailors labelled DEMO, their graphics, declarations and the demo stage will be deleted. Your own data is not touched.', 'Remove demo data')) await call('rm', '/api/demo/remove', 'DEMO data removed');
         }}>Remove demo data</Button>
       </div>
       {dialog}

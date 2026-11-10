@@ -102,7 +102,7 @@ const NAV_GROUPS = [
   ] },
   { label: 'Data', tone: { head: 'text-sky-400', bar: 'bg-sky-400', icon: 'text-sky-400', active: 'bg-sky-500/15 text-sky-100 border-sky-400' }, items: [
     { to: '/vmix/overview', label: 'Teams & crews', icon: 'teams' },
-    { to: '/vmix/fleets', label: 'Fleets', icon: 'fleets' },
+    { to: '/vmix/groups', label: 'Groups', icon: 'fleets' },
     { to: '/vmix/declarations', label: 'Declarations and line-ups', icon: 'declarations' },
     { to: '/vmix/results', label: 'Results', icon: 'results' },
   ] },
@@ -177,7 +177,8 @@ function MainApp() {
           <Route path="teams" element={<Navigate to="/vmix/overview" replace />} />
           <Route path="teams/:id" element={<TeamDetailPage />} />
           <Route path="sailors/:id" element={<SailorPage />} />
-          <Route path="fleets" element={<FleetsPage />} />
+          <Route path="groups" element={<FleetsPage />} />
+          <Route path="fleets" element={<Navigate to="/vmix/groups" replace />} />
           <Route path="declarations" element={<DeclarationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="general" element={<GeneralPage />} />

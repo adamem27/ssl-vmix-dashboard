@@ -8,6 +8,8 @@ import { updateTeam } from '../src/services/teams.js';
 import { setCaptain } from '../src/services/sailors.js';
 import { createFleet, createSet } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
+import { nowSheet } from '../src/services/workbookSheets.js';
+import { setShowConfig } from '../src/services/show.js';
 import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, seedGraphicSets } from '../src/services/graphicSets.js';
 import { generalSheet, resultsSheet, sailorsSheet, setCurrentStage, teamsSheet } from '../src/services/workbookSheets.js';
@@ -71,6 +73,12 @@ describe('workbook sheets', () => {
     const teams = teamsSheet(ctx, eventId, today);
     expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['GROUP A', '1', 'BRN'], ['GROUP A', '2', 'IND']]);
     expect(Object.keys(teams[0]).slice(0, 4)).toEqual(['Group', 'Place', 'Code', 'Name']);
+
+    // Racing now: one row about the group picked at the top
+    expect(nowSheet(ctx, eventId, today)[0].Group).toBe('');
+    setShowConfig(db, { fleetId });
+    const now = nowSheet(ctx, eventId, today)[0];
+    expect(now).toMatchObject({ Group: 'GROUP A', 'Group letter': 'A', SUBTITLE: 'GROUP A', T1Code: 'BRN', T2Code: 'IND', T3Code: '', 'POS 1': '1', 'POINTS 1': '7', 'R1 1': '4' });
 
     const sailors = sailorsSheet(ctx, eventId, today);
     expect(sailors.map((r) => [r['Team code'], r['Last name'], r['Line-up place'], r.Captain])).toEqual([

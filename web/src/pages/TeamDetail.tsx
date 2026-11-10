@@ -34,7 +34,7 @@ export function TeamDetailPage() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ['team', id] }); qc.invalidateQueries({ queryKey: ['teams'] }); };
 
   const del = async () => {
-    if (!(await ask('Delete team?', <>Team <b>{t.name}</b> will be deleted together with {t.sailorCount} sailors, assigned graphics, declarations and fleet places. This cannot be undone (except by restoring a backup).</>, 'Delete team'))) return;
+    if (!(await ask('Delete team?', <>Team <b>{t.name}</b> will be deleted together with {t.sailorCount} sailors, assigned graphics, declarations and group places. This cannot be undone (except by restoring a backup).</>, 'Delete team'))) return;
     try { await api.del(`/api/teams/${t.id}`); toast.ok(`Team ${t.name} deleted`); qc.invalidateQueries(); nav('/vmix/teams'); } catch (e) { toast.error(e); }
   };
 

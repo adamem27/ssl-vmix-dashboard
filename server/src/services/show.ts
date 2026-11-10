@@ -379,7 +379,7 @@ export class Show {
   /** The lineup lower third: the places in the set order, split into the first five and the rest. */
   lineupParts(): LtSailor[][] {
     const b = this.boats()[this.state.boat - 1];
-    if (!b) throw badRequest('Pick a boat first.');
+    if (!b) throw badRequest('Pick a team first.');
     const all = crewOf(this.ctx, b.id).filter((s) => s.lastName || s.firstName);
     const order = this.config.lineup5;
     const crew = [...order.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s), ...all.filter((s) => !order.includes(s.slot))];
