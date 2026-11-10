@@ -1,8 +1,14 @@
 {
-  "version": "1.0.113",
-  "commit": "d6ac839",
-  "date": "2026-11-10T14:10:26Z",
+  "version": "1.0.114",
+  "commit": "d2567a3",
+  "date": "2026-11-10T15:42:39Z",
   "changes": [
+    {
+      "version": "1.0.114",
+      "commit": "d2567a3",
+      "date": "2026-11-10T15:42:39Z",
+      "text": "Fix Trimmer 2 lower third key; masks stay put in the animation preview"
+    },
     {
       "version": "1.0.113",
       "commit": "d6ac839",
@@ -476,12 +482,6 @@
       "commit": "3d863b0",
       "date": "2026-11-07T18:07:14Z",
       "text": "vMix sync: Windows autostart with self-restart, heartbeat badge in the dashboard"
-    },
-    {
-      "version": "1.0.20",
-      "commit": "6aa2cfc",
-      "date": "2026-10-22T14:54:39+02:00",
-      "text": "Generator: gradient stroke with per-element checkbox and angle (#3)"
     }
   ]
 }

@@ -212,9 +212,16 @@ export class LowerThirds {
         const teamId = code ? this.teamByCode(code).id : this.state.teamId;
         if (!teamId)
             throw badRequest('Pick a country first.');
-        const p = place.trim().toLowerCase().replace(/\s+/g, '');
+        const raw = place.trim().toLowerCase().replace(/\s+/g, ' ');
+        const p = raw.replace(/ /g, '');
         const crew = crewOf(this.ctx, teamId);
-        const s = crew.find((x) => x.slot.toLowerCase() === p || x.label.toLowerCase().replace(/\s+/g, '') === p) ?? crew[Number(p) - 1];
+        const bare = (x) => x.toLowerCase().replace(/\s+/g, '');
+        // exact matches first: Trimmer 2 is stored as `Trimmer1`, which is also Trimmer 1's label without spaces
+        const s = crew.find((x) => x.slot.toLowerCase() === raw)
+            ?? crew.find((x) => x.label.toLowerCase() === raw)
+            ?? crew.find((x) => x.slot.toLowerCase() === p)
+            ?? crew.find((x) => bare(x.label) === p)
+            ?? (/^\d+$/.test(p) ? crew[Number(p) - 1] : undefined);
         if (!s)
             throw notFound(`Place ${place}`);
         if (!s.firstName && !s.lastName)
