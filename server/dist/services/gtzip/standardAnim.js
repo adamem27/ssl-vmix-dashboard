@@ -147,10 +147,14 @@ function plan(sc, list) {
         footer.forEach((u) => { inA.push(anim('Fade', u.name, Math.max(0.75, end - 0.2), 0.6)); outA.push(anim('Fade', u.name, 0, 0.4)); });
     }
     else if (sc === 'lowerthird') {
-        bg.forEach((u) => { inA.push(anim('Reveal', u.name, 0, 0.6, 'Left')); outA.push(anim('Reveal', u.name, 0.15, 0.5, 'Left')); });
+        // the bar fades in and out (a fast Reveal from the left looked rough on air)
+        bg.forEach((u) => { inA.push(anim('Fade', u.name, 0, 0.75)); outA.push(anim('Fade', u.name, 0, 0.5)); });
         const t = bg.length ? 1 : 0;
-        // the photo rises a moment after the bar is in, and goes down first on the way out
-        photo.forEach((u) => { inA.push(anim('Fly', u.name, 0.4 * t, 0.55, 'Bottom')); outA.push(anim('Fly', u.name, 0, 0.4, 'Bottom')); });
+        // a photo picture (an Image, or the masked Image of a layer): vMix plays no Fly on it in Transition In, only its
+        // DataChange (added below), so the dashboard sets it right after the title is in and clears it before it goes out
+        // (lowerthirds.ts); any other photo unit rises a moment after the bar
+        photo.filter((u) => u.node.tag !== 'Image' && u.name === u.node.attrs.Name)
+            .forEach((u) => { inA.push(anim('Fly', u.name, 0.4 * t, 0.55, 'Bottom')); outA.push(anim('Fly', u.name, 0, 0.4, 'Bottom')); });
         const { sorted } = order([...rest, ...header, ...ticker]);
         sorted.forEach((u, i) => { inA.push(anim('Fade', u.name, 0.45 * t + i * 0.05, 0.4)); outA.push(anim('Fade', u.name, 0, 0.3)); });
         badge.forEach((u) => { inA.push(anim('Reveal', u.name, 0.6 * t, 0.5, 'Bottom')); outA.push(anim('Reveal', u.name, 0, 0.4, 'Bottom')); });

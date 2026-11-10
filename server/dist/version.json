@@ -1,8 +1,14 @@
 {
-  "version": "1.0.123",
-  "commit": "c669540",
-  "date": "2026-11-10T18:04:43Z",
+  "version": "1.0.124",
+  "commit": "fed4bbe",
+  "date": "2026-11-10T18:13:48Z",
   "changes": [
+    {
+      "version": "1.0.124",
+      "commit": "fed4bbe",
+      "date": "2026-11-10T18:13:48Z",
+      "text": "Standard animation, lower third: the bar fades in (0.75 s) and out (0.5 s) instead of a fast Reveal from the left"
+    },
     {
       "version": "1.0.123",
       "commit": "c669540",
@@ -476,12 +482,6 @@
       "commit": "43b6a14",
       "date": "2026-11-07T21:50:13Z",
       "text": "Matchboard update (7 Nov): QS H/I regrouped, QS J removed, R1 B with KOR and GRE; changed sets reset on next start"
-    },
-    {
-      "version": "1.0.30",
-      "commit": "7a8564f",
-      "date": "2026-11-07T21:09:47Z",
-      "text": "Readable dropdown options on Windows; full time zone list with Rio de Janeiro (America/Sao_Paulo)"
     }
   ]
 }
