@@ -7,7 +7,8 @@ import { getSetDetail, listSets } from './fleets.js';
 import { listPeople } from './general.js';
 import { listGraphicSets, tickerText } from './graphicSets.js';
 import { loadLineup, slotDefs } from './lineups.js';
-import { crewOf, getLtConfig } from './lowerthirds.js';
+import { crewOf, getLtConfig, getLtState } from './lowerthirds.js';
+import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
 import { raceRunFields } from './raceRuns.js';
@@ -692,8 +693,13 @@ export class Show {
         const ov = ctxt?.overlays ?? {};
         const isOn = (id) => { if (!ctxt)
             return false; const g = this.graphics().find((x) => x.id === id); const i = g && this.resolve(g, ctxt.inputs); return !!(g && i && ov[g.overlay] === i.number); };
+        const lt = getLtState(this.ctx.db);
+        let team; // the team whose national colours the key takes
         if (kind === 'anthem' || kind === 'lineup' || kind === 'boat' || kind === 'qualified') {
             const b = boats[Number(arg) - 1];
+            team = b;
+            if (b && kind === 'anthem')
+                onAir = lt.onAir && lt.kind === 'team' && lt.teamId === b.id;
             text = b ? (kind === 'boat' ? `${b.code}\\n${b.name.toUpperCase().slice(0, 12)}` : `${{ anthem: 'ANTHEM', lineup: 'LINEUP', qualified: 'QUALIFIED' }[kind]}\\n${b.code}`) : `${key.text}\\n—`;
             empty = !b;
             if (kind === 'boat')
@@ -702,8 +708,18 @@ export class Show {
         else if (kind === 'sailor') {
             const s = this.sailors()[Number(arg) - 1];
             const b = boats[st.boat - 1];
+            team = b;
+            if (s && b)
+                onAir = lt.onAir && lt.kind === 'sailor' && lt.teamId === b.id && lt.slot === s.slot;
             text = s ? `#${s.number || '?'}${s.photo ? ' ●' : ''}\\n${s.position.toUpperCase()}\\n${s.lastName.toUpperCase().slice(0, 10)}${b ? ` ${b.code}` : ''}` : '';
             empty = !s;
+        }
+        else if (kind === 'teamlt') {
+            team = boats[st.boat - 1];
+            if (team) {
+                text = `TEAM LT\\n${team.code}`;
+                onAir = lt.onAir && lt.kind === 'team' && lt.teamId === team.id;
+            }
         }
         else if (kind === 'bug' && /^\d+$/.test(arg)) {
             const a = this.announcements()[Number(arg) - 1];
@@ -730,14 +746,29 @@ export class Show {
             onAir = isOn('break');
         if (key.custom)
             text = key.custom.replace(/\{auto\}/g, text);
+        // team and sailor keys in the team's national colours, the feedback (selected / on air) in its colours too;
+        // a colour set on the key or on its kind in the key editor still wins
+        const nation = team && !empty && !key.bg && !this.config.kindColours[key.kind] ? teamKeyColours(this.ctx.db, team.code) : null;
+        if (nation) {
+            const l = teamKeyLook(nation, text, { active, onAir });
+            return { text: l.text, bg: l.bg, fg: key.fg || l.fg, onAir, active, empty };
+        }
         let bg = keyBg(this.config, key);
-        const fg = key.fg || '#ffffff';
-        if (active)
-            bg = '#d97706';
-        if (onAir)
+        let fg = key.fg || '#ffffff';
+        if (active) {
+            bg = '#f59e0b';
+            fg = '#000000';
+            text = `▶ ${text}`;
+        }
+        if (onAir) {
             bg = '#dc2626';
-        if (empty)
+            fg = '#ffffff';
+            text = `● ${text}`;
+        }
+        if (empty) {
             bg = '#18181b';
+            fg = key.fg || '#ffffff';
+        }
         return { text, bg, fg, onAir, active, empty };
     }
     async view() {

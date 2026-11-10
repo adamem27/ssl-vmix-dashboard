@@ -1,3 +1,4 @@
+import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { badRequest, notFound } from './errors.js';
@@ -255,13 +256,13 @@ export class LowerThirds {
         const team = teams.find((t) => t.id === st.teamId) ?? null;
         const crew = team ? crewOf(this.ctx, team.id) : [];
         const groups = [
-            teams.map((t) => ({ action: `team:${t.code}`, text: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
+            teams.map((t) => ({ action: `team:${t.code}`, text: t.code, team: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
             LINEUP_SLOTS.map((d) => {
                 const s = crew.find((x) => x.slot === d.key);
-                return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
+                return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
             }),
             [
-                { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', active: false, onAir: false },
+                { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', team: team?.code, active: false, onAir: !!team && st.onAir && st.kind === 'team' && st.teamId === team.id },
                 { action: 'next', text: 'NEXT\\nRESULT', active: false, onAir: false },
                 { action: 'out', text: 'OUT', active: false, onAir: st.onAir },
             ],
@@ -284,7 +285,7 @@ export class LowerThirds {
                 }
                 if (row >= cfg.rows)
                     flushPage();
-                page.push({ ...k, page: cfg.companionPage + pages.length, row, col });
+                page.push({ ...k, ...ltKeyStyle(this.ctx.db, k), page: cfg.companionPage + pages.length, row, col });
                 col++;
             }
         }
@@ -335,8 +336,8 @@ export class LowerThirds {
         let n = 0;
         try {
             for (const k of this.layout().flat()) {
-                const bg = keyColour(k);
-                const q = `text=${encodeURIComponent(k.text)}&bgcolor=${encodeURIComponent(bg)}&color=${encodeURIComponent('#ffffff')}&size=auto`;
+                const st = k.bg ? { bg: k.bg, fg: k.fg, label: k.label } : ltKeyStyle(this.ctx.db, k);
+                const q = `text=${encodeURIComponent(st.label)}&bgcolor=${encodeURIComponent(st.bg)}&color=${encodeURIComponent(st.fg)}&size=auto`;
                 const id = `${k.page}/${k.row}/${k.col}`;
                 if (this.labels.get(id) === q)
                     continue;
@@ -357,7 +358,20 @@ export class LowerThirds {
     stop() { if (this.timer)
         clearInterval(this.timer); }
 }
-export const keyColour = (k) => k.onAir ? '#b91c1c' : k.active ? '#d97706' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
+/**
+ * Colours of a key: country and place keys in the team's national colours (selected ▶ and on air ● in its colours too),
+ * the others grey with red when on air and amber when selected. `label` is the text with the marker.
+ */
+export function ltKeyStyle(db, k) {
+    const nation = k.team ? teamKeyColours(db, k.team) : null;
+    if (nation) {
+        const l = teamKeyLook(nation, k.text, k);
+        return { bg: l.bg, fg: l.fg, label: l.text, baseBg: nation.normal.bg, baseFg: nation.normal.fg };
+    }
+    const bg = keyColour(k), base = keyColour({ ...k, active: false, onAir: false });
+    return { bg, fg: k.active && !k.onAir ? '#000000' : '#ffffff', label: k.onAir ? `● ${k.text}` : k.active ? `▶ ${k.text}` : k.text, baseBg: base, baseFg: '#ffffff' };
+}
+export const keyColour = (k) => k.onAir ? '#dc2626' : k.active ? '#f59e0b' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
 /** The dashboard URL a key calls; it names the action itself, so the key keeps working wherever it sits in Companion. */
 export function keyUrl(base, action) {
     const [kind, arg] = action.split(':');
@@ -382,7 +396,7 @@ export function companionPageExport(keys, base, cfg, pageIndex) {
             type: 'button',
             style: {
                 text: k.text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center',
-                color: 0xffffff, bgcolor: parseInt(keyColour({ ...k, active: false, onAir: false }).slice(1), 16), show_topbar: 'default',
+                color: parseInt((k.baseFg ?? '#ffffff').slice(1), 16), bgcolor: parseInt((k.baseBg ?? keyColour({ ...k, active: false, onAir: false })).slice(1), 16), show_topbar: 'default',
             },
             options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
             feedbacks: [],

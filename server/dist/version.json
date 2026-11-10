@@ -1,8 +1,14 @@
 {
-  "version": "1.0.109",
-  "commit": "d6b4565",
-  "date": "2026-11-10T02:22:02Z",
+  "version": "1.0.110",
+  "commit": "2f62346",
+  "date": "2026-11-10T14:05:17Z",
   "changes": [
+    {
+      "version": "1.0.110",
+      "commit": "2f62346",
+      "date": "2026-11-10T14:05:17Z",
+      "text": "Stream Deck keys in national colours: team and sailor keys (Show control and Lower thirds) take the team's colours, selected (▶) and on-air (●) feedback in its colours too"
+    },
     {
       "version": "1.0.109",
       "commit": "d6b4565",
@@ -476,12 +482,6 @@
       "commit": "e3fff57",
       "date": "2026-10-22T11:21:12Z",
       "text": "PNG generator: team gradients (V1–V3), rectangle elements with stroke and Copacabana waves, live preview and auto export"
-    },
-    {
-      "version": "1.0.14",
-      "commit": "ed9f4ec",
-      "date": "2026-10-19T10:32:59Z",
-      "text": "Add app.cjs startup file for Passenger-based Node hosting (DirectAdmin)"
     }
   ]
 }
