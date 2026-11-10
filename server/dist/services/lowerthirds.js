@@ -39,12 +39,13 @@ export const ltConfigSchema = z.object({
     fields: z.object({ top: z.string().max(60), bottom: z.string().max(60), photo: z.string().max(60), flag: z.string().max(60), emblem: z.string().max(60), bar: z.string().max(60) }),
 });
 export const DEFAULT_LT = {
-    photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 2,
+    photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 1,
     barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', countryShowsTeam: false,
     companionUrl: '', companionPage: 1, rows: 4, cols: 8,
     fields: { top: 'Top text', bottom: 'Bottom text', photo: 'PHOTO', flag: 'Flag', emblem: 'Emblem', bar: 'Bar' },
 };
 const CONFIG_KEY = 'lt.config';
+const LAYER1_KEY = 'lt.config.layer1';
 export function getLtConfig(db) {
     try {
         const saved = JSON.parse(getSetting(db, CONFIG_KEY) || '{}');
@@ -53,6 +54,18 @@ export function getLtConfig(db) {
     catch {
         return DEFAULT_LT;
     }
+}
+/** Every graphic is on OV1 now (only the break scene keeps OV4): lower thirds saved on another overlay move over, once. */
+export function moveLtToLayer1(db) {
+    if (getSetting(db, LAYER1_KEY))
+        return;
+    setSetting(db, LAYER1_KEY, '1');
+    try {
+        const saved = JSON.parse(getSetting(db, CONFIG_KEY) || '{}');
+        if (saved.overlay && saved.overlay !== 1)
+            setSetting(db, CONFIG_KEY, JSON.stringify({ ...saved, overlay: 1 }));
+    }
+    catch { /* nothing saved */ }
 }
 export function setLtConfig(db, patch) {
     const cur = getLtConfig(db);
@@ -137,6 +150,7 @@ export class LowerThirds {
         this.ctx = ctx;
         this.fetcher = fetcher;
         this.log = log;
+        moveLtToLayer1(ctx.db);
     }
     get config() { return getLtConfig(this.ctx.db); }
     get state() { return getLtState(this.ctx.db); }
@@ -411,38 +425,8 @@ export class LowerThirds {
      * Writes the key texts and colours into Companion (HTTP remote control: POST /api/location/page/row/col/style),
      * only for keys that changed since the last time.
      */
-    async pushLabels(force = false) {
-        const cfg = this.config;
-        if (!cfg.companionUrl)
-            return { sent: 0 };
-        // the Show control tab owns the Companion keys unless its labels are switched off
-        try {
-            if (JSON.parse(getSetting(this.ctx.db, 'show.config') || '{}').labels !== false)
-                return { sent: 0, show: true };
-        }
-        catch { /* ignore */ }
-        if (force)
-            this.labels.clear();
-        let n = 0;
-        try {
-            for (const k of this.layout().flat()) {
-                const st = k.bg ? { bg: k.bg, fg: k.fg, label: k.label } : ltKeyStyle(this.ctx.db, k);
-                const q = `text=${encodeURIComponent(st.label)}&bgcolor=${encodeURIComponent(st.bg)}&color=${encodeURIComponent(st.fg)}&size=auto`;
-                const id = `${k.page}/${k.row}/${k.col}`;
-                if (this.labels.get(id) === q)
-                    continue;
-                const res = await this.fetcher(`${cfg.companionUrl}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
-                if (res.ok) {
-                    this.labels.set(id, q);
-                    n++;
-                }
-            }
-        }
-        catch (e) {
-            this.log(`Companion labels: ${e?.message ?? e}`);
-        }
-        return { sent: n };
-    }
+    /** Keys show no on-air feedback: nothing is pushed to Companion. */
+    async pushLabels(_force = false) { return { sent: 0 }; }
     /** Keeps the labels in step with line-up changes made elsewhere. */
     start(ms = 15000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }
     stop() { if (this.timer)

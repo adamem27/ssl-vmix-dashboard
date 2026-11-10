@@ -1,8 +1,14 @@
 {
-  "version": "1.0.134",
-  "commit": "34645ac",
-  "date": "2026-11-10T21:54:11Z",
+  "version": "1.0.135",
+  "commit": "7da9e54",
+  "date": "2026-11-10T22:27:06Z",
   "changes": [
+    {
+      "version": "1.0.135",
+      "commit": "7da9e54",
+      "date": "2026-11-10T22:27:06Z",
+      "text": "Every graphic on overlay 1, one OUT key, no key feedback, tidier Companion pages; bug titles found by their GTZIP name"
+    },
     {
       "version": "1.0.134",
       "commit": "34645ac",
@@ -476,12 +482,6 @@
       "commit": "6e8d554",
       "date": "2026-11-08T19:38:08Z",
       "text": "GTZIP generator: scene list with variants, save edited state as a template"
-    },
-    {
-      "version": "1.0.41",
-      "commit": "ddc87b6",
-      "date": "2026-11-08T17:56:50Z",
-      "text": "General graphics versions (welcome, follow us, tickers, race officials, announcements), team line-ups with sync from declaration, Results tab"
     }
   ]
 }
