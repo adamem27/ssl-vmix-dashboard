@@ -2,7 +2,57 @@ export class ApiError extends Error {
   constructor(public status: number, message: string, public details?: any) { super(message); }
 }
 
+// ---------- static commentator page: answers come from one data.json written by the venue PC ----------
+interface StaticFeed { pushedAt: string; version: string; routes: Record<string, unknown> }
+interface StaticStatus { pushedAt: string; version: string }
+let staticBase: string | null = null;
+let statusLoad: { at: number; p: Promise<StaticStatus> } | null = null;
+let feedCache: Promise<StaticFeed> | null = null;
+let feedVersion = '';
+/** Static page: read status.json and data.json from this folder ('' = the page's own folder). */
+export function setStaticSource(base: string) { staticBase = base; }
+export const isStatic = () => staticBase !== null;
+
+const getJson = <T,>(name: string): Promise<T> =>
+  fetch(`${staticBase}${name}?t=${Date.now()}`, { cache: 'no-store' }).then(async (r) => {
+    if (!r.ok) throw new ApiError(r.status, r.status === 404 ? 'No data from the venue yet.' : `Cannot load the data (HTTP ${r.status}).`);
+    return r.json() as Promise<T>;
+  }, () => { throw new ApiError(0, 'No connection. The screen will retry by itself.'); });
+
+/** status.json is tiny and read every round; the big data.json only when its version changed. */
+function loadStatus(): Promise<StaticStatus> {
+  if (statusLoad && Date.now() - statusLoad.at < 2_500) return statusLoad.p;
+  const p = getJson<StaticStatus>('status.json');
+  statusLoad = { at: Date.now(), p };
+  p.catch(() => { statusLoad = null; });
+  return p;
+}
+async function loadFeed(): Promise<StaticFeed> {
+  const st = await loadStatus().catch(() => null);
+  if (!feedCache || (st && st.version !== feedVersion)) {
+    const p = getJson<StaticFeed>('data.json');
+    feedCache = p;
+    feedVersion = st?.version ?? '';
+    p.catch(() => { if (feedCache === p) { feedCache = null; feedVersion = ''; } });
+  }
+  return feedCache;
+}
+
+async function staticGet<T>(url: string): Promise<T> {
+  const [path, qs = ''] = url.split('?');
+  if (path === '/api/live/status') { const st = await loadStatus(); return { feed: { pushedAt: st.pushedAt, receivedAt: st.pushedAt }, now: new Date().toISOString() } as T; }
+  const feed = await loadFeed();
+  const set = new URLSearchParams(qs).get('set');
+  const key = set && (path === '/api/overview' || path === '/api/commentator') ? `${path}?set=${set}` : path;
+  if (!(key in feed.routes)) throw new ApiError(404, 'Not in the commentator data.');
+  return feed.routes[key] as T;
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
+  if (staticBase !== null) {
+    if (method !== 'GET') throw new ApiError(403, 'This screen is read-only.');
+    return staticGet<T>(url);
+  }
   // The commentator screen at /live reads the snapshot pushed by the venue PC when there is one.
   const onLive = window.location.pathname === '/live';
   const init: RequestInit = { method, headers: onLive ? { 'x-ssl-live': '1' } : {} };

@@ -12,8 +12,11 @@ interface PushInfo { enabled: boolean; status: { viewerUrl: string; error: strin
  * Online dashboard: its own link. Venue PC: the link the online dashboard returned to the last push.
  */
 export function useCommentatorLink() {
+  const site = useQuery({ queryKey: ['commentator-link', 'static'], queryFn: () => api.get<{ enabled: boolean; url: string; status: { error: string; lastOkAt: string | null } }>('/api/static-site'), refetchInterval: 10_000 });
   const viewer = useQuery({ queryKey: ['live-viewer'], queryFn: () => api.get<ViewerInfo>('/api/live/viewer'), staleTime: 30_000 });
   const push = useQuery({ queryKey: ['live-push'], queryFn: () => api.get<PushInfo>('/api/live/push'), enabled: viewer.data?.passwordSet === false, refetchInterval: 10_000 });
+  // the static page comes first: it is what the venue PC publishes when switched on
+  if (site.data?.enabled && site.data.url) return { url: site.data.url, sending: { enabled: true, status: { viewerUrl: site.data.url, error: site.data.status.error, lastOkAt: site.data.status.lastOkAt } } as PushInfo };
   if (viewer.data?.passwordSet) return { url: window.location.origin + viewer.data.path, sending: null as PushInfo | null };
   return { url: push.data?.status.viewerUrl ?? '', sending: push.data ?? null };
 }
@@ -33,7 +36,7 @@ export function CommentatorLinkButton() {
     try { await navigator.clipboard.writeText(url); toast.ok('Commentator link copied'); }
     catch { window.prompt('Copy the commentator link', url); }
   };
-  const problem = !url ? (sending?.enabled ? (sending.status.error || 'Waiting for the first send…') : 'Sending to the online dashboard is off.') : sending?.status.error || '';
+  const problem = !url ? (sending?.enabled ? (sending.status.error || 'Waiting for the first send…') : 'Publishing of the commentator page is off.') : sending?.status.error || '';
   return (
     <div ref={box} className="relative shrink-0">
       <button onClick={() => (url && !open ? copy().then(() => setOpen(true)) : setOpen(!open))} title={url ? 'Copy the link for commentators' : 'Set up the commentator link'}

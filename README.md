@@ -101,7 +101,25 @@ W prawym górnym rogu dashboardu jest znacznik "vMix PC": zielony = synchronizac
 
 W vMix: Data Sources → Excel → `C:\SSL-vMix\ssl-vmix.xlsx` (lub JSON → `C:\SSL-vMix\ssl-vmix.json`). Okno synchronizacji musi być otwarte.
 
-## Ekran komentatora online (tylko do odczytu)
+## Ekran komentatora jako statyczna strona (zalecane)
+
+Ekran komentatora może być zwykłą statyczną stroną na dowolnym hostingu: na serwerze nie działa żaden program, tylko serwer WWW podaje pliki, więc nie ma czego wysypać. Co 5 s PC na regatach zapisuje folder:
+
+- `index.html` i `assets/` – sam ekran (budowany razem z aplikacją: `web/dist/commentator.html`),
+- `data.json` – wszystkie dane ekranu; adresy obrazków wskazują na `img/`,
+- `img/<sha1>.png|jpg` – flagi, emblematy, zdjęcia,
+- `status.json` – godzina i wersja danych, nadpisywany co rundę; strona pobiera duży `data.json` tylko, gdy zmieni się wersja.
+
+Wysyłane są tylko zmienione pliki (każdy pod tymczasową nazwą, potem zmiana nazwy, więc komentator nigdy nie czyta połowy pliku). Nazwa folderu ma losową część (`komentator-xxxxxxxx`): adres jest kluczem, a strona nie daje możliwości zmiany czegokolwiek.
+
+Konfiguracja na PC z vMixem: **Settings → Commentator online**:
+1. „Upload by FTP”: serwer, port, użytkownik i hasło FTP, folder na serwerze (puste = folder konta FTP), FTPS włączone. Na seohost: w DirectAdmin utwórz subdomenę (np. `komentator.em27code.com`) i osobne konto FTP ograniczone do jej folderu.
+2. „Web address of that folder”: adres tego folderu w przeglądarce, np. `https://komentator.em27code.com`.
+3. Save, zaznacz „Publish every 5 seconds”. Link dla komentatorów (`https://komentator.em27code.com/komentator-xxxxxxxx/`) jest pod spodem i w przycisku **🎙 Commentator link** na górnym pasku.
+
+„Only save to a folder on this PC” zapisuje to samo do lokalnego folderu (np. do synchronizowania własnym narzędziem). „New address” przenosi stronę pod nowy losowy folder; stary folder usuń ręcznie przez FTP.
+
+## Ekran komentatora przez dashboard online (alternatywa)
 
 Komentatorzy mogą oglądać zakładkę Commentator pod adresem w internecie, nawet gdy baza działa lokalnie na PC na regatach. Lokalny dashboard co 5 s wysyła na dashboard online wyłącznie dane tego ekranu (JSON i obrazki flag/zdjęć, gzip, zmienione obrazki tylko raz), a gdy nic się nie zmieniło, tylko krótki sygnał „żyję”. PC na regatach niczego nie wystawia do internetu: potrzebuje tylko wyjścia HTTPS.
 
