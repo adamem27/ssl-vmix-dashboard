@@ -1,3 +1,4 @@
+import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
@@ -253,13 +254,13 @@ export class LowerThirds {
     const team = teams.find((t) => t.id === st.teamId) ?? null;
     const crew = team ? crewOf(this.ctx, team.id) : [];
     const groups: LtKey[][] = [
-      teams.map((t) => ({ action: `team:${t.code}`, text: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
+      teams.map((t) => ({ action: `team:${t.code}`, text: t.code, team: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
       LINEUP_SLOTS.map((d) => {
         const s = crew.find((x) => x.slot === d.key);
-        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
+        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
       }),
       [
-        { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', active: false, onAir: false },
+        { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', team: team?.code, active: false, onAir: !!team && st.onAir && st.kind === 'team' && st.teamId === team.id },
         { action: 'next', text: 'NEXT\\nRESULT', active: false, onAir: false },
         { action: 'out', text: 'OUT', active: false, onAir: st.onAir },
       ],
@@ -274,7 +275,7 @@ export class LowerThirds {
       for (const k of g) {
         if (col >= cfg.cols) { row++; col = 0; }
         if (row >= cfg.rows) flushPage();
-        page.push({ ...k, page: cfg.companionPage + pages.length, row, col });
+        page.push({ ...k, ...ltKeyStyle(this.ctx.db, k), page: cfg.companionPage + pages.length, row, col });
         col++;
       }
     }
@@ -311,8 +312,8 @@ export class LowerThirds {
     let n = 0;
     try {
       for (const k of this.layout().flat()) {
-        const bg = keyColour(k);
-        const q = `text=${encodeURIComponent(k.text)}&bgcolor=${encodeURIComponent(bg)}&color=${encodeURIComponent('#ffffff')}&size=auto`;
+        const st = k.bg ? { bg: k.bg, fg: k.fg!, label: k.label! } : ltKeyStyle(this.ctx.db, k);
+        const q = `text=${encodeURIComponent(st.label)}&bgcolor=${encodeURIComponent(st.bg)}&color=${encodeURIComponent(st.fg)}&size=auto`;
         const id = `${k.page}/${k.row}/${k.col}`;
         if (this.labels.get(id) === q) continue;
         const res = await this.fetcher(`${cfg.companionUrl}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
@@ -329,7 +330,21 @@ export class LowerThirds {
   stop() { if (this.timer) clearInterval(this.timer); }
 }
 
-export const keyColour = (k: LtKey) => k.onAir ? '#b91c1c' : k.active ? '#d97706' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
+/**
+ * Colours of a key: country and place keys in the team's national colours (selected ▶ and on air ● in its colours too),
+ * the others grey with red when on air and amber when selected. `label` is the text with the marker.
+ */
+export function ltKeyStyle(db: AssetCtx['db'] | null, k: LtKey): { bg: string; fg: string; label: string; baseBg: string; baseFg: string } {
+  const nation = k.team ? teamKeyColours(db, k.team) : null;
+  if (nation) {
+    const l = teamKeyLook(nation, k.text, k);
+    return { bg: l.bg, fg: l.fg, label: l.text, baseBg: nation.normal.bg, baseFg: nation.normal.fg };
+  }
+  const bg = keyColour(k), base = keyColour({ ...k, active: false, onAir: false });
+  return { bg, fg: k.active && !k.onAir ? '#000000' : '#ffffff', label: k.onAir ? `● ${k.text}` : k.active ? `▶ ${k.text}` : k.text, baseBg: base, baseFg: '#ffffff' };
+}
+
+export const keyColour = (k: LtKey) => k.onAir ? '#dc2626' : k.active ? '#f59e0b' : k.action.startsWith('team:') ? '#1e3a5f' : k.action.startsWith('place:') ? '#27303f' : '#3f3f46';
 
 /** The dashboard URL a key calls; it names the action itself, so the key keeps working wherever it sits in Companion. */
 export function keyUrl(base: string, action: string) {
@@ -353,7 +368,7 @@ export function companionPageExport(keys: LtKey[], base: string, cfg: LtConfig, 
       type: 'button',
       style: {
         text: k.text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center',
-        color: 0xffffff, bgcolor: parseInt(keyColour({ ...k, active: false, onAir: false }).slice(1), 16), show_topbar: 'default',
+        color: parseInt((k.baseFg ?? '#ffffff').slice(1), 16), bgcolor: parseInt((k.baseBg ?? keyColour({ ...k, active: false, onAir: false })).slice(1), 16), show_topbar: 'default',
       },
       options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
       feedbacks: [],
@@ -379,4 +394,4 @@ export function companionPageExport(keys: LtKey[], base: string, cfg: LtConfig, 
   };
 }
 
-export interface LtKey { action: string; text: string; active: boolean; onAir: boolean; page?: number; row?: number; col?: number }
+export interface LtKey { action: string; text: string; active: boolean; onAir: boolean; page?: number; row?: number; col?: number; /** the team whose national colours the key takes */ team?: string; bg?: string; fg?: string; label?: string; baseBg?: string; baseFg?: string }

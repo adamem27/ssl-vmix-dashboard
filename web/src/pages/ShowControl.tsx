@@ -122,7 +122,7 @@ function Show({ data }: { data: ShowData }) {
         </div>
         <p className="mb-3 text-sm text-ink-400">
           Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (teams of the group, sailors by shirt number, announcements, extras).
-          A key brings its graphic in and a second press takes it out. Red = on air (read from vMix), orange = selected. The bottom row is the same on every page.
+          A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
           {[1, 2].map((d) => {
@@ -148,7 +148,7 @@ function Show({ data }: { data: ShowData }) {
                     return k ? (
                       <button key={id} {...dnd} onClick={() => (edit ? setPick(id) : run(k.action))} disabled={!edit && (!!busy || k.empty)} title={k.action}
                         style={{ background: k.bg, color: k.fg }}
-                        className={cx('aspect-square whitespace-pre-line rounded-lg px-0.5 text-center text-[10px] font-bold leading-tight shadow transition hover:brightness-125 disabled:opacity-60', k.onAir && 'ring-2 ring-red-300', busy === k.action && 'animate-pulse', edit && 'cursor-grab', picked && 'outline outline-2 outline-offset-2 outline-sky-400')}>
+                        className={cx('aspect-square whitespace-pre-line rounded-lg px-0.5 text-center text-[10px] font-bold leading-tight shadow transition hover:brightness-125 disabled:opacity-60', k.onAir && 'ring-2 ring-red-300', k.active && !k.onAir && 'ring-2 ring-white/70', busy === k.action && 'animate-pulse', edit && 'cursor-grab', picked && 'outline outline-2 outline-offset-2 outline-sky-400')}>
                         {k.text.replace(/\\n/g, '\n')}
                       </button>
                     ) : <div key={id} {...dnd} onClick={() => edit && setPick(id)} className={cx('aspect-square rounded-lg border border-dashed border-ink-800', edit && 'cursor-pointer hover:border-ink-500', picked && 'outline outline-2 outline-offset-2 outline-sky-400')} />;

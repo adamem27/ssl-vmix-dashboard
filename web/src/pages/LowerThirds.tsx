@@ -9,7 +9,7 @@ interface Config {
   companionUrl: string; companionPage: number; rows: number; cols: number; fields: Fields;
 }
 interface State { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
-interface Key { action: string; text: string; active: boolean; onAir: boolean; page: number; row: number; col: number }
+interface Key { action: string; text: string; active: boolean; onAir: boolean; page: number; row: number; col: number; bg?: string; fg?: string; label?: string }
 interface Sailor { slot: string; label: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; photo: string; best: string[] }
 interface LtData { config: Config; state: State; teams: { id: string; code: string; name: string }[]; keys: Key[][]; crew: Sailor[]; teamSlots: { key: string; label: string }[]; last: { at: string; what: string; error: string | null } | null }
 
@@ -72,8 +72,8 @@ function LowerThirds({ data }: { data: LtData }) {
                 const id = `${k.page}/${k.row}/${k.col}`;
                 return (
                   <button key={n} onClick={() => press(k)} disabled={!!busy} title={k.action}
-                    className={cx('aspect-square whitespace-pre-line rounded-lg px-1 text-center text-xs font-bold leading-tight shadow transition hover:brightness-125 disabled:opacity-70', keyBg(k), busy === id && 'animate-pulse')}>
-                    {k.text.replace(/\\n/g, '\n')}
+                    className={cx('aspect-square whitespace-pre-line rounded-lg px-1 text-center text-xs font-bold leading-tight shadow transition hover:brightness-125 disabled:opacity-70', !k.bg && keyBg(k), k.onAir && 'ring-2 ring-white/80', busy === id && 'animate-pulse')} style={k.bg ? { background: k.bg, color: k.fg } : undefined}>
+                    {(k.label ?? k.text).replace(/\\n/g, '\n')}
                   </button>
                 );
               })}

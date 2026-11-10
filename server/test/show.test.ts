@@ -6,6 +6,7 @@ import { saveLineup } from '../src/services/lineups.js';
 import { createGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
+import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -187,5 +188,31 @@ describe('show control', () => {
     const f: any = companionFiles(show.config, 'http://x', 'http://v', show.graphics())[0].file;
     expect(f.page.controls[0][0].style).toMatchObject({ text: 'HELLO\\nWELCOME', bgcolor: 0x16a34a, color: 0 });
     expect(f.page.controls[0][2]).toBeUndefined();
+  });
+
+  it('colours team and sailor keys in national colours, with matching selected / on-air feedback', async () => {
+    const { s } = race();
+    expect(nationColours(null, 'BRA')).toEqual(['#049240', '#fdc900']);
+    expect(nationColours(null, 'ITA').length).toBe(2); // from the flag table
+    expect(nationColours(null, 'XYZ')).toEqual([]);
+    const bra = teamKeyColours(null, 'BRA')!;
+    expect(bra.onAir.bg).toBe('#fdc900');
+    expect(bra.onAir.fg).toBe(textOn('#fdc900'));
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const racePage = deckPages(show.config)[2];
+    const team1 = await show.keyLook(racePage.keys[0][0]!); // ESP, selected (boat 1)
+    const esp = teamKeyColours(s.db, 'ESP')!;
+    expect(team1).toMatchObject({ active: true, bg: esp.active.bg, fg: esp.active.fg });
+    expect(team1.text.startsWith('▶ ')).toBe(true);
+    const team2 = await show.keyLook(racePage.keys[0][1]!); // BRA, not selected
+    expect(team2.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
+    const sailor = await show.keyLook(racePage.keys[1][0]!);
+    expect(sailor.bg).toBe(esp.normal.bg);
+    // a colour set on the key in the key editor still wins
+    setShowConfig(s.db, { keys: { '2/0/1': { bg: '#123456' } } });
+    expect((await show.keyLook(deckPages(show.config)[2].keys[0][1]!)).bg).toBe('#123456');
+    // lower thirds: country keys in their colours
+    const keys = new LowerThirds(s.ctx).layout().flat();
+    expect(keys.find((k) => k.action === 'team:BRA')!.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
   });
 });
