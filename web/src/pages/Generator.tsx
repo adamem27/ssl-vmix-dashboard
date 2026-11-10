@@ -16,7 +16,8 @@ const fromOf = (t: ElementSpec): From => t.gradientFrom ?? (t.flip ? 'right' : '
 interface TeamGradients { teamId: string; code: string; name: string; gradients: Record<number, Gradient | null> }
 interface GenStatus { autoExport: boolean; folder: string; pending: number; files: number; lastWriteAt: string | null; error: string | null }
 interface Output { rel: string; teamId: string; templateId: string; updatedAt: string }
-interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string; strokeGradient: Gradient; neutral: NeutralSettings }
+type CustomGraphic = Omit<Template, 'sort' | 'variant' | 'scope'> & { gradient: Gradient };
+interface GenState { templates: Template[]; teams: TeamGradients[]; status: GenStatus; outputs: Output[]; vmixAssetsRoot: string; strokeGradient: Gradient; neutral: NeutralSettings; custom: CustomGraphic[] }
 
 /** The shared gradient that elements with a gradient stroke are painted with. */
 const StrokeGradientCtx = createContext<Gradient | null>(null);
@@ -49,26 +50,36 @@ function colorAt(g: Gradient, pos: number): GradientStop {
   return { pos, color: toHex([0, 1, 2].map((k) => ca[k] + (cb[k] - ca[k]) * f) as [number, number, number]), opacity: Math.round(a.opacity + (b.opacity - a.opacity) * f) };
 }
 
-type GenTab = 'elements' | 'matchboard';
+type GenTab = 'elements' | 'custom' | 'matchboard';
 const TABS: [GenTab, string, string][] = [
-  ['elements', 'Elements & team colours', 'The exported PNGs and the gradients V1–V3 of each team'],
-  ['matchboard', 'Matchboard', 'Bracket graphic with teams, texts and highlights'],
+  ['elements', 'Team elements', 'Shapes made once for every team in its colours (V1–V3) and in the neutral set. Change a shape here and every team’s PNG follows.'],
+  ['custom', 'Custom graphics', 'One-off PNGs that belong to no team or group: your own size, shape and colours. They never change the team elements, and the team elements never change them.'],
+  ['matchboard', 'Matchboard', 'The bracket graphic with teams, texts and highlights.'],
 ];
 
 export function GeneratorPage() {
   const [params, setParams] = useSearchParams();
   const tab = (TABS.find(([k]) => k === params.get('tab'))?.[0] ?? 'elements') as GenTab;
   const q = useQuery({ queryKey: ['generator'], queryFn: () => api.get<GenState>('/api/generator'), refetchOnWindowFocus: false });
+  const hint = TABS.find(([k]) => k === tab)![2];
   return (
     <div className="space-y-3">
       <nav className="flex flex-wrap gap-1 border-b border-ink-800" aria-label="PNG generator sections">
-        {TABS.map(([k, label, hint]) => (
-          <button key={k} title={hint} onClick={() => setParams(k === 'elements' ? {} : { tab: k }, { replace: true })}
-            className={cx('-mb-px border-b-2 px-4 py-2 text-sm font-semibold', tab === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>{label}</button>
+        {TABS.map(([k, label, h]) => (
+          <button key={k} title={h} onClick={() => setParams(k === 'elements' ? {} : { tab: k }, { replace: true })}
+            className={cx('-mb-px border-b-2 px-4 py-2 text-sm font-semibold', tab === k ? 'border-accent-400 text-ink-50' : 'border-transparent text-ink-400 hover:text-ink-100')}>
+            {label}{k === 'custom' && q.data?.custom.length ? <span className="ml-1.5 rounded bg-ink-800 px-1.5 text-[10px] text-ink-300">{q.data.custom.length}</span> : null}
+          </button>
         ))}
       </nav>
+      <p className="text-sm text-ink-400">{hint}</p>
       {tab === 'matchboard' ? <MatchboardTab />
-        : q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : <Generator state={q.data!} />}
+        : q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} onRetry={() => q.refetch()} /> : (
+          <>
+            <ExportBar state={q.data!} />
+            {tab === 'custom' ? <CustomTab state={q.data!} /> : <Generator state={q.data!} />}
+          </>
+        )}
     </div>
   );
 }
@@ -135,11 +146,14 @@ function Generator({ state }: { state: GenState }) {
   return (
     <StrokeGradientCtx.Provider value={strokeGradient}>
     <div className="space-y-3">
-      <ExportBar state={state} />
       <ElementsPanel templates={templates} patch={patchTemplate} onReload={refresh} newScope={isNeutral ? 'neutral' : 'teams'} preview={(t) => (
         <ElementPreview template={t} team={t.scope === 'neutral' || (t.scope === 'both' && isNeutral) ? neutralTeam : isNeutral ? null : team} teams={shown} neutral={t.scope === 'neutral' || (t.scope === 'both' && isNeutral) ? neutral : undefined} bg={bg} setBg={setBg}
           onPick={(id) => setTeamId(id)} />
       )} />
+      <div className="flex items-baseline gap-2 px-1 pt-1">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">2 · Team colours</h2>
+        <span className="text-xs text-ink-500">pick a team (or NEUTRAL) on the left and set its gradients V1–V3; the preview shows its PNGs</span>
+      </div>
       <div className="grid gap-3 lg:grid-cols-[230px_minmax(0,1fr)]">
         <TeamList teams={shown} selected={teamId} onSelect={setTeamId} neutral={neutral} />
         <div className="min-w-0 space-y-3">
@@ -208,7 +222,7 @@ function ExportBar({ state }: { state: GenState }) {
   };
   return (
     <section className="card flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2 text-sm">
-      <h1 className="text-sm font-bold uppercase tracking-wide text-ink-200">PNG generator</h1>
+      <h1 className="text-sm font-bold uppercase tracking-wide text-ink-200">Export</h1>
       <label className="flex cursor-pointer items-center gap-2">
         <input type="checkbox" checked={s.autoExport} onChange={toggle} className="h-4 w-4 accent-sky-500" />
         <span className="text-ink-200">Auto export</span>
@@ -640,7 +654,7 @@ function ElementsPanel({ templates, patch, onReload, preview, newScope }: { temp
     <NumInput className={w} min={min} max={max} value={t[k] as number} label={String(k)} onChange={(n) => patch(t.id, { [k]: n })} />
   );
   return (
-    <Panel title="PNG elements" right={<>
+    <Panel title="1 · Shapes" titleExtra={<span className="text-xs text-ink-500">one row per PNG made for every team · ▸ opens a preview</span>} right={<>
       <Button size="sm" variant="ghost" onClick={() => setOpen(allOpen ? new Set() : new Set(templates.map((t) => t.id)))}>{allOpen ? 'Collapse all' : 'Expand all'}</Button>
       <Button size="sm" onClick={add} title={newScope === 'neutral' ? 'New neutral element (NEUTRAL is selected)' : 'New team element'}>+ {newScope === 'neutral' ? 'Neutral element' : 'Element'}</Button>
     </>}>
@@ -751,4 +765,184 @@ function TextInput({ value, onChange, className, label }: { value: string; onCha
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return <input className={cx('input px-2 py-1', className)} value={v} aria-label={label} onChange={(e) => { setV(e.target.value); onChange(e.target.value); }} onBlur={() => setV(value)} />;
+}
+
+// ---------- custom graphics ----------
+const BLANK_GRADIENT: Gradient = { angle: 0, stops: [{ pos: 0, color: '#e30820', opacity: 100 }, { pos: 100, color: '#f6a010', opacity: 100 }] };
+
+/** One-off PNGs with their own size, shape and gradient; stored apart from the team elements. */
+function CustomTab({ state }: { state: GenState }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const debounce = useDebouncer(350);
+  const { ask, dialog } = useConfirm();
+  const [list, setList] = useState(state.custom);
+  useEffect(() => setList(state.custom), [state.custom]);
+  const listRef = useRef(list);
+  listRef.current = list;
+  const [selId, setSelId] = useState(() => state.custom[0]?.id ?? '');
+  const [bg, setBg] = useState<Bg>('checker');
+  const [stopSel, setStopSel] = useState(0);
+  const refresh = () => qc.invalidateQueries({ queryKey: ['generator'] });
+  const sel = list.find((c) => c.id === selId) ?? list[0] ?? null;
+
+  const patch = (id: string, p: Partial<CustomGraphic>) => {
+    setList((l) => l.map((c) => (c.id === id ? { ...c, ...p } : c)));
+    debounce(`c:${id}`, () => {
+      const cur = listRef.current.find((c) => c.id === id);
+      if (!cur) return;
+      const { id: _i, ...body } = cur;
+      api.patch(`/api/generator/custom/${id}`, body).catch((e) => { toast.error(e); refresh(); });
+    });
+  };
+  const create = async (body: Omit<CustomGraphic, 'id'>) => {
+    try { const c = await api.post<CustomGraphic>('/api/generator/custom', body); setSelId(c.id); setStopSel(0); refresh(); } catch (e) { toast.error(e); }
+  };
+  const freeNumber = (base: string) => {
+    const names = new Set(list.map((c) => c.fileName.toLowerCase()));
+    let n = list.length + 1;
+    while (names.has(`${base}_${n}`.toLowerCase())) n++;
+    return n;
+  };
+  const addBlank = () => {
+    const n = freeNumber('custom');
+    void create({
+      name: `Custom ${n}`, fileName: `custom_${n}`, width: 800, height: 100, radius: 0, corner: 'round', cutX: 0, cutY: 0, cutSides: 'both', opacity: 100, flip: false, angleOffset: 0,
+      strokeWidth: 1, strokeColor: '#9a9a9a', strokeOpacity: 100, strokeGradient: true, strokeAngle: -45, pattern: true, patternOpacity: 10, patternScale: 100, enabled: true, gradient: BLANK_GRADIENT,
+    });
+  };
+  /** a copy of a team element's shape (and the first team colour it has), to change freely */
+  const addFromElement = (tid: string) => {
+    const t = state.templates.find((x) => x.id === tid);
+    if (!t) return;
+    const { id: _i, sort: _s, variant, scope: _sc, ...shape } = t;
+    const g = state.teams.find((x) => x.gradients[variant])?.gradients[variant] ?? BLANK_GRADIENT;
+    const n = freeNumber(t.fileName);
+    void create({ ...shape, name: `${t.name} (custom)`, fileName: `${t.fileName}_${n}`, enabled: true, gradient: structuredClone(g) });
+  };
+  const sources = useMemo(() => {
+    const out: { key: string; label: string; g: Gradient }[] = [];
+    neutralGradients(state.neutral.color, state.neutral.opacity).forEach((g, i) => out.push({ key: `n${i}`, label: `${NEUTRAL_CODE} · V${i + 1}`, g }));
+    for (const t of state.teams) for (const v of VARIANTS) { const g = t.gradients[v]; if (g) out.push({ key: `${t.teamId}:${v}`, label: `${t.code} · V${v}`, g }); }
+    return out;
+  }, [state.teams, state.neutral]);
+
+  const num = (c: CustomGraphic, k: keyof CustomGraphic, label: string, min = 0, max = 4096, w = 'w-20') => (
+    <Labeled label={label}><NumInput className={w} min={min} max={max} value={c[k] as number} label={label} onChange={(n) => patch(c.id, { [k]: n } as Partial<CustomGraphic>)} /></Labeled>
+  );
+
+  return (
+    <StrokeGradientCtx.Provider value={state.strokeGradient}>
+      {dialog}
+      <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <section className="card flex max-h-[calc(100vh-150px)] flex-col lg:sticky lg:top-[72px]">
+          <div className="space-y-2 border-b border-ink-800 p-2">
+            <Button size="sm" variant="primary" className="w-full" onClick={addBlank}>+ New custom graphic</Button>
+            <select className="input py-1 text-xs" value="" onChange={(e) => addFromElement(e.target.value)} aria-label="Start from a team element">
+              <option value="">Copy the shape of a team element…</option>
+              {state.templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.width}×{t.height})</option>)}
+            </select>
+          </div>
+          <ul className="min-h-0 flex-1 overflow-y-auto p-1">
+            {list.map((c) => (
+              <li key={c.id}>
+                <button onClick={() => { setSelId(c.id); setStopSel(0); }} className={cx('flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm', c.id === sel?.id ? 'bg-ink-800 text-ink-50' : 'text-ink-300 hover:bg-ink-850', !c.enabled && 'opacity-50')}>
+                  <span className="checker block h-5 w-12 shrink-0 overflow-hidden rounded-sm"><span className="block h-full" style={{ background: cssGradient(c.gradient) }} /></span>
+                  <span className="min-w-0 flex-1"><span className="block truncate font-medium">{c.name}</span><span className="block truncate font-mono text-[10px] text-ink-500">{c.fileName}.png · {c.width}×{c.height}</span></span>
+                </button>
+              </li>
+            ))}
+            {!list.length && <li className="px-2 py-4 text-xs text-ink-500">No custom graphics yet. Start a blank one, or copy the shape of a team element and change it.</li>}
+          </ul>
+        </section>
+
+        {sel ? (
+          <div className="min-w-0 space-y-3">
+            <Panel title={sel.name} right={<>
+              <BgToggle bg={bg} setBg={setBg} />
+              <a className="inline-flex items-center rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs font-medium text-ink-100 hover:bg-ink-700" href={`/api/generator/custom/${sel.id}/png`}>↓ Download PNG</a>
+              <Button size="sm" variant="ghost" onClick={async () => { try { const d = await api.post<CustomGraphic>(`/api/generator/custom/${sel.id}/duplicate`); setSelId(d.id); refresh(); } catch (e) { toast.error(e); } }}>⧉ Duplicate</Button>
+              <Button size="sm" variant="ghost" onClick={async () => {
+                if (!(await ask(`Delete “${sel.name}”?`, 'Its PNG file is removed too. Team elements are not affected.', 'Delete'))) return;
+                try { await api.del(`/api/generator/custom/${sel.id}`); setSelId(''); refresh(); } catch (e) { toast.error(e); }
+              }}>✕ Delete</Button>
+            </>}>
+              <div className={cx('grid min-h-[120px] place-items-center rounded p-4 ring-1 ring-ink-700', bgClass(bg))}>
+                <Canvas spec={sel} gradient={sel.gradient} maxW={1100} maxH={420} />
+              </div>
+              <p className="mt-2 text-xs text-ink-500">Exported as <span className="font-mono">PNG generator/Custom/{sel.fileName}.png</span>{sel.enabled ? '' : ' (export is off)'} · listed in /json/custom-graphics.</p>
+            </Panel>
+
+            <Panel title="File">
+              <div className="flex flex-wrap items-end gap-3 text-sm">
+                <Labeled label="Name"><TextInput className="w-56" value={sel.name} label="Name" onChange={(name) => name.trim() && patch(sel.id, { name })} /></Labeled>
+                <Labeled label="File name (.png)"><TextInput className="w-56 font-mono" value={sel.fileName} label="File name" onChange={(fileName) => /^[\w.-]+$/.test(fileName) && patch(sel.id, { fileName })} /></Labeled>
+                <label className="mb-1.5 flex items-center gap-2"><input type="checkbox" checked={sel.enabled} onChange={(e) => patch(sel.id, { enabled: e.target.checked })} className="h-4 w-4 accent-sky-500" />Export with the others</label>
+              </div>
+            </Panel>
+
+            <Panel title="Shape">
+              <div className="flex flex-wrap items-end gap-3 text-sm">
+                {num(sel, 'width', 'Width px', 1)}
+                {num(sel, 'height', 'Height px', 1)}
+                <Labeled label="Corners">
+                  <select className="input w-auto px-1.5 py-1" value={sel.corner ?? 'round'} aria-label="Corner shape"
+                    onChange={(e) => patch(sel.id, e.target.value === 'cut' && !sel.cutX && !sel.cutY ? { corner: 'cut', cutX: Math.round(sel.height / 3), cutY: Math.round(sel.height / 3) } : { corner: e.target.value as 'round' | 'cut' })}>
+                    <option value="round">◜ Round</option><option value="cut">◸ Cut</option>
+                  </select>
+                </Labeled>
+                {num(sel, 'radius', sel.corner === 'cut' ? 'Vertex rounding' : 'Radius')}
+                {sel.corner === 'cut' && <>
+                  {num(sel, 'cutX', 'Cut ↔')}
+                  {num(sel, 'cutY', 'Cut ↕')}
+                  <Labeled label="Cut ends">
+                    <select className="input w-auto px-1.5 py-1" value={sel.cutSides ?? 'both'} onChange={(e) => patch(sel.id, { cutSides: e.target.value as 'both' | 'left' | 'right' })} aria-label="Cut ends">
+                      <option value="both">Both</option><option value="left">Left</option><option value="right">Right</option>
+                    </select>
+                  </Labeled>
+                </>}
+                {num(sel, 'opacity', 'Opacity %', 0, 100)}
+              </div>
+            </Panel>
+
+            <Panel title="Colour" right={
+              <select className="input w-auto py-1 text-xs" value="" aria-label="Copy a gradient"
+                onChange={(e) => { const src = sources.find((x) => x.key === e.target.value); if (src) { patch(sel.id, { gradient: structuredClone(src.g) }); setStopSel(0); } }}>
+                <option value="">Copy a gradient from…</option>
+                {sources.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+              </select>
+            }>
+              <GradientEditor g={sel.gradient} sel={stopSel} setSel={setStopSel} onChange={(gradient) => patch(sel.id, { gradient })} />
+              <div className="mt-3 flex flex-wrap items-end gap-3 text-sm">
+                <Labeled label="Gradient from">
+                  <select className="input w-auto px-1.5 py-1" value={fromOf(sel)} onChange={(e) => { const v = e.target.value as From; patch(sel.id, { gradientFrom: v, flip: v === 'right' }); }} aria-label="Gradient from">
+                    <option value="left">→ Left</option><option value="right">← Right</option><option value="top">↓ Top</option><option value="bottom">↑ Bottom</option>
+                  </select>
+                </Labeled>
+                {num(sel, 'angleOffset', 'Angle +', -360, 360)}
+              </div>
+            </Panel>
+
+            <Panel title="Stroke and waves">
+              <div className="flex flex-wrap items-end gap-3 text-sm">
+                {num(sel, 'strokeWidth', 'Stroke px', 0, 200)}
+                <Labeled label="Stroke">
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center gap-1 text-xs text-ink-300" title="Paint the stroke with the shared orange → yellow stroke gradient">
+                      <input type="checkbox" checked={sel.strokeGradient} onChange={(e) => patch(sel.id, { strokeGradient: e.target.checked, ...(e.target.checked && !sel.strokeWidth ? { strokeWidth: 1 } : {}) })} className="h-4 w-4 accent-sky-500" />Gradient
+                    </label>
+                    {!sel.strokeGradient && <input type="color" value={sel.strokeColor} onChange={(e) => patch(sel.id, { strokeColor: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-ink-700 bg-transparent" aria-label="Stroke colour" />}
+                  </div>
+                </Labeled>
+                {sel.strokeGradient && num(sel, 'strokeAngle', 'Stroke ∠', -360, 360)}
+                {num(sel, 'strokeOpacity', 'Stroke %', 0, 100)}
+                <label className="mb-1.5 flex items-center gap-2"><input type="checkbox" checked={sel.pattern} onChange={(e) => patch(sel.id, { pattern: e.target.checked })} className="h-4 w-4 accent-sky-500" />Waves</label>
+                {sel.pattern && <>{num(sel, 'patternOpacity', 'Waves %', 0, 100)}{num(sel, 'patternScale', 'Waves size %', 5, 1000)}</>}
+              </div>
+            </Panel>
+          </div>
+        ) : <section className="card p-6 text-sm text-ink-400">Make a graphic that belongs to no team or group: start a blank one on the left, or copy the shape of a team element and change it freely.</section>}
+      </div>
+    </StrokeGradientCtx.Provider>
+  );
 }

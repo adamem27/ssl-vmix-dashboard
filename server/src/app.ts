@@ -466,6 +466,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     vmixAssetsRoot: getSetting(db, 'paths.vmixAssetsRoot'),
     strokeGradient: pngGen.getStrokeGradient(db),
     neutral: pngGen.getNeutral(db),
+    custom: pngGen.listCustom(db),
   });
   app.get('/api/generator', async () => genState());
   app.get('/api/generator/status', async () => ({ status: generator.status(), outputs: pngGen.listOutputs(db) }));
@@ -493,6 +494,15 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     matchboard.schedule(1500);
     return pngGen.listGradients(db).find((t) => t.teamId === req.params.teamId);
   });
+  app.post('/api/generator/custom', async (req) => pngGen.createCustom(db, req.body));
+  app.patch<{ Params: { id: string } }>('/api/generator/custom/:id', async (req) => pngGen.updateCustom(db, req.params.id, req.body));
+  app.post<{ Params: { id: string } }>('/api/generator/custom/:id/duplicate', async (req) => pngGen.duplicateCustom(db, req.params.id));
+  app.delete<{ Params: { id: string } }>('/api/generator/custom/:id', async (req) => { pngGen.deleteCustom(db, req.params.id); return { ok: true }; });
+  app.get<{ Params: { id: string } }>('/api/generator/custom/:id/png', async (req, reply) => {
+    const { buf, fileName } = pngGen.renderCustom(generator.ctx, req.params.id);
+    return reply.type('image/png').header('Content-Disposition', `attachment; filename="${fileName}"`).send(buf);
+  });
+  app.get('/json/custom-graphics', async () => pngGen.jsonCustomGraphics(db, deps.assetsDir));
   app.put('/api/generator/stroke-gradient', async (req) => ({
     strokeGradient: pngGen.setStrokeGradient(db, z.object({ gradient: pngGen.gradientSchema.nullable() }).parse(req.body).gradient),
   }));

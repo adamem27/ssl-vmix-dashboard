@@ -179,6 +179,88 @@ export function setNeutral(db: DB, patch: Partial<NeutralSettings>) {
   return n;
 }
 
+// ---------- custom graphics ----------
+/**
+ * One-off PNGs that belong to no team or group: each has its own size, shape, stroke, waves and gradient,
+ * kept apart from the elements and team colours so changing one never touches the others.
+ */
+export const CUSTOM_CODE = 'Custom';
+export const CUSTOM_TEAM_ID = '__custom__';
+const { variant: _cv, scope: _cs, ...customFields } = templateFields;
+export const customSchema = z.object({
+  ...customFields,
+  corner: customFields.corner.default('round'), cutX: customFields.cutX.default(0), cutY: customFields.cutY.default(0), cutSides: customFields.cutSides.default('both'),
+  strokeGradient: z.boolean().default(false), strokeAngle: customFields.strokeAngle.default(-45),
+  gradient: gradientSchema,
+});
+export const customPatchSchema = z.object({ ...customFields, gradient: gradientSchema }).partial();
+export type CustomGraphic = z.infer<typeof customSchema> & { id: string };
+const CUSTOM_KEY = 'generator.custom';
+
+export function listCustom(db: DB): CustomGraphic[] {
+  let raw: unknown[] = [];
+  try { raw = JSON.parse(getSetting(db, CUSTOM_KEY) || '[]'); } catch { /* none */ }
+  return raw.flatMap((r: any) => { const p = customSchema.safeParse(r); return p.success && r.id ? [{ ...p.data, id: String(r.id) }] : []; });
+}
+const saveCustom = (db: DB, list: CustomGraphic[]) => setSetting(db, CUSTOM_KEY, JSON.stringify(list));
+function customFileFree(list: CustomGraphic[], fileName: string, exceptId?: string) {
+  const clash = list.find((c) => c.fileName.toLowerCase() === fileName.toLowerCase() && c.id !== exceptId);
+  if (clash) throw badRequest(`File name “${fileName}” is already used by “${clash.name}”.`);
+}
+export const customRel = (fileName: string) => `${GENERATED_DIR}/${CUSTOM_CODE}/${fileName}.png`;
+
+export function createCustom(db: DB, input: unknown): CustomGraphic {
+  const list = listCustom(db);
+  const c = { ...customSchema.parse(input), id: newId() };
+  customFileFree(list, c.fileName);
+  saveCustom(db, [...list, c]);
+  return c;
+}
+export function updateCustom(db: DB, id: string, patch: unknown): CustomGraphic {
+  const list = listCustom(db);
+  const i = list.findIndex((c) => c.id === id);
+  if (i < 0) throw notFound('Custom graphic');
+  const next = { ...customSchema.parse({ ...list[i], ...customPatchSchema.parse(patch) }), id };
+  customFileFree(list, next.fileName, id);
+  list[i] = next;
+  saveCustom(db, list);
+  return next;
+}
+export function duplicateCustom(db: DB, id: string): CustomGraphic {
+  const cur = listCustom(db).find((c) => c.id === id);
+  if (!cur) throw notFound('Custom graphic');
+  const names = new Set(listCustom(db).map((c) => c.fileName.toLowerCase()));
+  let n = 2;
+  while (names.has(`${cur.fileName}_${n}`.toLowerCase())) n++;
+  const { id: _i, ...rest } = cur;
+  return createCustom(db, { ...rest, name: `${cur.name} ${n}`, fileName: `${cur.fileName}_${n}` });
+}
+export function deleteCustom(db: DB, id: string) {
+  const list = listCustom(db);
+  if (!list.some((c) => c.id === id)) throw notFound('Custom graphic');
+  saveCustom(db, list.filter((c) => c.id !== id));
+}
+const customSpec = (c: CustomGraphic): ElementSpec => {
+  const { id: _i, name: _n, fileName: _f, enabled: _e, gradient: _g, ...spec } = c;
+  return spec;
+};
+/** The custom graphic as a PNG (download), without writing it. */
+export function renderCustom(ctx: GenCtx, id: string): { buf: Buffer; fileName: string } {
+  const c = listCustom(ctx.db).find((x) => x.id === id);
+  if (!c) throw notFound('Custom graphic');
+  const job = { rel: customRel(c.fileName), teamId: CUSTOM_TEAM_ID, code: CUSTOM_CODE, templateId: c.id, spec: customSpec(c), gradient: c.gradient, hash: '' };
+  return { buf: renderJob(ctx, job), fileName: `${c.fileName}.png` };
+}
+/** Where vMix finds each exported custom graphic. */
+export function jsonCustomGraphics(db: DB, assetsDir: string): Record<string, string>[] {
+  const root = getSetting(db, 'paths.vmixAssetsRoot');
+  const outputs = new Set(listOutputs(db).map((o) => o.rel));
+  return listCustom(db).filter((c) => c.enabled).map((c) => {
+    const rel = customRel(c.fileName);
+    return { name: c.name, file: c.fileName, path: outputs.has(rel) ? (root ? joinVmixPath(root, rel) : path.join(assetsDir, ...rel.split('/'))) : '' };
+  });
+}
+
 // ---------- outputs ----------
 /** Bump when the waves drawing changes so every file with waves is rendered again. */
 const WAVES_VERSION = 'gradienty.ai-1';
@@ -213,6 +295,12 @@ export function plannedJobs(ctx: GenCtx): Job[] {
       const hash = createHash('sha1').update(JSON.stringify(['neutral', spec, g, t.pattern ? WAVES_VERSION : null, spec.strokeWidth > 0 ? strokeGradient : null])).digest('hex');
       jobs.push({ rel: outputRel(NEUTRAL_CODE, t.fileName), teamId: NEUTRAL_ID, code: NEUTRAL_CODE, templateId: t.id, spec, gradient: g, hash });
     }
+  }
+  for (const c of listCustom(ctx.db).filter((x) => x.enabled)) {
+    const spec = customSpec(c);
+    const stroke = c.strokeGradient && c.strokeWidth > 0 ? strokeGradient : null;
+    const hash = createHash('sha1').update(JSON.stringify(['custom', spec, c.gradient, c.pattern ? WAVES_VERSION : null, stroke])).digest('hex');
+    jobs.push({ rel: customRel(c.fileName), teamId: CUSTOM_TEAM_ID, code: CUSTOM_CODE, templateId: c.id, spec, gradient: c.gradient, hash });
   }
   return jobs;
 }

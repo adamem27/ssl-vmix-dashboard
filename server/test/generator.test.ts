@@ -343,3 +343,27 @@ describe('PNG generator export', () => {
     expect(listGradients(db).find((x) => x.teamId === pol)!.gradients[1]).toEqual(redBlue);
   });
 });
+
+describe('PNG generator custom graphics', () => {
+  it('exports standalone graphics under Custom without touching elements or team colours', async () => {
+    const { createCustom, updateCustom, duplicateCustom, deleteCustom, listCustom, jsonCustomGraphics } = await import('../src/services/generator/generator.js');
+    const { db, ctx, exporter } = gen();
+    const before = JSON.stringify([listTemplates(db), listGradients(db)]);
+    const c = createCustom(db, { ...STARTER_TEMPLATES[0], name: 'Sponsor strip', fileName: 'sponsor_strip', width: 64, height: 12, gradient: redBlue });
+    expect(() => createCustom(db, { ...STARTER_TEMPLATES[0], name: 'x', fileName: 'SPONSOR_strip', gradient: redBlue })).toThrow(/already used/);
+    exporter.flush();
+    const file = path.join(ctx.assetsDir, 'PNG generator', 'Custom', 'sponsor_strip.png');
+    expect(inspectImage(fs.readFileSync(file))?.width).toBe(64);
+    updateCustom(db, c.id, { width: 80 });
+    const d = duplicateCustom(db, c.id);
+    expect(d.fileName).toBe('sponsor_strip_2');
+    exporter.flush();
+    expect(inspectImage(fs.readFileSync(file))?.width).toBe(80);
+    expect(jsonCustomGraphics(db, ctx.assetsDir).map((r) => r.file)).toEqual(['sponsor_strip', 'sponsor_strip_2']);
+    deleteCustom(db, d.id);
+    exporter.flush();
+    expect(fs.existsSync(path.join(ctx.assetsDir, 'PNG generator', 'Custom', 'sponsor_strip_2.png'))).toBe(false);
+    expect(listCustom(db)).toHaveLength(1);
+    expect(JSON.stringify([listTemplates(db), listGradients(db)])).toBe(before);
+  });
+});
