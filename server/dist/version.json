@@ -1,8 +1,14 @@
 {
-  "version": "1.0.114",
-  "commit": "d2567a3",
-  "date": "2026-11-10T15:42:39Z",
+  "version": "1.0.115",
+  "commit": "0a09836",
+  "date": "2026-11-10T15:49:04Z",
   "changes": [
+    {
+      "version": "1.0.115",
+      "commit": "0a09836",
+      "date": "2026-11-10T15:49:04Z",
+      "text": "Announcement bugs = race flags + Replay with icons; a key for every bug and ticker; General graphics into vMix at the press"
+    },
     {
       "version": "1.0.114",
       "commit": "d2567a3",
@@ -476,12 +482,6 @@
       "commit": "deba4c4",
       "date": "2026-11-07T19:02:27Z",
       "text": "Prebuilt deploy branch for hosting panels without npm workspaces (CloudLinux)"
-    },
-    {
-      "version": "1.0.21",
-      "commit": "3d863b0",
-      "date": "2026-11-07T18:07:14Z",
-      "text": "vMix sync: Windows autostart with self-restart, heartbeat badge in the dashboard"
     }
   ]
 }

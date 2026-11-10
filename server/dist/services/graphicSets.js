@@ -1,5 +1,7 @@
 import { getSetting, newId, nowIso, setSetting } from '../db/db.js';
+import path from 'node:path';
 import { badRequest, notFound } from './errors.js';
+import { isWindowsPath, joinVmixPath } from './paths.js';
 export const GRAPHIC_KINDS = [
     {
         kind: 'welcome', label: 'Welcome', sheet: 'Welcome',
@@ -16,16 +18,16 @@ export const GRAPHIC_KINDS = [
     },
     {
         kind: 'announcement', label: 'Announcements', sheet: 'Announcements',
-        description: 'Short bars such as FALSE START or PENALTY; the second line is for a team code or a reason.',
+        description: 'Announcement bugs: one line of text and an icon (the race flag, or the SSL star). One version per race flag, plus Replay. Every version is on its own Show control key (pages BUGS 1 and BUGS 2), a new one at once.',
         fields: [
             { key: 'text', label: 'Text', wide: true, default: 'ANNOUNCEMENT' },
-            { key: 'detail', label: 'Second line', wide: true, placeholder: 'BRN · WAITING FOR WIND', hint: 'team code (Penalty, Individual recall) or reason (Delay)' },
+            { key: 'icon', label: 'Icon', type: 'image', hint: 'PNG: the race flag or the SSL star' },
         ],
-        defaults: [{ name: 'Announcement', data: {} }, { name: 'False start', data: { text: 'FALSE START' } }],
+        defaults: [],
     },
     {
         kind: 'ticker', label: 'Tickers', sheet: 'Tickers',
-        description: 'Scrolling bars. The fixed tickers need only their changing parts; your own tickers take one message per line. The separator goes between messages and after the last, so the text loops.',
+        description: 'Scrolling bars. The fixed tickers need only their changing parts; your own tickers take one message per line. The separator goes between messages and after the last, so the text loops. Every version is on its own Show control key (page TICKERS), a new one at once.',
         fields: [
             { key: 'preset', label: 'Preset', hidden: true },
             { key: 'position', label: 'Position', type: 'select', options: ['Top', 'Bottom'], default: 'Bottom' },
@@ -135,20 +137,42 @@ export function seedGraphicSets(db, eventId) {
     setSetting(db, flag, '1');
     ensurePresets(db, eventId);
 }
-/** Announcements of the finals titles, added once to events made before they existed (a deleted one stays deleted). */
-const MORE_ANNOUNCEMENTS = [
-    { name: 'Warning signal', data: { text: 'WARNING SIGNAL' } },
-    { name: 'General recall', data: { text: 'GENERAL RECALL' } },
-    { name: 'Individual recall', data: { text: 'INDIVIDUAL RECALL', detail: 'BRN' } },
-    { name: 'Penalty', data: { text: 'PENALTY', detail: 'BRN' } },
-    { name: 'Race postponed', data: { text: 'RACE POSTPONED' } },
-    { name: 'Race abandoned', data: { text: 'RACE ABANDONED' } },
-    { name: 'Delay – weather', data: { text: 'RACE DELAYED', detail: 'WAITING FOR WIND' } },
-    { name: 'Delay – other reasons', data: { text: 'RACE DELAYED', detail: 'TECHNICAL ISSUES' } },
-    { name: 'Replay', data: { text: 'REPLAY' } },
-    { name: 'Thanks for watching', data: { text: 'THANKS FOR WATCHING' } },
-    { name: 'Custom text', data: { text: 'CUSTOM TEXT' } },
+/** The announcement bugs: one per race flag (race-flags/ in the assets folder), plus Replay with the SSL star. */
+export const FLAG_ANNOUNCEMENTS = [
+    { name: 'P – Preparatory', text: 'PREPARATORY SIGNAL', icon: 'P_preparatory.png' },
+    { name: 'I – Round the ends', text: 'I FLAG - ROUND THE ENDS RULE', icon: 'I_preparatory_round_the_ends.png' },
+    { name: 'Z – 20% penalty', text: 'Z FLAG - 20% PENALTY RULE', icon: 'Z_preparatory_20_percent_penalty.png' },
+    { name: 'U – U flag rule', text: 'U FLAG RULE', icon: 'U_preparatory_u_flag.png' },
+    { name: 'Black – Black flag rule', text: 'BLACK FLAG RULE', icon: 'BLACK_preparatory_black_flag.png' },
+    { name: 'X – Individual recall', text: 'INDIVIDUAL RECALL', icon: 'X_individual_recall.png' },
+    { name: 'First substitute – General recall', text: 'GENERAL RECALL', icon: 'FIRST_SUBSTITUTE_general_recall.png' },
+    { name: 'AP – Postponed', text: 'RACE POSTPONED', icon: 'AP_postponed.png' },
+    { name: 'AP over H – Postponed, signals ashore', text: 'RACE POSTPONED - FURTHER SIGNALS ASHORE', icon: 'AP_over_H_postponed_signals_ashore.png' },
+    { name: 'AP over A – Postponed, no more racing today', text: 'RACE POSTPONED - NO MORE RACING TODAY', icon: 'AP_over_A_postponed_no_more_racing_today.png' },
+    { name: 'N – Abandoned', text: 'RACE ABANDONED', icon: 'N_abandoned.png' },
+    { name: 'N over H – Abandoned, signals ashore', text: 'RACE ABANDONED - FURTHER SIGNALS ASHORE', icon: 'N_over_H_abandoned_signals_ashore.png' },
+    { name: 'N over A – Abandoned, no more racing today', text: 'RACE ABANDONED - NO MORE RACING TODAY', icon: 'N_over_A_abandoned_no_more_racing_today.png' },
+    { name: 'S – Shortened course', text: 'SHORTENED COURSE', icon: 'S_shortened_course.png' },
+    { name: 'C – Change of course', text: 'CHANGE OF COURSE', icon: 'C_change_of_course.png' },
+    { name: 'M – Mark replaced', text: 'MARK REPLACED', icon: 'M_mark_replaced.png' },
+    { name: 'L – Come within hail', text: 'COME WITHIN HAIL', icon: 'L_come_within_hail.png' },
+    { name: 'Y – Wear lifejackets', text: 'WEAR LIFEJACKETS', icon: 'Y_wear_lifejackets.png' },
+    { name: 'A – No more racing today', text: 'NO MORE RACING TODAY', icon: 'A_ashore.png' },
+    { name: 'H – Signals ashore', text: 'FURTHER SIGNALS ASHORE', icon: 'H_ashore.png' },
+    { name: 'V – Monitor safety channel', text: 'MONITOR THE SAFETY CHANNEL', icon: 'V_safety_monitor_channel.png' },
+    { name: 'Orange – Start line', text: 'START LINE', icon: 'ORANGE_start_line.png' },
+    { name: 'Blue – Finish line', text: 'FINISH LINE', icon: 'BLUE_finish_line.png' },
+    { name: 'Red – Penalty / protest', text: 'PROTEST', icon: 'RED_penalty_protest.png' },
+    { name: 'Green and white – No penalty', text: 'NO PENALTY', icon: 'GREEN_WHITE_no_penalty.png' },
+    { name: 'Green – No penalty', text: 'NO PENALTY', icon: 'GREEN_no_penalty.png' },
+    { name: 'Yellow – Penalty', text: 'PENALTY', icon: 'YELLOW_penalty.png' },
+    { name: 'Black – Disqualified', text: 'DISQUALIFIED', icon: 'BLACK_disqualified.png' },
 ];
+/** Replay: its icon is the SSL star, empty until that PNG is added (Icon field). */
+export const REPLAY_ANNOUNCEMENT = { name: 'Replay', text: 'REPLAY', icon: '' };
+/** Announcements seeded by earlier versions; they go when the flag set comes in (versions you added stay). */
+const OLD_ANNOUNCEMENTS = ['announcement', 'false start', 'warning signal', 'general recall', 'individual recall', 'penalty', 'race postponed',
+    'race abandoned', 'delay – weather', 'delay – other reasons', 'thanks for watching', 'custom text'];
 /** The fixed versions (presets) of every graphic, made when missing; and the newer default versions, once. */
 export function ensurePresets(db, eventId) {
     for (const k of GRAPHIC_KINDS) {
@@ -161,14 +185,47 @@ export function ensurePresets(db, eventId) {
     }
     const flag = `graphicSets.more.${eventId}`;
     if (!getSetting(db, flag)) {
-        const have = new Set(listGraphicSets(db, eventId, 'announcement').map((r) => r.name.toLowerCase()));
-        for (const a of MORE_ANNOUNCEMENTS)
-            if (!have.has(a.name.toLowerCase()))
-                createGraphicSet(db, eventId, 'announcement', a.name, a.data);
         if (!listGraphicSets(db, eventId, 'course').length)
             createGraphicSet(db, eventId, 'course', 'Race course', {});
         setSetting(db, flag, '1');
     }
+    // announcements = race flags + Replay (once per event; a deleted one stays deleted)
+    const flags = `graphicSets.flags.${eventId}`;
+    if (!getSetting(db, flags)) {
+        const cur = listGraphicSets(db, eventId, 'announcement');
+        for (const r of cur)
+            if (OLD_ANNOUNCEMENTS.includes(r.name.toLowerCase()))
+                db.prepare('DELETE FROM graphic_sets WHERE id = ?').run(r.id);
+        const have = new Set(listGraphicSets(db, eventId, 'announcement').map((r) => r.name.toLowerCase()));
+        db.transaction(() => {
+            for (const a of FLAG_ANNOUNCEMENTS)
+                if (!have.has(a.name.toLowerCase()))
+                    createGraphicSet(db, eventId, 'announcement', a.name, { text: a.text, icon: `race-flags/${a.icon}` });
+            if (!have.has('replay'))
+                createGraphicSet(db, eventId, 'announcement', REPLAY_ANNOUNCEMENT.name, { text: REPLAY_ANNOUNCEMENT.text, icon: REPLAY_ANNOUNCEMENT.icon });
+        })();
+        // the flags first, in the order above; Replay and your own after them
+        const order = [...FLAG_ANNOUNCEMENTS.map((a) => a.name.toLowerCase()), 'replay'];
+        const list = listGraphicSets(db, eventId, 'announcement');
+        const rank = (n) => { const i = order.indexOf(n.toLowerCase()); return i < 0 ? order.length : i; };
+        const sorted = [...list].sort((x, y) => rank(x.name) - rank(y.name) || x.sort - y.sort);
+        const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
+        db.transaction(() => sorted.forEach((x, i) => upd.run(i + 1, x.id)))();
+        setSetting(db, flags, '1');
+    }
+}
+/**
+ * Where vMix finds a picture of a graphic: a path in the dashboard's assets folder (race-flags/X.png) under the vMix
+ * assets root (or the local folder when no root is set); an absolute path stays as it is.
+ */
+export function imagePath(db, assetsDir, v) {
+    const s = (v ?? '').trim();
+    if (!s || isWindowsPath(s) || s.startsWith('/'))
+        return s;
+    const root = getSetting(db, 'paths.vmixAssetsRoot');
+    if (root)
+        return joinVmixPath(root, s);
+    return assetsDir ? path.join(assetsDir, ...s.split('/')) : s;
 }
 export function listGraphicSets(db, eventId, kind) {
     const rows = db.prepare(`SELECT * FROM graphic_sets WHERE event_id = ? ${kind ? 'AND kind = ?' : ''} ORDER BY kind, sort, created_at`).all(...(kind ? [eventId, kind] : [eventId]));
@@ -246,12 +303,12 @@ export function tickerText(data, auto = {}) {
     return items.join(sep) + sep;
 }
 /** Sheet rows for one graphic: one per version, `set` first, then every field (tickers also get `text`). */
-export function graphicSheetRows(db, eventId, kind, auto = {}) {
+export function graphicSheetRows(db, eventId, kind, auto = {}, assetsDir = null) {
     const k = kindOf(kind);
     return listGraphicSets(db, eventId, kind).map((s) => {
         const row = { set: s.name };
         for (const f of k.fields)
-            row[f.key] = f.type === 'list' ? (s.data[f.key] ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : s.data[f.key] ?? '';
+            row[f.key] = f.type === 'image' ? imagePath(db, assetsDir, s.data[f.key]) : f.type === 'list' ? (s.data[f.key] ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : s.data[f.key] ?? '';
         if (kind === 'ticker')
             row.text = tickerText(s.data, auto);
         return row;
