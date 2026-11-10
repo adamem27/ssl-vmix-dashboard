@@ -22,11 +22,16 @@ const tickerMessages = (d: Record<string, string>, auto: TickerAuto = {}): strin
     default: return (d.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   }
 };
-/** Ticker text as it goes to vMix: messages joined by the separator, which also closes the loop. */
+/** Ticker text as it goes to vMix: messages joined by the separator, which also closes the loop, repeated (3× and
+ * 600 characters at least, as graphicSets.ts) so the scrolling text runs on without a gap. */
 const tickerText = (d: Record<string, string>, auto?: TickerAuto) => {
   const items = tickerMessages(d, auto);
   const sep = d.separator || ' I ';
-  return items.length ? items.join(sep) + sep : '';
+  if (!items.length) return '';
+  const loop = items.join(sep) + sep;
+  let out = loop;
+  for (let i = 1; i < 3 || out.length < 600; i++) out += loop;
+  return out;
 };
 const shows = (f: GField, s: GSet) => !f.hidden && (!f.only || f.only.includes(s.data.preset ?? ''));
 

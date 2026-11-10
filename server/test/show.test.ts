@@ -3,7 +3,7 @@ import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
 import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
-import { createGraphicSet, listGraphicSets, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
+import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
@@ -136,7 +136,7 @@ describe('show control', () => {
     expect(tk.length).toBe(before + 1);
     v.calls.length = 0;
     await show.run(tk.at(-1)!.action);
-    expect(v.calls).toContain('?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=BOAT CAPSIZED - ALL CREW SAFE I ');
+    expect(v.calls).toContain(`?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=${repeatLoop('BOAT CAPSIZED - ALL CREW SAFE I ')}`);
     // THANKS FOR WATCHING is the fixed ticker
     await show.run('ticker:thanks');
     expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=THANKS FOR WATCHING'))).toBe(true);

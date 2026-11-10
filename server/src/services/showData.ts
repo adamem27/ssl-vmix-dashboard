@@ -82,6 +82,9 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       f.set('TITLE.Text', 'TODAY');
       f.set('SUBTITLE.Text', dotted(today));
       f.set('WEBSITE.Text', up(socials.website));
+      // the L-bar's side panel: the handles of Follow us, in order (SOCIAL 1–3)
+      [socials.facebook, socials.youtube, socials.instagram, socials.tiktok, socials.x].map((v) => (v ?? '').trim()).filter(Boolean)
+        .concat('', '', '').slice(0, 3).forEach((v, i) => f.set(`SOCIAL ${i + 1}.Text`, v.toUpperCase()));
       sched();
       if (o.tickerText !== undefined) f.set('Ticker1.Text', o.tickerText);
       return f;

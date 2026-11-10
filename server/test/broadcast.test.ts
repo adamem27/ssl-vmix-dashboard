@@ -15,7 +15,7 @@ describe('general graphics versions', () => {
     const tickers = gs.listGraphicSets(db, eventId, 'ticker');
     expect(tickers.map((t) => t.name)).toEqual(['Top ticker', 'Bottom ticker', 'Warning signal', 'Thanks for watching', 'Delay', 'Custom text']);
     gs.updateGraphicSet(db, tickers[1].id, { data: { items: 'RACE 2 WILL START SOON\n\nGROUP A NEXT' } });
-    expect(gs.graphicSheetRows(db, eventId, 'ticker')[1].text).toBe('RACE 2 WILL START SOON I GROUP A NEXT I ');
+    expect(gs.graphicSheetRows(db, eventId, 'ticker')[1].text).toBe(gs.repeatLoop('RACE 2 WILL START SOON I GROUP A NEXT I '));
     const copy = gs.createGraphicSet(db, eventId, 'socials', 'Spanish', {}, gs.listGraphicSets(db, eventId, 'socials')[0].id);
     gs.moveGraphicSet(db, copy, -1);
     const socials = gs.graphicSheetRows(db, eventId, 'socials');
@@ -33,7 +33,10 @@ describe('general graphics versions', () => {
     gs.seedGraphicSets(db, eventId);
     const t = (p: string) => gs.listGraphicSets(db, eventId, 'ticker').find((x) => x.data.preset === p)!;
     gs.updateGraphicSet(db, t('warning').id, { data: { race: '1', group: 'h', time: '10:00' } });
-    expect(gs.tickerText(t('warning').data)).toBe('RACE 1 OF GROUP H WARNING SIGNAL AT 10:00 (GMT-3) I ');
+    expect(gs.tickerText(t('warning').data)).toBe(gs.repeatLoop('RACE 1 OF GROUP H WARNING SIGNAL AT 10:00 (GMT-3) I '));
+    // repeated so the ticker runs on: 3× and 600 characters at least
+    expect(gs.repeatLoop('A I ')).toBe('A I '.repeat(150));
+    expect(gs.repeatLoop('x'.repeat(400))).toBe('x'.repeat(1200));
     expect(gs.tickerMessages(t('thanks').data)).toEqual(['THANKS FOR WATCHING - JOIN US TOMORROW FOR THE 2ND DAY OF THE SSL GOLD CUP PAN-AMERICAN QUALIFIERS']);
     expect(gs.tickerMessages(t('delay').data, { group: 'I', race: '2' })).toEqual(['WE ARE BACK SOON - RACE 2 OF GROUP I IS DELAYED DUE TO WEATHER CONDITIONS']);
     expect(() => gs.deleteGraphicSet(db, t('custom').id)).toThrow(/fixed/);

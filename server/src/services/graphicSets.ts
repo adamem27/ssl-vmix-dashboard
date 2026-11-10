@@ -303,12 +303,26 @@ export function tickerMessages(data: Record<string, string>, auto: TickerAuto = 
   }
 }
 
-/** Ticker text: messages joined with the separator, which also closes the text so a scrolling ticker loops cleanly. */
+/** A scrolling ticker restarts only when its text has run out: the loop is repeated (3× and 600 characters at least). */
+export const TICKER_REPEAT = { times: 3, chars: 600 };
+
+/**
+ * Ticker text: messages joined with the separator, which also closes each loop, and the loop repeated so the
+ * ticker runs on without a gap (vMix starts the text again only after all of it has gone by).
+ */
 export function tickerText(data: Record<string, string>, auto: TickerAuto = {}) {
   const items = tickerMessages(data, auto);
   if (!items.length) return '';
   const sep = data.separator || ' I ';
-  return items.join(sep) + sep;
+  return repeatLoop(items.join(sep) + sep);
+}
+
+/** One loop of a ticker repeated: 3× and 600 characters at least. */
+export function repeatLoop(loop: string) {
+  if (!loop) return '';
+  let out = loop;
+  for (let i = 1; i < TICKER_REPEAT.times || out.length < TICKER_REPEAT.chars; i++) out += loop;
+  return out;
 }
 
 /** Sheet rows for one graphic: one per version, `set` first, then every field (tickers also get `text`). */
