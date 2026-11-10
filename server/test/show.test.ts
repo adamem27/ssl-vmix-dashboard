@@ -173,4 +173,19 @@ describe('show control', () => {
     // every page keeps the safety row in the same place
     for (const p of deckPages(cfg)) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
   });
+
+  it('lets keys be edited like a Stream Deck: text, colours, another action, an empty place', async () => {
+    const { s } = race();
+    setShowConfig(s.ctx.db, { keys: { '0/0/0': { text: 'HELLO\\n{auto}', bg: '#16a34a', fg: '#000000' }, '0/0/1': { action: 'show:weather' }, '0/0/2': { action: '' } }, kindColours: { board: '#7c3aed' } });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const p = deckPages(show.config)[0];
+    expect(p.keys[0][1]).toMatchObject({ action: 'show:weather', text: 'WEATHER', kind: 'board' });
+    expect(p.keys[0][2]).toBeNull();
+    const look = await show.keyLook(p.keys[0][0]!);
+    expect(look).toMatchObject({ text: 'HELLO\\nWELCOME', bg: '#16a34a', fg: '#000000' });
+    expect((await show.keyLook(p.keys[0][3]!)).bg).toBe('#7c3aed');
+    const f: any = companionFiles(show.config, 'http://x', 'http://v', show.graphics())[0].file;
+    expect(f.page.controls[0][0].style).toMatchObject({ text: 'HELLO\\nWELCOME', bgcolor: 0x16a34a, color: 0 });
+    expect(f.page.controls[0][2]).toBeUndefined();
+  });
 });
