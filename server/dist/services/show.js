@@ -443,10 +443,10 @@ export class Show {
         const lt = getLtConfig(this.ctx.db);
         const t = listTeams(this.ctx).find((x) => x.id === b.id);
         const a = t.assets;
-        await this.set(input, new Map([
+        await this.set(input, this.lt.fitToTitle(input, new Map([
             [`${lt.fields.top}.Text`, t.name.toUpperCase()], [`${lt.fields.bottom}.Text`, 'QUALIFIED'],
             [`${lt.fields.flag}.Source`, img(a[lt.flagSlot])], [`${lt.fields.emblem}.Source`, img(a[lt.emblemSlot])], [`${lt.fields.bar}.Source`, img(a[lt.barSlot])],
-        ]));
+        ]), t.id));
         await this.bringIn({ ...g, overlay: lt.overlay }, input, snap);
         return { in: 'teamq', team: b.code };
     }
@@ -493,7 +493,8 @@ export class Show {
         const photo = p.photo ? img(p.photo) : '';
         const withPhoto = photo ? this.resolve({ ...g, inputs: g.inputs.slice(0, 1) }, snap.inputs) : undefined;
         const input = withPhoto ?? this.resolve({ ...g, inputs: g.inputs.slice(1) }, snap.inputs) ?? this.need(g, snap.inputs);
-        const f = new Map([['Top text.Text', p.name.toUpperCase()], ['Bottom text.Text', (p.title || p.role).toUpperCase()], ['PHOTO.Source', photo]]);
+        const lf = getLtConfig(this.ctx.db).fields;
+        const f = this.lt.fitToTitle(input, new Map([[`${lf.top}.Text`, p.name.toUpperCase()], [`${lf.bottom}.Text`, (p.title || p.role).toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
         // on-air swap of the same title animates; a different title comes in on the overlay
         await this.set(input, f);
         await this.bringIn({ ...g }, input, snap);

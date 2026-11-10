@@ -20,15 +20,17 @@ const area = (b) => Math.max(0, b[2]) * Math.max(0, b[3]);
 function boxOf(n, origin, parent) {
     const [x, y] = vec(n.attrs.Location);
     const [dw, dh] = size(n, parent);
-    // a layer the size of the frame (a common GT habit) is measured by what is in it
-    const frameSized = !n.attrs.Dimensions || (Math.abs(x) < 1 && Math.abs(y) < 1 && Math.abs(dw - parent[0]) < 2 && Math.abs(dh - parent[1]) < 2);
-    if (n.tag === 'Layer' && frameSized) {
+    // a layer is measured by what is in it, cut to the layer (GT habit: layers the size of the frame, or nearly)
+    if (n.tag === 'Layer') {
         const inner = innerComposition(n);
         const kids = inner?.children.filter((c) => isElement(c) && isVisible(c)) ?? [];
         if (kids.length) {
-            const bs = kids.map((c) => boxOf(c, [origin[0] + x, origin[1] + y], parent));
-            const x0 = Math.min(...bs.map((b) => b[0])), y0 = Math.min(...bs.map((b) => b[1]));
-            return [x0, y0, Math.max(...bs.map((b) => b[0] + b[2])) - x0, Math.max(...bs.map((b) => b[1] + b[3])) - y0];
+            const lx = origin[0] + x, ly = origin[1] + y;
+            const bs = kids.map((c) => boxOf(c, [lx, ly], [dw, dh]));
+            const x0 = Math.max(lx, Math.min(...bs.map((b) => b[0]))), y0 = Math.max(ly, Math.min(...bs.map((b) => b[1])));
+            const x1 = Math.min(lx + dw, Math.max(...bs.map((b) => b[0] + b[2]))), y1 = Math.min(ly + dh, Math.max(...bs.map((b) => b[1] + b[3])));
+            if (x1 > x0 && y1 > y0)
+                return [x0, y0, x1 - x0, y1 - y0];
         }
     }
     return [origin[0] + x, origin[1] + y, dw, dh];

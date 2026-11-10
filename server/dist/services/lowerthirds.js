@@ -7,6 +7,7 @@ import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 import { findInput, parseVmixXml, vmixUrl } from './vmixResults.js';
+import { ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
 import { stageTeamIds } from './workbookSheets.js';
 /**
  * Lower thirds driven from a Stream Deck (Bitfocus Companion) or the dashboard's own keys.
@@ -165,6 +166,7 @@ export class LowerThirds {
         if (!input)
             throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name on the Lower thirds tab.`);
         const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
+        fields = this.fitToTitle(input, fields, next.teamId);
         const has = new Set(input.fields);
         const id = input.key || input.number;
         const last = sent.get(id) ?? new Map();
@@ -185,6 +187,30 @@ export class LowerThirds {
         saveState(this.ctx.db, state);
         void this.pushLabels();
         return { ...state, changed, cameIn: !onAir };
+    }
+    /**
+     * The values (keyed by the field names on the Lower thirds tab) moved onto the fields this title really has
+     * (Name, position/pb…), and the bar picture swapped for the team's PNG made like the title's own (ltTitle.ts).
+     */
+    fitToTitle(input, fields, teamId) {
+        const cfg = this.config;
+        const roles = ltRoles(cfg.fields, input.fields);
+        const out = new Map();
+        const suffix = { top: '.Text', bottom: '.Text', photo: '.Source', flag: '.Source', emblem: '.Source', bar: '.Source' };
+        for (const role of Object.keys(suffix)) {
+            const v = fields.get(`${cfg.fields[role]}${suffix[role]}`);
+            const f = roles[role];
+            if (v !== undefined && f)
+                out.set(f, v);
+        }
+        const team = teamId ? listTeams(this.ctx).find((t) => t.id === teamId) : undefined;
+        if (team && roles.bar) {
+            const info = ltTitleInfo(this.ctx.assetsDir, input.title, listTeams(this.ctx).map((t) => t.code));
+            const pic = teamPictureFor(this.ctx, team, info?.images[roles.bar.replace(/\.Source$/i, '').toLowerCase()]);
+            if (pic)
+                out.set(roles.bar, pic);
+        }
+        return out;
     }
     teamByCode(code) {
         const t = listTeams(this.ctx).find((x) => x.code.toLowerCase() === code.trim().toLowerCase() || x.id === code);
