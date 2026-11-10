@@ -119,8 +119,9 @@ export interface ShowState {
   bugId: string; // its version (General graphics → Announcements)
   tickerId: string; // the ticker version on air from a ticker key ('' = TICKER key: next race / end of day)
   lineupPart: number; // 0 = off, 1 = first five, 2 = the rest
+  compareMark: 'flag' | 'emblem'; // what Team comparison shows by each team
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0 };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0, compareMark: 'flag' };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -167,7 +168,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = []): DeckPage[
         row8(k('anthem:1', 'ANTHEM\\nTEAM 1', 'team'), k('anthem:2', 'ANTHEM\\nTEAM 2', 'team'), k('anthem:3', 'ANTHEM\\nTEAM 3', 'team'), k('anthem:4', 'ANTHEM\\nTEAM 4', 'team'),
           k('lineup:1', 'LINEUP\\nTEAM 1', 'board'), k('lineup:2', 'LINEUP\\nTEAM 2', 'board'), k('lineup:3', 'LINEUP\\nTEAM 3', 'board'), k('lineup:4', 'LINEUP\\nTEAM 4', 'board')),
         row8(k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('comm:water', 'ON-WATER\\nLT', 'lt'),
-          k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt')),
+          k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
       ],
     },
@@ -486,7 +487,7 @@ export class Show {
       await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
     } else if (g.id === 'compare') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
-      await this.set(input, compareFields(this.ctx, ev, this.config.fleetId, todayIn(activeEvent(this.ctx.db).timezone)));
+      await this.set(input, this.compareData());
     } else if (g.id === 'ticker') {
       await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
     } else if (g.id === 'lineup5') {
@@ -501,6 +502,24 @@ export class Show {
       const f = showDataFields(this.ctx, g.id, { eventId: ev, today: todayIn(e.timezone), auto: tickerAuto(this.ctx.db, e), tickerText: this.tickerText() });
       if (f) await this.set(input, f);
     }
+  }
+
+  /** Team comparison of the group picked at the top, with the flag or the emblem by each team (COMPARE key). */
+  private compareData() {
+    const ev = activeEvent(this.ctx.db);
+    return compareFields(this.ctx, ev.id, this.config.fleetId, todayIn(ev.timezone), { mark: this.state.compareMark, emblemSlot: getLtConfig(this.ctx.db).emblemSlot });
+  }
+
+  /** Flag ⇄ emblem on Team comparison; the title shows the change at once (on air too, as a data change). */
+  async compareMark() {
+    const mark = this.state.compareMark === 'emblem' ? 'flag' : 'emblem';
+    this.patchState({ compareMark: mark });
+    if (this.config.fleetId) {
+      const { inputs } = await this.snapshot();
+      const input = this.resolve(this.graphic('compare'), inputs);
+      if (input) await this.set(input, new Map([...this.compareData()].filter(([k]) => /flag\.source$/i.test(k))));
+    }
+    return { compareMark: mark };
   }
 
   /** The lineup lower third: the places in the set order, split into the first five and the rest. */
@@ -852,6 +871,7 @@ export class Show {
       case 'rotate': return this.toggleRotation();
       case 'nextslide': return this.nextSlide();
       case 'tickermode': return this.tickerMode();
+      case 'comparemark': return this.compareMark();
       case 'undo': return this.undo();
       case 'allout': return this.allOut();
       case 'panic': return this.panic();
@@ -905,13 +925,14 @@ export class Show {
       empty = !t;
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
+    else if (kind === 'comparemark') text = `COMPARE:\\n${st.compareMark === 'emblem' ? 'EMBLEM' : 'FLAG'}`;
     else if (kind === 'tickermode') text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
     else if (kind === 'rotate') { text = st.rotating ? 'ROTATION\\n⏸ STOP' : 'ROTATION\\n▶ START'; active = st.rotating; }
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
     if (key.action === 'show:lineup5' && st.lineupPart) text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
     if (kind === 'break') onAir = isOn('break');
-    if (neutral) { onAir = false; active = false; }
+    if (neutral) { onAir = false; active = false; if (key.kind === 'mode') text = key.text; } // a fixed key: its name, not today's mode
     if (key.custom) text = key.custom.replace(/\{auto\}/g, text);
     // team and sailor keys in the team's national colours, the feedback (selected / on air) in its colours too;
     // a colour set on the key or on its kind in the key editor still wins
@@ -1010,7 +1031,7 @@ export class Show {
         const input = this.resolve(this.graphic(id), inputs);
         if (!input) continue;
         const f = id === 'schedule' ? showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() })
-          : id === 'results' ? resultFieldsFor(this.ctx, fleetId, input).fields : compareFields(this.ctx, ev.id, fleetId, today);
+          : id === 'results' ? resultFieldsFor(this.ctx, fleetId, input).fields : this.compareData();
         if (!f) continue;
         const match = titleFieldMatcher(input.fields);
         const changed = new Map([...f].filter(([k, v]) => { const r = match(k); return r !== undefined && (input.values?.[r] ?? '') !== v; }));

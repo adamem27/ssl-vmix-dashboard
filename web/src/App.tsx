@@ -17,7 +17,6 @@ import { SettingsPage } from './pages/Settings';
 import { GeneratorPage } from './pages/Generator';
 import { GtzipGeneratorPage } from './pages/GtzipGenerator';
 import { ResultsPage } from './pages/Results';
-import { LowerThirdsPage } from './pages/LowerThirds';
 import { ShowControlPage } from './pages/ShowControl';
 
 export function useMeta() {
@@ -98,7 +97,6 @@ function NavIcon({ name }: { name: string }) {
 const NAV_GROUPS = [
   { label: 'On air', tone: { head: 'text-rose-400', bar: 'bg-rose-400', icon: 'text-rose-400', active: 'bg-rose-500/15 text-rose-100 border-rose-400' }, items: [
     { to: '/vmix/show', label: 'Show control', icon: 'live' },
-    { to: '/vmix/lowerthirds', label: 'Lower thirds', icon: 'lower' },
   ] },
   { label: 'Data', tone: { head: 'text-sky-400', bar: 'bg-sky-400', icon: 'text-sky-400', active: 'bg-sky-500/15 text-sky-100 border-sky-400' }, items: [
     { to: '/vmix/overview', label: 'Teams & crews', icon: 'teams' },
@@ -184,7 +182,7 @@ function MainApp() {
           <Route path="general" element={<GeneralPage />} />
           <Route path="results" element={<ResultsPage />} />
           <Route path="show" element={<ShowControlPage />} />
-          <Route path="lowerthirds" element={<LowerThirdsPage />} />
+          <Route path="lowerthirds" element={<Navigate to="/vmix/show" replace />} />
           <Route path="json" element={<JsonPage />} />
           <Route path="generator" element={<GeneratorPage />} />
           <Route path="gtzip" element={<GtzipGeneratorPage />} />

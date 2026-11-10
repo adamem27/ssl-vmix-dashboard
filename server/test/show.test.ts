@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { encodePng } from '../src/services/png.js';
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
@@ -254,11 +257,15 @@ describe('show control', () => {
       { slot: 'Tactician', firstName: 'Florian', lastName: 'Trittel', number: '2', captain: true },
     ] });
     const v = fakeVmix({
-      ssl_results_group: ['COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
-      ssl_compare: ['Group.Text', '1 COUNTRY.Text', '1 NICKNAME.Text', 'RANK 1.Text', 'RANK NUM 3.Text', '1 CPT NAME.Text', '1 CPT SURNAME.Text', '1 FLAG.Source', '1 PHOTO.Source', 'PHOTO 2.Source'],
+      ssl_results_group: ['COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'bar1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
+      ssl_compare: ['Group.Text', '1 COUNTRY.Text', '1 NICKNAME.Text', 'RANK 1.Text', 'RANK NUM 3.Text', '1 CPT NAME.Text', '1 CPT SURNAME.Text', '1 FLAG.Source', '1 BG.Source', '1 PHOTO.Source', 'PHOTO 2.Source'],
       ssl_lineup: ['TeamName.Text', 'Trimmer1NAME.Text', 'Trimmer1Positio.Text', 'Trimmer2SURNAME.Text', 'TacticianSURNAM.Text', 'BowPosition.Text', 'PitPOSITION.Text'],
       ssl_schedule: ['DateText.Text'],
     });
+    // the team's PNGs from the generator: its long bar (results) and its left panel (comparison)
+    const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'ESP');
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     // picking the group (top of the dashboard) is enough: results and comparison follow it
     const r = await show.syncData();
@@ -268,9 +275,16 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=TEAM ESP');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=TRITTEL');
     expect(v.calls.some((c) => c.includes('SelectedName=DateText.Text'))).toBe(true);
+    expect(v.calls.find((c) => c.includes('SelectedName=bar1.Source'))).toMatch(/ESP_bar_long\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=1 BG.Source'))).toMatch(/ESP_panel_left\.png$/);
     // nothing changed: nothing sent again
     v.calls.length = 0;
     expect((await show.syncData()).sent).toBe(0);
+    // COMPARE key: the emblem instead of the flag, straight into the title
+    v.calls.length = 0;
+    expect(await show.run('comparemark')).toEqual({ compareMark: 'emblem' });
+    expect(v.calls.map((c) => c.split('&Value')[0])).toEqual(['?Function=SetImage&Input=k2&SelectedName=1 FLAG.Source']);
+    v.calls.length = 0;
     // the lineup: GT's cut names and the trimmers numbered 1 and 2
     await show.run('lineup:ESP');
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer1NAME.Text&Value=JOAN');

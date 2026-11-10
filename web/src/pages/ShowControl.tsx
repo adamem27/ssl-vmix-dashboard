@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { LowerThirdSettings } from './LowerThirds';
 import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
@@ -165,6 +166,7 @@ function Show({ data }: { data: ShowData }) {
       </Panel>
       <Race data={data} onSaved={refresh} />
       <Registry data={data} onSaved={refresh} />
+      <LowerThirdSettings />
       <CompanionSetup data={data} onSaved={refresh} />
     </div>
   );
@@ -297,7 +299,7 @@ function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set on the Lower thirds tab (overlay 2 recommended).</p>
+      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set in the Lower thirds panel below (overlay 2 recommended).</p>
     </Panel>
   );
 }
