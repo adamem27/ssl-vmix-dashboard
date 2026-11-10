@@ -54,7 +54,7 @@ function Settings({ data, onSaved }: { data: LtData; onSaved: () => void }) {
   const field = (k: keyof Fields, label: string) => text(label, c.fields[k], (v) => setC({ ...c, fields: { ...c.fields, [k]: v } }), '', 'w-32');
   return (
     <Panel title="Lower thirds" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
-      <p className="mb-3 text-sm text-ink-400">Sailors and teams on deck 2 (a page per team): a place key shows whoever sails there in today's line-up, NEXT RESULT changes only the line under the name (position → best results), LT OUT takes it off. On air, a change only swaps the data, so the title's change animations play.</p>
+      <p className="mb-3 text-sm text-ink-400">Sailors and teams on deck 2 (a page per team): a place key shows whoever sails there in today's line-up, NEXT RESULT changes only the line under the name (position → best results), OUT takes it off. On air, a change only swaps the data, so the title's change animations play.</p>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-2">
           <h3 className="text-xs font-bold uppercase text-ink-300">vMix</h3>

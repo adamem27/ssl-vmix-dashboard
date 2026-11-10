@@ -101,15 +101,19 @@ describe('show control', () => {
     expect(flags()).toBe(4);
   });
 
-  it('toggles a board on overlay 1 and takes a lower third off when a board comes in', async () => {
+  it('toggles a board on overlay 1, where it replaces a lower third; OUT takes either out', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    await show.run('anthem:1'); // team lower third of team 1 on the lower-third channel (overlay 2)
-    expect(v.calls.at(-1)).toMatch(/^\?Function=OverlayInput2In&Input=k8$/);
+    await show.run('teamlt:1'); // team lower third of team 1, on overlay 1 like every graphic but the break scene
+    expect(v.calls.at(-1)).toMatch(/^\?Function=OverlayInput1In&Input=k8$/);
     v.calls.length = 0;
     await show.run('show:welcome');
-    expect(v.calls).toEqual(['?Function=OverlayInput2Out', '?Function=OverlayInput1In&Input=k1']);
+    expect(v.calls).toEqual(['?Function=OverlayInput1In&Input=k1']);
+    await show.run('out');
+    expect(v.overlays[1]).toBe('');
+    await show.run('show:welcome');
+    v.calls.length = 0;
     v.calls.length = 0;
     await show.run('show:welcome');
     expect(v.calls).toEqual(['?Function=OverlayInput1Out']);
@@ -136,7 +140,7 @@ describe('show control', () => {
     const n = show.announcements().findIndex((a) => a.data.text === 'GENERAL RECALL') + 1;
     await show.run(`bug:${n}`);
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=GENERAL RECALL');
-    expect(v.overlays[3]).toBe('4');
+    expect(v.overlays[1]).toBe('4');
 
     expect(show.sailors().map((x) => x.number)).toEqual(['3', '12', '']);
     v.calls.length = 0;
@@ -149,6 +153,21 @@ describe('show control', () => {
     await show.run('lineup:1');
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitSURNAME.Text&Value=RUIZ');
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
+  });
+
+  it('finds the bug title under its GTZIP name, before a placeholder image, and says so when only the placeholder is there', async () => {
+    const { s, ev } = race();
+    seedGraphicSets(s.db, ev);
+    const v = fakeVmix({ ...TITLES, ssl_bug: [], 'Announcement_bug 2.gtzip': ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('bug:6');
+    const n = v.num('Announcement_bug 2.gtzip');
+    expect(v.calls).toContain(`?Function=SetText&Input=k${n}&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL`);
+    expect(v.calls.some((c) => c.startsWith(`?Function=SetImage&Input=k${n}&SelectedName=Race flag.Source&Value=`) && c.endsWith('X_individual_recall.png'))).toBe(true);
+    expect(v.overlays[1]).toBe(n);
+    const only = fakeVmix({ ...TITLES, ssl_bug: [] });
+    const show2 = new Show(s.ctx, new LowerThirds(s.ctx, only.fetcher), only.fetcher);
+    await expect(show2.run('bug:6')).rejects.toThrow(/placeholder image/);
   });
 
   it('bugs carry text and icon and toggle; every bug and ticker has a key, new ones too; General graphics go in at the press', async () => {
@@ -165,9 +184,9 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
     expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=Race flag.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
     expect(v.calls.some((c) => /icon_background|bar\.Source/.test(c))).toBe(false);
-    expect(v.overlays[3]).toBe('4');
+    expect(v.overlays[1]).toBe('4');
     await show.run('bug:6');
-    expect(v.overlays[3]).toBe('');
+    expect(v.overlays[1]).toBe('');
 
     // a new ticker made during the show is on the next free ticker key at once
     const before = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty).length;
@@ -209,7 +228,7 @@ describe('show control', () => {
     await show.run('show:lineup5');
     expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=TAC');
     expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 5.Text&Value=TR1');
-    expect(v.overlays[2]).toBe('9');
+    expect(v.overlays[1]).toBe('9');
     v.calls.length = 0;
     await show.run('show:lineup5');
     expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=GRI');
@@ -218,11 +237,11 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 4.Text&Value=');
     expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
     await show.run('show:lineup5');
-    expect(v.overlays[2]).toBe('');
+    expect(v.overlays[1]).toBe('');
 
     await show.run('qualified:2');
     expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=Qualified for the finals of SSL Gold Cup');
-    expect(v.overlays[2]).toBe('10');
+    expect(v.overlays[1]).toBe('10');
   });
 
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
@@ -265,13 +284,20 @@ describe('show control', () => {
     expect(esp.controls[1][0].style.text).toBe('BOW\\nPONS');
     expect(esp.controls[1][2].style.text).toBe('PIT\\nRUIZ');
     expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
-    expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
+    expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=qualified%3AESP');
+    // the team lower thirds sit on TEAMS, under each team's page key (not on the team's own page)
+    expect(url(f.pages[3].controls[1][1])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
+    expect(Object.values(esp.controls).flatMap((r: any) => Object.values(r)).some((c: any) => /teamlt/.test(c?.steps?.[0]?.action_sets?.down?.[0]?.options?.url ?? ''))).toBe(false);
     expect(esp.controls[3][1].steps[0].action_sets.down[0].options.page).toBe(9); // ◀ BRA
     expect(esp.controls[3][2].steps[0].action_sets.down[0].options.page).toBe(11); // ▶ GBR
     expect(f.pages[12].controls[3][2].steps[0].action_sets.down[0].options.page).toBe(9); // after the last team: the first
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+    for (const p of show.pages()) expect(p.keys[3].slice(4).map((k) => k?.action)).toEqual(['out', 'undo', 'allout', 'panic']);
+    // each action on one key only (navigation and the bottom row aside), no anthem keys
+    const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next').map((k) => k!.action);
+    expect(acts.filter((a, i) => acts.indexOf(a) !== i)).toEqual([]);
+    expect(acts.some((a) => a.startsWith('anthem'))).toBe(false);
   });
 
   it('the preset has pages only for the teams of the stage picked at the top, in group order', () => {
@@ -295,7 +321,7 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const page = show.pages().find((p) => p.name === 'COMPARE')!;
     expect(page.keys[0].slice(0, 2).map((x) => x?.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
-    expect(show.pages()[0].keys[2][7]?.action).toBe(`nav:${page.page}`);
+    expect(show.pages()[0].keys[0][7]?.action).toBe(`nav:${page.page}`);
     // the group's data into its own input, then in; the same key again takes it out
     const n1 = v.num(`ssl_compare_${k1}`);
     expect(await show.run(`compare:${k1}`)).toMatchObject({ in: 'compare' });

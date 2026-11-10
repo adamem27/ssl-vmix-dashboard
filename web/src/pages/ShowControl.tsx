@@ -36,7 +36,7 @@ function Panel({ title, right, children }: { title: string; right?: ReactNode; c
   );
 }
 
-const OVERLAY = ['', 'OV1 boards', 'OV2 lower thirds', 'OV3 bugs', 'OV4 scene'];
+const OVERLAY = ['', 'OV1', 'OV2', 'OV3', 'OV4 break scene'];
 
 export function ShowControlPage() {
   const q = useQuery({ queryKey: ['show'], queryFn: () => api.get<ShowData>('/api/show'), refetchInterval: 2000 });
@@ -299,7 +299,7 @@ function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set in the Lower thirds panel below (overlay 2 recommended).</p>
+      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set in the Lower thirds panel below (overlay 1, like every graphic but the break scene).</p>
     </Panel>
   );
 }
