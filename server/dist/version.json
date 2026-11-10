@@ -1,8 +1,14 @@
 {
-  "version": "1.0.120",
-  "commit": "c4dd94c",
-  "date": "2026-11-10T17:38:23Z",
+  "version": "1.0.121",
+  "commit": "452b7db",
+  "date": "2026-11-10T17:54:38Z",
   "changes": [
+    {
+      "version": "1.0.121",
+      "commit": "452b7db",
+      "date": "2026-11-10T17:54:38Z",
+      "text": "Lower thirds: the photo rises by its DataChange after the title is in, and flies down before it goes out"
+    },
     {
       "version": "1.0.120",
       "commit": "c4dd94c",
@@ -476,12 +482,6 @@
       "commit": "d359281",
       "date": "2026-11-07T19:57:43Z",
       "text": "Windows launcher: never close silently, ignore stderr from node, CI test of the real start"
-    },
-    {
-      "version": "1.0.27",
-      "commit": "0bcab8c",
-      "date": "2026-11-07T19:31:08Z",
-      "text": "README: Windows package"
     }
   ]
 }

@@ -118,8 +118,11 @@ export function ltTitleInfo(assetsDir, title, teamCodes) {
     const changes = {};
     for (const sb of storyboards(doc)) {
         const field = sb.node.attrs.DataName?.toLowerCase();
-        if (field && /^DataChange(In|Out)$/.test(sb.type))
-            changes[field] = (changes[field] ?? 0) + storyboardLength(sb.node);
+        const m = sb.type.match(/^DataChange(In|Out)$/);
+        if (!field || !m)
+            continue;
+        const c = (changes[field] ??= { out: 0, in: 0 });
+        c[m[1] === 'In' ? 'in' : 'out'] = storyboardLength(sb.node);
     }
     const info = { images, changes };
     cache.set(file, { at, info });
