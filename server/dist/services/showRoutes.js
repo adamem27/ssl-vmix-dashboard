@@ -32,6 +32,16 @@ export function registerShowRoutes(app, ctx, show) {
     app.post('/api/show/labels', async () => show.pushLabels(true));
     app.post('/api/show/placeholders', async () => show.addPlaceholders());
     // ?base= is the dashboard address Companion should call, ?vmix= the vMix address for the fallback page
+    // the whole preset: every page of both decks, a page per team, the fallback page (Companion: Import → full config)
+    app.get('/api/show/preset.companionconfig', async (req, reply) => {
+        const cfg = show.config;
+        const base = String(req.query?.base ?? '') || `${req.protocol}://${req.headers.host}`;
+        const vmix = String(req.query?.vmix ?? '') || cfg.vmixForCompanion || vmixUrl(db);
+        const file = await show.companionPreset(base, vmix);
+        reply.header('Content-Disposition', 'attachment; filename="ssl-show-preset.companionconfig"');
+        reply.type('application/json');
+        return JSON.stringify(file, null, 2);
+    });
     app.get('/api/show/companion/:name', async (req, reply) => {
         const cfg = show.config;
         const base = String(req.query?.base ?? '') || `${req.protocol}://${req.headers.host}`;

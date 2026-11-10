@@ -1,8 +1,14 @@
 {
-  "version": "1.0.122",
-  "commit": "c741afb",
-  "date": "2026-11-10T18:00:56Z",
+  "version": "1.0.123",
+  "commit": "c669540",
+  "date": "2026-11-10T18:04:43Z",
   "changes": [
+    {
+      "version": "1.0.123",
+      "commit": "c669540",
+      "date": "2026-11-10T18:04:43Z",
+      "text": "Companion: one preset with every page and a page per team; no live key labels"
+    },
     {
       "version": "1.0.122",
       "commit": "c741afb",
@@ -476,12 +482,6 @@
       "commit": "7a8564f",
       "date": "2026-11-07T21:09:47Z",
       "text": "Readable dropdown options on Windows; full time zone list with Rio de Janeiro (America/Sao_Paulo)"
-    },
-    {
-      "version": "1.0.29",
-      "commit": "db96c47",
-      "date": "2026-11-07T21:04:28Z",
-      "text": "Workbook: overwrite in place when Windows will not replace a file vMix holds open"
     }
   ]
 }
