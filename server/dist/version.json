@@ -1,8 +1,14 @@
 {
-  "version": "1.0.128",
-  "commit": "35c5ab1",
-  "date": "2026-11-10T20:29:11Z",
+  "version": "1.0.129",
+  "commit": "ffbdafb",
+  "date": "2026-11-10T20:39:36Z",
   "changes": [
+    {
+      "version": "1.0.129",
+      "commit": "ffbdafb",
+      "date": "2026-11-10T20:39:36Z",
+      "text": "Generator: Lineup photo element (211x135, team colours) for the box behind each sailor's photo in the line-up"
+    },
     {
       "version": "1.0.128",
       "commit": "35c5ab1",
@@ -476,12 +482,6 @@
       "commit": "8a8c2b5",
       "date": "2026-11-08T16:11:37Z",
       "text": "Fleet size, third personal best, nation ranking, declared weights, five standardised sponsor logos"
-    },
-    {
-      "version": "1.0.35",
-      "commit": "6c60c2a",
-      "date": "2026-11-08T00:34:44Z",
-      "text": "Bundled team flags and emblems"
     }
   ]
 }
