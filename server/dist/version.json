@@ -1,8 +1,14 @@
 {
-  "version": "1.0.127",
-  "commit": "1e995d2",
-  "date": "2026-11-10T19:55:56Z",
+  "version": "1.0.128",
+  "commit": "35c5ab1",
+  "date": "2026-11-10T20:29:11Z",
   "changes": [
+    {
+      "version": "1.0.128",
+      "commit": "35c5ab1",
+      "date": "2026-11-10T20:29:11Z",
+      "text": "Schedule groups from any stage; results bar_results; lineup photo boxes and qualified LT in team colours; bug race flag; Team comparison tab in General graphics"
+    },
     {
       "version": "1.0.127",
       "commit": "1e995d2",
@@ -476,12 +482,6 @@
       "commit": "6c60c2a",
       "date": "2026-11-08T00:34:44Z",
       "text": "Bundled team flags and emblems"
-    },
-    {
-      "version": "1.0.34",
-      "commit": "fab9a3a",
-      "date": "2026-11-08T00:13:16Z",
-      "text": "Launcher: a launcher file that cannot be replaced no longer fails the update"
     }
   ]
 }

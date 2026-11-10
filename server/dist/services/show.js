@@ -8,7 +8,8 @@ import { listPeople } from './general.js';
 import { imagePath, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
-import { crewOf, getLtConfig, getLtState, ltTeams } from './lowerthirds.js';
+import { crewOf, getLtConfig, getLtState, ltFields, ltTeams } from './lowerthirds.js';
+import { teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
@@ -17,6 +18,18 @@ import { joinVmixPath } from './paths.js';
 import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
 import { parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmixResults.js';
+/**
+ * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
+ * driven from two Stream Decks through Companion. Each key calls /api/show/do?a=<action>; the dashboard fills the
+ * title through the vMix Web API, brings it in on its overlay channel and keeps the rules:
+ *  - OV1 boards, OV2 lower thirds, OV3 bugs and tickers, OV4 the break scene, L-bar and PiP frames
+ *  - a board coming in takes the lower third and the break scene off; the break scene takes boards and lower thirds off
+ *  - UNDO puts every overlay back as it was before the last action; ALL OUT takes everything out with its
+ *    animation; PANIC (pressed twice) cuts everything at once
+ * State (what is on air) is always read from vMix, never remembered from key presses.
+ */
+/** The bottom line of the qualified team lower third. */
+export const QUALIFIED_TEXT = 'Qualified for the finals of SSL Gold Cup';
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS = [
     { id: 'welcome', label: 'Welcome', kind: 'board', overlay: 1, inputs: ['ssl_welcome'] },
@@ -553,19 +566,24 @@ export class Show {
         this.patchState({ lineupPart: part });
         return { in: 'lineup5', part, of: parts };
     }
-    /** Team lower third, qualified version: its own title, team fields like the team lower third. */
+    /**
+     * Team lower third, qualified version: the same data and pictures as the team lower third with no photo (name, flag,
+     * emblem, the team's bar) on its own title; only the bottom line reads QUALIFIED_TEXT.
+     */
     async qualified(boat) {
         const b = this.teamRef(String(boat));
         const g = this.graphic('teamq');
         const snap = await this.snapshot();
         const input = this.need(g, snap.inputs);
         const lt = getLtConfig(this.ctx.db);
-        const t = listTeams(this.ctx).find((x) => x.id === b.id);
-        const a = t.assets;
-        await this.set(input, this.lt.fitToTitle(input, new Map([
-            [`${lt.fields.top}.Text`, t.name.toUpperCase()], [`${lt.fields.bottom}.Text`, 'QUALIFIED'],
-            [`${lt.fields.flag}.Source`, img(a[lt.flagSlot])], [`${lt.fields.emblem}.Source`, img(a[lt.emblemSlot])], [`${lt.fields.bar}.Source`, img(a[lt.barSlot])],
-        ]), t.id));
+        const f = ltFields(this.ctx, lt, b.id, null);
+        f.set(`${lt.fields.bottom}.Text`, QUALIFIED_TEXT);
+        const out = this.lt.fitToTitle(input, f, b.id);
+        // titles with a field of their own for the line (QualifiedText, Qualified…) get it too
+        for (const x of input.fields)
+            if (/qualif/i.test(x) && x.endsWith('.Text') && !out.has(x))
+                out.set(x, QUALIFIED_TEXT);
+        await this.set(input, out);
         await this.bringIn({ ...g, overlay: lt.overlay }, input, snap);
         return { in: 'teamq', team: b.code };
     }
@@ -648,6 +666,12 @@ export class Show {
             f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
             f.set(`${fl.photo}.Source`, s?.photo ?? '');
         }
+        // the box behind each photo (HelmBG, Trimmer1BG…): the team's square from the PNG generator, when there is one
+        const square = teamPictureFor(this.ctx, team, { w: 211, h: 135, key: 'square', like: /square|lineup|photobg/ });
+        if (square)
+            for (const x of input.fields)
+                if (/^\w+BG\.Source$/i.test(x) && !/^BG\.Source$/i.test(x))
+                    f.set(x, square);
         await this.set(input, f);
         await this.bringIn(g, input, snap);
         return { in: 'lineup', team: b.code, input: input.title };
@@ -658,13 +682,14 @@ export class Show {
         const list = this.announcements();
         return list.find((x) => x.id === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
     }
-    /** The bug's text and icon, by the title's field names (TEXT, ICON / FLAG / STAR…). */
+    /** The bug's text and icon, by the title's field names (TEXT; Race flag, ICON, FLAG, STAR… but not icon_background). */
     bugFields(input, data) {
         const f = new Map();
         const text = this.textField(input, /text/i);
         if (text)
             f.set(text, (data.text ?? '').toUpperCase());
-        const icon = input.fields.find((x) => x.endsWith('.Source') && /icon|flag|star|logo/i.test(x));
+        const pics = input.fields.filter((x) => x.endsWith('.Source') && !/background|\bbg\b|_bg|bar/i.test(x));
+        const icon = [/race ?flag/i, /^icon\./i, /flag/i, /icon/i, /star/i, /logo/i].map((re) => pics.find((x) => re.test(x))).find(Boolean);
         if (icon)
             f.set(icon, imagePath(this.ctx.db, this.ctx.assetsDir, data.icon));
         return f;

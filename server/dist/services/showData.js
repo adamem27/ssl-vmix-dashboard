@@ -6,7 +6,7 @@
  * Only fields the title has are set (Show.set), so one map serves every variant of a title.
  */
 import { listAssets } from './assets.js';
-import { getSetDetail } from './fleets.js';
+import { getSetDetail, listSets } from './fleets.js';
 import { getWeather, listSchedule } from './general.js';
 import { GRAPHIC_KINDS, imagePath, listGraphicSets } from './graphicSets.js';
 import { groupLabel } from './groupNames.js';
@@ -16,6 +16,7 @@ import { overview } from './overview.js';
 import { listTeams } from './teams.js';
 import { teamPictureFor } from './ltTitle.js';
 import { currentStage } from './workbookSheets.js';
+import { getSetting, setSetting } from '../db/db.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 const up = (s) => (s ?? '').trim().toUpperCase();
 /** DD.MM.YYYY, as on the SSL boards. */
@@ -36,14 +37,27 @@ function versionFields(ctx, kind, data, f) {
             f.set(`${fd.key}.Text`, fd.type === 'list' ? (data[fd.key] ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : data[fd.key] ?? '');
     }
 }
-/** Today's schedule rows with the flags of each group's teams (current stage). */
-function scheduleRows(ctx, eventId, today) {
+/**
+ * Groups a schedule row can name: the current stage's first, then every other stage (latest first), so a row typed
+ * for a group of another stage, or with no stage picked at the top, still finds its teams.
+ */
+function scheduleFleets(ctx, eventId) {
     const stage = currentStage(ctx.db, eventId);
-    const fleets = stage ? getSetDetail(ctx.db, stage.id).fleets : [];
+    const sets = listSets(ctx.db, eventId).map((x) => x.id).reverse();
+    const order = stage ? [stage.id, ...sets.filter((x) => x !== stage.id)] : sets;
+    return order.flatMap((id) => getSetDetail(ctx.db, id).fleets);
+}
+const groupKey = (s) => groupLabel(s).replace(/\s+/g, ' ').trim();
+/** Today's schedule rows with the flags of each group's teams (current stage first). */
+export function scheduleRows(ctx, eventId, today) {
+    const fleets = scheduleFleets(ctx, eventId);
     const flagOf = (teamId) => { const a = listAssets(ctx, 'team', teamId); return img(a.flag_small) || img(a.flag_big); };
     return listSchedule(ctx.db, eventId, today).map((s) => {
         const label = groupLabel(s.fleet);
-        const f = fleets.find((x) => groupLabel(x.name) === label || x.name.toUpperCase() === (s.fleet ?? '').trim().toUpperCase());
+        const key = groupKey(s.fleet);
+        // same name first, then the same label; a group with teams placed before an empty one of the same name
+        const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key)];
+        const f = same.find((x) => x.filled > 0) ?? same[0];
         const race = (s.race ?? '').trim();
         return { time: s.time ?? '', race: /^\d+$/.test(race) ? `RACE ${race}` : up(race), group: label, flags: f ? f.positions.filter((x) => !!x).map(flagOf) : [] };
     });
@@ -124,7 +138,7 @@ export function showDataFields(ctx, graphicId, o) {
             f.set('TEXT.Text', up(r.data.text) || 'REPLAY');
             if (r.data.icon) {
                 const p = imagePath(ctx.db, ctx.assetsDir, r.data.icon);
-                for (const n of ['ICON', 'STAR'])
+                for (const n of ['ICON', 'STAR', 'Race flag'])
                     f.set(`${n}.Source`, p);
             }
             return f;
@@ -133,40 +147,107 @@ export function showDataFields(ctx, graphicId, o) {
             return null;
     }
 }
-/**
- * Team comparison of a group (its teams in group order, 1–4): name, nickname, SSL ranking, team weight, captain and
- * the captain's photo, flag. Each value goes under the names of both kinds of title: 1 COUNTRY, 1 NICKNAME,
- * RANK 1 / RANK NUM 1, 1 WEIGHT NUM, 1 CPT NAME, 1 CPT SURNAME, 1 FLAG, 1 PHOTO / PHOTO 1, and T1Name, T1Nick, T1Rank…
- */
-export function compareFields(ctx, eventId, fleetId, today, o = {}) {
-    const f = new Map();
+/** Team comparison overrides (General graphics → Team comparison): per group, the group's own fields and each team's. */
+export const COMPARE_KEY = 'compare.overrides';
+export const COMPARE_TEAM_FIELDS = ['name', 'nick', 'rank', 'weight', 'cptName', 'cptSurname', 'flag', 'emblem', 'photo', 'panel'];
+export const COMPARE_GROUP_FIELDS = ['title', 'group'];
+export function compareOverrides(db) {
+    try {
+        return JSON.parse(getSetting(db, COMPARE_KEY) || '{}');
+    }
+    catch {
+        return {};
+    }
+}
+/** Sets (or, with an empty value, clears) one override of a group: n = 0 for the group's own fields, 1–4 for a team. */
+export function setCompareOverride(db, fleetId, n, field, value) {
+    const all = compareOverrides(db);
+    const g = (all[fleetId] ??= {});
+    const v = value.trim();
+    if (n === 0) {
+        if (!COMPARE_GROUP_FIELDS.includes(field))
+            throw new Error(`Unknown field ${field}`);
+        if (v)
+            g[field] = v;
+        else
+            delete g[field];
+    }
+    else {
+        if (!COMPARE_TEAM_FIELDS.includes(field))
+            throw new Error(`Unknown field ${field}`);
+        const t = ((g.teams ??= {})[String(n)] ??= {});
+        if (v)
+            t[field] = v;
+        else
+            delete t[field];
+    }
+    setSetting(db, COMPARE_KEY, JSON.stringify(all));
+}
+/** What the comparison of a group shows by itself (no overrides): the group's title and each team's values, 1–4. */
+export function compareAuto(ctx, eventId, fleetId, today, o = {}) {
     const fleet = ctx.db.prepare('SELECT name, fleet_set_id AS setId FROM fleets WHERE id = ?').get(fleetId);
     const welcome = first(ctx, eventId, 'welcome');
-    f.set('Group.Text', groupLabel(fleet?.name));
-    f.set('SUBTITLE.Text', groupLabel(fleet?.name));
-    f.set('TITLE.Text', up(welcome.stage) || up(welcome.event));
     const ids = fleet ? getSetDetail(ctx.db, fleet.setId).fleets.find((x) => x.id === fleetId)?.positions ?? [] : [];
     const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
     const weights = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t.declaration?.totalWeight ?? '']));
-    for (let n = 1; n <= 4; n++) {
+    const rows = [1, 2, 3, 4].map((n) => {
         const t = teams.get(ids[n - 1] ?? '');
         const a = (t?.assets ?? {});
         const cpt = t ? loadLineup(ctx.db, eventId, t.id).data.rows.find((r) => r.captain) : undefined;
-        const photo = t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '';
         const w = t ? String(weights.get(t.id) ?? '') : '';
-        const name = (t?.name ?? '').toUpperCase(), nick = t?.nickname ?? '', rank = t?.ranking ?? '';
-        // the small flag, or the team's emblem (COMPARE: FLAG ⇄ EMBLEM key)
-        const flag = o.mark === 'emblem' ? img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark) : img(a.flag_small) || img(a.flag_big);
-        // the team's panel from the PNG generator: left for teams 1 and 3, right for 2 and 4 (851×390)
-        const side = n % 2 ? 'left' : 'right';
-        const panel = t ? teamPictureFor(ctx, t, { w: 851, h: 390, key: `panel${side}` }) : ''; // null: the title keeps its own
+        // the team's panel from the PNG generator: left for teams 1 and 3, right for 2 and 4 (851×390); null: none
+        const panel = t ? teamPictureFor(ctx, t, { w: 851, h: 390, key: `panel${n % 2 ? 'left' : 'right'}` }) : '';
+        const v = {
+            name: (t?.name ?? '').toUpperCase(), nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
+            cptName: cpt?.firstName ?? '', cptSurname: (cpt?.lastName ?? '').toUpperCase(),
+            flag: img(a.flag_small) || img(a.flag_big), emblem: img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark),
+            photo: t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '', panel: panel ?? '',
+        };
+        return { n, team: t ? { id: t.id, code: t.code, name: t.name } : null, values: v, panelFound: panel !== null };
+    });
+    return { fleetId, name: fleet?.name ?? '', group: groupLabel(fleet?.name), title: up(welcome.stage) || up(welcome.event), teams: rows };
+}
+/** The groups of the current stage (or every stage when none is picked) with their comparison data and overrides. */
+export function compareTab(ctx, eventId, today, o = {}) {
+    const stage = currentStage(ctx.db, eventId);
+    const sets = stage ? [stage.id] : listSets(ctx.db, eventId).map((x) => x.id);
+    const over = compareOverrides(ctx.db);
+    return {
+        stage: stage?.name ?? '',
+        groups: sets.flatMap((id) => getSetDetail(ctx.db, id).fleets).map((f) => ({ ...compareAuto(ctx, eventId, f.id, today, o), over: over[f.id] ?? {} })),
+    };
+}
+/**
+ * Team comparison of a group (its teams in group order, 1–4): name, nickname, SSL ranking, team weight, captain and
+ * the captain's photo, flag (or emblem), panel. What General graphics → Team comparison overrides wins. Each value
+ * goes under the names of both kinds of title: 1 COUNTRY, 1 NICKNAME, RANK 1 / RANK NUM 1, 1 WEIGHT NUM, 1 CPT NAME,
+ * 1 CPT SURNAME, 1 FLAG, 1 BG, 1 PHOTO / PHOTO 1, and T1Name, T1Nick, T1Rank…
+ */
+export function compareFields(ctx, eventId, fleetId, today, o = {}) {
+    const f = new Map();
+    const auto = compareAuto(ctx, eventId, fleetId, today, o);
+    const over = compareOverrides(ctx.db)[fleetId] ?? {};
+    const group = over.group || auto.group;
+    f.set('Group.Text', group);
+    f.set('SUBTITLE.Text', group);
+    f.set('TITLE.Text', over.title || auto.title);
+    for (const r of auto.teams) {
+        const n = r.n;
+        const ov = over.teams?.[String(n)] ?? {};
+        const pic = (k) => (ov[k] ? imagePath(ctx.db, ctx.assetsDir, ov[k]) : r.values[k]);
+        const val = (k) => ov[k] ?? r.values[k];
+        const name = val('name'), nick = val('nick'), rank = val('rank'), w = val('weight');
+        const cptName = val('cptName'), cptSurname = val('cptSurname');
+        const flag = o.mark === 'emblem' ? pic('emblem') : pic('flag');
+        const photo = pic('photo');
+        const panel = ov.panel || r.panelFound ? pic('panel') : null; // null: the title keeps its own
         for (const [k, v] of [
             [`${n} COUNTRY.Text`, name], [`T${n}Name.Text`, name], [`${n} NICKNAME.Text`, nick], [`T${n}Nick.Text`, nick],
             [`RANK ${n}.Text`, rank], [`RANK NUM ${n}.Text`, rank], [`T${n}Rank.Text`, rank],
-            [`${n} WEIGHT NUM.Text`, w ? `${w} kg` : ''], [`T${n}Weight.Text`, w],
-            [`${n} CPT NAME.Text`, cpt?.firstName ?? ''], [`${n} CPT SURNAME.Text`, (cpt?.lastName ?? '').toUpperCase()],
-            [`T${n}Captain.Text`, cpt ? `${cpt.firstName} ${cpt.lastName}`.trim() : ''],
-            [`${n} FLAG.Source`, flag], [`T${n}Flag.Source`, flag], ...(panel === null ? [] : [[`${n} BG.Source`, panel], [`T${n}Panel.Source`, panel]]), [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
+            [`${n} WEIGHT NUM.Text`, w ? (/kg/i.test(w) ? w : `${w} kg`) : ''], [`T${n}Weight.Text`, w],
+            [`${n} CPT NAME.Text`, cptName], [`${n} CPT SURNAME.Text`, cptSurname], [`T${n}Captain.Text`, `${cptName} ${cptSurname}`.trim()],
+            [`${n} FLAG.Source`, flag], [`T${n}Flag.Source`, flag], ...(panel === null ? [] : [[`${n} BG.Source`, panel], [`T${n}Panel.Source`, panel]]),
+            [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
         ])
             f.set(k, v);
     }

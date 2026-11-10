@@ -159,6 +159,10 @@ function pngSize(file) {
  * The team's PNG for a picture of the title: the one named like the title's (CODE_<key>.png), else the one of the
  * closest shape (within 4 %); null when nothing fits (the caller keeps its own choice).
  */
+/**
+ * The team's generated picture for a box: by file key (`key`, then any key `like` matches), else (unless `exact`) the
+ * one closest in shape (within 4%). Null when nothing fits.
+ */
 export function teamPictureFor(ctx, team, want) {
     if (!want || !want.w || !want.h)
         return null;
@@ -173,9 +177,9 @@ export function teamPictureFor(ctx, team, want) {
     catch { /* none */ }
     const local = (rel) => path.join(ctx.assetsDir, ...rel.split('/'));
     const exists = files.filter((r) => fs.existsSync(local(r)));
-    const byKey = want.key ? exists.find((r) => keyOf(path.basename(r), [team.code]) === want.key) : undefined;
-    let pick = byKey;
-    if (!pick) {
+    const k = (r) => keyOf(path.basename(r), [team.code]);
+    let pick = (want.key ? exists.find((r) => k(r) === want.key) : undefined) ?? (want.like ? exists.find((r) => want.like.test(k(r))) : undefined);
+    if (!pick && !want.exact) {
         const ratio = want.w / want.h;
         let best = null;
         for (const r of exists) {

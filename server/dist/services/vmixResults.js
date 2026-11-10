@@ -69,9 +69,9 @@ export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
             f.set(`R${j} points${n}.Text`, r && k >= 0 ? r.races[k] ?? '' : '');
         }
         f.set(`Total${n}.Text`, r ? r.total : '');
-        // the row's bar in the team's colours: its long bar from the PNG generator (CODE_bar_long.png, 1130×75)
+        // the row's bar in the team's colours: its results bar from the PNG generator (CODE_bar_results.png / CODE - OVERALL.png)
         // (a team with no generated bar keeps the title's own; a row with no team gets none)
-        const bar = t ? teamPictureFor(ctx, t, { w: 1130, h: 75, key: 'barlong' }) : '';
+        const bar = t ? teamPictureFor(ctx, t, { w: 1129, h: 76, key: 'barresults', like: /result|overall/, exact: true }) : '';
         if (bar !== null)
             f.set(`bar${n}.Source`, bar);
     }
