@@ -172,14 +172,21 @@ export class LowerThirds {
     const id = input.key || input.number;
     const last = sent.get(id) ?? new Map<string, string>();
     let changed = 0;
+    let settle = 0;
+    const changes = onAir ? {} : ltTitleInfo(this.ctx.assetsDir, input.title, listTeams(this.ctx).map((t) => t.code))?.changes ?? {};
     for (const [name, value] of fields) {
       if (!has.has(name)) continue;
-      if (onAir && last.get(name) === value) continue; // unchanged: no animation
+      // unchanged (by what vMix says the title holds, else by what was sent last): no animation
+      if ((input.values?.[name] ?? last.get(name)) === value) continue;
+      settle = Math.max(settle, changes[name.toLowerCase()] ?? 0);
       await this.vmix(`?Function=${name.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(id)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
       last.set(name, value);
       changed++;
     }
     sent.set(id, last);
+    // vMix plays a field's DataChange animation even while the title is off air: bringing it in at once would run
+    // that animation (the photo flying out and back) over the Transition In, so the title comes in once it is done
+    if (!onAir && settle > 0) await new Promise((r) => setTimeout(r, Math.min(settle, 2) * 1000 + 100));
     if (!onAir) await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
     const state: LtState = { ...next, onAir: true, input: input.title };
     saveState(this.ctx.db, state);

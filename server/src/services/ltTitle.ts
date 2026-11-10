@@ -12,13 +12,14 @@ import path from 'node:path';
 import { getSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import { GTZIP_DIR, loadPackage } from './gtzip/gtzip.js';
-import { bitmap, elements, GtNode, size } from './gtzip/model.js';
+import { bitmap, elements, GtNode, size, storyboardLength, storyboards } from './gtzip/model.js';
 import { GENERATED_DIR, listOutputs } from './generator/generator.js';
 import { joinVmixPath } from './paths.js';
 
 export type LtRole = 'top' | 'bottom' | 'photo' | 'flag' | 'emblem' | 'bar';
 export interface LtImageInfo { w: number; h: number; key: string }
-export interface LtTitleInfo { images: Record<string, LtImageInfo> }
+/** images: each picture's box and file key; changes: seconds a field's DataChange Out + In takes (lowercase field). */
+export interface LtTitleInfo { images: Record<string, LtImageInfo>; changes: Record<string, number> }
 
 const base = (f: string) => f.replace(/\.(Text|Source)$/i, '');
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -89,7 +90,12 @@ export function ltTitleInfo(assetsDir: string, title: string, teamCodes: string[
     const src = (bitmap(e.node)?.attrs.Source ?? '').split(/[\\/]/).pop() ?? '';
     images[e.node.attrs.Name.toLowerCase()] = { w, h, key: keyOf(src, codes) };
   }
-  const info = { images };
+  const changes: Record<string, number> = {};
+  for (const sb of storyboards(doc)) {
+    const field = sb.node.attrs.DataName?.toLowerCase();
+    if (field && /^DataChange(In|Out)$/.test(sb.type)) changes[field] = (changes[field] ?? 0) + storyboardLength(sb.node);
+  }
+  const info = { images, changes };
   cache.set(file, { at, info });
   return info;
 }

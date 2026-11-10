@@ -12,10 +12,12 @@ import { setSetting } from '../src/db/db.js';
 import { companionPageExport, getLtConfig, LowerThirds, setLtConfig } from '../src/services/lowerthirds.js';
 
 const fields = ['Bar.Source', 'PHOTO.Source', 'Bottom text.Text', 'Top text.Text', 'Flag.Source', 'Emblem.Source'];
+const held = new Map<string, string>(); // what the fake vMix titles hold, by `k<n>/<field>`
 const input = (n: number, title: string, f: string[]) =>
-  `<input key="k${n}" number="${n}" type="GT" title="${title}">${f.map((x) => x.endsWith('.Source') ? `<image index="0" name="${x}"></image>` : `<text index="0" name="${x}">x</text>`).join('')}</input>`;
+  `<input key="k${n}" number="${n}" type="GT" title="${title}">${f.map((x) => x.endsWith('.Source') ? `<image index="0" name="${x}">${held.get(`k${n}/${x}`) ?? ''}</image>` : `<text index="0" name="${x}">${held.get(`k${n}/${x}`) ?? 'x'}</text>`).join('')}</input>`;
 
 function fakeVmix() {
+  held.clear();
   const calls: string[] = [];
   let overlay = '';
   const fetcher = async (url: string) => {
@@ -25,6 +27,8 @@ function fakeVmix() {
       return { ok: true, status: 200, text: async () => xml };
     }
     calls.push(q);
+    const set = q.match(/Function=Set(?:Text|Image)&Input=(k\d)&SelectedName=(.+?)&Value=(.*)$/);
+    if (set) held.set(`${set[1]}/${set[2]}`, set[3]);
     const m = q.match(/Function=OverlayInput2In&Input=k(\d)/);
     if (m) overlay = m[1];
     if (q.includes('OverlayInput2Out')) overlay = '';
@@ -88,7 +92,7 @@ describe('lower thirds', () => {
     updateTeam(s.db, teamId, { nickname: 'The Canaries' });
     // the title as the GTZIP generator made it: Name, position/pb, PHOTO, Flag and a bar ANT_lowerthird.png 802×105
     const bar = 'aaaaaaaa-0000-0000-0000-000000000001\\ANT_lowerthird.png';
-    const doc = `<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0"><Image.Bitmap><Bitmap Source="${bar}" /></Image.Bitmap></Image><TextBlock Name="Name" Text="x" /><TextBlock Name="position/pb" Text="x" /><Image Name="PHOTO" Dimensions="425,425,0" /><Image Name="Flag" Dimensions="124,79,0" /></Composition>`;
+    const doc = `<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0"><Image.Bitmap><Bitmap Source="${bar}" /></Image.Bitmap></Image><TextBlock Name="Name" Text="x" /><TextBlock Name="position/pb" Text="x" /><Image Name="PHOTO" Dimensions="425,425,0" /><Image Name="Flag" Dimensions="124,79,0" /><Storyboard Type="DataChangeOut" DataName="Name.Text"><Storyboard.Animations><Fade Object="Name" Duration="0.3" /></Storyboard.Animations></Storyboard><Storyboard Type="DataChangeIn" DataName="Name.Text"><Storyboard.Animations><Fade Object="Name" Duration="0.2" /></Storyboard.Animations></Storyboard></Composition>`;
     const one = encodePng(1, 1, () => [0, 0, 0, 0]);
     const ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml" /></Types>';
     fs.mkdirSync(path.join(s.ctx.assetsDir, 'gtzip'), { recursive: true });
@@ -104,8 +108,10 @@ describe('lower thirds', () => {
       const q = decodeURIComponent(url.split('/api/')[1] ?? '');
       if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="2"></overlay></overlays></vmix>` };
       calls.push(q);
+      times.push(Date.now());
       return { ok: true, status: 200, text: async () => '' };
     };
+    const times: number[] = [];
     setLtConfig(s.db, { photoInput: 'lowerthird_photo 2 1.gtzip', noPhotoInput: 'lowerthird_photo 2 1.gtzip' });
     const lt = new LowerThirds(s.ctx, fetcher);
     await lt.showTeam('BRA');
@@ -113,6 +119,9 @@ describe('lower thirds', () => {
     expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=THE CANARIES');
     const barCall = calls.find((c) => c.includes('SelectedName=Bar.Source'));
     expect(barCall).toMatch(/BRA_lowerthird\.png$/);
+    // the name's DataChange (0.3 s out + 0.2 s in) plays off air too: the title comes in after it, not over it
+    expect(calls.at(-1)).toBe('?Function=OverlayInput2In&Input=k1');
+    expect(times.at(-1)! - times.at(-2)!).toBeGreaterThanOrEqual(550);
   });
 
   it('every place key shows the sailor on that place (Trimmer 2 is not Trimmer 1)', async () => {
