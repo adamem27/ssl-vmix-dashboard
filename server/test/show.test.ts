@@ -15,7 +15,7 @@ import { nationColours, teamKeyColours, textOn } from '../src/services/nationCol
 import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
 import { createScheduleItem } from '../src/services/general.js';
-import { groupLabel } from '../src/services/groupNames.js';
+import { groupLabel, groupLetter } from '../src/services/groupNames.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -250,7 +250,7 @@ describe('show control', () => {
     const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
     expect(f).toMatchObject({ version: 4, type: 'full' });
     // deck 1: 1–2, deck 2: 3–7, fallback 8, teams (by code) 9–12
-    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
     const url = (c: any) => c.steps[0].action_sets.down[0].options.url;
     expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
     expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
@@ -282,7 +282,30 @@ describe('show control', () => {
     setCurrentStage(s.db, ev, stage.id);
     show.invalidate();
     expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
-    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
+    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'COMPARE']);
+  });
+
+  it('every group of the stage has its own Team comparison input and key', async () => {
+    const { s, ev, f1, f2 } = race();
+    const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
+    setCurrentStage(s.db, ev, stage.id);
+    const [k1, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+    const v = fakeVmix({ ...TITLES, [`ssl_compare_${k1}`]: ['1 COUNTRY.Text', '1 FLAG.Source'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const page = show.pages().find((p) => p.name === 'COMPARE')!;
+    expect(page.keys[0].slice(0, 2).map((x) => x?.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
+    expect(show.pages()[0].keys[2][7]?.action).toBe(`nav:${page.page}`);
+    // the group's data into its own input, then in; the same key again takes it out
+    const n1 = v.num(`ssl_compare_${k1}`);
+    expect(await show.run(`compare:${k1}`)).toMatchObject({ in: 'compare' });
+    expect(v.calls).toContain(`?Function=SetText&Input=k${n1}&SelectedName=1 COUNTRY.Text&Value=TEAM ESP`);
+    expect(v.overlays[1]).toBe(n1);
+    await show.run(`compare:${k1}`);
+    expect(v.overlays[1]).toBe('');
+    // the data stays in step in every group's input without a key
+    v.calls.length = 0;
+    await show.syncData();
+    expect(v.calls.some((c) => c.includes(`Input=k${v.num(`ssl_compare_${k2}`)}&SelectedName=1 COUNTRY.Text`))).toBe(true);
   });
 
   it("fills the producer's own titles (overall_results, team_comparison, team_lineup) and keeps them in step without a key", async () => {
