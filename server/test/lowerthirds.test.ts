@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
-import { saveLineup } from '../src/services/lineups.js';
+import { LINEUP_SLOTS, saveLineup } from '../src/services/lineups.js';
 import { activeEvent } from '../src/db/db.js';
 import { updateSailor } from '../src/services/sailors.js';
 import { updateTeam } from '../src/services/teams.js';
@@ -75,6 +75,25 @@ describe('lower thirds', () => {
     await lt.out();
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput2Out');
     expect(lt.state.onAir).toBe(false);
+  });
+
+  it('every place key shows the sailor on that place (Trimmer 2 is not Trimmer 1)', async () => {
+    const s = setup();
+    const names = LINEUP_SLOTS.map((d) => `First ${d.key}`);
+    const { teamId } = seedTeam(s.db, 'BRA', names);
+    saveLineup(s.ctx, activeEvent(s.db).id, teamId, { rows: LINEUP_SLOTS.map((d) => ({ slot: d.key, sailorId: null, firstName: 'X', lastName: d.key, number: '' })) });
+    const v = fakeVmix();
+    const lt = new LowerThirds(s.ctx, v.fetcher);
+    await lt.pickTeam('BRA');
+    for (const d of LINEUP_SLOTS) {
+      const r = await lt.run(`place:${d.key}`);
+      expect(r).toMatchObject({ slot: d.key });
+      expect(v.calls).toContain(`?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=X ${d.key.toUpperCase()}`);
+    }
+    // by label and by number too
+    expect(await lt.showSailor(null, 'Trimmer 2')).toMatchObject({ slot: 'Trimmer1' });
+    expect(await lt.showSailor(null, 'trimmer 1')).toMatchObject({ slot: 'Trimmer' });
+    expect(await lt.showSailor(null, '6')).toMatchObject({ slot: 'Trimmer1' });
   });
 
   it('lays out keys: countries, places, then TEAM / NEXT / OUT, and presses them by position', async () => {
