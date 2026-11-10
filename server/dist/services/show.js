@@ -589,6 +589,7 @@ export class Show {
         }
         const t = listTeams(this.ctx).find((x) => x.id === b?.id);
         f.set('Flag.Source', img(t?.assets?.flag_big));
+        f.set('TeamName.Text', (t?.name ?? '').toUpperCase());
         return f;
     }
     /** First press: the first five come in; second: the rest swap in (data change); third: out. */

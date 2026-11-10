@@ -82,10 +82,19 @@ export function showDataFields(ctx, graphicId, o) {
         }
     };
     switch (graphicId) {
-        case 'welcome':
+        case 'welcome': {
             versionFields(ctx, 'welcome', welcome, f);
             f.set('DATE.Text', welcome.dates ?? '');
+            // the SSL26 welcome bar (welcome_graphic.gtzip): stage on top; below it day, today's date, place and country
+            const loc = (welcome.location ?? '').trim();
+            const cut = loc.lastIndexOf(',');
+            f.set('Top text.Text', (welcome.stage || welcome.event || '').trim());
+            f.set('Day number.Text', up(welcome.day));
+            f.set('Date.Text', dotted(today));
+            f.set('City.Text', up(cut > 0 ? loc.slice(0, cut) : loc));
+            f.set('Country.Text', up(cut > 0 ? loc.slice(cut + 1) : ''));
             return f;
+        }
         case 'schedule':
             f.set('DayText.Text', up(welcome.day));
             f.set('DateText.Text', dotted(today));

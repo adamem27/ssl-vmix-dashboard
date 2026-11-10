@@ -1,8 +1,14 @@
 {
-  "version": "1.0.133",
-  "commit": "c56e4b7",
-  "date": "2026-11-10T21:47:17Z",
+  "version": "1.0.134",
+  "commit": "34645ac",
+  "date": "2026-11-10T21:54:11Z",
   "changes": [
+    {
+      "version": "1.0.134",
+      "commit": "34645ac",
+      "date": "2026-11-10T21:54:11Z",
+      "text": "Welcome bar fields (Top text, Day number, Date, City, Country) and the team name on the lineup lower third"
+    },
     {
       "version": "1.0.133",
       "commit": "c56e4b7",
@@ -476,12 +482,6 @@
       "commit": "ddc87b6",
       "date": "2026-11-08T17:56:50Z",
       "text": "General graphics versions (welcome, follow us, tickers, race officials, announcements), team line-ups with sync from declaration, Results tab"
-    },
-    {
-      "version": "1.0.40",
-      "commit": "9a9309c",
-      "date": "2026-11-08T17:46:50Z",
-      "text": "GTZIP generator tab: edit vMix GT titles and generate new .gtzip files (#4)"
     }
   ]
 }
