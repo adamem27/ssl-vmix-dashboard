@@ -8,8 +8,7 @@ import * as gs from './graphicSets.js';
 import { currentGroup, stageGroups, tickerAuto } from './groups.js';
 import * as lu from './lineups.js';
 import * as rs from './results.js';
-import * as rr from './raceRuns.js';
-import { getShowConfig, setShowConfig } from './show.js';
+import { setShowConfig } from './show.js';
 import { badRequest } from './errors.js';
 import * as wb from './workbookSheets.js';
 import { todayIn } from './dates.js';
@@ -84,21 +83,6 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     if (b.input !== undefined) rs.saveResults(db, req.params.fleetId, { vmixInput: b.input });
     return vx.pushResults(ctx, req.params.fleetId, rs.getResults(db, req.params.fleetId).vmixInput);
   });
-  // ---------- one race of a group: times at the marks ----------
-  type RP = { Params: { fleetId: string; race: string } };
-  const raceNo = (v: string) => z.coerce.number().int().min(1).max(rs.MAX_RACES).parse(v);
-  app.get<RP>('/api/races/:fleetId/:race', async (req) => rr.getRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
-  app.put<RP>('/api/races/:fleetId/:race', async (req) => {
-    const race = raceNo(req.params.race);
-    const r = rr.saveRaceRun(db, req.params.fleetId, race, z.object({
-      marks: z.array(s(16)).max(rr.MAX_MARKS),
-      rows: z.array(z.object({ teamId: s(64), times: z.array(s(12)).max(rr.MAX_MARKS).optional(), points: s(12).optional() })).max(32),
-    }).partial().parse(req.body));
-    // typing a race of the group on air makes it the race the Race results key shows
-    if (getShowConfig(db).fleetId === req.params.fleetId) setShowConfig(db, { race });
-    return r;
-  });
-  app.delete<RP>('/api/races/:fleetId/:race', async (req) => rr.clearRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
   app.get('/api/settings/vmix', async () => ({ apiUrl: vx.vmixUrl(db), default: vx.DEFAULT_VMIX_URL }));
   app.put('/api/settings/vmix', async (req) => vx.setVmixUrl(db, z.object({ apiUrl: s(200) }).parse(req.body).apiUrl));
 

@@ -36,7 +36,7 @@ function Panel({ title, right, children }: { title: string; right?: ReactNode; c
   );
 }
 
-const OVERLAY = ['', 'OV1 boards', 'OV2 lower thirds', 'OV3 bugs', 'OV4 scene / PiP'];
+const OVERLAY = ['', 'OV1 boards', 'OV2 lower thirds', 'OV3 bugs', 'OV4 scene'];
 
 export function ShowControlPage() {
   const q = useQuery({ queryKey: ['show'], queryFn: () => api.get<ShowData>('/api/show'), refetchInterval: 2000 });

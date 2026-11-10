@@ -153,82 +153,10 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
           </table>
         </div>
       )}
-      {g.rows.length > 0 && <RaceRunPanel g={g} teamById={teamById} />}
       <footer className="border-t border-ink-800 px-3 py-1.5 text-[11px] text-ink-500">
         Empty Points = sum of the races (shown greyed); a typed value (blue) wins. {g.updatedAt ? `Saved ${fmtDateTime(g.updatedAt)}.` : 'Nothing entered yet.'}
       </footer>
       {dialog}
     </section>
-  );
-}
-
-interface RunRow { teamId: string; times: string[]; points: string; finish: string; gap: string; autoPoints: string; total: string }
-interface Run { fleetId: string; race: number; marks: string[]; rows: RunRow[]; updatedAt: string | null }
-
-/** One race of the group: times at the marks for the Race results board. Rows follow the finish times; points go into R{race} above. */
-function RaceRunPanel({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const { ask, dialog } = useConfirm();
-  const [race, setRace] = useState(1);
-  const key = ['race-run', g.fleetId, race];
-  const run = useQuery({ queryKey: key, queryFn: () => api.get<Run>(`/api/races/${g.fleetId}/${race}`) });
-  const done = (r: Run) => { qc.setQueryData(key, r); void qc.invalidateQueries({ queryKey: ['results', g.setId] }); };
-  const put = async (body: object) => { try { done(await api.put<Run>(`/api/races/${g.fleetId}/${race}`, body)); } catch (e) { toast.error(e); } };
-  const clear = async () => { if (await ask(`Clear race ${race} of ${g.fleetName}?`, 'Times and points of this race go back to empty.', 'Clear')) { try { done(await api.del<Run>(`/api/races/${g.fleetId}/${race}`)); } catch (e) { toast.error(e); } } };
-  const r = run.data;
-  const setTime = (row: RunRow, i: number, v: string) => { const times = [...row.times]; times[i] = v.trim(); void put({ rows: [{ teamId: row.teamId, times }] }); };
-
-  return (
-    <div className="border-t border-ink-800">
-      <div className="flex flex-wrap items-end gap-2 px-3 py-2">
-        <span className="mr-1 text-sm font-semibold text-ink-200">Race results · times at marks</span>
-        <div className="flex flex-wrap gap-0.5" role="tablist" aria-label="Race">
-          {Array.from({ length: Math.min(MAX_RACES, g.races + 1) }, (_, i) => i + 1).map((n) => (
-            <button key={n} role="tab" aria-selected={n === race} onClick={() => setRace(n)}
-              className={cx('rounded border px-2 py-0.5 text-xs tabular-nums', n === race ? 'border-accent-500 bg-accent-500/15 text-accent-300' : 'border-ink-700 text-ink-400 hover:bg-ink-800')}>R{n}</button>
-          ))}
-        </div>
-        <label className="ml-auto w-72"><span className="label">Marks (comma separated, finish last)</span>
-          <SaveInput value={r?.marks.join(', ') ?? ''} onSave={(v) => put({ marks: v.split(',').map((x) => x.trim()).filter(Boolean) })} label="Marks" maxLength={140} className="text-xs" /></label>
-        <Button size="sm" variant="ghost" onClick={clear}>Clear race</Button>
-      </div>
-      {run.isLoading ? <Loading /> : run.error ? <ErrorBox error={run.error} onRetry={() => run.refetch()} /> : r && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-wide text-ink-500">
-              <tr>
-                <th className="w-8 px-1 py-1 text-center">#</th><th className="px-1 py-1 text-left">Team</th>
-                {r.marks.map((m, i) => <th key={i} className="w-20 px-0.5 py-1 text-center">{m}</th>)}
-                <th className="w-14 px-1 py-1 text-center">Gap</th><th className="w-14 px-1 py-1 text-center">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {r.rows.map((row, i) => {
-                const t = teamById.get(row.teamId);
-                return (
-                  <tr key={row.teamId} className={cx('border-t border-ink-800/60', i === 0 && row.finish && 'bg-amber-500/5')}>
-                    <td className="px-1 text-center font-semibold tabular-nums text-ink-300">{row.finish ? i + 1 : '–'}</td>
-                    <td className="px-1 py-1"><span className="font-mono text-xs font-bold text-ink-100">{t?.code ?? '?'}</span> <span className="text-ink-400">{t?.name}</span></td>
-                    {row.times.map((v, j) => (
-                      <td key={j} className="px-0.5 py-0.5"><SaveInput value={v} onSave={(x) => setTime(row, j, x)} label={`${t?.code} ${r.marks[j]}`} placeholder={j === row.times.length - 1 ? '1:15:00' : '15:00'} maxLength={12} className="px-1 text-center tabular-nums" /></td>
-                    ))}
-                    <td className="px-1 text-center text-xs tabular-nums text-ink-400">{row.gap}</td>
-                    <td className="px-1 py-0.5">
-                      <SaveInput value={row.points} onSave={(points) => put({ rows: [{ teamId: row.teamId, points: points.trim() }] })} label={`${t?.code} race points`} placeholder={row.autoPoints || '0'} maxLength={12}
-                        className={cx('px-1 text-center font-bold tabular-nums', row.points ? 'text-sky-300' : 'text-ink-50')} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="px-3 pb-2 pt-1 text-[11px] text-ink-500">
-        Times as m:ss or h:mm:ss. Rows sort by the finish; points are teams − place + 1 unless typed, and land in R{race} of the table above. Typing a race of the group on air makes it the one the RACE RESULTS key shows.
-      </p>
-      {dialog}
-    </div>
   );
 }

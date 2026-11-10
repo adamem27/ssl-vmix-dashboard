@@ -8,9 +8,10 @@ import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
 import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
+import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
-import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
+import { companionFiles, deckPages, getShowConfig, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
@@ -316,7 +317,7 @@ describe('show control', () => {
       { slot: 'Tactician', firstName: 'Florian', lastName: 'Trittel', number: '2', captain: true },
     ] });
     const v = fakeVmix({
-      ssl_results_group: ['COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'bar1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
+      ssl_results_group: ['LOCALIZATION.Text', 'COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'bar1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
       ssl_compare: ['Group.Text', '1 COUNTRY.Text', '1 NICKNAME.Text', 'RANK 1.Text', 'RANK NUM 3.Text', '1 CPT NAME.Text', '1 CPT SURNAME.Text', '1 FLAG.Source', '1 BG.Source', '1 PHOTO.Source', 'PHOTO 2.Source'],
       ssl_lineup: ['BG.Source', 'HelmBG.Source', 'Trimmer1BG.Source', 'TeamName.Text', 'Trimmer1NAME.Text', 'Trimmer1Positio.Text', 'Trimmer2SURNAME.Text', 'TacticianSURNAM.Text', 'BowPosition.Text', 'PitPOSITION.Text'],
       ssl_schedule: ['DateText.Text'],
@@ -325,12 +326,15 @@ describe('show control', () => {
     const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'ESP');
     fs.mkdirSync(dir, { recursive: true });
     for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_bar_results.png', 1129, 76], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390], ['ESP_square.png', 210, 134], ['ESP_lineup_photo_left.png', 211, 135], ['ESP_lineup_photo_right.png', 211, 135]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
+    // the Results tab's subtitle is the place on the board (not Welcome's location)
+    saveResults(s.db, getShowConfig(s.db).fleetId, { subtitle: 'Rio de Janeiro, Brazil' });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     // picking the group (top of the dashboard) is enough: results and comparison follow it
     const r = await show.syncData();
     expect(r.sent).toBeGreaterThan(5);
     expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=COUNTRY1.Text&Value=TEAM ESP');
     expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Group A.Text&Value=FLEET 1');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=LOCALIZATION.Text&Value=RIO DE JANEIRO, BRAZIL');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=TEAM ESP');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=TRITTEL');
     expect(v.calls.some((c) => c.includes('SelectedName=DateText.Text'))).toBe(true);

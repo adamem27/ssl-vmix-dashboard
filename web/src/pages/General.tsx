@@ -72,10 +72,9 @@ function WeatherPanel() {
   const select = (k: string, label: string, opts: string[]) => field(label, <SelectCell value={d[k]} options={opts} onSave={(v) => save(k, v)} label={label} className="text-ink-50" />);
   return (
     <Panel title="Weather">
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
         {select('forecast', 'Forecast', CONDITIONS)}
         {text('air_temp', 'Air °C', '24')}
-        {text('water_temp', 'Water °C', '21')}
         {text('wind_speed', 'Wind', '12')}
         {field('Direction', (
           <div className="flex items-center gap-1">

@@ -34,7 +34,6 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
   const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
   const f = new Map<string, string>();
   f.set('SUBTITLE.Text', g.title);
-  if (g.subtitle.trim()) f.set('LOCATION.Text', g.subtitle);
   // race columns stand at the right, next to Points: with 4 races in a 6-column title,
   // R1…R4 go to columns 3…6 and columns 1–2 stay empty; more races than columns show the last ones
   const c = cols || g.races;
@@ -46,10 +45,14 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
   // R1 points1…, Total1): the stage and place from Welcome (General graphics), the group's name
   const welcome = listGraphicSets(ctx.db, activeEvent(ctx.db).id, 'welcome')[0]?.data ?? {};
   const up = (v: string | undefined) => (v ?? '').trim().toUpperCase();
+  // the Results tab gives the group's title (Group A / GROUP) and the subtitle (the place: LOCALIZATION / LOCATION);
+  // Welcome only fills in a subtitle left empty, and the stage
+  const place = g.subtitle.trim() || welcome.location || '';
   f.set('STAGE.Text', up(welcome.stage) || up(welcome.event));
-  f.set('LOCALIZATION.Text', up(welcome.location));
-  f.set('Group A.Text', groupLabel(g.fleetName));
-  f.set('GROUP.Text', groupLabel(g.fleetName));
+  f.set('LOCALIZATION.Text', up(place));
+  f.set('LOCATION.Text', up(place));
+  f.set('Group A.Text', up(g.title) || groupLabel(g.fleetName));
+  f.set('GROUP.Text', up(g.title) || groupLabel(g.fleetName));
   for (let n = 1; n <= Math.max(rowsInTitle, g.rows.length); n++) {
     const r = g.rows[n - 1];
     const t = r ? teams.get(r.teamId) : undefined;

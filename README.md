@@ -219,13 +219,12 @@ Kolumna **For** w tabeli elementów decyduje, w jakich barwach powstaje element:
 
 ## Show control (dwa Stream Decki)
 
-Zakładka **Show control** prowadzi wszystkie grafiki z dwóch Stream Decków XL. Deck 1 ma program (strona 1 „A BEFORE”, strona 2 „C–E AFTER / BREAK”), deck 2 wyścig (strona 11 „B RACE” z drużynami grupy z Fleets i żeglarzami wybranej drużyny według numeru na koszulce, strona 12 „EXTRAS”: komunikaty, bugi, L-bar, PiP, lineup LT). Dolny rząd jest wszędzie taki sam: HOME, ◀, ▶, FALLBACK, UNDO, ALL OUT, PANIC (drugie naciśnięcie w ciągu 3 s).
+Zakładka **Show control** prowadzi wszystkie grafiki z dwóch Stream Decków XL. Deck 1 ma program (strona 1 „A BEFORE”, strona 2 „C–E AFTER / BREAK”), deck 2 wyścig (strona 11 „B RACE” z drużynami grupy z Fleets i żeglarzami wybranej drużyny według numeru na koszulce, strona 12 „EXTRAS”: komunikaty, bugi, L-bar, lineup LT). Dolny rząd jest wszędzie taki sam: HOME, ◀, ▶, FALLBACK, UNDO, ALL OUT, PANIC (drugie naciśnięcie w ciągu 3 s).
 
-- Każdy klawisz woła `/api/show/do?a=<akcja>`. Dashboard wpisuje dane do tytułu przez Web API vMixa i wpuszcza go na jego overlay: OV1 plansze, OV2 belki, OV3 bugi i ticker, OV4 scena przerwy, L-bar i ramki PiP. Plansza zdejmuje belkę i scenę przerwy, scena przerwy zdejmuje plansze i belki.
+- Każdy klawisz woła `/api/show/do?a=<akcja>`. Dashboard wpisuje dane do tytułu przez Web API vMixa i wpuszcza go na jego overlay: OV1 plansze, OV2 belki, OV3 bugi i ticker, OV4 scena przerwy i L-bar. Plansza zdejmuje belkę i scenę przerwy, scena przerwy zdejmuje plansze i belki.
 - Co jest na wizji, dashboard czyta z vMixa (XML), więc kolory klawiszy zgadzają się z vMixem, a UNDO przywraca poprzedni stan overlayów.
 - Inputy są szukane po nazwie (`ssl_welcome`, `ssl_results_group_4`, `ssl_lineup_9`…; listę zmienisz w tabeli zakładki). Przycisk „Add placeholders” dodaje brakujące jako inputy Image z przezroczystym PNG. Dashboard nie zmienia niczego innego w vMixie, w tym ustawień wyjść.
 - Scena przerwy `ssl_break` to input z warstwami. Dashboard co kilka sekund wstawia na zmianę day schedule i wyniki grup do warstwy planszy (`SetMultiViewOverlay`). Przycisk TICKER przełącza tekst tickera między wersją „przed wyścigiem” i „koniec dnia” (General graphics → Tickers).
-- Klawisz RACE RESULTS pokazuje jeden wyścig z czasami na znakach (input `ssl_results_race_4` / `ssl_results_race`). Czasy wpisujesz w zakładce Results pod tabelą grupy: wiersze same układają się po czasie na mecie, GAP liczy się do zwycięzcy, punkty (łódki − miejsce + 1, chyba że wpiszesz) trafiają do kolumny R tego wyścigu w tabeli ogólnej. Pola tytułu: `TITLE`, `RACE`, `SUBTITLE`, `H1…` (nazwy znaków), w wierszu n: `POS n`, `FLAG n`, `TEAM n`, `RANKING n`, `M1 n…` (czasy), `TIME n`, `GAP n` (zwycięzca ma swój czas), `POINTS n`.
 - Pliki stron Companiona (5 plików, w tym FALLBACK, który steruje vMixem bez dashboardu) pobierasz z zakładki i importujesz w Companion → Import / Export.
 
 ## Lowerthirdy ze Stream Decka (Companion)

@@ -14,7 +14,6 @@ import { teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
-import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
 import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
@@ -26,7 +25,7 @@ import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatche
  * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
  * driven from two Stream Decks through Companion. Each key calls /api/show/do?a=<action>; the dashboard fills the
  * title through the vMix Web API, brings it in on its overlay channel and keeps the rules:
- *  - OV1 boards, OV2 lower thirds, OV3 bugs and tickers, OV4 the break scene, L-bar and PiP frames
+ *  - OV1 boards, OV2 lower thirds, OV3 bugs and tickers, OV4 the break scene and L-bar
  *  - a board coming in takes the lower third and the break scene off; the break scene takes boards and lower thirds off
  *  - UNDO puts every overlay back as it was before the last action; ALL OUT takes everything out with its
  *    animation; PANIC (pressed twice) cuts everything at once
@@ -45,7 +44,6 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'schedule', label: 'Day schedule', kind: 'board', overlay: 1, inputs: ['ssl_schedule'] },
   { id: 'matchboard', label: 'Matchboard', kind: 'board', overlay: 1, inputs: ['ssl_matchboard'] },
   { id: 'results', label: 'Group results', kind: 'board', overlay: 1, inputs: ['ssl_results_group_{n}', 'ssl_results_group'] },
-  { id: 'raceresults', label: 'Race results', kind: 'board', overlay: 1, inputs: ['ssl_results_race_{n}', 'ssl_results_race'] },
   { id: 'compare', label: 'Team comparison', kind: 'board', overlay: 1, inputs: ['ssl_compare_{n}', 'ssl_compare'] },
   { id: 'lineup', label: 'Team lineup', kind: 'board', overlay: 1, inputs: ['ssl_lineup_{crew}', 'ssl_lineup'] },
   { id: 'course', label: 'Race course', kind: 'board', overlay: 1, inputs: ['ssl_course'] },
@@ -61,9 +59,6 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 3, inputs: ['ssl_sponsors'] },
   { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: ['ssl_break'] },
   { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 4, inputs: ['ssl_lbar'] },
-  { id: 'pip_replay', label: 'PiP replay + onboard', kind: 'scene', overlay: 4, inputs: ['ssl_pip_replay'] },
-  { id: 'pip_live', label: 'PiP onboard + live', kind: 'scene', overlay: 4, inputs: ['ssl_pip_live'] },
-  { id: 'pip_4', label: 'PiP 4 onboards', kind: 'scene', overlay: 4, inputs: ['ssl_pip_4'] },
 ];
 
 export const showConfigSchema = z.object({
@@ -186,7 +181,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:raceresults', 'RACE\\nRESULTS', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board'),
+        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board'),
           k('qualified:1', 'QUALIFIED\\nTEAM 1', 'team'), k('qualified:2', 'QUALIFIED\\nTEAM 2', 'team'), k('qualified:3', 'QUALIFIED\\nTEAM 3', 'team'), k('qualified:4', 'QUALIFIED\\nTEAM 4', 'team'), k('ltout', 'LT OUT', 'lt')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
           k('tickermode', 'TICKER:\\nNEXT RACE', 'mode')),
@@ -209,7 +204,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
         row8(...Array.from({ length: 8 }, (_, i) => k(`bug:${i + 1}`, '—', 'bug'))),
         row8(k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug'), k('show:replay', 'REPLAY\\nBUG', 'bug'), k('show:socials', 'SOCIALS', 'bug'),
           k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lineup5', 'LINEUP\\nLT', 'lt')),
-        row8(k('show:pip_replay', 'PiP\\nREPLAY+OB', 'scene'), k('show:pip_live', 'PiP\\nOB+LIVE', 'scene'), k('show:pip_4', 'PiP\\n4 ONBOARDS', 'scene'), k('scene4out', 'PiP OUT', 'scene'), null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
+        row8(null, null, null, null, null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
         nav(p2, p2, 'TEAMS', p2 + 2, 'BUGS 1'),
       ],
     },
@@ -501,11 +496,7 @@ export class Show {
   /** The data of a graphic, set right before it comes in. */
   private async fill(g: Graphic, input: VmixInput) {
     const ev = activeEvent(this.ctx.db).id;
-    if (g.id === 'raceresults') {
-      if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
-      const rows = Math.max(0, ...input.fields.map((f) => Number(f.match(/^TEAM (\d+)\.Text$/i)?.[1] ?? 0)));
-      await this.set(input, raceRunFields(this.ctx, this.config.fleetId, this.config.race, rows));
-    } else if (g.id === 'results') {
+    if (g.id === 'results') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
       await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
     } else if (g.id === 'compare') {
@@ -941,7 +932,7 @@ export class Show {
       case 'ticker': return this.ticker(arg);
       case 'bugout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(3, s.overlays); return { out: 'bug' }; }
       case 'boardout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(1, s.overlays); return { out: 'board' }; }
-      case 'breakout': case 'scene4out': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
+      case 'breakout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
       case 'rotate': return this.toggleRotation();
       case 'nextslide': return this.nextSlide();
       case 'tickermode': return this.tickerMode();
@@ -1237,7 +1228,7 @@ function fallbackControls(cfg: ShowConfig, vmixBase: string, graphics: Graphic[]
   const v = vmixBase.replace(/\/+$/, '');
   const fb: Record<number, Record<number, unknown>> = {};
   const first = (g: Graphic) => g.inputs.map((x) => x.replace('{n}', '4').replace('{crew}', '9')).find((x) => !x.includes('{'))!;
-  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'raceresults', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'replay', 'socials', 'sponsors', 'break', 'lbar'];
+  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'replay', 'socials', 'sponsors', 'break', 'lbar'];
   const fbKeys = pick.map((id) => graphics.find((g) => g.id === id)).filter((g): g is Graphic => !!g);
   fbKeys.slice(0, 16).forEach((g, i) => {
     const r = Math.floor(i / 8), c = i % 8;

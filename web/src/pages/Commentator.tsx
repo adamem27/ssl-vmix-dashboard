@@ -17,7 +17,7 @@ interface Stop { pos: number; color: string; opacity: number }
 interface Gradient { angle: number; stops: Stop[] }
 interface LineupPlace { label: string; number: string; firstName: string; lastName: string; position: string; captain: boolean; sailorId: string | null }
 interface Standing { fleetId: string; fleetName: string; title: string; subtitle: string; races: number; rows: { teamId: string; races: string[]; total: string }[] }
-interface Weather { forecast: string; air_temp: string; water_temp: string; wind_speed: string; wind_direction: string; wind_degrees: string; wind_unit: string }
+interface Weather { forecast: string; air_temp: string; wind_speed: string; wind_direction: string; wind_degrees: string; wind_unit: string }
 interface CommentatorData {
   event: { name: string; timezone: string }; stage: { id: string; name: string } | null; date: string;
   weather: Weather; schedule: { id: string; time: string; race: string; fleet: string; status: string; note: string }[];
@@ -149,7 +149,6 @@ function TopStrip({ x, tz, sets, activeSet, onSet, badge }: { x?: CommentatorDat
     ['Wind', w.wind_speed ? `${w.wind_speed} ${unit}` : '', '💨'],
     ['Direction', [w.wind_direction, w.wind_degrees && `${w.wind_degrees}°`].filter(Boolean).join(' '), '🧭'],
     ['Air', w.air_temp ? `${w.air_temp}°C` : '', '🌡'],
-    ['Water', w.water_temp ? `${w.water_temp}°C` : '', '🌊'],
     ['Forecast', w.forecast, '⛅'],
   ] as [string, string, string][]).filter(([, v]) => v) : [];
   return (
