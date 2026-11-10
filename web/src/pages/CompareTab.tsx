@@ -14,6 +14,7 @@ interface CompareTab { stage: string; groups: CompareGroup[] }
 
 const TEXTS: [TeamField, string][] = [['name', 'Country'], ['nick', 'Nickname'], ['rank', 'SSL rank'], ['weight', 'Weight (kg)'], ['cptName', 'Captain name'], ['cptSurname', 'Captain surname']];
 const PICS: [TeamField, string][] = [['flag', 'Flag'], ['emblem', 'Emblem'], ['photo', 'Captain photo'], ['panel', 'Panel (background)']];
+const isAsset = (v: string) => !!v && !/^([a-zA-Z]:[\\/]|\\\\|\/)/.test(v);
 const file = (p: string) => p.split(/[\\/]/).pop() ?? p;
 
 /**
@@ -31,7 +32,7 @@ export function ComparePanel() {
   };
   const upload = async (fleetId: string, n: number, field: string, f: File | undefined) => {
     if (!f) return;
-    try { const r = await api.upload<{ icon: string }>('/api/graphic-sets/icon', f); await save(fleetId, n, field, r.icon); } catch (e) { toast.error(e); }
+    try { const r = await api.upload<{ path: string }>('/api/compare/upload', f); await save(fleetId, n, field, r.path); } catch (e) { toast.error(e); }
   };
   return (
     <section className="card">
@@ -70,12 +71,15 @@ export function ComparePanel() {
                         return (
                           <Field key={k} label={label} wide>
                             <div className="flex items-center gap-1">
+                              {ov[k] && isAsset(ov[k]!) && (
+                                <img src={`/api/gtzip/image?src=${encodeURIComponent(`asset:${ov[k]}`)}`} alt="" className="h-7 w-7 shrink-0 rounded border border-ink-800 object-contain" />
+                              )}
                               <div className="min-w-0 flex-1">
                                 <Cell value={ov[k] ?? ''} placeholder={auto} onSave={(v) => save(g.fleetId, t.n, k, v)} label={`${t.n} ${label}`} />
                               </div>
-                              <label className="inline-flex cursor-pointer items-center whitespace-nowrap rounded border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] text-ink-100 hover:bg-ink-700" title="Upload a PNG for this place">
-                                PNG
-                                <input type="file" accept="image/png" className="hidden" onChange={(e) => { void upload(g.fleetId, t.n, k, e.target.files?.[0]); e.target.value = ''; }} />
+                              <label className="inline-flex cursor-pointer items-center whitespace-nowrap rounded border border-ink-700 bg-ink-800 px-2 py-0.5 text-[11px] text-ink-100 hover:bg-ink-700" title="Upload a PNG or JPG for this place (it is used instead of the dashboard's picture; clear the field to go back)">
+                                Upload
+                                <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => { void upload(g.fleetId, t.n, k, e.target.files?.[0]); e.target.value = ''; }} />
                               </label>
                             </div>
                           </Field>

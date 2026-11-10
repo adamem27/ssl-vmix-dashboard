@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { encodePng } from '../src/services/png.js';
+import { PNG } from 'pngjs';
+import { comparisonFlag } from '../src/services/compareImages.js';
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
@@ -68,6 +70,23 @@ function race() {
 }
 
 describe('show control', () => {
+  it('makes the comparison flag on the emblems\' square canvas and leaves the team\'s flag file alone', () => {
+    const { s } = race();
+    const src = path.join(s.ctx.assetsDir, 'flag_src.png');
+    const orig = encodePng(300, 200, () => [200, 0, 0, 255]);
+    fs.mkdirSync(s.ctx.assetsDir, { recursive: true });
+    fs.writeFileSync(src, orig);
+    const out = comparisonFlag(s.ctx, 'ESP', src);
+    expect(out).toMatch(/team-comparison[\\/]ESP_flag_comparison\.png$/);
+    const png = PNG.sync.read(fs.readFileSync(out));
+    expect([png.width, png.height]).toEqual([401, 401]);
+    const a = (x: number, y: number) => png.data[(y * 401 + x) * 4 + 3];
+    expect(a(200, 200)).toBe(255);
+    expect(a(200, 80)).toBe(0); // above the flag: 214 px tall, centred
+    expect(a(30, 200)).toBe(0); // left of it: 321 px wide
+    expect(fs.readFileSync(src).equals(orig)).toBe(true);
+  });
+
   it('schedule rows find their group and its flags with no stage picked, and in another stage than the picked one', () => {
     const { s, ev, f1 } = race();
     setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL');
