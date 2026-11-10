@@ -32,7 +32,7 @@ function normalize(raw) {
     const order = (raw.order ?? []).filter((k, i, a) => defs.some((d) => d.key === k) && a.indexOf(k) === i);
     const ordered = [...order.map((k) => defs.find((d) => d.key === k)), ...defs.filter((d) => !order.includes(d.key))];
     return {
-        title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', extra,
+        title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', photoSide: raw.photoSide === 'right' ? 'right' : 'left', extra,
         rows: ordered.map((d) => {
             const r = byKey.get(d.key);
             return r ? { ...emptyRow(d), ...r, slot: d.key, captain: !!r.captain } : emptyRow(d);
@@ -64,7 +64,7 @@ export function getLineup(ctx, eventId, teamId) {
 export function saveLineup(ctx, eventId, teamId, patch) {
     getTeam(ctx, teamId);
     const cur = loadLineup(ctx.db, eventId, teamId).data;
-    const next = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
+    const next = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.photoSide !== undefined && { photoSide: patch.photoSide }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
     const rows = new Map(cur.rows.map((r) => [r.slot, r]));
     for (const p of patch.rows ?? []) {
         if (!p.slot)
@@ -151,7 +151,7 @@ export function syncLineupFromDeclaration(ctx, eventId, teamId, date) {
             break;
         placed.set(d.key, { slot: d.key, ...c, position: (c.position || d.position).toUpperCase() });
     }
-    const data = normalize({ title: cur.title, teamName: cur.teamName, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
+    const data = normalize({ title: cur.title, teamName: cur.teamName, photoSide: cur.photoSide, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
     store(ctx.db, eventId, teamId, data, date);
     return { synced: true, sailors: crew.length };
 }

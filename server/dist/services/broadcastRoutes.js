@@ -59,7 +59,7 @@ export function registerBroadcastRoutes(app, ctx) {
     const row = z.object({ slot: s(20), sailorId: s(64).nullable(), firstName: s(80), lastName: s(80), number: s(10), position: s(40), captain: z.boolean() }).partial().required({ slot: true });
     app.get('/api/lineups', async () => lu.lineupStatus(db, ev().id));
     app.get('/api/lineups/:teamId', async (req) => lu.getLineup(ctx, ev().id, req.params.teamId));
-    app.put('/api/lineups/:teamId', async (req) => lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20), order: z.array(s(20)).max(20) }).partial().parse(req.body)));
+    app.put('/api/lineups/:teamId', async (req) => lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), photoSide: z.enum(['left', 'right']), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20), order: z.array(s(20)).max(20) }).partial().parse(req.body)));
     app.delete('/api/lineups/:teamId', async (req) => lu.clearLineup(ctx, ev().id, req.params.teamId));
     const date = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
     app.post('/api/lineups/:teamId/sync', async (req) => {

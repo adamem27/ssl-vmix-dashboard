@@ -200,6 +200,15 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
     const sAng = (el.strokeAngle * Math.PI) / 180;
     const [sdx, sdy] = orient(Math.cos(sAng), -Math.sin(sAng));
     const sLen = Math.abs(W * sdx) + Math.abs(H * sdy) || 1;
+    // notch: top corners rounded, bottom left square, minus a bar under it (its top corners rounded by the notch)
+    const notch = Math.max(0, Math.min((el.notch ?? 0) * scale, H - 1));
+    const notchSdf = (px, py) => {
+        const ext = radius + 2;
+        const outer = roundedRectSdf(px, py - ext / 2, hw, hh + ext / 2, radius);
+        const bh = (notch * 3 + 2) / 2;
+        const bar = roundedRectSdf(px, py - (hh - notch + bh), hw, bh, Math.min(notch, hw));
+        return Math.max(outer, -bar);
+    };
     const usePattern = el.pattern && el.patternOpacity > 0;
     const patA = clamp01(el.patternOpacity / 100);
     const ps = Math.max(0.05, el.patternScale / 100) * scale;
@@ -207,7 +216,7 @@ export function renderElement(el, gradient, scale = 1, strokeGradient = null) {
         const cy = y + 0.5 - hh;
         for (let x = 0; x < W; x++) {
             const cx = x + 0.5 - hw;
-            const d = cut ? polygonSdf(cx, cy, cut.poly) - cut.r : roundedRectSdf(cx, cy, hw, hh, radius);
+            const d = cut ? polygonSdf(cx, cy, cut.poly) - cut.r : notch > 0 ? notchSdf(cx, cy) : roundedRectSdf(cx, cy, hw, hh, radius);
             const cover = clamp01(0.5 - d);
             if (cover <= 0)
                 continue;

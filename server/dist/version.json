@@ -1,8 +1,14 @@
 {
-  "version": "1.0.129",
-  "commit": "ffbdafb",
-  "date": "2026-11-10T20:39:36Z",
+  "version": "1.0.130",
+  "commit": "dd1ee32",
+  "date": "2026-11-10T20:52:20Z",
   "changes": [
+    {
+      "version": "1.0.130",
+      "commit": "dd1ee32",
+      "date": "2026-11-10T20:52:20Z",
+      "text": "Lineup photo box: bottom notch like the artwork, left and right versions; each team picks its side on the Line-up tab"
+    },
     {
       "version": "1.0.129",
       "commit": "ffbdafb",
@@ -476,12 +482,6 @@
       "commit": "12a3b38",
       "date": "2026-11-08T16:42:51Z",
       "text": "Matchboard editor in the PNG generator: editable texts, team picker with flags, highlights, PNG export"
-    },
-    {
-      "version": "1.0.36",
-      "commit": "8a8c2b5",
-      "date": "2026-11-08T16:11:37Z",
-      "text": "Fleet size, third personal best, nation ranking, declared weights, five standardised sponsor logos"
     }
   ]
 }
