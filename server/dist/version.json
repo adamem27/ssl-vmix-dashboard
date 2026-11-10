@@ -1,8 +1,14 @@
 {
-  "version": "1.0.118",
-  "commit": "2bc3b2b",
-  "date": "2026-11-10T17:13:11Z",
+  "version": "1.0.119",
+  "commit": "8c05d66",
+  "date": "2026-11-10T17:25:32Z",
   "changes": [
+    {
+      "version": "1.0.119",
+      "commit": "8c05d66",
+      "date": "2026-11-10T17:25:32Z",
+      "text": "Speed: Show control keys read their data once per refresh; the workbook is built only after a change"
+    },
     {
       "version": "1.0.118",
       "commit": "2bc3b2b",
@@ -476,12 +482,6 @@
       "commit": "e6bbb11",
       "date": "2026-11-07T19:28:30Z",
       "text": "Form login instead of the browser password popup; Windows package can sync from an online dashboard"
-    },
-    {
-      "version": "1.0.25",
-      "commit": "09fef95",
-      "date": "2026-11-07T19:24:39Z",
-      "text": "Windows launcher: CI test that it downloads the release and starts"
     }
   ]
 }

@@ -8,6 +8,9 @@ import { listGraphicSets } from './graphicSets.js';
 /** Show control: one GET per Stream Deck key (/api/show/do?a=…), the tab's view and the Companion page files. */
 export function registerShowRoutes(app, ctx, show) {
     const { db } = ctx;
+    // a change anywhere in the dashboard (teams, groups, line-ups, General graphics…) shows on the keys at once
+    app.addHook('onResponse', async (req) => { if (req.method !== 'GET')
+        show.invalidate(); });
     app.get('/api/show', async () => {
         const ev = activeEvent(db).id;
         const fleets = listSets(db, ev).flatMap((s) => getSetDetail(db, s.id).fleets.map((f) => ({ id: f.id, name: `${s.name} · ${f.name}`, size: f.filled })));

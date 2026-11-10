@@ -201,6 +201,21 @@ export class Show {
     timer = null;
     rotation = null;
     labels = new Map();
+    /**
+     * Data the keys read, kept for a second: one view or Companion refresh looks at 200 keys, and each team / sailor /
+     * announcement key would read the group, the teams and their pictures again (seconds of a busy server on a big
+     * event). A key press or any change made in the dashboard clears it (invalidate).
+     */
+    memo = new Map();
+    cached(key, fn) {
+        const m = this.memo.get(key);
+        if (m && Date.now() - m.at < 1000)
+            return m.v;
+        const v = fn();
+        this.memo.set(key, { at: Date.now(), v });
+        return v;
+    }
+    invalidate() { this.memo.clear(); }
     constructor(ctx, lt, fetcher = fetch, log = () => { }) {
         this.ctx = ctx;
         this.lt = lt;
@@ -232,6 +247,9 @@ export class Show {
         throw notFound(`Graphic ${id}`); return g; }
     /** The teams of the race now, in fleet order (team keys 1–4). */
     boats() {
+        return this.cached(`boats:${this.config.fleetId}`, () => this.loadBoats());
+    }
+    loadBoats() {
         const cfg = this.config;
         if (!cfg.fleetId)
             return [];
@@ -251,10 +269,13 @@ export class Show {
         const b = this.boats()[this.state.boat - 1];
         if (!b)
             return [];
+        return this.cached(`sailors:${b.id}`, () => this.loadSailors(b));
+    }
+    loadSailors(b) {
         const num = (s) => (Number.isFinite(Number(s.number)) && s.number !== '' ? Number(s.number) : 999);
         return crewOf(this.ctx, b.id).filter((s) => s.firstName || s.lastName).sort((a, c) => num(a) - num(c));
     }
-    announcements() { return listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement'); }
+    announcements() { return this.cached('announcements', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement')); }
     /** Fleets that rotate in the break scene. */
     breakFleets() {
         const cfg = this.config;
@@ -269,7 +290,17 @@ export class Show {
         return cfg.fleetId ? [cfg.fleetId] : [];
     }
     // ---------- vMix state ----------
+    /** vMix's state; the tab and the Companion refresh share one read for half a second. */
     async snapshot() {
+        const m = this.memo.get('snapshot');
+        if (m && Date.now() - m.at < 500)
+            return m.v;
+        const p = this.readSnapshot();
+        this.memo.set('snapshot', { at: Date.now(), v: p });
+        p.catch(() => this.memo.delete('snapshot'));
+        return p;
+    }
+    async readSnapshot() {
         const xml = await this.vmix('');
         const inputs = parseVmixXml(xml);
         const overlays = {};
@@ -523,7 +554,7 @@ export class Show {
         await this.bringIn(g, input, snap);
         return { in: 'lineup', team: b.code, input: input.title };
     }
-    tickers() { return listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker'); }
+    tickers() { return this.cached('tickers', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker')); }
     /** An announcement by key: its position (bug:3), its version id, or THANKS (old keys: the Thanks ticker). */
     announcement(which) {
         const list = this.announcements();
@@ -702,9 +733,10 @@ export class Show {
     }
     // ---------- the key router ----------
     async run(action) {
+        this.invalidate();
         const [kind, arg = ''] = action.split(':');
         try {
-            const r = await this.dispatch(kind, arg);
+            const r = await this.dispatch(kind, arg).finally(() => this.invalidate()); // what the press changed shows at once
             this.patchState({ last: { at: new Date().toISOString(), action, error: null } });
             void this.pushLabels();
             return r;
