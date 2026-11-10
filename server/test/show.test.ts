@@ -7,6 +7,7 @@ import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateG
 import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
+import { setCurrentStage } from '../src/services/workbookSheets.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -231,6 +232,18 @@ describe('show control', () => {
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
     for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+  });
+
+  it('the preset has pages only for the teams of the stage picked at the top, in group order', () => {
+    const { s, ev } = race();
+    seedTeam(s.db, 'USA', []); // not in the stage
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    expect(show.presetTeams().map((t) => t.code)).toEqual(['BRA', 'ESP', 'GBR', 'ITA', 'USA']); // no stage picked: every team
+    const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
+    setCurrentStage(s.db, ev, stage.id);
+    show.invalidate();
+    expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
+    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
   });
 
   it('a team page key shows that place of that team, whatever team is picked', async () => {

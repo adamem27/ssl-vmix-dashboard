@@ -9,7 +9,7 @@ import { listPeople } from './general.js';
 import { imagePath, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
-import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor } from './lowerthirds.js';
+import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor, ltTeams } from './lowerthirds.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
@@ -288,8 +288,22 @@ export class Show {
   invalidate() { this.memo.clear(); }
   constructor(readonly ctx: AssetCtx, readonly lt: LowerThirds, private fetcher: Fetch = fetch as unknown as Fetch, private log: (m: string) => void = () => {}) {}
 
-  get config() { return getShowConfig(this.ctx.db); }
-  get state() { return getShowState(this.ctx.db); }
+  // the config and state are read by every key of a view (hundreds): parsed again only when the stored text changes
+  private cfgCache = { raw: '\u0000', v: null as unknown as ShowConfig };
+  private stCache = { raw: '\u0000', v: null as unknown as ShowState };
+  get config() {
+    const raw = getSetting(this.ctx.db, CFG) || '';
+    if (raw !== this.cfgCache.raw) this.cfgCache = { raw, v: getShowConfig(this.ctx.db) };
+    return this.cfgCache.v;
+  }
+  get state() {
+    const raw = getSetting(this.ctx.db, STATE) || '';
+    if (raw !== this.stCache.raw) this.stCache = { raw, v: getShowState(this.ctx.db) };
+    return { ...this.stCache.v };
+  }
+  /** The event's teams (read once per view) and a team's key colours. */
+  private teams() { return this.cached('teams', () => listTeams(this.ctx)); }
+  private nation(code: string) { return this.cached(`nation:${code}`, () => teamKeyColours(this.ctx.db, code)); }
   private patchState(p: Partial<ShowState>) { const s = { ...this.state, ...p }; saveShowState(this.ctx.db, s); return s; }
 
   private async vmix(q: string) {
@@ -323,9 +337,12 @@ export class Show {
     }
     return [];
   }
-  /** Every team of the event with its places, for its page (sorted by code, as on the TEAMS page). */
+  /**
+   * The teams of the stage picked at the top of the dashboard (group by group, in fleet order), each with its places,
+   * for its page; every team only when no stage is picked.
+   */
   presetTeams(): PresetTeam[] {
-    return this.cached('presetTeams', () => [...listTeams(this.ctx)].filter((t) => t.code).sort((a, b) => a.code.localeCompare(b.code)).map((t) => ({
+    return this.cached('presetTeams', () => ltTeams(this.ctx).filter((t) => t.code).map((t) => ({
       code: t.code, name: t.name,
       crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName })),
     })));
@@ -336,7 +353,7 @@ export class Show {
   /** A team by key: its position in the group racing now (1–4) or its code. */
   teamRef(arg: string) {
     if (/^\d+$/.test(arg)) return this.boat(Number(arg));
-    const t = listTeams(this.ctx).find((x) => x.code.toLowerCase() === arg.toLowerCase());
+    const t = this.teams().find((x) => x.code.toLowerCase() === arg.toLowerCase());
     if (!t) throw notFound(`Team ${arg}`);
     return { id: t.id, code: t.code, name: t.name };
   }
@@ -841,7 +858,7 @@ export class Show {
     let team: { id: string; code: string } | undefined; // the team whose national colours the key takes
     if (key.team) {
       // a key of a team's page (or the TEAMS page): its text is fixed, the team gives the colours
-      const t = listTeams(this.ctx).find((x) => x.code === key.team);
+      const t = this.teams().find((x) => x.code === key.team);
       team = t;
       if (t && kind === 'sailorof') onAir = lt.onAir && lt.kind === 'sailor' && lt.teamId === t.id && lt.slot === arg.split('/')[1];
       if (t && (kind === 'teamlt' || kind === 'anthem')) onAir = lt.onAir && lt.kind === 'team' && lt.teamId === t.id;
@@ -883,7 +900,7 @@ export class Show {
     if (key.custom) text = key.custom.replace(/\{auto\}/g, text);
     // team and sailor keys in the team's national colours, the feedback (selected / on air) in its colours too;
     // a colour set on the key or on its kind in the key editor still wins
-    const nation = team && !empty && !key.bg && !this.config.kindColours[key.kind] ? teamKeyColours(this.ctx.db, team.code) : null;
+    const nation = team && !empty && !key.bg && !this.config.kindColours[key.kind] ? this.nation(team.code) : null;
     if (nation) {
       const l = teamKeyLook(nation, text, { active, onAir });
       return { text: l.text, bg: l.bg, fg: key.fg || l.fg, onAir, active, empty };
