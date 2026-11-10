@@ -1,8 +1,14 @@
 {
-  "version": "1.0.110",
-  "commit": "2f62346",
-  "date": "2026-11-10T14:05:17Z",
+  "version": "1.0.111",
+  "commit": "51ea2a9",
+  "date": "2026-11-10T14:06:15Z",
   "changes": [
+    {
+      "version": "1.0.111",
+      "commit": "51ea2a9",
+      "date": "2026-11-10T14:06:15Z",
+      "text": "PNG generator: Custom graphics (one-off PNGs outside any team or group, own shape and gradient, exported to PNG generator/Custom), tabs reorganised"
+    },
     {
       "version": "1.0.110",
       "commit": "2f62346",
@@ -476,12 +482,6 @@
       "commit": "0cb8a0c",
       "date": "2026-10-22T11:22:51Z",
       "text": "PNG generator: wider number fields in the elements table"
-    },
-    {
-      "version": "1.0.15",
-      "commit": "e3fff57",
-      "date": "2026-10-22T11:21:12Z",
-      "text": "PNG generator: team gradients (V1–V3), rectangle elements with stroke and Copacabana waves, live preview and auto export"
     }
   ]
 }
