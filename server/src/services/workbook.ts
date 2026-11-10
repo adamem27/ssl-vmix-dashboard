@@ -43,14 +43,22 @@ export class WorkbookWriter {
 
   stop() { if (this.timer) clearInterval(this.timer); }
 
+  private lastSig = '';
+  private lastBuild = 0;
+
   tick() {
     try {
       organizeAssets(this.ctx); // a renamed team or sailor moves its files before the paths are written
       applyPanamColours(this.ctx.db); // Panam teams added after the start get their colours too
       fillTeamSlotsFromGenerator(this.ctx); // empty backgrounds and lower thirds take the generated PNGs
+      // building every sheet takes a while on a big event: only when the database changed (any write, by anyone,
+      // through this connection), else every 30 s for what follows the clock (the next race of the group)
+      const sig = String((this.ctx.db.prepare('SELECT total_changes() AS n').get() as { n: number }).n);
+      if (sig === this.lastSig && Date.now() - this.lastBuild < 30_000 && fs.existsSync(this.file)) return;
       const sheets = allSheets(this.ctx);
+      const done = () => { this.lastSig = sig; this.lastBuild = Date.now(); };
       const hash = createHash('sha1').update(JSON.stringify(sheets.map((s) => [s.name, s.rows, (s.rows as { styles?: unknown }).styles ?? null, LAYOUT_VERSION]))).digest('hex');
-      if (hash === this.lastHash && fs.existsSync(this.file)) return;
+      if (hash === this.lastHash && fs.existsSync(this.file)) { done(); return; }
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = `${this.file}.tmp`;
       fs.writeFileSync(tmp, buildXlsx(sheets));
@@ -61,6 +69,7 @@ export class WorkbookWriter {
         try { fs.copyFileSync(tmp, this.file); } catch { throw e; } finally { fs.rmSync(tmp, { force: true }); }
       }
       this.lastHash = hash;
+      done();
       this.updatedAt = new Date().toISOString();
       if (this.lastError) this.log('Workbook written again after an error');
       this.lastError = null;

@@ -131,6 +131,7 @@ describe('show control', () => {
     // a new ticker made during the show is on the next free ticker key at once
     const before = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty).length;
     createGraphicSet(s.db, ev, 'ticker', 'Breaking', { items: 'BOAT CAPSIZED - ALL CREW SAFE' });
+    show.invalidate(); // what any change through the dashboard's API does (showRoutes)
     const tk = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty);
     expect(tk.length).toBe(before + 1);
     v.calls.length = 0;

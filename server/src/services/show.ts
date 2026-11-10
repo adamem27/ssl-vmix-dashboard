@@ -239,6 +239,20 @@ export class Show {
   private timer: NodeJS.Timeout | null = null;
   private rotation: NodeJS.Timeout | null = null;
   private labels = new Map<string, string>();
+  /**
+   * Data the keys read, kept for a second: one view or Companion refresh looks at 200 keys, and each team / sailor /
+   * announcement key would read the group, the teams and their pictures again (seconds of a busy server on a big
+   * event). A key press or any change made in the dashboard clears it (invalidate).
+   */
+  private memo = new Map<string, { at: number; v: unknown }>();
+  private cached<T>(key: string, fn: () => T): T {
+    const m = this.memo.get(key);
+    if (m && Date.now() - m.at < 1000) return m.v as T;
+    const v = fn();
+    this.memo.set(key, { at: Date.now(), v });
+    return v;
+  }
+  invalidate() { this.memo.clear(); }
   constructor(readonly ctx: AssetCtx, readonly lt: LowerThirds, private fetcher: Fetch = fetch as unknown as Fetch, private log: (m: string) => void = () => {}) {}
 
   get config() { return getShowConfig(this.ctx.db); }
@@ -263,6 +277,9 @@ export class Show {
 
   /** The teams of the race now, in fleet order (team keys 1–4). */
   boats(): { id: string; code: string; name: string }[] {
+    return this.cached(`boats:${this.config.fleetId}`, () => this.loadBoats());
+  }
+  private loadBoats(): { id: string; code: string; name: string }[] {
     const cfg = this.config;
     if (!cfg.fleetId) return [];
     const ev = activeEvent(this.ctx.db).id;
@@ -279,11 +296,14 @@ export class Show {
   sailors(): LtSailor[] {
     const b = this.boats()[this.state.boat - 1];
     if (!b) return [];
+    return this.cached(`sailors:${b.id}`, () => this.loadSailors(b));
+  }
+  private loadSailors(b: { id: string }): LtSailor[] {
     const num = (s: LtSailor) => (Number.isFinite(Number(s.number)) && s.number !== '' ? Number(s.number) : 999);
     return crewOf(this.ctx, b.id).filter((s) => s.firstName || s.lastName).sort((a, c) => num(a) - num(c));
   }
 
-  announcements() { return listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement'); }
+  announcements() { return this.cached('announcements', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement')); }
 
   /** Fleets that rotate in the break scene. */
   breakFleets(): string[] {
@@ -298,7 +318,16 @@ export class Show {
   }
 
   // ---------- vMix state ----------
+  /** vMix's state; the tab and the Companion refresh share one read for half a second. */
   async snapshot() {
+    const m = this.memo.get('snapshot');
+    if (m && Date.now() - m.at < 500) return m.v as ReturnType<Show['readSnapshot']>;
+    const p = this.readSnapshot();
+    this.memo.set('snapshot', { at: Date.now(), v: p });
+    p.catch(() => this.memo.delete('snapshot'));
+    return p;
+  }
+  private async readSnapshot() {
     const xml = await this.vmix('');
     const inputs = parseVmixXml(xml);
     const overlays: Record<string, string> = {};
@@ -533,7 +562,7 @@ export class Show {
     return { in: 'lineup', team: b.code, input: input.title };
   }
 
-  tickers() { return listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker'); }
+  tickers() { return this.cached('tickers', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker')); }
 
   /** An announcement by key: its position (bug:3), its version id, or THANKS (old keys: the Thanks ticker). */
   private announcement(which: string) {
@@ -695,9 +724,10 @@ export class Show {
 
   // ---------- the key router ----------
   async run(action: string) {
+    this.invalidate();
     const [kind, arg = ''] = action.split(':');
     try {
-      const r = await this.dispatch(kind, arg);
+      const r = await this.dispatch(kind, arg).finally(() => this.invalidate()); // what the press changed shows at once
       this.patchState({ last: { at: new Date().toISOString(), action, error: null } });
       void this.pushLabels();
       return r;
