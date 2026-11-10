@@ -1,8 +1,14 @@
 {
-  "version": "1.0.121",
-  "commit": "452b7db",
-  "date": "2026-11-10T17:54:38Z",
+  "version": "1.0.122",
+  "commit": "c741afb",
+  "date": "2026-11-10T18:00:56Z",
   "changes": [
+    {
+      "version": "1.0.122",
+      "commit": "c741afb",
+      "date": "2026-11-10T18:00:56Z",
+      "text": "Tickers repeat their loop so the scroll runs on; L-bar socials; Replay bug key uses the Replay title"
+    },
     {
       "version": "1.0.121",
       "commit": "452b7db",
@@ -476,12 +482,6 @@
       "commit": "db96c47",
       "date": "2026-11-07T21:04:28Z",
       "text": "Workbook: overwrite in place when Windows will not replace a file vMix holds open"
-    },
-    {
-      "version": "1.0.28",
-      "commit": "d359281",
-      "date": "2026-11-07T19:57:43Z",
-      "text": "Windows launcher: never close silently, ignore stderr from node, CI test of the real start"
     }
   ]
 }

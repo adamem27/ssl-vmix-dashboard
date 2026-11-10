@@ -580,6 +580,9 @@ export class Show {
             throw badRequest(`No announcement ${which}. Add it under General graphics → Announcements.`);
         const g = this.graphic('bug');
         const snap = await this.snapshot();
+        // Replay with no icon of its own: the Replay bug title, when vMix has it (the announcement bug would show an empty icon)
+        if (!a.data.icon?.trim() && /^replay$/i.test((a.data.text || a.name).trim()) && this.resolve(this.graphic('replay'), snap.inputs))
+            return this.toggle('replay');
         const input = this.need(g, snap.inputs);
         const on = snap.overlays[g.overlay] === input.number;
         if (on && this.state.bugId === a.id) {
