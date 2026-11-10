@@ -24,18 +24,18 @@ describe('standard animation', () => {
     expect(storyboards(root).some((s) => s.type === 'DataChangeIn')).toBe(true);
   });
 
-  it('animates a lower third: plate from the left, photo up, texts fade; quick out', () => {
+  it('animates a lower third: plate fades, photo up, texts fade; quick out', () => {
     const root = doc(layer('Plate', img('Bar', 572, 898, 802, 102)) + layer('Person', img('Photo', 572, 820, 205, 179)) + layer('Info', `<TextBlock Name="Role" Location="650,954,0" Dimensions="600,31,0" Text="x"/>`));
     const r = applyStandardAnimation(root, { dataChange: true });
     expect(r.scenario).toBe('lowerthird');
     const inA = animationsOf(storyboards(root)[0].node);
-    expect(inA.map((a) => `${a.tag} ${a.attrs.Object} ${a.attrs.Direction ?? ''}`.trim())).toEqual(['Reveal Plate Left', 'Fly Person Bottom', 'Fade Info']);
+    expect(inA.map((a) => `${a.tag} ${a.attrs.Object} ${a.attrs.Direction ?? ''}`.trim())).toEqual(['Fade Plate', 'Fly Person Bottom', 'Fade Info']);
     expect(r.outLength).toBeLessThan(0.7);
     // DataChangeOut added for Role (DataChangeIn was already there)
     expect(storyboards(root).filter((s) => s.node.attrs.DataName === 'Role.Text').map((s) => s.type).sort()).toEqual(['DataChangeIn', 'DataChangeOut']);
   });
 
-  it('a masked photo in its own layer rises from behind its mask after the bar; a nearly full-frame layer is still a lower third', () => {
+  it('a lower third: the bar fades, the masked photo rises by its DataChange; a nearly full-frame layer is still a lower third', () => {
     const { root } = parseXml(`<Composition Width="1920" Height="1080">
       <Layer Name="Main bar group" Dimensions="1920,1080,0"><Layer.Composition><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0" /><TextBlock Name="Name" Dimensions="517,46,0" Location="709,933,0" /></Composition></Layer.Composition></Layer>
       <Layer Name="Photo group" Dimensions="1920,1025,0"><Layer.Composition><Composition Width="1920" Height="1025"><Image Name="PHOTO" Dimensions="425,425,0" Location="465,777,0"><Image.Mask><Mask Object="Rectangle1" /></Image.Mask></Image><Rectangle Name="Rectangle1" Dimensions="300,298,0" Location="559,727,0" /></Composition></Layer.Composition></Layer>
@@ -43,8 +43,8 @@ describe('standard animation', () => {
     expect(detectScenario(root)).toBe('lowerthird');
     applyStandardAnimation(root);
     const inA = animationsOf(storyboards(root)[0].node).map((a) => [a.tag, a.attrs.Object, a.attrs.Direction, a.attrs.Delay]);
-    expect(inA).toContainEqual(['Fly', 'PHOTO', 'Bottom', '0.4']);
-    expect(inA.some((a) => a[1] === 'Photo group')).toBe(false);
+    expect(inA).toContainEqual(['Fade', 'Main bar group', undefined, undefined]);
+    expect(inA.some((a) => a[1] === 'Photo group' || a[1] === 'PHOTO')).toBe(false);
     // vMix flies the photo by its DataChange (the dashboard sets it after the title is in)
     const dc = storyboards(root).filter((s) => s.node.attrs.DataName === 'PHOTO.Source').map((s) => [s.type, animationsOf(s.node)[0].tag, animationsOf(s.node)[0].attrs.Direction]);
     expect(dc).toEqual([['DataChangeOut', 'Fly', 'Bottom'], ['DataChangeIn', 'Fly', 'Bottom']]);
