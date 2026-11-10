@@ -39,7 +39,11 @@ describe('general graphics versions', () => {
     expect(() => gs.deleteGraphicSet(db, t('custom').id)).toThrow(/fixed/);
     gs.seedGraphicSets(db, eventId);
     expect(gs.listGraphicSets(db, eventId, 'ticker').filter((x) => x.data.preset)).toHaveLength(4); // not doubled
-    expect(gs.listGraphicSets(db, eventId, 'announcement').map((a) => a.name)).toContain('Penalty');
+    // announcements: one per race flag (its PNG as the icon) plus Replay
+    const ann = gs.listGraphicSets(db, eventId, 'announcement');
+    expect(ann.length).toBe(gs.FLAG_ANNOUNCEMENTS.length + 1);
+    expect(ann.find((a) => a.name === 'Yellow – Penalty')?.data).toMatchObject({ text: 'PENALTY', icon: 'race-flags/YELLOW_penalty.png' });
+    expect(ann.at(-1)).toMatchObject({ name: 'Replay', data: { text: 'REPLAY', icon: '' } });
   });
 
   it('names groups as the broadcast does', () => {

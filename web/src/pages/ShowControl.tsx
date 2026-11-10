@@ -122,7 +122,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (teams of the group, sailors by shirt number, announcements, extras).
+          Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (teams of the group, sailors by shirt number, extras), then every announcement (BUGS 1–2) and every ticker (TICKERS) on a key of its own: a version added in General graphics gets the next free key at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">

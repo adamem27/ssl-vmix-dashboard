@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
-import { activeEvent } from '../src/db/db.js';
+import { activeEvent, setSetting } from '../src/db/db.js';
 import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
-import { createGraphicSet } from '../src/services/graphicSets.js';
+import { createGraphicSet, listGraphicSets, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
@@ -111,6 +111,49 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
   });
 
+  it('bugs carry text and icon and toggle; every bug and ticker has a key, new ones too; General graphics go in at the press', async () => {
+    const { s, ev } = race();
+    seedGraphicSets(s.db, ev);
+    setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL\\assets');
+    const v = fakeVmix({ ...TITLES, ssl_bug: ['TEXT.Text', 'ICON.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['EVENT.Text', 'LOCATION.Text', 'DATE.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const pages = (await show.view()).pages;
+    const bugs1 = pages.find((p) => p.name === 'BUGS 1')!;
+    expect(bugs1.keys[0][0]).toMatchObject({ action: 'bug:1', text: 'P – PREPARATORY', empty: false });
+    // the announcement on its key: one line of text and the flag's PNG from the vMix assets folder
+    await show.run('bug:6');
+    expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
+    expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=ICON.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
+    expect(v.overlays[3]).toBe('4');
+    await show.run('bug:6');
+    expect(v.overlays[3]).toBe('');
+
+    // a new ticker made during the show is on the next free ticker key at once
+    const before = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty).length;
+    createGraphicSet(s.db, ev, 'ticker', 'Breaking', { items: 'BOAT CAPSIZED - ALL CREW SAFE' });
+    const tk = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty);
+    expect(tk.length).toBe(before + 1);
+    v.calls.length = 0;
+    await show.run(tk.at(-1)!.action);
+    expect(v.calls).toContain('?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=BOAT CAPSIZED - ALL CREW SAFE I ');
+    // THANKS FOR WATCHING is the fixed ticker
+    await show.run('ticker:thanks');
+    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=THANKS FOR WATCHING'))).toBe(true);
+
+    // a board gets General graphics at the press
+    const w = listGraphicSets(s.db, ev, 'welcome')[0];
+    updateGraphicSet(s.db, w.id, { data: { event: 'SSL GOLD CUP', location: 'RIO', dates: '1-2 DEC' } });
+    const o = listGraphicSets(s.db, ev, 'officials')[0];
+    updateGraphicSet(s.db, o.id, { data: { pro_name: 'Jan Kowalski' } });
+    v.calls.length = 0;
+    await show.run('show:welcome');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=EVENT.Text&Value=SSL GOLD CUP');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=DATE.Text&Value=1-2 DEC');
+    await show.run('show:officials');
+    expect(v.calls.some((c) => c.includes('SelectedName=ROLE 1.Text&Value=PRINCIPAL RACE OFFICER'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('SelectedName=NAME 1.Text&Value=Jan Kowalski'))).toBe(true);
+  });
+
   it('splits the lineup lower third into the first five and the rest, then goes out; shows a qualified team', async () => {
     const { s, ev, teams } = race();
     saveLineup(s.ctx, ev, teams[0], { rows: [
@@ -165,11 +208,11 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
     const cfg = show.config;
     const files = companionFiles(cfg, 'http://10.0.0.5:4310', 'http://10.0.0.5:8088', show.graphics());
-    expect(files.map((f) => f.page)).toEqual([1, 2, 11, 12, 20]);
+    expect(files.map((f) => f.page)).toEqual([1, 2, 11, 12, 13, 14, 15, 20]);
     const p1: any = files[0].file;
     expect(p1.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
     expect(p1.page.controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
-    const fb: any = files[4].file;
+    const fb: any = files[7].file;
     expect(fb.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
     for (const p of deckPages(cfg)) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);

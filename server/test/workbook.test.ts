@@ -101,8 +101,10 @@ describe('workbook sheets', () => {
     expect(general[t - 1].A).toBe(''); // an empty row between blocks
     expect(general.some((r) => r.A === 'ANNOUNCEMENTS' || r.A === 'PEOPLE')).toBe(false); // own sheets
     const { announcementsSheet, peopleSheet } = await import('../src/services/workbookSheets.js');
-    expect(announcementsSheet(ctx, eventId).slice(0, 2).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
-    expect(announcementsSheet(ctx, eventId).find((r) => r.Version === 'Penalty')).toMatchObject({ Text: 'PENALTY', 'Second line': 'BRN' });
+    expect(announcementsSheet(ctx, eventId)[0]).toMatchObject({ Version: 'P – Preparatory', Text: 'PREPARATORY SIGNAL' });
+    // the icon as vMix reads it: in the assets folder (no vMix root set here)
+    expect(announcementsSheet(ctx, eventId)[0].Icon).toMatch(/race-flags[\\/]P_preparatory\.png$/);
+    expect(announcementsSheet(ctx, eventId)[0]).not.toHaveProperty('Second line');
     expect(peopleSheet(ctx, eventId)).toEqual([]);
     const { lineupSheet } = await import('../src/services/workbookSheets.js');
     const lu = lineupSheet(ctx, eventId);

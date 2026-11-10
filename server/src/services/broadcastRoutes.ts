@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { activeEvent } from '../db/db.js';
@@ -31,6 +33,27 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     gs.updateGraphicSet(db, req.params.id, z.object({ name: s(80), data: z.record(z.string(), s(4000)) }).partial().parse(req.body)));
   app.post<{ Params: { id: string } }>('/api/graphic-sets/:id/move', async (req) => { gs.moveGraphicSet(db, req.params.id, z.object({ dir: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body).dir); return { ok: true }; });
   app.delete<{ Params: { id: string } }>('/api/graphic-sets/:id', async (req) => { gs.deleteGraphicSet(db, req.params.id); return { ok: true }; });
+
+  // icons of the announcements (PNG): kept in the assets folder under icons/, so vMix reads them from there
+  app.post('/api/graphic-sets/icon', async (req) => {
+    const file = await req.file();
+    if (!file) throw badRequest('No file was uploaded.');
+    const buf = await file.toBuffer();
+    if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) throw badRequest('The icon must be a PNG.');
+    const base = path.basename(file.filename || 'icon').replace(/\.[^.]+$/, '').replace(/[^\w() -]+/g, '_').slice(0, 80) || 'icon';
+    const dir = path.join(ctx.assetsDir, 'icons');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${base}.png`), buf);
+    return { icon: `icons/${base}.png` };
+  });
+  // the PNGs an icon can be: race flags and uploaded icons
+  app.get('/api/graphic-sets/icons', async () => {
+    const out: string[] = [];
+    for (const d of ['race-flags', 'icons']) {
+      try { for (const f of fs.readdirSync(path.join(ctx.assetsDir, d)).sort()) if (/\.png$/i.test(f)) out.push(`${d}/${f}`); } catch { /* none yet */ }
+    }
+    return out;
+  });
 
   // ---------- line-ups ----------
   const row = z.object({ slot: s(20), sailorId: s(64).nullable(), firstName: s(80), lastName: s(80), number: s(10), position: s(40), captain: z.boolean() }).partial().required({ slot: true });
@@ -136,7 +159,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
 
   // ---------- JSON for vMix ----------
   app.get<{ Params: { key: string } }>('/json/sheet/:key', async (req) => wb.sheetRows(ctx, ev().id, todayIn(ev().timezone), req.params.key));
-  app.get<{ Params: { kind: string } }>('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind, tickerAuto(db, ev())));
+  app.get<{ Params: { kind: string } }>('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind, tickerAuto(db, ev()), ctx.assetsDir));
   // both follow the current stage like the workbook does
   app.get('/json/lineups', async () => {
     const ids = wb.stageTeamIds(db, ev().id);

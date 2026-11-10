@@ -4,7 +4,7 @@ import { AssetCtx, listAssets } from './assets.js';
 import { badRequest } from './errors.js';
 import { getWeather, listPeople, listSchedule } from './general.js';
 import { listOutputs, listTemplates, outputRel } from './generator/generator.js';
-import { GRAPHIC_KINDS, listGraphicSets, tickerMessages, tickerText } from './graphicSets.js';
+import { GRAPHIC_KINDS, imagePath, listGraphicSets, tickerMessages, tickerText } from './graphicSets.js';
 import { currentGroup, groupLabel, nextRace, tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
@@ -138,7 +138,7 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
 export function announcementsSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {
   const k = GRAPHIC_KINDS.find((x) => x.kind === 'announcement')!;
   return listGraphicSets(ctx.db, eventId).filter((s) => s.kind === 'announcement')
-    .map((s) => ({ Version: s.name, ...Object.fromEntries(k.fields.map((f) => [f.label, s.data[f.key] ?? ''])) }));
+    .map((s) => ({ Version: s.name, ...Object.fromEntries(k.fields.map((f) => [f.label, f.type === 'image' ? imagePath(ctx.db, ctx.assetsDir, s.data[f.key]) : s.data[f.key] ?? ''])) }));
 }
 
 export function peopleSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {

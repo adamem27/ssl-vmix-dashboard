@@ -6,7 +6,7 @@ import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
 import { listPeople } from './general.js';
-import { listGraphicSets, tickerText } from './graphicSets.js';
+import { imagePath, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor } from './lowerthirds.js';
@@ -15,6 +15,8 @@ import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
 import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
+import { showDataFields } from './showData.js';
+import { todayIn } from './dates.js';
 import { findInput, parseVmixXml, pushResults, VmixInput, vmixUrl } from './vmixResults.js';
 
 /**
@@ -112,9 +114,11 @@ export interface ShowState {
   undo: Record<string, string>[]; // overlay → input key, newest last
   last: { at: string; action: string; error: string | null } | null;
   bug: string; // announcement shown on the bug
+  bugId: string; // its version (General graphics → Announcements)
+  tickerId: string; // the ticker version on air from a ticker key ('' = TICKER key: next race / end of day)
   lineupPart: number; // 0 = off, 1 = first five, 2 = the rest
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', lineupPart: 0 };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0 };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -161,7 +165,7 @@ function defaultDeckPages(cfg: ShowConfig): DeckPage[] {
           k('qualified:1', 'QUALIFIED\\nTEAM 1', 'team'), k('qualified:2', 'QUALIFIED\\nTEAM 2', 'team'), k('qualified:3', 'QUALIFIED\\nTEAM 3', 'team'), k('qualified:4', 'QUALIFIED\\nTEAM 4', 'team'), k('ltout', 'LT OUT', 'lt')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
           k('tickermode', 'TICKER:\\nNEXT RACE', 'mode')),
-        row8(k('bug:thanks', 'THANKS FOR\\nWATCHING', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug')),
+        row8(k('ticker:thanks', 'THANKS FOR\\nWATCHING', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug')),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
       ],
     },
@@ -171,7 +175,7 @@ function defaultDeckPages(cfg: ShowConfig): DeckPage[] {
           k('photo', 'PHOTO\\nAUTO', 'mode'), k('next', 'NEXT\\nRESULT', 'lt'), k('teamlt', 'TEAM LT', 'lt'), k('ltout', 'LT OUT', 'lt')),
         row8(...Array.from({ length: 8 }, (_, i) => k(`sailor:${i + 1}`, '—', 'sailor'))),
         row8(...Array.from({ length: 8 }, (_, i) => k(`sailor:${i + 9}`, '—', 'sailor'))),
-        nav(p2, p2 + 1, 'EXTRAS', p2 + 1, 'EXTRAS'),
+        nav(p2, p2 + 4, 'TICKERS', p2 + 1, 'EXTRAS'),
       ],
     },
     {
@@ -180,10 +184,22 @@ function defaultDeckPages(cfg: ShowConfig): DeckPage[] {
         row8(k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug'), k('show:replay', 'REPLAY\\nBUG', 'bug'), k('show:socials', 'SOCIALS', 'bug'),
           k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lineup5', 'LINEUP\\nLT', 'lt')),
         row8(k('show:pip_replay', 'PiP\\nREPLAY+OB', 'scene'), k('show:pip_live', 'PiP\\nOB+LIVE', 'scene'), k('show:pip_4', 'PiP\\n4 ONBOARDS', 'scene'), k('scene4out', 'PiP OUT', 'scene')),
-        nav(p2, p2, 'RACE', p2, 'RACE'),
+        nav(p2, p2, 'RACE', p2 + 2, 'BUGS 1'),
       ],
     },
+    // every announcement and every ticker on a key of its own, by position: a version added in General graphics is
+    // on the next free key at once (Companion keys too, they call the position)
+    slotPage(p2 + 2, 'BUGS 1', 'bug', 0, nav(p2, p2 + 1, 'EXTRAS', p2 + 3, 'BUGS 2')),
+    slotPage(p2 + 3, 'BUGS 2', 'bug', SLOTS_PER_PAGE, nav(p2, p2 + 2, 'BUGS 1', p2 + 4, 'TICKERS')),
+    slotPage(p2 + 4, 'TICKERS', 'ticker', 0, nav(p2, p2 + 3, 'BUGS 2', p2, 'RACE')),
   ];
+}
+
+/** Keys of a page of announcement or ticker versions: 3 rows of 8, numbered from `from` + 1. */
+const SLOTS_PER_PAGE = 24;
+function slotPage(page: number, name: string, kind: 'bug' | 'ticker', from: number, navRow: (DeckKey | null)[]): DeckPage {
+  const rows = [0, 1, 2].map((r) => row8(...Array.from({ length: 8 }, (_, c) => k(`${kind}:${from + r * 8 + c + 1}`, '—', 'bug'))));
+  return { deck: 2, name, page, keys: [...rows, navRow] };
 }
 
 export const KEY_COLOURS: Record<string, string> = { board: '#1e3a8a', lt: '#166534', bug: '#a16207', scene: '#0f766e', team: '#1e3a5f', sailor: '#27303f', nav: '#3f3f46', safety: '#7c2d12', mode: '#4c1d95' };
@@ -372,8 +388,16 @@ export class Show {
       await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
     } else if (g.id === 'lineup5') {
       await this.set(input, this.lineupPartFields(1));
+    } else if (g.id === 'bug') {
+      // BUG key without a version: the announcement shown last, else the first one
+      const a = (this.state.bugId && this.announcement(this.state.bugId)) || this.announcements()[0];
+      if (a) { await this.set(input, this.bugFields(input, a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
+    } else {
+      // General graphics straight into the title, so a change made a moment ago is on air without waiting for Excel
+      const e = activeEvent(this.ctx.db);
+      const f = showDataFields(this.ctx, g.id, { eventId: ev, today: todayIn(e.timezone), auto: tickerAuto(this.ctx.db, e), tickerText: this.tickerText() });
+      if (f) await this.set(input, f);
     }
-    void ev;
   }
 
   /** The lineup lower third: the places in the set order, split into the first five and the rest. */
@@ -459,6 +483,7 @@ export class Show {
       return { out: g.id };
     }
     await this.fill(g, input);
+    if (g.id === 'ticker') this.patchState({ tickerId: '' });
     await this.bringIn(g, input, snap);
     if (g.id === 'break') this.startRotation();
     return { in: g.id, input: input.title };
@@ -507,20 +532,71 @@ export class Show {
     return { in: 'lineup', team: b.code, input: input.title };
   }
 
-  async bug(which: string) {
+  tickers() { return listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker'); }
+
+  /** An announcement by key: its position (bug:3), its version id, or THANKS (old keys: the Thanks ticker). */
+  private announcement(which: string) {
     const list = this.announcements();
-    const a = which === 'thanks'
-      ? list.find((x) => /thank/i.test(x.data.text || x.name)) ?? { name: 'Thanks', data: { text: 'THANKS FOR WATCHING' } }
-      : list[Number(which) - 1];
+    return list.find((x) => x.id === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
+  }
+
+  /** The bug's text and icon, by the title's field names (TEXT, ICON / FLAG / STAR…). */
+  private bugFields(input: VmixInput, data: Record<string, string>) {
+    const f = new Map<string, string>();
+    const text = this.textField(input, /text/i);
+    if (text) f.set(text, (data.text ?? '').toUpperCase());
+    const icon = input.fields.find((x) => x.endsWith('.Source') && /icon|flag|star|logo/i.test(x));
+    if (icon) f.set(icon, imagePath(this.ctx.db, this.ctx.assetsDir, data.icon));
+    return f;
+  }
+
+  /** Announcement bug: its text and icon go into the title, then it comes in; the same key again takes it out. */
+  async bug(which: string) {
+    if (which === 'thanks') return this.ticker('thanks');
+    const a = this.announcement(which);
     if (!a) throw badRequest(`No announcement ${which}. Add it under General graphics → Announcements.`);
-    const text = a.data.text || a.name.toUpperCase();
     const g = this.graphic('bug');
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
-    await this.set(input, new Map([[this.textField(input, /text/i) ?? '', text]]));
-    this.patchState({ bug: text });
+    const on = snap.overlays[g.overlay] === input.number;
+    if (on && this.state.bugId === a.id) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      this.patchState({ bugId: '' });
+      return { out: 'bug' };
+    }
+    await this.set(input, this.bugFields(input, a.data));
+    const text = (a.data.text || a.name).toUpperCase();
+    this.patchState({ bug: text, bugId: a.id });
     await this.bringIn(g, input, snap);
     return { in: 'bug', text };
+  }
+
+  /** A ticker version by key: position (ticker:2), version id or fixed ticker (thanks, warning, delay, custom). */
+  private tickerVersion(which: string) {
+    const list = this.tickers();
+    return list.find((x) => x.id === which) ?? list.find((x) => x.data.preset === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
+  }
+
+  /** Ticker of one version (Tickers in General graphics): its text goes in, then it comes in; again = out. */
+  async ticker(which: string) {
+    const t = this.tickerVersion(which);
+    if (!t) throw badRequest(`No ticker ${which}. Add it under General graphics → Tickers.`);
+    const g = this.graphic('ticker');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const on = snap.overlays[g.overlay] === input.number;
+    if (on && this.state.tickerId === t.id) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      this.patchState({ tickerId: '' });
+      return { out: 'ticker' };
+    }
+    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+    await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
+    this.patchState({ tickerId: t.id });
+    if (!on) await this.bringIn(g, input, snap);
+    return { in: 'ticker', text };
   }
 
   /** Lower thirds of a sailor on the selected boat, by key index (1–16, sorted by shirt number) or by shirt number. */
@@ -644,6 +720,7 @@ export class Show {
       case 'teamlt': return this.lt.showTeam(this.boat(this.state.boat).code);
       case 'ltout': return this.lt.out();
       case 'bug': return this.bug(arg);
+      case 'ticker': return this.ticker(arg);
       case 'bugout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(3, s.overlays); return { out: 'bug' }; }
       case 'boardout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(1, s.overlays); return { out: 'board' }; }
       case 'breakout': case 'scene4out': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
@@ -686,10 +763,16 @@ export class Show {
     } else if (kind === 'teamlt') {
       team = boats[st.boat - 1];
       if (team) { text = `TEAM LT\\n${team.code}`; onAir = lt.onAir && lt.kind === 'team' && lt.teamId === team.id; }
-    } else if (kind === 'bug' && /^\d+$/.test(arg)) {
-      const a = this.announcements()[Number(arg) - 1];
-      text = a ? (a.data.text || a.name).toUpperCase().slice(0, 24) : '';
+    } else if (kind === 'bug' && arg !== 'thanks') {
+      const a = this.announcement(arg);
+      text = a ? a.name.toUpperCase().slice(0, 28) : '';
       empty = !a;
+      if (a) onAir = isOn('bug') && st.bugId === a.id;
+    } else if (kind === 'ticker' || (kind === 'bug' && arg === 'thanks')) {
+      const t = this.tickerVersion(kind === 'bug' ? 'thanks' : arg);
+      text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
+      empty = !t;
+      if (t) onAir = isOn('ticker') && st.tickerId === t.id;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
     else if (kind === 'tickermode') text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
     else if (kind === 'rotate') { text = st.rotating ? 'ROTATION\\n⏸ STOP' : 'ROTATION\\n▶ START'; active = st.rotating; }
