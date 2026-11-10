@@ -1,8 +1,14 @@
 {
-  "version": "1.0.124",
-  "commit": "fed4bbe",
-  "date": "2026-11-10T18:13:48Z",
+  "version": "1.0.125",
+  "commit": "f97f269",
+  "date": "2026-11-10T18:43:14Z",
   "changes": [
+    {
+      "version": "1.0.125",
+      "commit": "f97f269",
+      "date": "2026-11-10T18:43:14Z",
+      "text": "Show control: preset pages only for the teams of the picked stage; a view 12× faster"
+    },
     {
       "version": "1.0.124",
       "commit": "fed4bbe",
@@ -476,12 +482,6 @@
       "commit": "68538f0",
       "date": "2026-11-07T22:13:10Z",
       "text": "Crews from the official Florida rooming list"
-    },
-    {
-      "version": "1.0.31",
-      "commit": "43b6a14",
-      "date": "2026-11-07T21:50:13Z",
-      "text": "Matchboard update (7 Nov): QS H/I regrouped, QS J removed, R1 B with KOR and GRE; changed sets reset on next start"
     }
   ]
 }
