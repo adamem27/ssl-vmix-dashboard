@@ -1,8 +1,14 @@
 {
-  "version": "1.0.119",
-  "commit": "8c05d66",
-  "date": "2026-11-10T17:25:32Z",
+  "version": "1.0.120",
+  "commit": "c4dd94c",
+  "date": "2026-11-10T17:38:23Z",
   "changes": [
+    {
+      "version": "1.0.120",
+      "commit": "c4dd94c",
+      "date": "2026-11-10T17:38:23Z",
+      "text": "Lower thirds: an off-air title comes in after its DataChange animations, not over the Transition In"
+    },
     {
       "version": "1.0.119",
       "commit": "8c05d66",
@@ -476,12 +482,6 @@
       "commit": "0bcab8c",
       "date": "2026-11-07T19:31:08Z",
       "text": "README: Windows package"
-    },
-    {
-      "version": "1.0.26",
-      "commit": "e6bbb11",
-      "date": "2026-11-07T19:28:30Z",
-      "text": "Form login instead of the browser password popup; Windows package can sync from an online dashboard"
     }
   ]
 }

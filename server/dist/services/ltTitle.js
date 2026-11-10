@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getSetting } from '../db/db.js';
 import { GTZIP_DIR, loadPackage } from './gtzip/gtzip.js';
-import { bitmap, elements, size } from './gtzip/model.js';
+import { bitmap, elements, size, storyboardLength, storyboards } from './gtzip/model.js';
 import { GENERATED_DIR, listOutputs } from './generator/generator.js';
 import { joinVmixPath } from './paths.js';
 const base = (f) => f.replace(/\.(Text|Source)$/i, '');
@@ -115,7 +115,13 @@ export function ltTitleInfo(assetsDir, title, teamCodes) {
         const src = (bitmap(e.node)?.attrs.Source ?? '').split(/[\\/]/).pop() ?? '';
         images[e.node.attrs.Name.toLowerCase()] = { w, h, key: keyOf(src, codes) };
     }
-    const info = { images };
+    const changes = {};
+    for (const sb of storyboards(doc)) {
+        const field = sb.node.attrs.DataName?.toLowerCase();
+        if (field && /^DataChange(In|Out)$/.test(sb.type))
+            changes[field] = (changes[field] ?? 0) + storyboardLength(sb.node);
+    }
+    const info = { images, changes };
     cache.set(file, { at, info });
     return info;
 }
