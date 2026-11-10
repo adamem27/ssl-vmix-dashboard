@@ -69,7 +69,7 @@ function clearSolidBackground(img) {
             push(x, y + 1);
     }
 }
-function trimBox(img) {
+export function trimBox(img) {
     let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
     for (let y = 0; y < img.height; y++) {
         for (let x = 0; x < img.width; x++) {
@@ -90,7 +90,7 @@ function trimBox(img) {
     return { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 /** Area-averaging resample of a box of the source (premultiplied alpha, so edges don't get dark fringes). */
-function resample(src, box, ow, oh) {
+export function resample(src, box, ow, oh) {
     const out = new Float32Array(ow * oh * 4);
     const sx = box.w / ow, sy = box.h / oh;
     for (let oy = 0; oy < oh; oy++) {

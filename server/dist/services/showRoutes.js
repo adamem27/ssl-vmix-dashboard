@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { COMPARE_DIR } from './compareImages.js';
 import { badRequest } from './errors.js';
 import { companionFiles, setShowConfig, showConfigSchema } from './show.js';
 import { vmixUrl } from './vmixResults.js';
@@ -48,6 +51,21 @@ export function registerShowRoutes(app, ctx, show) {
         }
         void show.syncData().catch(() => undefined);
         return { ok: true };
+    });
+    // a picture typed over a team's comparison value (captain photo, flag, emblem, panel): PNG or JPG, kept in the assets folder
+    app.post('/api/compare/upload', async (req) => {
+        const file = await req.file();
+        if (!file)
+            throw badRequest('No file was uploaded.');
+        const buf = await file.toBuffer();
+        const ext = buf.length > 8 && buf.readUInt32BE(0) === 0x89504e47 ? 'png' : buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 ? 'jpg' : '';
+        if (!ext)
+            throw badRequest('The picture must be a PNG or JPG.');
+        const base = path.basename(String(file.filename || 'picture')).replace(/\.[^.]+$/, '').replace(/[^\w() -]+/g, '_').slice(0, 80) || 'picture';
+        const rel = `${COMPARE_DIR}/uploads/${base}.${ext}`;
+        fs.mkdirSync(path.join(ctx.assetsDir, COMPARE_DIR, 'uploads'), { recursive: true });
+        fs.writeFileSync(path.join(ctx.assetsDir, ...rel.split('/')), buf);
+        return { path: rel };
     });
     app.get('/api/show/do', act);
     app.post('/api/show/do', act);

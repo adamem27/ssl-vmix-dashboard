@@ -1,8 +1,14 @@
 {
-  "version": "1.0.130",
-  "commit": "dd1ee32",
-  "date": "2026-11-10T20:52:20Z",
+  "version": "1.0.131",
+  "commit": "6c0fbaa",
+  "date": "2026-11-10T21:00:14Z",
   "changes": [
+    {
+      "version": "1.0.131",
+      "commit": "6c0fbaa",
+      "date": "2026-11-10T21:00:14Z",
+      "text": "Team comparison: flags on the emblems' square canvas (new files, team flags untouched); upload PNG/JPG pictures for any place"
+    },
     {
       "version": "1.0.130",
       "commit": "dd1ee32",
@@ -476,12 +482,6 @@
       "commit": "c4ad1b1",
       "date": "2026-11-08T16:59:42Z",
       "text": "Matchboard: rows are box standings (drag or arrows), starred teams fill the next round's linked rows"
-    },
-    {
-      "version": "1.0.37",
-      "commit": "12a3b38",
-      "date": "2026-11-08T16:42:51Z",
-      "text": "Matchboard editor in the PNG generator: editable texts, team picker with flags, highlights, PNG export"
     }
   ]
 }

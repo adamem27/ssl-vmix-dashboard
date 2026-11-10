@@ -15,6 +15,7 @@ import { crewOf } from './lowerthirds.js';
 import { overview } from './overview.js';
 import { listTeams } from './teams.js';
 import { teamPictureFor } from './ltTitle.js';
+import { comparisonFlag } from './compareImages.js';
 import { currentStage } from './workbookSheets.js';
 import { getSetting, setSetting } from '../db/db.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
@@ -200,7 +201,8 @@ export function compareAuto(ctx, eventId, fleetId, today, o = {}) {
         const v = {
             name: (t?.name ?? '').toUpperCase(), nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
             cptName: cpt?.firstName ?? '', cptSurname: (cpt?.lastName ?? '').toUpperCase(),
-            flag: img(a.flag_small) || img(a.flag_big), emblem: img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark),
+            // the flag on the emblems' square canvas, made from the team's flag (its own files stay as they are)
+            flag: t ? comparisonFlag(ctx, t.code, img(a.flag_big) || img(a.flag_small)) : '', emblem: img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark),
             photo: t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '', panel: panel ?? '',
         };
         return { n, team: t ? { id: t.id, code: t.code, name: t.name } : null, values: v, panelFound: panel !== null };
