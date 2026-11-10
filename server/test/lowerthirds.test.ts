@@ -92,7 +92,7 @@ describe('lower thirds', () => {
     updateTeam(s.db, teamId, { nickname: 'The Canaries' });
     // the title as the GTZIP generator made it: Name, position/pb, PHOTO, Flag and a bar ANT_lowerthird.png 802×105
     const bar = 'aaaaaaaa-0000-0000-0000-000000000001\\ANT_lowerthird.png';
-    const doc = `<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0"><Image.Bitmap><Bitmap Source="${bar}" /></Image.Bitmap></Image><TextBlock Name="Name" Text="x" /><TextBlock Name="position/pb" Text="x" /><Image Name="PHOTO" Dimensions="425,425,0" /><Image Name="Flag" Dimensions="124,79,0" /><Storyboard Type="DataChangeOut" DataName="Name.Text"><Storyboard.Animations><Fade Object="Name" Duration="0.3" /></Storyboard.Animations></Storyboard><Storyboard Type="DataChangeIn" DataName="Name.Text"><Storyboard.Animations><Fade Object="Name" Duration="0.2" /></Storyboard.Animations></Storyboard></Composition>`;
+    const doc = `<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0"><Image.Bitmap><Bitmap Source="${bar}" /></Image.Bitmap></Image><TextBlock Name="Name" Text="x" /><TextBlock Name="position/pb" Text="x" /><Image Name="PHOTO" Dimensions="425,425,0" /><Image Name="Flag" Dimensions="124,79,0" /><Storyboard Type="DataChangeOut" DataName="PHOTO.Source"><Storyboard.Animations><Fly Object="PHOTO" Duration="0.3" Direction="Bottom" /></Storyboard.Animations></Storyboard><Storyboard Type="DataChangeIn" DataName="PHOTO.Source"><Storyboard.Animations><Fly Object="PHOTO" Duration="0.5" Direction="Bottom" /></Storyboard.Animations></Storyboard></Composition>`;
     const one = encodePng(1, 1, () => [0, 0, 0, 0]);
     const ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml" /></Types>';
     fs.mkdirSync(path.join(s.ctx.assetsDir, 'gtzip'), { recursive: true });
@@ -106,12 +106,18 @@ describe('lower thirds', () => {
     const calls: string[] = [];
     const fetcher = async (url: string) => {
       const q = decodeURIComponent(url.split('/api/')[1] ?? '');
-      if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="2"></overlay></overlays></vmix>` };
+      if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="2">${overlay}</overlay></overlays></vmix>` };
       calls.push(q);
+      const set = q.match(/Function=Set(?:Text|Image)&Input=(k\d)&SelectedName=(.+?)&Value=(.*)$/);
+      if (set) held.set(`${set[1]}/${set[2]}`, set[3]);
+      if (q.includes('OverlayInput2In')) overlay = '1';
+      if (q.includes('OverlayInput2Out')) overlay = '';
       times.push(Date.now());
       return { ok: true, status: 200, text: async () => '' };
     };
     const times: number[] = [];
+    let overlay = '';
+    held.clear();
     setLtConfig(s.db, { photoInput: 'lowerthird_photo 2 1.gtzip', noPhotoInput: 'lowerthird_photo 2 1.gtzip' });
     const lt = new LowerThirds(s.ctx, fetcher);
     await lt.showTeam('BRA');
@@ -119,9 +125,24 @@ describe('lower thirds', () => {
     expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=THE CANARIES');
     const barCall = calls.find((c) => c.includes('SelectedName=Bar.Source'));
     expect(barCall).toMatch(/BRA_lowerthird\.png$/);
-    // the name's DataChange (0.3 s out + 0.2 s in) plays off air too: the title comes in after it, not over it
     expect(calls.at(-1)).toBe('?Function=OverlayInput2In&Input=k1');
-    expect(times.at(-1)! - times.at(-2)!).toBeGreaterThanOrEqual(550);
+    await lt.out();
+
+    // vMix plays the photo's DataChange, not a Fly in Transition In: the title comes in with no photo, the photo after
+    calls.length = 0; times.length = 0;
+    await (lt as any).show('lowerthird_photo 2 1.gtzip', new Map([['PHOTO.Source', 'C:\\p.png']]), { kind: 'sailor', teamId, slot: 'Pit', line: 0 });
+    const inAt = calls.indexOf('?Function=OverlayInput2In&Input=k1');
+    expect(inAt).toBeGreaterThanOrEqual(0);
+    expect(calls.slice(inAt + 1)).toEqual(['?Function=SetImage&Input=k1&SelectedName=PHOTO.Source&Value=C:\\p.png']);
+    // out: the photo flies down (DataChange Out 0.3 s), then the title goes out; the key does not wait for it
+    calls.length = 0; times.length = 0;
+    const t0 = Date.now();
+    await lt.out();
+    expect(Date.now() - t0).toBeLessThan(250);
+    expect(calls).toEqual(['?Function=SetImage&Input=k1&SelectedName=PHOTO.Source&Value=']);
+    await new Promise((r) => setTimeout(r, 400));
+    expect(calls.at(-1)).toBe('?Function=OverlayInput2Out');
+    expect(times.at(-1)! - t0).toBeGreaterThanOrEqual(290);
   });
 
   it('every place key shows the sailor on that place (Trimmer 2 is not Trimmer 1)', async () => {

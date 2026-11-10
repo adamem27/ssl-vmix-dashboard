@@ -45,6 +45,9 @@ describe('standard animation', () => {
     const inA = animationsOf(storyboards(root)[0].node).map((a) => [a.tag, a.attrs.Object, a.attrs.Direction, a.attrs.Delay]);
     expect(inA).toContainEqual(['Fly', 'PHOTO', 'Bottom', '0.4']);
     expect(inA.some((a) => a[1] === 'Photo group')).toBe(false);
+    // vMix flies the photo by its DataChange (the dashboard sets it after the title is in)
+    const dc = storyboards(root).filter((s) => s.node.attrs.DataName === 'PHOTO.Source').map((s) => [s.type, animationsOf(s.node)[0].tag, animationsOf(s.node)[0].attrs.Direction]);
+    expect(dc).toEqual([['DataChangeOut', 'Fly', 'Bottom'], ['DataChangeIn', 'Fly', 'Bottom']]);
   });
 
   it('flies a small top bug in and out from the top; tempo makes it faster', () => {

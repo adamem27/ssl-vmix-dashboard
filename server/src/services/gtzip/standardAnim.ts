@@ -10,7 +10,7 @@
  *  - bugs (small, top of the screen): Fly from the Top (0.75) in and out;
  *  - bars at the bottom (socials, tickers): the bar Reveals from the Bottom, the text Fades in.
  */
-import { GtNode, innerComposition, isElement, isVisible, size, vec } from './model.js';
+import { elements, GtNode, innerComposition, isElement, isVisible, size, vec } from './model.js';
 
 export type Scenario = 'board' | 'lowerthird' | 'bug' | 'bar' | 'lbar';
 export const SCENARIOS: Record<Scenario, string> = {
@@ -236,6 +236,17 @@ export function applyStandardAnimation(root: GtNode, o: StandardOpts = {}): Stan
         if (dataNames.has(`${type}|${name}.Text`)) continue;
         sbs.push({ tag: 'Storyboard', attrs: { Type: type, DataName: `${name}.Text` }, children: [{ tag: 'Storyboard.Animations', attrs: {}, children: [anim('Fade', name, 0, 0.3 / tempo)] }] });
       }
+    }
+  }
+  // vMix plays a photo's DataChange but not a Fly on it in Transition In: the dashboard brings the title in without the
+  // photo and sets it right after, so the photo rises a moment after the bar (lowerthirds.ts). Each photo gets one.
+  for (const u of ordered) {
+    if (u.role !== 'photo' || !u.name) continue;
+    const img = elements(root).find((e) => e.node.attrs.Name === u.name)?.node;
+    if (img?.tag !== 'Image') continue;
+    for (const [type, d] of [['DataChangeOut', 0.35], ['DataChangeIn', 0.5]] as const) {
+      if (dataNames.has(`${type}|${u.name}.Source`)) continue;
+      sbs.push({ tag: 'Storyboard', attrs: { Type: type, DataName: `${u.name}.Source` }, children: [{ tag: 'Storyboard.Animations', attrs: {}, children: [anim('Fly', u.name, 0, d / tempo, 'Bottom')] }] });
     }
   }
   const first = root.children.findIndex((c) => c.tag === 'Storyboard');

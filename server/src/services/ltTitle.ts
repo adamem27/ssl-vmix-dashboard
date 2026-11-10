@@ -18,8 +18,8 @@ import { joinVmixPath } from './paths.js';
 
 export type LtRole = 'top' | 'bottom' | 'photo' | 'flag' | 'emblem' | 'bar';
 export interface LtImageInfo { w: number; h: number; key: string }
-/** images: each picture's box and file key; changes: seconds a field's DataChange Out + In takes (lowercase field). */
-export interface LtTitleInfo { images: Record<string, LtImageInfo>; changes: Record<string, number> }
+/** images: each picture's box and file key; changes: seconds a field's DataChange Out and In take (lowercase field). */
+export interface LtTitleInfo { images: Record<string, LtImageInfo>; changes: Record<string, { out: number; in: number }> }
 
 const base = (f: string) => f.replace(/\.(Text|Source)$/i, '');
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -90,10 +90,13 @@ export function ltTitleInfo(assetsDir: string, title: string, teamCodes: string[
     const src = (bitmap(e.node)?.attrs.Source ?? '').split(/[\\/]/).pop() ?? '';
     images[e.node.attrs.Name.toLowerCase()] = { w, h, key: keyOf(src, codes) };
   }
-  const changes: Record<string, number> = {};
+  const changes: LtTitleInfo['changes'] = {};
   for (const sb of storyboards(doc)) {
     const field = sb.node.attrs.DataName?.toLowerCase();
-    if (field && /^DataChange(In|Out)$/.test(sb.type)) changes[field] = (changes[field] ?? 0) + storyboardLength(sb.node);
+    const m = sb.type.match(/^DataChange(In|Out)$/);
+    if (!field || !m) continue;
+    const c = (changes[field] ??= { out: 0, in: 0 });
+    c[m[1] === 'In' ? 'in' : 'out'] = storyboardLength(sb.node);
   }
   const info = { images, changes };
   cache.set(file, { at, info });

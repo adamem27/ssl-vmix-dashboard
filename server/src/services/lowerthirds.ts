@@ -160,9 +160,27 @@ export class LowerThirds {
     return xml.match(new RegExp(`<overlay number="${overlay}"[^>]*>(\\d+)</overlay>`))?.[1] ?? '';
   }
 
+  /** OverlayOut waiting for the photo to fly out (out()); a new show on that title cancels it. */
+  private pendingOut: NodeJS.Timeout | null = null;
+
+  /** The title's photo field when the title animates it on a data change (vMix plays that, not a Fly in Transition In). */
+  private photoMove(input: VmixInput) {
+    const field = ltRoles(this.config.fields, input.fields).photo;
+    if (!field) return null;
+    const info = ltTitleInfo(this.ctx.assetsDir, input.title, listTeams(this.ctx).map((t) => t.code));
+    // a title the dashboard cannot find (loaded in vMix from elsewhere): as the generator makes it (0.35 s out, 0.5 s in)
+    const anim = info ? info.changes[field.toLowerCase()] : { out: 0.35, in: 0.5 };
+    return anim ? { field, ...anim } : null;
+  }
+
+  private set(id: string, name: string, value: string) {
+    return this.vmix(`?Function=${name.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(id)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
+  }
+
   private async show(inputName: string, fields: Map<string, string>, next: Omit<LtState, 'onAir' | 'input'>) {
     const cfg = this.config;
     if (!inputName.trim()) throw badRequest('Set the vMix inputs of the lower thirds on the Lower thirds tab.');
+    if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; await this.vmix(`?Function=OverlayInput${cfg.overlay}Out`); }
     const xml = await this.vmix('');
     const input: VmixInput | undefined = findInput(parseVmixXml(xml), inputName);
     if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name on the Lower thirds tab.`);
@@ -171,23 +189,30 @@ export class LowerThirds {
     const has = new Set(input.fields);
     const id = input.key || input.number;
     const last = sent.get(id) ?? new Map<string, string>();
+    const held = (name: string) => input.values?.[name] ?? last.get(name) ?? '';
+    // vMix leaves a Fly on the photo in Transition In out (the photo only fades in with the title), but plays the
+    // photo's DataChange: the title comes in with no photo and the photo is set right after, so it rises from the
+    // bottom once its DataChange Out (of the empty picture) has run, a moment after the bar
+    const move = onAir ? null : this.photoMove(input);
+    const late = move && has.has(move.field) ? move.field : null;
     let changed = 0;
-    let settle = 0;
-    const changes = onAir ? {} : ltTitleInfo(this.ctx.assetsDir, input.title, listTeams(this.ctx).map((t) => t.code))?.changes ?? {};
     for (const [name, value] of fields) {
-      if (!has.has(name)) continue;
-      // unchanged (by what vMix says the title holds, else by what was sent last): no animation
-      if ((input.values?.[name] ?? last.get(name)) === value) continue;
-      settle = Math.max(settle, changes[name.toLowerCase()] ?? 0);
-      await this.vmix(`?Function=${name.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(id)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
+      if (!has.has(name) || name === late) continue;
+      if (held(name) === value) continue; // unchanged: no animation
+      await this.set(id, name, value);
       last.set(name, value);
       changed++;
     }
+    if (late && held(late)) {
+      // a photo left in the title (another program, an older version): clear it and let its fly-out end off air
+      await this.set(id, late, '');
+      last.set(late, '');
+      await new Promise((r) => setTimeout(r, Math.min(move!.out + move!.in, 3) * 1000 + 100));
+    }
     sent.set(id, last);
-    // vMix plays a field's DataChange animation even while the title is off air: bringing it in at once would run
-    // that animation (the photo flying out and back) over the Transition In, so the title comes in once it is done
-    if (!onAir && settle > 0) await new Promise((r) => setTimeout(r, Math.min(settle, 2) * 1000 + 100));
     if (!onAir) await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
+    const photo = late ? fields.get(late) ?? '' : '';
+    if (late && photo) { await this.set(id, late, photo); last.set(late, photo); changed++; }
     const state: LtState = { ...next, onAir: true, input: input.title };
     saveState(this.ctx.db, state);
     void this.pushLabels();
@@ -277,7 +302,21 @@ export class LowerThirds {
 
   async out() {
     const cfg = this.config;
-    await this.vmix(`?Function=OverlayInput${cfg.overlay}Out`);
+    if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; }
+    // the photo flies down first (its DataChange, which vMix plays), then the title goes out; the key does not wait
+    const xml = await this.vmix('');
+    const onOverlay = LowerThirds.onOverlay(xml, cfg.overlay);
+    const input = onOverlay ? parseVmixXml(xml).find((i) => i.number === onOverlay) : undefined;
+    const move = input ? this.photoMove(input) : null;
+    const id = input ? input.key || input.number : '';
+    if (input && move && (input.values?.[move.field] ?? sent.get(id)?.get(move.field))) {
+      await this.set(id, move.field, '');
+      sent.get(id)?.set(move.field, '');
+      this.pendingOut = setTimeout(() => {
+        this.pendingOut = null;
+        this.vmix(`?Function=OverlayInput${cfg.overlay}Out`).catch((e) => this.log(`Lower third not taken out: ${e?.message ?? e}`));
+      }, Math.min(move.out, 2) * 1000);
+    } else await this.vmix(`?Function=OverlayInput${cfg.overlay}Out`);
     const st = { ...this.state, onAir: false };
     saveState(this.ctx.db, st);
     void this.pushLabels();
