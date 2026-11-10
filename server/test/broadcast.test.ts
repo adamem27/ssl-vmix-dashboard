@@ -6,13 +6,14 @@ import * as rs from '../src/services/results.js';
 import { createManualDeclaration, addMember, getDeclaration } from '../src/services/declarations.js';
 import { createSet, createFleet } from '../src/services/fleets.js';
 import { allSheets } from '../src/services/workbook.js';
+import { groupLabel } from '../src/services/groups.js';
 
 describe('general graphics versions', () => {
   it('seeds defaults once, copies, moves and exports one row per version', () => {
     const { db, ctx, eventId } = setup();
     gs.seedGraphicSets(db, eventId);
     const tickers = gs.listGraphicSets(db, eventId, 'ticker');
-    expect(tickers.map((t) => t.name)).toEqual(['Top ticker', 'Bottom ticker']);
+    expect(tickers.map((t) => t.name)).toEqual(['Top ticker', 'Bottom ticker', 'Warning signal', 'Thanks for watching', 'Delay', 'Custom text']);
     gs.updateGraphicSet(db, tickers[1].id, { data: { items: 'RACE 2 WILL START SOON\n\nGROUP A NEXT' } });
     expect(gs.graphicSheetRows(db, eventId, 'ticker')[1].text).toBe('RACE 2 WILL START SOON I GROUP A NEXT I ');
     const copy = gs.createGraphicSet(db, eventId, 'socials', 'Spanish', {}, gs.listGraphicSets(db, eventId, 'socials')[0].id);
@@ -25,6 +26,24 @@ describe('general graphics versions', () => {
     expect(gs.listGraphicSets(db, eventId, 'welcome')).toHaveLength(0); // deleting is respected
     const names = allSheets(ctx).map((s) => s.name);
     expect(names).toEqual(['General', 'Teams', 'Sailors', 'Line-up', 'Results', 'Announcements', 'People']);
+  });
+
+  it('has fixed tickers that need only their changing parts, filled from the group racing now', () => {
+    const { db, eventId } = setup();
+    gs.seedGraphicSets(db, eventId);
+    const t = (p: string) => gs.listGraphicSets(db, eventId, 'ticker').find((x) => x.data.preset === p)!;
+    gs.updateGraphicSet(db, t('warning').id, { data: { race: '1', group: 'h', time: '10:00' } });
+    expect(gs.tickerText(t('warning').data)).toBe('RACE 1 OF GROUP H WARNING SIGNAL AT 10:00 (GMT-3) I ');
+    expect(gs.tickerMessages(t('thanks').data)).toEqual(['THANKS FOR WATCHING - JOIN US TOMORROW FOR THE 2ND DAY OF THE SSL GOLD CUP PAN-AMERICAN QUALIFIERS']);
+    expect(gs.tickerMessages(t('delay').data, { group: 'I', race: '2' })).toEqual(['WE ARE BACK SOON - RACE 2 OF GROUP I IS DELAYED DUE TO WEATHER CONDITIONS']);
+    expect(() => gs.deleteGraphicSet(db, t('custom').id)).toThrow(/fixed/);
+    gs.seedGraphicSets(db, eventId);
+    expect(gs.listGraphicSets(db, eventId, 'ticker').filter((x) => x.data.preset)).toHaveLength(4); // not doubled
+    expect(gs.listGraphicSets(db, eventId, 'announcement').map((a) => a.name)).toContain('Penalty');
+  });
+
+  it('names groups as the broadcast does', () => {
+    expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['GROUP H', 'GROUP A', 'GROUP B', 'GROUP C', 'FINAL', 'PETIT FINAL']);
   });
 });
 
@@ -85,6 +104,6 @@ describe('results', () => {
     g = rs.sortResults(db, fleetId);
     expect(g.rows.map((r) => r.total)).toEqual(['20', '18', '12', '11']);
     const row = rs.resultSheetRows(ctx, eventId)[0];
-    expect(row).toMatchObject({ group: 'Group A', T1Code: 'BRN', T1Points: '20', T1R6: '4', T3Code: 'MYA', T3Rank: '3', R6Label: 'R6' });
+    expect(row).toMatchObject({ group: 'GROUP A', T1Code: 'BRN', T1Points: '20', T1R6: '4', T3Code: 'MYA', T3Rank: '3', R6Label: 'R6' });
   });
 });

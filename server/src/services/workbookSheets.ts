@@ -4,7 +4,8 @@ import { AssetCtx, listAssets } from './assets.js';
 import { badRequest } from './errors.js';
 import { getWeather, listPeople, listSchedule } from './general.js';
 import { listOutputs, listTemplates, outputRel } from './generator/generator.js';
-import { GRAPHIC_KINDS, listGraphicSets, tickerText } from './graphicSets.js';
+import { GRAPHIC_KINDS, listGraphicSets, tickerMessages, tickerText } from './graphicSets.js';
+import { groupLabel, tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
 import { overview } from './overview.js';
@@ -57,7 +58,7 @@ function stageTeams(ctx: AssetCtx, eventId: string) {
   const slots = ctx.db.prepare(`SELECT x.team_id AS teamId, x.position, f.name AS fleet FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id
     WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id) as { teamId: string; position: number; fleet: string }[];
   const byId = new Map(teams.map((t) => [t.id, t]));
-  return { stage, teams: slots.filter((s) => byId.has(s.teamId)).map((s) => ({ t: byId.get(s.teamId)!, group: s.fleet, place: String(s.position) })) };
+  return { stage, teams: slots.filter((s) => byId.has(s.teamId)).map((s) => ({ t: byId.get(s.teamId)!, group: groupLabel(s.fleet), place: String(s.position) })) };
 }
 
 // ---------- General ----------
@@ -103,21 +104,26 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
 
   // general graphics: one block per kind, versions side by side
   const sets = listGraphicSets(db, eventId);
+  const ev2 = db.prepare('SELECT id, timezone FROM events WHERE id = ?').get(eventId) as { id: string; timezone: string } | undefined;
+  const auto = ev2 ? tickerAuto(db, ev2) : {};
   for (const k of GRAPHIC_KINDS) {
     if (k.kind === 'announcement') continue; // own sheet: adding one shifts nothing here
     const vs = sets.filter((x) => x.kind === k.kind);
-    const lines: [string, ...string[]][] = k.fields.map((f) => [f.label, ...vs.map((s) => {
+    // tickers: the same rows for free and fixed versions (a fixed one's messages are its sentence)
+    const fields = k.kind === 'ticker' ? k.fields.filter((f) => f.key === 'position' || f.key === 'separator' || f.key === 'items') : k.fields.filter((f) => !f.hidden);
+    const lines: [string, ...string[]][] = fields.map((f) => [f.label, ...vs.map((s) => {
+      if (k.kind === 'ticker' && f.key === 'items') return tickerMessages(s.data, auto).join(' | ');
       const v = s.data[f.key] ?? '';
       return f.type === 'list' ? v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : v;
     })]);
-    if (k.kind === 'ticker') lines.push(['Ticker text', ...vs.map((s) => tickerText(s.data))]);
+    if (k.kind === 'ticker') lines.push(['Ticker text', ...vs.map((s) => tickerText(s.data, auto))]);
     row += block(row, 0, k.label.toUpperCase(), vs.map((s) => s.name), lines) + 1;
   }
 
   // people: one column per person
   // today's schedule last: one race per row
-  block(row, 0, "TODAY'S SCHEDULE", ['Time', 'Race', 'Group', 'Status', 'Note'],
-    listSchedule(db, eventId, today).map((s, i) => [`Race ${i + 1}`, s.time, s.race, s.fleet, s.status, s.note]));
+  block(row, 0, "TODAY'S SCHEDULE", ['Time', 'Race', 'Group'],
+    listSchedule(db, eventId, today).map((s, i) => [`Race ${i + 1}`, s.time, s.race, groupLabel(s.fleet)]));
 
   const width = Math.max(...grid.map((r) => r.length), 2);
   const cols = Array.from({ length: width }, (_, i) => letter(i));
@@ -259,7 +265,7 @@ export function resultsSheet(ctx: AssetCtx, eventId: string): Record<string, str
       const t = teams.get(r.teamId);
       const row: Record<string, string> = {};
       if (!stage) row.Stage = g.setName;
-      Object.assign(row, { Group: g.fleetName, Title: g.title, Subtitle: g.subtitle, Rank: String(i + 1), Code: t?.code ?? '', Team: t?.name ?? '', Ranking: t?.ranking ?? '', Flag: img(t?.assets.flag_small) });
+      Object.assign(row, { Group: groupLabel(g.fleetName), Title: g.title, Subtitle: g.subtitle, Rank: String(i + 1), Code: t?.code ?? '', Team: t?.name ?? '', Ranking: t?.ranking ?? '', Flag: img(t?.assets.flag_small) });
       for (let j = 0; j < races; j++) row[`R${j + 1}`] = j < g.races ? r.races[j] ?? '' : '';
       row.Points = r.total;
       rows.push(row);
@@ -272,7 +278,7 @@ export function resultsSheet(ctx: AssetCtx, eventId: string): Record<string, str
       if (filled.has(pos) || !ph[pos - 1]) continue;
       const row: Record<string, string> = {};
       if (!stage) row.Stage = g.setName;
-      Object.assign(row, { Group: g.fleetName, Title: g.title, Subtitle: g.subtitle, Rank: '', Code: '', Team: ph[pos - 1] ?? '', Ranking: '', Flag: '' });
+      Object.assign(row, { Group: groupLabel(g.fleetName), Title: g.title, Subtitle: g.subtitle, Rank: '', Code: '', Team: ph[pos - 1] ?? '', Ranking: '', Flag: '' });
       for (let j = 0; j < races; j++) row[`R${j + 1}`] = '';
       row.Points = '';
       rows.push(row);

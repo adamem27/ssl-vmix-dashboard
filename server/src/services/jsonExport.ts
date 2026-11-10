@@ -1,3 +1,4 @@
+import { groupLabel } from './groups.js';
 import { DB } from '../db/db.js';
 import { AssetCtx, listAssets } from './assets.js';
 import { getWeather, listPeople, listSchedule } from './general.js';
@@ -86,7 +87,7 @@ export function jsonFleetSet(ctx: AssetCtx, setId: string) {
     for (let p = 1; p <= (f.size || 4); p++) {
       const t = teams.get(slots.find((s) => s.fleet_id === f.id && s.position === p)?.team_id);
       const empty: Record<string, string> = Object.fromEntries(TEAM_SLOTS.map((s) => [s.key, '']));
-      rows.push({ fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', nickname: '', ranking: '', ranking_points: '', ...empty }) });
+      rows.push({ group: groupLabel(f.name), fleet: f.name, place: String(p), ...(t ? teamFields(t) : { code: ph[p - 1] || '', name: ph[p - 1] || '', nickname: '', ranking: '', ranking_points: '', ...empty }) });
     }
   }
   return rows;

@@ -5,11 +5,12 @@ import { api, Asset, FleetSetDetail, FleetSetSummary } from '../api';
 import { Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
 import { Cell, ImgCell, SelectCell } from '../components/cells';
 import { GraphicSetsSections } from './GraphicSets';
+import { useStage } from '../components/StagePicker';
+import { groupLabel } from '../../../server/src/services/groupNames';
 
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 const WIND_UNITS = ['kn', 'm/s', 'km/h', 'mph'];
-const STATUSES = ['Scheduled', 'Next', 'Live', 'Finished', 'Postponed', 'Cancelled'];
 const LANGUAGES = ['English', 'Polish', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese', 'Japanese'];
 
 const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People']];
@@ -87,19 +88,21 @@ function WeatherPanel() {
 }
 
 // ---------- schedule ----------
-interface Item { id: string; date: string; time: string; race: string; fleet: string; status: string; note: string }
+interface Item { id: string; date: string; time: string; race: string; fleet: string }
 
-function useFleetNames() {
+/** Group names as the graphics show them (GROUP H): the stage's groups first, then every other group. */
+function useGroupNames() {
+  const stage = useStage();
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
   const names = useQuery({
     queryKey: ['fleet-names', sets.data?.map((s) => s.id).join()],
     queryFn: async () => {
       const details = await Promise.all((sets.data ?? []).map((s) => api.get<FleetSetDetail>(`/api/fleet-sets/${s.id}`)));
-      return [...new Set(details.flatMap((d) => d.fleets.map((f) => f.name)))];
+      return details.flatMap((d) => d.fleets.map((f) => groupLabel(f.name)));
     },
     enabled: !!sets.data,
   });
-  return names.data ?? [];
+  return [...new Set([...(stage.data?.groups ?? []).map((g) => g.label), ...(names.data ?? [])])];
 }
 
 function SchedulePanel() {
@@ -110,7 +113,8 @@ function SchedulePanel() {
   const [date, setDate] = useState<string | null>(null);
   const day = date ?? todayIn(tz);
   const items = useQuery({ queryKey: ['schedule', day], queryFn: () => api.get<Item[]>(`/api/schedule?date=${day}`) });
-  const fleetNames = useFleetNames();
+  const fleetNames = useGroupNames();
+  const stage = useStage();
   const refresh = () => qc.invalidateQueries({ queryKey: ['schedule'] });
   const save = async (id: string, patch: Partial<Item>) => {
     try { await api.patch(`/api/schedule/${id}`, patch); refresh(); } catch (e) { toast.error(e); throw e; }
@@ -121,7 +125,7 @@ function SchedulePanel() {
   const [f, setF] = useState(empty);
   const add = async () => {
     if (!f.time.trim() && !f.race.trim()) return;
-    try { await api.post('/api/schedule', { ...f, date: day, status: 'Scheduled' }); setF(empty); refresh(); } catch (e) { toast.error(e); }
+    try { await api.post('/api/schedule', { ...f, fleet: f.fleet.trim() || stage.data?.group?.label || '', date: day }); setF(empty); refresh(); } catch (e) { toast.error(e); }
   };
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter') void add(); };
 
@@ -136,16 +140,14 @@ function SchedulePanel() {
       {items.error ? <ErrorBox error={items.error} /> : (
         <table className="w-full table-fixed text-sm">
           <thead className="text-left text-[10px] uppercase tracking-wide text-ink-500">
-            <tr><th className="w-24 px-1 py-1">Time</th><th className="px-1 py-1">Race</th><th className="w-48 px-1 py-1">Fleet</th><th className="w-36 px-1 py-1">Status</th><th className="px-1 py-1">Note</th><th className="w-8" /></tr>
+            <tr><th className="w-24 px-1 py-1">Time</th><th className="px-1 py-1">Race</th><th className="w-56 px-1 py-1">Group</th><th className="w-24" /></tr>
           </thead>
           <tbody>
             {(items.data ?? []).map((it) => (
-              <tr key={it.id} className={cx('group border-t border-ink-800/60', it.status === 'Live' && 'bg-red-950/30', it.status === 'Next' && 'bg-sky-950/30')}>
+              <tr key={it.id} className="group border-t border-ink-800/60">
                 <td><Cell value={it.time} onSave={(v) => save(it.id, { time: v })} label="Time" className="font-mono tabular-nums text-ink-50" /></td>
                 <td><Cell value={it.race} onSave={(v) => save(it.id, { race: v })} label="Race" className="text-ink-50" /></td>
-                <td><Cell value={it.fleet} onSave={(v) => save(it.id, { fleet: v })} label="Fleet" suggestions={fleetNames} /></td>
-                <td><SelectCell value={it.status} options={STATUSES} onSave={(v) => save(it.id, { status: v })} label="Status" /></td>
-                <td><Cell value={it.note} onSave={(v) => save(it.id, { note: v })} label="Note" className="text-ink-300" /></td>
+                <td><Cell value={groupLabel(it.fleet)} onSave={(v) => save(it.id, { fleet: v })} label="Group" suggestions={fleetNames} /></td>
                 <td className="text-center"><button onClick={() => remove(it.id)} className="invisible px-1 text-ink-500 hover:text-red-300 group-hover:visible" aria-label="Delete row">✕</button></td>
               </tr>
             ))}
@@ -153,11 +155,10 @@ function SchedulePanel() {
               <td className="py-1 pr-1"><input className="input py-1 font-mono text-sm" placeholder="14:00" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} onKeyDown={onKey} aria-label="New time" /></td>
               <td className="py-1 pr-1"><input className="input py-1 text-sm" placeholder="Race" value={f.race} onChange={(e) => setF({ ...f, race: e.target.value })} onKeyDown={onKey} aria-label="New race" /></td>
               <td className="py-1 pr-1">
-                <input className="input py-1 text-sm" placeholder="Fleet" list="dl-new-fleet" value={f.fleet} onChange={(e) => setF({ ...f, fleet: e.target.value })} onKeyDown={onKey} aria-label="New fleet" />
+                <input className="input py-1 text-sm" placeholder={stage.data?.group?.label ?? 'GROUP H'} list="dl-new-fleet" value={f.fleet} onChange={(e) => setF({ ...f, fleet: e.target.value })} onKeyDown={onKey} aria-label="New group" />
                 <datalist id="dl-new-fleet">{fleetNames.map((n) => <option key={n} value={n} />)}</datalist>
               </td>
               <td className="py-1"><Button size="sm" variant="primary" onClick={add} disabled={!f.time.trim() && !f.race.trim()}>Add</Button></td>
-              <td colSpan={2} />
             </tr>
           </tbody>
         </table>

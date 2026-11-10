@@ -3,18 +3,32 @@ import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { SaveInput, SaveTextArea } from '../components/fields';
 
-interface GField { key: string; label: string; type?: 'text' | 'select' | 'list'; options?: string[]; placeholder?: string; default?: string; wide?: boolean; hint?: string }
+interface GField { key: string; label: string; type?: 'text' | 'select' | 'list'; options?: string[]; placeholder?: string; default?: string; wide?: boolean; hint?: string; only?: string[]; hidden?: boolean }
 interface GKind { kind: string; label: string; sheet: string; description: string; fields: GField[] }
 interface GSet { id: string; kind: string; name: string; data: Record<string, string>; sort: number; updatedAt: string }
 
-export const useGraphicSets = () => useQuery({ queryKey: ['graphic-sets'], queryFn: () => api.get<{ kinds: GKind[]; sets: GSet[] }>('/api/graphic-sets') });
+interface TickerAuto { group?: string; race?: string }
+export const useGraphicSets = () => useQuery({ queryKey: ['graphic-sets'], queryFn: () => api.get<{ kinds: GKind[]; sets: GSet[]; auto?: TickerAuto }>('/api/graphic-sets') });
 
+// the same sentences as the server builds (graphicSets.tickerMessages), for the preview
+const up = (s: string | undefined) => (s ?? '').trim().toUpperCase();
+const tickerMessages = (d: Record<string, string>, auto: TickerAuto = {}): string[] => {
+  const group = up(d.group) || up(auto.group) || '?', race = up(d.race) || up(auto.race) || '?';
+  switch (d.preset) {
+    case 'warning': return [`RACE ${race} OF GROUP ${group} WARNING SIGNAL AT ${up(d.time) || '?'}${d.timezone?.trim() ? ` (${up(d.timezone)})` : ''}`];
+    case 'thanks': return [`THANKS FOR WATCHING - JOIN US ${up(d.when) || 'TOMORROW'} FOR THE ${up(d.day) || '2ND DAY'} OF THE ${up(d.event)}`];
+    case 'delay': return [`WE ARE BACK SOON - RACE ${race} OF GROUP ${group} IS DELAYED DUE TO ${up(d.reason) || 'WEATHER CONDITIONS'}`];
+    case 'custom': return d.text?.trim() ? [d.text.trim()] : [];
+    default: return (d.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  }
+};
 /** Ticker text as it goes to vMix: messages joined by the separator, which also closes the loop. */
-const tickerText = (d: Record<string, string>) => {
-  const items = (d.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+const tickerText = (d: Record<string, string>, auto?: TickerAuto) => {
+  const items = tickerMessages(d, auto);
   const sep = d.separator || ' I ';
   return items.length ? items.join(sep) + sep : '';
 };
+const shows = (f: GField, s: GSet) => !f.hidden && (!f.only || f.only.includes(s.data.preset ?? ''));
 
 /** One panel per graphic (Welcome, Follow us, Tickers, …); each version is a card and a row in its sheet. */
 /** The panels of the given kinds (all when none given), in the order asked for. */
@@ -23,10 +37,10 @@ export function GraphicSetsSections({ kinds }: { kinds?: string[] }) {
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
   const list = kinds ? kinds.map((id) => q.data!.kinds.find((k) => k.kind === id)).filter((k): k is GKind => !!k) : q.data!.kinds;
-  return <>{list.map((k) => <KindPanel key={k.kind} k={k} sets={q.data!.sets.filter((s) => s.kind === k.kind)} />)}</>;
+  return <>{list.map((k) => <KindPanel key={k.kind} k={k} auto={q.data!.auto} sets={q.data!.sets.filter((s) => s.kind === k.kind).sort((a, b) => Number(!a.data.preset) - Number(!b.data.preset) || a.sort - b.sort)} />)}</>;
 }
 
-function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
+function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAuto }) {
   const qc = useQueryClient();
   const toast = useToast();
   const { ask, dialog } = useConfirm();
@@ -60,11 +74,12 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
                 <button disabled={i === 0} onClick={() => move(s, -1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move up">▲</button>
                 <button disabled={i === sets.length - 1} onClick={() => move(s, 1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move down">▼</button>
                 <button onClick={() => dup(s)} className="h-7 rounded px-2 text-xs text-ink-400 hover:bg-ink-800 hover:text-ink-100" title="Duplicate this version">Duplicate</button>
-                <button onClick={() => remove(s)} className="h-7 w-7 rounded text-ink-500 hover:bg-ink-800 hover:text-red-300" aria-label={`Delete ${s.name}`}>✕</button>
+                {s.data.preset ? <span className="rounded bg-accent-900/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-200" title="A fixed version: always there, only its changing parts are typed">Fixed</span>
+                  : <button onClick={() => remove(s)} className="h-7 w-7 rounded text-ink-500 hover:bg-ink-800 hover:text-red-300" aria-label={`Delete ${s.name}`}>✕</button>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 p-2">
-              {k.fields.map((f) => (
+              {k.fields.filter((f) => shows(f, s)).map((f) => (
                 <label key={f.key} className={cx('block min-w-0', (f.wide || f.type === 'list') && 'col-span-2')}>
                   <span className="flex items-baseline gap-2 px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">
                     {f.label}{f.hint && <span className="normal-case tracking-normal text-ink-500">· {f.hint}</span>}
@@ -76,14 +91,14 @@ function KindPanel({ k, sets }: { k: GKind; sets: GSet[] }) {
                   ) : f.type === 'list' ? (
                     <SaveTextArea value={s.data[f.key] ?? ''} onSave={(v) => save(s, { data: { [f.key]: v } })} label={f.label} rows={4} placeholder="One message per line" />
                   ) : (
-                    <SaveInput value={s.data[f.key] ?? ''} onSave={(v) => save(s, { data: { [f.key]: v } })} label={f.label} placeholder={f.placeholder ?? f.default} />
+                    <SaveInput value={s.data[f.key] ?? ''} onSave={(v) => save(s, { data: { [f.key]: v } })} label={f.label} placeholder={f.placeholder === 'auto' ? `auto: ${(f.key === 'group' ? auto?.group : auto?.race) || '—'}` : f.placeholder ?? f.default} />
                   )}
                 </label>
               ))}
               {k.kind === 'ticker' && (
                 <div className="col-span-2 min-w-0">
                   <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Ticker text</span>
-                  <div className="truncate rounded border border-ink-800 bg-ink-900 px-2 py-1 font-mono text-xs text-ink-300" title={tickerText(s.data)}>{tickerText(s.data) || '—'}</div>
+                  <div className="truncate rounded border border-ink-800 bg-ink-900 px-2 py-1 font-mono text-xs text-ink-300" title={tickerText(s.data, auto)}>{tickerText(s.data, auto) || '—'}</div>
                 </div>
               )}
             </div>

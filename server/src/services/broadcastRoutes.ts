@@ -3,10 +3,12 @@ import { z } from 'zod';
 import { activeEvent } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import * as gs from './graphicSets.js';
+import { currentGroup, stageGroups, tickerAuto } from './groups.js';
 import * as lu from './lineups.js';
 import * as rs from './results.js';
 import * as rr from './raceRuns.js';
 import { getShowConfig, setShowConfig } from './show.js';
+import { badRequest } from './errors.js';
 import * as wb from './workbookSheets.js';
 import { todayIn } from './dates.js';
 import { getWeather, listSchedule } from './general.js';
@@ -20,7 +22,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   const s = (max: number) => z.string().max(max);
 
   // ---------- general graphics versions ----------
-  app.get('/api/graphic-sets', async () => { gs.seedGraphicSets(db, ev().id); return { kinds: gs.GRAPHIC_KINDS, sets: gs.listGraphicSets(db, ev().id) }; });
+  app.get('/api/graphic-sets', async () => { gs.seedGraphicSets(db, ev().id); return { kinds: gs.GRAPHIC_KINDS, sets: gs.listGraphicSets(db, ev().id), auto: tickerAuto(db, ev()) }; });
   app.post('/api/graphic-sets', async (req) => {
     const b = z.object({ kind: s(40), name: s(80).optional(), copyFrom: s(64).optional() }).parse(req.body);
     return { id: gs.createGraphicSet(db, ev().id, b.kind, b.name ?? '', {}, b.copyFrom) };
@@ -78,9 +80,31 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   app.put('/api/settings/vmix', async (req) => vx.setVmixUrl(db, z.object({ apiUrl: s(200) }).parse(req.body).apiUrl));
 
   // ---------- current stage (decides which teams and groups go to the workbook) ----------
-  const stageInfo = () => ({ current: wb.currentStage(db, ev().id), teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id) });
+  // the group racing now goes with it: one of the stage's groups (Show control keys, tickers, results boards follow it)
+  const stageInfo = () => {
+    const current = wb.currentStage(db, ev().id);
+    return {
+      current, teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id),
+      groups: current ? stageGroups(db, current.id) : [], group: currentGroup(db),
+    };
+  };
   app.get('/api/stage', async () => stageInfo());
-  app.put('/api/stage', async (req) => { wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId); return stageInfo(); });
+  app.put('/api/stage', async (req) => {
+    const stage = wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId);
+    // a group of another stage is no longer racing: the stage's first group takes its place
+    const g = currentGroup(db);
+    if (stage && (!g || g.setId !== stage.id)) setShowConfig(db, { fleetId: stageGroups(db, stage.id)[0]?.id ?? '' });
+    return stageInfo();
+  });
+  app.put('/api/stage/group', async (req) => {
+    const fleetId = z.object({ fleetId: z.string().max(64) }).parse(req.body).fleetId;
+    if (fleetId && !db.prepare('SELECT 1 FROM fleets WHERE id = ?').get(fleetId)) throw badRequest('Unknown group.');
+    setShowConfig(db, { fleetId });
+    // picking a group of another stage moves the stage along
+    const g = currentGroup(db);
+    if (g && wb.currentStage(db, ev().id)?.id !== g.setId) wb.setCurrentStage(db, ev().id, g.setId);
+    return stageInfo();
+  });
 
   // ---------- commentator: everything around one fleet set in one call ----------
   app.get<{ Querystring: { set?: string; date?: string } }>('/api/commentator', async (req) => {
@@ -112,7 +136,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
 
   // ---------- JSON for vMix ----------
   app.get<{ Params: { key: string } }>('/json/sheet/:key', async (req) => wb.sheetRows(ctx, ev().id, todayIn(ev().timezone), req.params.key));
-  app.get<{ Params: { kind: string } }>('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind));
+  app.get<{ Params: { kind: string } }>('/json/graphics-sets/:kind', async (req) => gs.graphicSheetRows(db, ev().id, req.params.kind, tickerAuto(db, ev())));
   // both follow the current stage like the workbook does
   app.get('/json/lineups', async () => {
     const ids = wb.stageTeamIds(db, ev().id);

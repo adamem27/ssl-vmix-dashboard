@@ -69,7 +69,7 @@ describe('workbook sheets', () => {
     expect(teamsSheet(ctx, eventId, today).map((r) => r.Code)).toEqual(['BRN', 'IND', 'MYA']); // no stage: every team
     setCurrentStage(db, eventId, setId);
     const teams = teamsSheet(ctx, eventId, today);
-    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['Group A', '1', 'BRN'], ['Group A', '2', 'IND']]);
+    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['GROUP A', '1', 'BRN'], ['GROUP A', '2', 'IND']]);
     expect(Object.keys(teams[0]).slice(0, 4)).toEqual(['Group', 'Place', 'Code', 'Name']);
 
     const sailors = sailorsSheet(ctx, eventId, today);
@@ -93,7 +93,8 @@ describe('workbook sheets', () => {
     expect(general[t - 1].A).toBe(''); // an empty row between blocks
     expect(general.some((r) => r.A === 'ANNOUNCEMENTS' || r.A === 'PEOPLE')).toBe(false); // own sheets
     const { announcementsSheet, peopleSheet } = await import('../src/services/workbookSheets.js');
-    expect(announcementsSheet(ctx, eventId).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
+    expect(announcementsSheet(ctx, eventId).slice(0, 2).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
+    expect(announcementsSheet(ctx, eventId).find((r) => r.Version === 'Penalty')).toMatchObject({ Text: 'PENALTY', 'Second line': 'BRN' });
     expect(peopleSheet(ctx, eventId)).toEqual([]);
     const { lineupSheet } = await import('../src/services/workbookSheets.js');
     const lu = lineupSheet(ctx, eventId);
