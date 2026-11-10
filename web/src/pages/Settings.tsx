@@ -31,11 +31,12 @@ export function SettingsPage() {
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">Settings</h1>
       <nav className="flex flex-wrap gap-2 text-xs">
-        {[['event', 'Event'], ['presets', 'Matchboard'], ['sync', 'Declaration sync'], ['paths', 'Files & vMix paths'], ['demo', 'Demo data'], ['backup', 'Backup']].map(([id, l]) => (
+        {[['event', 'Event'], ['commentator-online', 'Commentator online'], ['presets', 'Matchboard'], ['sync', 'Declaration sync'], ['paths', 'Files & vMix paths'], ['demo', 'Demo data'], ['backup', 'Backup']].map(([id, l]) => (
           <a key={id} href={`#${id}`} className="rounded-md border border-ink-700 px-2.5 py-1 text-ink-300 hover:bg-ink-800">{l}</a>
         ))}
       </nav>
       <EventSection event={q.data!.event} />
+      <CommentatorOnlineSection />
       <PresetSection />
       <SyncSection />
       <PathsSection info={q.data!} />
@@ -333,6 +334,115 @@ function BackupSection({ info }: { info: SettingsInfo }) {
         <p><b>Restore</b> (stop the server first):</p>
         <pre className="overflow-x-auto rounded-md bg-ink-950 p-3 text-xs text-ink-200">npm run restore -- backups\2026-06-11-08-30-00</pre>
       </div>
+    </Section>
+  );
+}
+
+// ---------- commentator screen online ----------
+interface PushInfo {
+  target: string; enabled: boolean; hasPassword: boolean;
+  status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; viewerUrl: string; bytes: number; pictures: number };
+}
+interface ViewerInfo { path: string; passwordSet: boolean; feed: { pushedAt: string; receivedAt: string | null; from: string; day: string } | null; now: string }
+
+function CopyLink({ url }: { url: string }) {
+  const toast = useToast();
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <code className="break-all rounded bg-ink-950 px-2 py-1 text-xs text-accent-200">{url}</code>
+      <Button size="sm" onClick={async () => { try { await navigator.clipboard.writeText(url); toast.ok('Link copied'); } catch { toast.info(url); } }}>Copy</Button>
+    </div>
+  );
+}
+
+/**
+ * Two halves of one feature. On the PC at the venue: send the commentator data to the online dashboard.
+ * On the online dashboard: the read-only link for commentators, and what arrived from the venue.
+ */
+function CommentatorOnlineSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { ask, dialog } = useConfirm();
+  const push = useQuery({ queryKey: ['live-push'], queryFn: () => api.get<PushInfo>('/api/live/push'), refetchInterval: 5000 });
+  const viewer = useQuery({ queryKey: ['live-viewer'], queryFn: () => api.get<ViewerInfo>('/api/live/viewer'), refetchInterval: 10000 });
+  const [target, setTarget] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+  const p = push.data;
+  const st = p?.status;
+  const save = async (body: Partial<{ target: string; password: string; enabled: boolean }>, msg: string) => {
+    setBusy('save');
+    try {
+      qc.setQueryData(['live-push'], await api.put<PushInfo>('/api/live/push', body));
+      if (body.enabled !== false && (body.enabled || p?.enabled)) qc.setQueryData(['live-push'], await api.post<PushInfo>('/api/live/push/now'));
+      setTarget(null); setPassword(''); toast.ok(msg);
+    } catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
+  const onSubmit = (e: FormEvent) => { e.preventDefault(); void save({ target: target ?? p?.target ?? '', ...(password ? { password } : {}) }, 'Saved'); };
+  const v = viewer.data;
+  const link = v ? window.location.origin + v.path : '';
+  const ago = (iso: string | null | undefined) => iso ? fmtDateTime(iso) : '—';
+  return (
+    <Section id="commentator-online" title="Commentator online"
+      desc={<>The commentator screen on a web address, read-only. The PC at the venue sends the data every 5 s to the online dashboard (for example <code>https://sslgfx.em27code.com</code>); commentators open a link that shows only the commentator screen and cannot change anything. The venue PC is not reachable from the internet.</>}>
+      <h3 className="text-sm font-semibold text-ink-200">1. On the PC at the venue: send the data</h3>
+      {push.isLoading ? <Loading /> : push.error ? <ErrorBox error={push.error} /> : p && (
+        <>
+          <form onSubmit={onSubmit} className="mt-2 grid gap-3 md:grid-cols-[2fr_1fr_auto] md:items-end">
+            <Field label="Online dashboard address">
+              <input className="input font-mono text-xs" value={target ?? p.target} onChange={(e) => setTarget(e.target.value)} placeholder="https://sslgfx.em27code.com" />
+            </Field>
+            <Field label={p.hasPassword ? 'Its password (saved; type to change)' : 'Its password (DASHBOARD_PASSWORD)'}>
+              <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={p.hasPassword ? '••••••••' : ''} autoComplete="new-password" />
+            </Field>
+            <Button type="submit" variant="primary" busy={busy === 'save'} disabled={(target === null || target === p.target) && !password}>Save</Button>
+          </form>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={p.enabled} disabled={!p.target || busy === 'save'}
+                onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? 'Sending switched on' : 'Sending switched off')} />
+              Send every 5 seconds
+            </label>
+            <Button size="sm" busy={busy === 'now'} disabled={!p.target} onClick={async () => {
+              setBusy('now');
+              try { const r = await api.post<PushInfo>('/api/live/push/now'); qc.setQueryData(['live-push'], r); if (r.status.error) toast.error(r.status.error); else toast.ok('Sent'); }
+              catch (e) { toast.error(e); } finally { setBusy(null); }
+            }}>Send now</Button>
+            {st && (st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Sent {ago(st.lastOkAt)}</Badge> : p.enabled ? <Badge>Waiting</Badge> : <Badge>Off</Badge>)}
+          </div>
+          {st?.error && <p className="mt-2 text-sm text-red-300">{st.error}</p>}
+          {st?.lastOkAt && <p className="mt-2 text-xs text-ink-400">Last change sent {ago(st.lastChangeAt)} · {Math.round(st.bytes / 1024)} KB of data · {st.pictures} pictures</p>}
+          {st?.viewerUrl && <div className="mt-3"><p className="mb-1 text-xs text-ink-400">Link for commentators (open in any browser; read-only):</p><CopyLink url={st.viewerUrl} /></div>}
+        </>
+      )}
+
+      <h3 className="mt-6 text-sm font-semibold text-ink-200">2. On the online dashboard: the commentator link</h3>
+      {viewer.isLoading ? <Loading /> : viewer.error ? <ErrorBox error={viewer.error} /> : v && (
+        <div className="mt-2 space-y-2 text-sm">
+          {!v.passwordSet ? <p className="text-ink-400">This is a local dashboard (no DASHBOARD_PASSWORD), so it does not receive data: the link for commentators is the one in part 1, or in these settings on the online dashboard.</p> : <>
+          <CopyLink url={link} />
+          <p className="text-xs text-ink-400">
+            {v.feed ? <>Data from the venue: received {ago(v.feed.receivedAt)}{v.feed.from ? ` from ${v.feed.from}` : ''}, day {v.feed.day}. </> : <>Nothing received from the venue yet: the link shows this dashboard&apos;s own data. </>}
+            Preview: <a className="text-accent-300 underline" href="/live" target="_blank" rel="noreferrer">/live</a>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="danger" busy={busy === 'rotate'} onClick={async () => {
+              if (!(await ask('Make a new commentator link?', 'The current link and everyone who opened it stop working at once. Send the new link to the commentators.', 'Make a new link'))) return;
+              setBusy('rotate');
+              try { await api.post('/api/live/viewer/rotate'); qc.invalidateQueries({ queryKey: ['live-viewer'] }); qc.invalidateQueries({ queryKey: ['live-push'] }); toast.ok('New link ready'); }
+              catch (e) { toast.error(e); } finally { setBusy(null); }
+            }}>New link (old one stops working)</Button>
+            {v.feed && <Button size="sm" busy={busy === 'clear'} onClick={async () => {
+              if (!(await ask('Forget the data from the venue?', 'The link then shows this dashboard\'s own data until the venue PC sends again.', 'Forget'))) return;
+              setBusy('clear');
+              try { await api.del('/api/live-feed'); qc.invalidateQueries({ queryKey: ['live-viewer'] }); toast.ok('Data from the venue removed'); }
+              catch (e) { toast.error(e); } finally { setBusy(null); }
+            }}>Forget data from the venue</Button>}
+          </div>
+          </>}
+        </div>
+      )}
+      {dialog}
     </Section>
   );
 }

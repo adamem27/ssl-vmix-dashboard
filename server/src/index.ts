@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { config } from './config.js';
 import { LowerThirds } from './services/lowerthirds.js';
 import { Show } from './services/show.js';
@@ -21,7 +22,7 @@ const generator = new GeneratorExporter({ db, assetsDir: config.assetsDir }, (m)
 const matchboard = new MatchboardExporter({ db, assetsDir: config.assetsDir }, (m) => app.log.warn(m));
 const lowerThirds = new LowerThirds({ db, assetsDir: config.assetsDir }, undefined, (m) => console.warn(m));
 const show = new Show({ db, assetsDir: config.assetsDir }, lowerThirds, undefined, (m) => console.warn(m));
-const app = await buildApp({ db, generator, matchboard, lowerThirds, show, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
+const app = await buildApp({ liveDir: path.join(config.dataDir, 'live-feed'), db, generator, matchboard, lowerThirds, show, assetsDir: config.assetsDir, sync, workbook, webDist: config.webDist, dbPath: config.dbPath, maxUploadBytes: config.maxUploadBytes, password: config.password });
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
@@ -39,6 +40,7 @@ generator.start();
 lowerThirds.start();
 show.start();
 matchboard.schedule(2000);
+(app as unknown as { liveFeed: { start(): void } }).liveFeed.start(); // commentator screen online: pushes only when switched on in Settings
 await app.listen({ host: config.host, port: config.port });
 app.log.info(`Database: ${config.dbPath}`);
 app.log.info(`Assets folder: ${config.assetsDir}`);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
@@ -33,7 +33,7 @@ const flagOf = (t: OverviewTeam) => t.assets.flag_small?.previewUrl ?? t.assets.
 const statusTone = (s: string) => { const v = s.toLowerCase(); return v.includes('live') || v.includes('racing') ? 'live' : v.includes('next') ? 'next' : v.includes('done') || v.includes('finish') || v.includes('complete') ? 'done' : v.includes('postpon') || v.includes('cancel') ? 'off' : ''; };
 
 /** Live screen for commentators: the event at a glance, today's races, the group's standing and every crew. */
-export function CommentatorPage() {
+export function CommentatorPage({ live = false }: { live?: boolean }) {
   const meta = useMeta();
   const tz = meta.data?.event.timezone ?? 'UTC';
   const day = todayIn(tz);
@@ -73,8 +73,8 @@ export function CommentatorPage() {
   const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
   // Sized for a 1920×1080 screen with the browser bars: everything fits the window; a long crew list scrolls inside its card.
   return (
-    <div className="mx-auto flex h-[calc(100vh-53px)] max-w-[1920px] flex-col gap-2 px-3 py-2">
-      <TopStrip x={x} tz={tz} sets={sets.data ?? []} activeSet={activeSet} onSet={(id) => { setSetId(id); setFleetId(''); }} />
+    <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')}>
+      <TopStrip x={x} tz={tz} sets={sets.data ?? []} activeSet={activeSet} onSet={(id) => { setSetId(id); setFleetId(''); }} badge={live ? <FreshnessBadge /> : undefined} />
       <div className="flex min-w-0 items-center gap-2">
         <nav className="flex shrink-0 gap-1" aria-label="Groups">
           {fleets.map((f, i) => (
@@ -123,7 +123,26 @@ function Clock({ tz }: { tz: string }) {
   return <span className="font-mono text-2xl font-black tabular-nums text-ink-50">{s}</span>;
 }
 
-function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: string; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void }) {
+interface LiveStatus { feed: { pushedAt: string; receivedAt: string | null } | null; now: string }
+
+/** Online: how fresh the data from the venue PC is. Green while it keeps coming, red once it stops. */
+function FreshnessBadge() {
+  const q = useQuery({ queryKey: ['live-status'], queryFn: () => api.get<LiveStatus>('/api/live/status'), refetchInterval: 5000 });
+  if (!q.data?.feed) return null;
+  const at = q.data.feed.receivedAt ?? q.data.feed.pushedAt;
+  const ago = Math.max(0, Math.round((Date.parse(q.data.now) - Date.parse(at)) / 1000));
+  const ok = ago < 30;
+  const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return (
+    <span title={ok ? 'Data from the venue arrives every few seconds' : 'The venue PC stopped sending: these are the last data it sent'}
+      className={cx('flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold', ok ? 'bg-emerald-950/60 text-emerald-300' : 'bg-red-950/70 text-red-300')}>
+      <span className={cx('h-2 w-2 rounded-full', ok ? 'bg-emerald-400' : 'animate-pulse bg-red-400')} />
+      {ok ? 'Live' : `Data from ${time} (${ago < 120 ? `${ago}s` : `${Math.round(ago / 60)} min`} ago)`}
+    </span>
+  );
+}
+
+function TopStrip({ x, tz, sets, activeSet, onSet, badge }: { x?: CommentatorData; tz: string; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void; badge?: ReactNode }) {
   const w = x?.weather;
   const unit = w?.wind_unit || 'kn';
   const chips: [string, string, string][] = w ? ([
@@ -145,6 +164,7 @@ function TopStrip({ x, tz, sets, activeSet, onSet }: { x?: CommentatorData; tz: 
         </div>
       </div>
       <Clock tz={tz} />
+      {badge}
       <ul className="ml-auto flex min-w-0 items-center gap-1.5" aria-label="Weather">
         {chips.map(([label, value, icon]) => (
           <li key={label} className="shrink-0 rounded-md border border-ink-800 bg-ink-950/50 px-2 py-1 text-sm" title={label}>
