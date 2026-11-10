@@ -11,6 +11,7 @@ import {
 import { absBox as absBoxOf, Box, Canvas, CanvasApi, CanvasBg, topSelected, unionBox } from './gtzip/Canvas';
 import { Layers } from './gtzip/Layers';
 import { Frame, Player } from './gtzip/Player';
+import { applyStandardAnimation, detectScenario, Scenario, SCENARIOS, StandardOpts } from '../../../server/src/services/gtzip/standardAnim';
 import { drawTitle, Img } from '../../../server/src/services/gtzip/draw';
 import { RepeatGroup, repeatGroups } from '../../../server/src/services/gtzip/params';
 
@@ -262,6 +263,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
   const [full, setFull] = useState(false);
   const [frame, setFrame] = useState<Frame | null>(null);
   const closeFull = useCallback(() => setFull(false), []);
+  const [playTick, setPlayTick] = useState(0);
   const [zoom, setZoom] = useState(0.5);
   const [mode, setModeState] = useState<Mode>(() => { try { return localStorage.getItem(MODE_KEY) === 'quick' ? 'quick' : 'advanced'; } catch { return 'advanced'; } });
   const setMode = (m: Mode) => { setModeState(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ } };
@@ -291,6 +293,14 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
 
   /** Applies a change to a copy of the document. */
   const mutate = (fn: (root: GtNode) => void, key?: string) => { const r = clone(doc); fn(r); commit(r, key); };
+  /** the house In / Out in one click, then played once on the canvas */
+  const standard = (o: StandardOpts = {}) => {
+    const r = clone(doc);
+    const res = applyStandardAnimation(r, o);
+    commit(r);
+    setPlayTick((t) => t + 1);
+    toast.ok(`Standard animation (${SCENARIOS[res.scenario].toLowerCase()}): In ${res.inLength.toFixed(2)} s, Out ${res.outLength.toFixed(2)} s. Ctrl+Z undoes it.`);
+  };
   const mutateSel = (fn: (n: GtNode, e: ElementInfo) => void, key?: string) =>
     mutate((r) => { for (const e of selInfos) { const n = nodeAt(r, e.path); if (n) fn(n, e); } }, key);
   const run = (fn: () => { root: GtNode; added?: Path[] } | void, msg?: string) => {
@@ -499,6 +509,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
           <button className={cx(tb, 'text-xs', prefs.layers && 'bg-ink-700')} title="Show or hide the Layers panel" onClick={() => setPrefs({ layers: !prefs.layers })}>Layers</button>
           <button className={cx(tb, 'text-xs', prefs.panel && 'bg-ink-700')} title="Show or hide the Properties panel" onClick={() => setPrefs({ panel: !prefs.panel })}>Properties</button>
         </>}
+        <button className={cx(tb, 'text-xs font-semibold text-amber-200')} title="Standard animation: the house In and Out for this kind of graphic, in one click (Animations tab for options)" onClick={() => standard()}>✨ Animate</button>
         <Tool title="Full screen preview (F)" onClick={() => setFull(true)}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
         </Tool>
@@ -530,7 +541,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
             onBoxes={(b, resize, key) => setBoxes(b, resize, key)}
             onDropFiles={(files, at) => void uploadPictures(files, at)}
             onDoubleClick={(e) => { setSel([pathKey(e.path)]); setRight('props'); setFocusTick((n) => n + 1); }} />
-          <div className="mt-2"><Player doc={doc} onFrame={setFrame} /></div>
+          <div className="mt-2"><Player doc={doc} onFrame={setFrame} playSignal={playTick} /></div>
           <p className="mt-1 text-[11px] text-ink-500">
             Click selects · Shift/Ctrl adds · drag on empty space selects an area · Alt+click picks a layer or a locked element · drag handles to resize (Shift keeps proportions) ·
             arrows nudge (Shift ×10) · Ctrl+wheel zooms, wheel or Space+drag pans · Ctrl+C/V/D/G · drop PNG files to add them. Preview is approximate; dashed boxes are picture fields filled by vMix.
@@ -559,7 +570,7 @@ function Editor({ tpl, scenes, onOpen, sidebar, setSidebar }: { tpl: TemplateDoc
                 <Button size="sm" variant="ghost" disabled={!selInfos.length} onClick={() => png(selInfos, false)} title="The selected elements on a transparent full frame, in place">⤓ Full frame</Button>
               </div>
             </>}
-            {right === 'animations' && <Animations doc={doc} mutate={mutate} selNames={selInfos.map((e) => e.node.attrs.Name).filter(Boolean)} />}
+            {right === 'animations' && <Animations doc={doc} mutate={mutate} onStandard={standard} selNames={selInfos.map((e) => e.node.attrs.Name).filter(Boolean)} />}
             {right === 'fields' && <Fields doc={doc} />}
           </div>
         </div>}
@@ -1175,7 +1186,37 @@ function DuplicateDialog({ infos, els, doc, onClose, onApply }: { infos: Element
 }
 
 // ---------- animations ----------
-function Animations({ doc, mutate, selNames }: { doc: GtNode; mutate: (fn: (r: GtNode) => void, key?: string) => void; selNames: string[] }) {
+function StandardCard({ doc, onApply }: { doc: GtNode; onApply: (o: StandardOpts) => void }) {
+  const [scenario, setScenario] = useState<Scenario | 'auto'>('auto');
+  const [tempo, setTempo] = useState(1);
+  const [dataChange, setDataChange] = useState(false);
+  const detected = useMemo(() => detectScenario(doc), [doc]);
+  const preview = useMemo(() => applyStandardAnimation(clone(doc), { scenario, tempo }), [doc, scenario, tempo]);
+  const ROLE: Record<string, string> = { background: 'bg-sky-900/60 text-sky-200', header: 'bg-violet-900/60 text-violet-200', item: 'bg-emerald-900/60 text-emerald-200', text: 'bg-emerald-900/60 text-emerald-200', photo: 'bg-amber-900/60 text-amber-200', badge: 'bg-rose-900/60 text-rose-200', footer: 'bg-ink-800 text-ink-300', ticker: 'bg-teal-900/60 text-teal-200' };
+  return (
+    <div className="card space-y-2 border border-amber-500/30 p-2">
+      <div className="flex items-center gap-2"><span className="text-sm font-semibold text-amber-200">✨ Standard animation</span><span className="text-[11px] text-ink-500">house In / Out in one click</span></div>
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <select className={small} value={scenario} onChange={(e) => setScenario(e.target.value as Scenario | 'auto')} title="Kind of graphic">
+          <option value="auto">Auto: {SCENARIOS[detected]}</option>
+          {(Object.keys(SCENARIOS) as Scenario[]).map((k) => <option key={k} value={k}>{SCENARIOS[k]}</option>)}
+        </select>
+        <select className={small} value={tempo} onChange={(e) => setTempo(Number(e.target.value))} title="Tempo">
+          <option value={0.85}>Calm</option><option value={1}>Standard</option><option value={1.2}>Snappy</option>
+        </select>
+        <label className="flex items-center gap-1 text-ink-300" title="A quick fade out and in on every text field when vMix changes its value"><input type="checkbox" checked={dataChange} onChange={(e) => setDataChange(e.target.checked)} />Data change fades</label>
+        <Button size="sm" variant="primary" className="ml-auto" onClick={() => onApply({ scenario, tempo, dataChange })}>Apply</Button>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {preview.roles.map((r) => <span key={r.name} className={cx('rounded px-1.5 py-0.5 text-[10px]', ROLE[r.role])} title={r.role}>{r.name} · {r.role}</span>)}
+        {!preview.roles.length && <span className="text-[11px] text-ink-500">No named elements to animate.</span>}
+      </div>
+      <p className="text-[11px] text-ink-500">In {preview.inLength.toFixed(2)} s · Out {preview.outLength.toFixed(2)} s. Replaces In and Out; data-change animations you already have stay. Name parts BG, HEADER, SPONSOR, PHOTO… to steer it.</p>
+    </div>
+  );
+}
+
+function Animations({ doc, mutate, selNames, onStandard }: { doc: GtNode; mutate: (fn: (r: GtNode) => void, key?: string) => void; selNames: string[]; onStandard: (o: StandardOpts) => void }) {
   const sbs = storyboards(doc);
   const [onlySel, setOnlySel] = useState(false);
   const names = [...new Set(elements(doc).map((e) => e.node.attrs.Name).filter(Boolean))].sort();
@@ -1190,6 +1231,7 @@ function Animations({ doc, mutate, selNames }: { doc: GtNode; mutate: (fn: (r: G
   const has = (t: string) => sbs.some((s) => s.type === t);
   return (
     <div className="space-y-3">
+      <StandardCard doc={doc} onApply={onStandard} />
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={onlySel} onChange={(e) => setOnlySel(e.target.checked)} /> Only selected elements</label>
         {!has('TransitionIn') && <Button size="sm" onClick={() => addSb('TransitionIn')}>+ In</Button>}

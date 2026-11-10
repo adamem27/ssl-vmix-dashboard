@@ -14,7 +14,7 @@ const HOLD = 1.5; // seconds on screen between In and Out in the full cycle
  * Plays the title's animations on the canvas: In, Out, the full cycle (In, hold, Out) and a data change of one field
  * (Out of the old value, new value, In). A timeline shows every animation as a bar; drag on it to scrub.
  */
-export function Player({ doc, onFrame, compact }: { doc: GtNode; onFrame: (f: Frame | null) => void; compact?: boolean }) {
+export function Player({ doc, onFrame, compact, playSignal }: { doc: GtNode; onFrame: (f: Frame | null) => void; compact?: boolean; playSignal?: number }) {
   const W = Number(doc.attrs.Width ?? 1920), H = Number(doc.attrs.Height ?? 1080);
   const sb = useMemo(() => previewStoryboards(doc), [doc]);
   const [mode, setMode] = useState<Mode>('cycle');
@@ -79,6 +79,7 @@ export function Player({ doc, onFrame, compact }: { doc: GtNode; onFrame: (f: Fr
   }, [playing, speed, len, loop]);
 
   const play = (m: Mode) => { setMode(m); setActive(true); setT(0); setPlaying(true); };
+  useEffect(() => { if (playSignal) play('cycle'); }, [playSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   const stop = () => { setPlaying(false); setActive(false); setT(0); };
   const has = { in: !!sb.in, out: !!sb.out, data: sb.fields.length > 0 };
 
