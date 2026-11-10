@@ -1,4 +1,8 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { encodePng } from '../src/services/png.js';
+import { zipStore } from '../src/services/xlsx.js';
 import { setup, seedTeam } from './helpers.js';
 import { LINEUP_SLOTS, saveLineup } from '../src/services/lineups.js';
 import { activeEvent } from '../src/db/db.js';
@@ -75,6 +79,40 @@ describe('lower thirds', () => {
     await lt.out();
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput2Out');
     expect(lt.state.onAir).toBe(false);
+  });
+
+  it('fills a title with its own field names and puts in the team bar made like the title\'s (no squeezed bar)', async () => {
+    const s = setup();
+    const { teamId } = seedTeam(s.db, 'BRA', ['Martine Grael']);
+    seedTeam(s.db, 'ANT', []);
+    updateTeam(s.db, teamId, { nickname: 'The Canaries' });
+    // the title as the GTZIP generator made it: Name, position/pb, PHOTO, Flag and a bar ANT_lowerthird.png 802×105
+    const bar = 'aaaaaaaa-0000-0000-0000-000000000001\\ANT_lowerthird.png';
+    const doc = `<?xml version="1.0" encoding="utf-16"?><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0"><Image.Bitmap><Bitmap Source="${bar}" /></Image.Bitmap></Image><TextBlock Name="Name" Text="x" /><TextBlock Name="position/pb" Text="x" /><Image Name="PHOTO" Dimensions="425,425,0" /><Image Name="Flag" Dimensions="124,79,0" /></Composition>`;
+    const one = encodePng(1, 1, () => [0, 0, 0, 0]);
+    const ct = '<?xml version="1.0" encoding="utf-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="text/xml" /></Types>';
+    fs.mkdirSync(path.join(s.ctx.assetsDir, 'gtzip'), { recursive: true });
+    fs.writeFileSync(path.join(s.ctx.assetsDir, 'gtzip', 'lowerthird_photo 2.gtzip'), zipStore([['document.xml', Buffer.from(doc)], ['resources.xml', Buffer.from('<resources />')], ['thumbnail.png', one], ['[Content_Types].xml', Buffer.from(ct)]]));
+    // the team's generated pictures: one named like the title's bar, one of another shape
+    const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'BRA');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'BRA_bar_waves.png'), encodePng(10, 2, () => [0, 0, 0, 255]));
+    fs.writeFileSync(path.join(dir, 'BRA_lowerthird.png'), encodePng(802, 105, () => [0, 0, 0, 255]));
+    const titleFields = ['Bar.Source', 'Name.Text', 'position/pb.Text', 'PHOTO.Source', 'Flag.Source'];
+    const calls: string[] = [];
+    const fetcher = async (url: string) => {
+      const q = decodeURIComponent(url.split('/api/')[1] ?? '');
+      if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="2"></overlay></overlays></vmix>` };
+      calls.push(q);
+      return { ok: true, status: 200, text: async () => '' };
+    };
+    setLtConfig(s.db, { photoInput: 'lowerthird_photo 2 1.gtzip', noPhotoInput: 'lowerthird_photo 2 1.gtzip' });
+    const lt = new LowerThirds(s.ctx, fetcher);
+    await lt.showTeam('BRA');
+    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=Name.Text&Value=TEAM BRA');
+    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=THE CANARIES');
+    const barCall = calls.find((c) => c.includes('SelectedName=Bar.Source'));
+    expect(barCall).toMatch(/BRA_lowerthird\.png$/);
   });
 
   it('every place key shows the sailor on that place (Trimmer 2 is not Trimmer 1)', async () => {
