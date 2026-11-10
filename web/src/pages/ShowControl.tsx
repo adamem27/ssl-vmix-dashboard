@@ -108,7 +108,7 @@ function Show({ data }: { data: ShowData }) {
         )}
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Button size="sm" variant={edit ? 'primary' : 'secondary'} onClick={() => { setEdit(!edit); setPick(null); }}>{edit ? '✓ Done editing' : '✎ Edit keys'}</Button>
-          {edit ? <span className="text-xs text-ink-400">Click a key to change its text, colour or action · drag a key onto another to swap them (Alt+drag copies) · saved at once and sent to Companion.</span>
+          {edit ? <span className="text-xs text-ink-400">Click a key to change its text, colour or action · drag a key onto another to swap them (Alt+drag copies) · saved at once (download the Companion preset again to put it on the decks).</span>
             : <span className="text-xs text-ink-500">Right-click a key to edit it.</span>}
           {edit && <>
             <span className="ml-auto text-xs text-ink-400">Colours by kind:</span>
@@ -122,7 +122,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as Companion shows them. Deck 1 runs the programme (before, after, break, end), deck 2 the race (teams of the group, sailors by shirt number, announcements, extras).
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names), EXTRAS, every announcement (BUGS 1–2) and every ticker (TICKERS) on a key of its own. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -303,38 +303,23 @@ function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
 }
 
 function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
-  const toast = useToast();
   const { c, setC, dirty, save } = useConfig(data, onSaved);
   const origin = window.location.origin;
-  const files = [...data.pages.map((p) => ({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, label: `Deck ${p.deck} · ${p.name}` })), { name: 'fallback', page: c.fallbackPage, label: 'Fallback (straight to vMix)' }];
-  const labels = async () => { try { const r = await api.post<{ sent: number }>('/api/show/labels'); toast.ok(`Companion: ${r.sent} keys updated`); } catch (e) { toast.error(e); } };
-  const num = (label: string, value: number, set: (v: number) => void) => (
-    <label className="block text-xs text-ink-400">{label}<input type="number" min={1} max={99} className="input mt-1 w-20 py-1 text-sm" value={value} onChange={(e) => set(Number(e.target.value) || 1)} /></label>
-  );
+  const teams = data.pages.filter((p) => p.page >= 9);
   return (
-    <Panel title="Companion" right={<>
-      {data.companionUrl && <Button size="sm" variant="ghost" onClick={labels}>Send key labels now</Button>}
-      <Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>
-    </>}>
+    <Panel title="Companion" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
       <div className="flex flex-wrap gap-4">
-        {num('Deck 1 first page', c.deck1Page, (v) => setC({ ...c, deck1Page: v }))}
-        {num('Deck 2 first page', c.deck2Page, (v) => setC({ ...c, deck2Page: v }))}
-        {num('Fallback page', c.fallbackPage, (v) => setC({ ...c, fallbackPage: v }))}
         <label className="block text-xs text-ink-400">vMix address as Companion reaches it (fallback page)
           <input className="input mt-1 w-72 py-1 text-sm" placeholder="same as Settings → vMix" value={c.vmixForCompanion} onChange={(e) => setC({ ...c, vmixForCompanion: e.target.value })} />
         </label>
-        <label className="mt-5 flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.labels} onChange={(e) => setC({ ...c, labels: e.target.checked })} /> Write key texts and colours into Companion</label>
       </div>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-300">
-        <li>Download the five pages (from the dashboard opened at the address Companion will call) and import each in Companion: <b>Import / Export → Import</b>, onto the page shown. On the second and later files, map the connection to the one already made.
-          <div className="mt-2 flex flex-wrap gap-2">
-            {files.map((f) => (
-              <a key={f.name} className="rounded bg-ink-800 px-3 py-1.5 text-xs font-semibold text-ink-100 hover:bg-ink-700" href={`/api/show/companion/${f.name}?base=${encodeURIComponent(origin)}`} download>p{f.page} · {f.label}</a>
-            ))}
-          </div>
+        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–7 (TEAMS, EXTRAS, BUGS 1, BUGS 2, TICKERS), the fallback on page 8 and a page per team from page 9 ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
+          <div className="mt-2"><a className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600" href={`/api/show/preset.companionconfig?base=${encodeURIComponent(origin)}`} download>Download Companion preset</a></div>
         </li>
-        <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page {c.deck1Page} and deck 2 on page {c.deck2Page}.</li>
-        <li>In Companion Settings → Protocols turn on <b>HTTP remote control</b> and type Companion's address on the Lower thirds tab. The dashboard then writes the boats, sailors (shirt number, position, name, ● = photo), announcements and the red ON AIR colour into the keys.</li>
+        <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there.</li>
+        <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page 1 and deck 2 on page 3.</li>
+        <li>On deck 2, TEAMS opens a team's page: its places with the sailors' names, TEAM LT, QUALIFIED, LINEUP, NEXT RESULT; ◀ ▶ go to the previous and next team. The key texts are fixed in the preset: download and import it again after the line-ups, teams, announcements or tickers change.</li>
         <li>PANIC cuts everything only on a second press within 3 seconds. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
       </ol>
     </Panel>

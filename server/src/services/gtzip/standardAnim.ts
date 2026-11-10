@@ -10,7 +10,7 @@
  *  - bugs (small, top of the screen): Fly from the Top (0.75) in and out;
  *  - bars at the bottom (socials, tickers): the bar Reveals from the Bottom, the text Fades in.
  */
-import { GtNode, innerComposition, isElement, isVisible, size, vec } from './model.js';
+import { elements, GtNode, innerComposition, isElement, isVisible, size, vec } from './model.js';
 
 export type Scenario = 'board' | 'lowerthird' | 'bug' | 'bar' | 'lbar';
 export const SCENARIOS: Record<Scenario, string> = {
@@ -30,15 +30,16 @@ const area = (b: Box) => Math.max(0, b[2]) * Math.max(0, b[3]);
 function boxOf(n: GtNode, origin: [number, number], parent: [number, number]): Box {
   const [x, y] = vec(n.attrs.Location);
   const [dw, dh] = size(n, parent);
-  // a layer the size of the frame (a common GT habit) is measured by what is in it
-  const frameSized = !n.attrs.Dimensions || (Math.abs(x) < 1 && Math.abs(y) < 1 && Math.abs(dw - parent[0]) < 2 && Math.abs(dh - parent[1]) < 2);
-  if (n.tag === 'Layer' && frameSized) {
+  // a layer is measured by what is in it, cut to the layer (GT habit: layers the size of the frame, or nearly)
+  if (n.tag === 'Layer') {
     const inner = innerComposition(n);
     const kids = inner?.children.filter((c) => isElement(c) && isVisible(c)) ?? [];
     if (kids.length) {
-      const bs = kids.map((c) => boxOf(c, [origin[0] + x, origin[1] + y], parent));
-      const x0 = Math.min(...bs.map((b) => b[0])), y0 = Math.min(...bs.map((b) => b[1]));
-      return [x0, y0, Math.max(...bs.map((b) => b[0] + b[2])) - x0, Math.max(...bs.map((b) => b[1] + b[3])) - y0];
+      const lx = origin[0] + x, ly = origin[1] + y;
+      const bs = kids.map((c) => boxOf(c, [lx, ly], [dw, dh]));
+      const x0 = Math.max(lx, Math.min(...bs.map((b) => b[0]))), y0 = Math.max(ly, Math.min(...bs.map((b) => b[1])));
+      const x1 = Math.min(lx + dw, Math.max(...bs.map((b) => b[0] + b[2]))), y1 = Math.min(ly + dh, Math.max(...bs.map((b) => b[1] + b[3])));
+      if (x1 > x0 && y1 > y0) return [x0, y0, x1 - x0, y1 - y0];
     }
   }
   return [origin[0] + x, origin[1] + y, dw, dh];
@@ -143,7 +144,8 @@ function plan(sc: Scenario, list: Unit[]): { inA: GtNode[]; outA: GtNode[] } {
   } else if (sc === 'lowerthird') {
     bg.forEach((u) => { inA.push(anim('Reveal', u.name, 0, 0.6, 'Left')); outA.push(anim('Reveal', u.name, 0.15, 0.5, 'Left')); });
     const t = bg.length ? 1 : 0;
-    photo.forEach((u) => { inA.push(anim('Fly', u.name, 0.3 * t, 0.5, 'Bottom')); outA.push(anim('Fade', u.name, 0, 0.3)); });
+    // the photo rises a moment after the bar is in, and goes down first on the way out
+    photo.forEach((u) => { inA.push(anim('Fly', u.name, 0.4 * t, 0.55, 'Bottom')); outA.push(anim('Fly', u.name, 0, 0.4, 'Bottom')); });
     const { sorted } = order([...rest, ...header, ...ticker]);
     sorted.forEach((u, i) => { inA.push(anim('Fade', u.name, 0.45 * t + i * 0.05, 0.4)); outA.push(anim('Fade', u.name, 0, 0.3)); });
     badge.forEach((u) => { inA.push(anim('Reveal', u.name, 0.6 * t, 0.5, 'Bottom')); outA.push(anim('Reveal', u.name, 0, 0.4, 'Bottom')); });
@@ -164,6 +166,17 @@ function plan(sc: Scenario, list: Unit[]): { inA: GtNode[]; outA: GtNode[] } {
 }
 
 const total = (as: GtNode[]) => Math.max(0, ...as.map((a) => Number(a.attrs.Delay ?? 0) + Number(a.attrs.Duration ?? 1)));
+
+/** The named picture with a mask inside a layer (PHOTO masked by Rectangle1), if there is one. */
+function maskedImage(layer: GtNode): string | null {
+  const inner = innerComposition(layer);
+  for (const c of inner?.children ?? []) {
+    if (!isElement(c) || !c.attrs.Name) continue;
+    if (c.children.some((h) => h.tag === `${c.tag}.Mask`)) return c.attrs.Name;
+    if (c.tag === 'Layer') { const m = maskedImage(c); if (m) return m; }
+  }
+  return null;
+}
 
 /** Text fields of the title (TextBlocks with a name), for the data-change fades. */
 function textNames(root: GtNode): string[] {
@@ -195,6 +208,13 @@ export function applyStandardAnimation(root: GtNode, o: StandardOpts = {}): Stan
     if (seenBg && !/^(bg|background|plate)/i.test(u.name)) u.role = sc === 'board' || sc === 'lbar' ? 'item' : 'text';
     seenBg = true;
   }
+  // a photo in a layer with its mask: the photo itself moves and the mask stays, so it rises from behind its frame
+  // (moving the whole layer moves the mask too, and vMix shows little more than a fade)
+  for (const u of withRoles) {
+    if (u.role !== 'photo' || u.node.tag !== 'Layer') continue;
+    const masked = maskedImage(u.node);
+    if (masked) u.name = masked;
+  }
   const ordered = list.map((u) => withRoles.find((w) => w.node === u.node)!);
   const { inA, outA } = plan(sc, ordered);
   const tempo = o.tempo && o.tempo > 0 ? o.tempo : 1;
@@ -216,6 +236,17 @@ export function applyStandardAnimation(root: GtNode, o: StandardOpts = {}): Stan
         if (dataNames.has(`${type}|${name}.Text`)) continue;
         sbs.push({ tag: 'Storyboard', attrs: { Type: type, DataName: `${name}.Text` }, children: [{ tag: 'Storyboard.Animations', attrs: {}, children: [anim('Fade', name, 0, 0.3 / tempo)] }] });
       }
+    }
+  }
+  // vMix plays a photo's DataChange but not a Fly on it in Transition In: the dashboard brings the title in without the
+  // photo and sets it right after, so the photo rises a moment after the bar (lowerthirds.ts). Each photo gets one.
+  for (const u of ordered) {
+    if (u.role !== 'photo' || !u.name) continue;
+    const img = elements(root).find((e) => e.node.attrs.Name === u.name)?.node;
+    if (img?.tag !== 'Image') continue;
+    for (const [type, d] of [['DataChangeOut', 0.35], ['DataChangeIn', 0.5]] as const) {
+      if (dataNames.has(`${type}|${u.name}.Source`)) continue;
+      sbs.push({ tag: 'Storyboard', attrs: { Type: type, DataName: `${u.name}.Source` }, children: [{ tag: 'Storyboard.Animations', attrs: {}, children: [anim('Fly', u.name, 0, d / tempo, 'Bottom')] }] });
     }
   }
   const first = root.children.findIndex((c) => c.tag === 'Storyboard');

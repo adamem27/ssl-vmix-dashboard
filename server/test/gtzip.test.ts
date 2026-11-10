@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { GtzipService, loadPackage, resourcePart, savePackage } from '../src/services/gtzip/gtzip.js';
-import { allNames, animationsOf, duplicate, elements, fitLayer, groupElements, GtNode, insertElements, makeElement, moveElements, parseXml, pasteElements, remove, renameElement, serializeXml, storyboards, ungroup, uniqueName, vec } from '../src/services/gtzip/model.js';
+import { allNames, animationsOf, duplicate, elements, fitLayer, groupElements, GtNode, insertElements, makeElement, moveElements, parseXml, pasteElements, remove, renameElement, serializeXml, setVec, storyboards, syncLayerSizes, ungroup, uniqueName, vec } from '../src/services/gtzip/model.js';
 import { repeatGroups, setCount } from '../src/services/gtzip/params.js';
 import { zipStore } from '../src/services/xlsx.js';
 import { setup } from './helpers.js';
@@ -438,5 +438,20 @@ describe('race flags', () => {
     const files = fs.readdirSync(path.join(dir, 'race-flags'));
     expect(files).toContain('AP_postponed.png');
     expect(files.length).toBeGreaterThanOrEqual(28);
+  });
+
+});
+
+describe('layer size', () => {
+  it('a resized layer is cut, not squeezed: its composition takes its size (vMix scales a composition into its layer)', () => {
+    const { root } = parseXml(`<Composition Width="1920" Height="1080"><Layer Name="Photo group" Dimensions="1920,1025,0" Location="0,0,0"><Layer.Composition><Composition Width="1920" Height="1080"><Rectangle Name="Rectangle1" Dimensions="300,298,0" Location="559,727,0" /></Composition></Layer.Composition></Layer></Composition>`);
+    expect(syncLayerSizes(root)).toBe(1);
+    const comp = () => root.children[0].children[0].children[0];
+    expect(comp().attrs).toMatchObject({ Width: '1920', Height: '1025' });
+    // the mask keeps its place: nothing inside moves
+    expect(comp().children[0].attrs.Location).toBe('559,727,0');
+    setVec(root.children[0], 'Dimensions', 800, 600);
+    expect(comp().attrs).toMatchObject({ Width: '800', Height: '600' });
+    expect(syncLayerSizes(root)).toBe(0);
   });
 });

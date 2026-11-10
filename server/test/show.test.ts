@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
-import { activeEvent } from '../src/db/db.js';
+import { activeEvent, setSetting } from '../src/db/db.js';
 import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
-import { createGraphicSet } from '../src/services/graphicSets.js';
+import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
@@ -111,6 +111,50 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
   });
 
+  it('bugs carry text and icon and toggle; every bug and ticker has a key, new ones too; General graphics go in at the press', async () => {
+    const { s, ev } = race();
+    seedGraphicSets(s.db, ev);
+    setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL\\assets');
+    const v = fakeVmix({ ...TITLES, ssl_bug: ['TEXT.Text', 'ICON.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['EVENT.Text', 'LOCATION.Text', 'DATE.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const pages = (await show.view()).pages;
+    const bugs1 = pages.find((p) => p.name === 'BUGS 1')!;
+    expect(bugs1.keys[0][0]).toMatchObject({ action: 'bug:1', text: 'P – PREPARATORY', empty: false });
+    // the announcement on its key: one line of text and the flag's PNG from the vMix assets folder
+    await show.run('bug:6');
+    expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
+    expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=ICON.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
+    expect(v.overlays[3]).toBe('4');
+    await show.run('bug:6');
+    expect(v.overlays[3]).toBe('');
+
+    // a new ticker made during the show is on the next free ticker key at once
+    const before = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty).length;
+    createGraphicSet(s.db, ev, 'ticker', 'Breaking', { items: 'BOAT CAPSIZED - ALL CREW SAFE' });
+    show.invalidate(); // what any change through the dashboard's API does (showRoutes)
+    const tk = (await show.view()).pages.find((p) => p.name === 'TICKERS')!.keys.flat().filter((k) => k && k.action.startsWith('ticker:') && !k.empty);
+    expect(tk.length).toBe(before + 1);
+    v.calls.length = 0;
+    await show.run(tk.at(-1)!.action);
+    expect(v.calls).toContain(`?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=${repeatLoop('BOAT CAPSIZED - ALL CREW SAFE I ')}`);
+    // THANKS FOR WATCHING is the fixed ticker
+    await show.run('ticker:thanks');
+    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=THANKS FOR WATCHING'))).toBe(true);
+
+    // a board gets General graphics at the press
+    const w = listGraphicSets(s.db, ev, 'welcome')[0];
+    updateGraphicSet(s.db, w.id, { data: { event: 'SSL GOLD CUP', location: 'RIO', dates: '1-2 DEC' } });
+    const o = listGraphicSets(s.db, ev, 'officials')[0];
+    updateGraphicSet(s.db, o.id, { data: { pro_name: 'Jan Kowalski' } });
+    v.calls.length = 0;
+    await show.run('show:welcome');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=EVENT.Text&Value=SSL GOLD CUP');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=DATE.Text&Value=1-2 DEC');
+    await show.run('show:officials');
+    expect(v.calls.some((c) => c.includes('SelectedName=ROLE 1.Text&Value=PRINCIPAL RACE OFFICER'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('SelectedName=NAME 1.Text&Value=Jan Kowalski'))).toBe(true);
+  });
+
   it('splits the lineup lower third into the first five and the rest, then goes out; shows a qualified team', async () => {
     const { s, ev, teams } = race();
     saveLineup(s.ctx, ev, teams[0], { rows: [
@@ -160,19 +204,44 @@ describe('show control', () => {
     expect(show.state.tickerMode).toBe('end');
   });
 
-  it('builds Companion page files: two pages per deck and a fallback straight to vMix', () => {
+  it('builds one Companion preset: every page, a page per team with its sailors, the fallback straight to vMix', async () => {
     const { s } = race();
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
-    const cfg = show.config;
-    const files = companionFiles(cfg, 'http://10.0.0.5:4310', 'http://10.0.0.5:8088', show.graphics());
-    expect(files.map((f) => f.page)).toEqual([1, 2, 11, 12, 20]);
-    const p1: any = files[0].file;
-    expect(p1.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
-    expect(p1.page.controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
-    const fb: any = files[4].file;
-    expect(fb.page.controls[0][0].steps[0].action_sets.down[0].options.url).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
+    const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
+    expect(f).toMatchObject({ version: 4, type: 'full' });
+    // deck 1: 1–2, deck 2: 3–7, fallback 8, teams (by code) 9–12
+    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    const url = (c: any) => c.steps[0].action_sets.down[0].options.url;
+    expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
+    expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
+    // TEAMS: a key per team opens its page; ESP is the second by code
+    expect(f.pages[3].name).toBe('SSL TEAMS');
+    expect(f.pages[3].controls[0][1].style.text).toBe('ESP\\nTEAM ESP');
+    expect(f.pages[3].controls[0][1].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', options: { page: 10 } });
+    // ESP's page: its places with the names fixed on the keys, each calling that place of that team
+    const esp = f.pages[10];
+    expect(esp.name).toBe('SSL ESP');
+    expect(esp.controls[1][0].style.text).toBe('BOW\\nPONS');
+    expect(esp.controls[1][2].style.text).toBe('PIT\\nRUIZ');
+    expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
+    expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
+    expect(esp.controls[3][1].steps[0].action_sets.down[0].options.page).toBe(9); // ◀ BRA
+    expect(esp.controls[3][2].steps[0].action_sets.down[0].options.page).toBe(11); // ▶ GBR
+    expect(f.pages[12].controls[3][2].steps[0].action_sets.down[0].options.page).toBe(9); // after the last team: the first
+    expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of deckPages(cfg)) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+  });
+
+  it('a team page key shows that place of that team, whatever team is picked', async () => {
+    const { s } = race();
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('boat:2');
+    await show.run('sailorof:ESP/Pit');
+    expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
+    await show.run('teamlt:ESP');
+    expect(v.calls.some((c) => c.includes('Value=TEAM ESP') || c.includes('Value=ESP'))).toBe(true);
   });
 
   it('lets keys be edited like a Stream Deck: text, colours, another action, an empty place', async () => {
@@ -199,18 +268,17 @@ describe('show control', () => {
     expect(bra.onAir.bg).toBe('#fdc900');
     expect(bra.onAir.fg).toBe(textOn('#fdc900'));
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
-    const racePage = deckPages(show.config)[2];
-    const team1 = await show.keyLook(racePage.keys[0][0]!); // ESP, selected (boat 1)
+    const pages = show.pages();
+    const espKey = await show.keyLook(pages[2].keys[0][1]!); // TEAMS: ESP
     const esp = teamKeyColours(s.db, 'ESP')!;
-    expect(team1).toMatchObject({ active: true, bg: esp.active.bg, fg: esp.active.fg });
-    expect(team1.text.startsWith('▶ ')).toBe(true);
-    const team2 = await show.keyLook(racePage.keys[0][1]!); // BRA, not selected
-    expect(team2.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
-    const sailor = await show.keyLook(racePage.keys[1][0]!);
-    expect(sailor.bg).toBe(esp.normal.bg);
+    expect(espKey).toMatchObject({ bg: esp.normal.bg, fg: esp.normal.fg });
+    const espPage = pages.find((p) => p.name === 'ESP')!;
+    const sailor = await show.keyLook(espPage.keys[1][2]!);
+    expect(sailor).toMatchObject({ text: 'PIT\\nRUIZ', bg: esp.normal.bg });
+    expect((await show.keyLook(pages[2].keys[0][0]!)).bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
     // a colour set on the key in the key editor still wins
     setShowConfig(s.db, { keys: { '2/0/1': { bg: '#123456' } } });
-    expect((await show.keyLook(deckPages(show.config)[2].keys[0][1]!)).bg).toBe('#123456');
+    expect((await show.keyLook(show.pages()[2].keys[0][1]!)).bg).toBe('#123456');
     // lower thirds: country keys in their colours
     const keys = new LowerThirds(s.ctx).layout().flat();
     expect(keys.find((k) => k.action === 'team:BRA')!.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);

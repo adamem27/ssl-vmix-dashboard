@@ -169,6 +169,7 @@ function CompanionHelp({ config, pages }: { config: Config; pages: number }) {
   );
   return (
     <Panel title="Setting up Companion">
+      <p className="mb-2 rounded border border-sky-800 bg-sky-950/40 px-3 py-2 text-sm text-sky-200">For the show use the Companion preset on the Show control tab: every team has its own page there, with the sailors' names fixed on the keys. The pages below are the older single-page layout, whose keys change their texts live.</p>
       <ol className="list-decimal space-y-2 pl-5 text-sm text-ink-300">
         <li>
           Download the Companion file for each page and import it in Companion (<b>Import / Export → Import</b>, pick the file, choose the page to put it on).

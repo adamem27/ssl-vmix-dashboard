@@ -3,7 +3,7 @@ import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { SaveInput, SaveTextArea } from '../components/fields';
 
-interface GField { key: string; label: string; type?: 'text' | 'select' | 'list'; options?: string[]; placeholder?: string; default?: string; wide?: boolean; hint?: string; only?: string[]; hidden?: boolean }
+interface GField { key: string; label: string; type?: 'text' | 'select' | 'list' | 'image'; options?: string[]; placeholder?: string; default?: string; wide?: boolean; hint?: string; only?: string[]; hidden?: boolean }
 interface GKind { kind: string; label: string; sheet: string; description: string; fields: GField[] }
 interface GSet { id: string; kind: string; name: string; data: Record<string, string>; sort: number; updatedAt: string }
 
@@ -22,11 +22,16 @@ const tickerMessages = (d: Record<string, string>, auto: TickerAuto = {}): strin
     default: return (d.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   }
 };
-/** Ticker text as it goes to vMix: messages joined by the separator, which also closes the loop. */
+/** Ticker text as it goes to vMix: messages joined by the separator, which also closes the loop, repeated (3× and
+ * 600 characters at least, as graphicSets.ts) so the scrolling text runs on without a gap. */
 const tickerText = (d: Record<string, string>, auto?: TickerAuto) => {
   const items = tickerMessages(d, auto);
   const sep = d.separator || ' I ';
-  return items.length ? items.join(sep) + sep : '';
+  if (!items.length) return '';
+  const loop = items.join(sep) + sep;
+  let out = loop;
+  for (let i = 1; i < 3 || out.length < 600; i++) out += loop;
+  return out;
 };
 const shows = (f: GField, s: GSet) => !f.hidden && (!f.only || f.only.includes(s.data.preset ?? ''));
 
@@ -88,6 +93,8 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
                     <select className="input py-1 text-sm" value={s.data[f.key] ?? ''} onChange={(e) => save(s, { data: { [f.key]: e.target.value } })} aria-label={f.label}>
                       {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
+                  ) : f.type === 'image' ? (
+                    <IconField value={s.data[f.key] ?? ''} onSave={(v) => save(s, { data: { [f.key]: v } })} label={f.label} />
                   ) : f.type === 'list' ? (
                     <SaveTextArea value={s.data[f.key] ?? ''} onSave={(v) => save(s, { data: { [f.key]: v } })} label={f.label} rows={4} placeholder="One message per line" />
                   ) : (
@@ -108,5 +115,42 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
       </div>
       {dialog}
     </section>
+  );
+}
+
+const iconSrc = (v: string) => `/api/gtzip/image?src=${encodeURIComponent(`asset:${v}`)}`;
+const isAsset = (v: string) => !!v && !/^([a-zA-Z]:[\\/]|\\\\|\/)/.test(v);
+
+/** A PNG for the version: a race flag, an uploaded icon (the SSL star) or empty. */
+function IconField({ value, onSave, label }: { value: string; onSave: (v: string) => void; label: string }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const icons = useQuery({ queryKey: ['graphic-icons'], queryFn: () => api.get<string[]>('/api/graphic-sets/icons') });
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const r = await api.upload<{ icon: string }>('/api/graphic-sets/icon', file);
+      await qc.invalidateQueries({ queryKey: ['graphic-icons'] });
+      onSave(r.icon);
+    } catch (e) { toast.error(e); }
+  };
+  const list = icons.data ?? [];
+  const name = (v: string) => v.split('/').pop()!.replace(/\.png$/i, '').replace(/_/g, ' ');
+  return (
+    <div className="flex items-center gap-2">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded border border-ink-800 bg-[repeating-conic-gradient(#27272a_0_25%,#18181b_0_50%)] bg-[length:10px_10px]" title={value || 'No icon'}>
+        {value && isAsset(value) ? <img src={iconSrc(value)} alt="" className="max-h-9 max-w-9" /> : <span className="text-[10px] text-ink-500">{value ? 'path' : 'none'}</span>}
+      </div>
+      <select className="input min-w-0 flex-1 py-1 text-sm" value={value} onChange={(e) => onSave(e.target.value)} aria-label={label}>
+        <option value="">— none —</option>
+        {value && !list.includes(value) && <option value={value}>{name(value)}</option>}
+        <optgroup label="Race flags">{list.filter((x) => x.startsWith('race-flags/')).map((x) => <option key={x} value={x}>{name(x)}</option>)}</optgroup>
+        <optgroup label="Uploaded icons">{list.filter((x) => x.startsWith('icons/')).map((x) => <option key={x} value={x}>{name(x)}</option>)}</optgroup>
+      </select>
+      <label className="inline-flex cursor-pointer items-center whitespace-nowrap rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs font-medium text-ink-100 hover:bg-ink-700" title="Upload a PNG (e.g. the SSL star); it is kept in the assets folder under icons/">
+        Upload PNG
+        <input type="file" accept="image/png" className="hidden" onChange={(e) => { void upload(e.target.files?.[0]); e.target.value = ''; }} />
+      </label>
+    </div>
   );
 }

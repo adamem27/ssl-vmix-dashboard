@@ -11,7 +11,7 @@ import { saveLineup } from '../src/services/lineups.js';
 import { nowSheet } from '../src/services/workbookSheets.js';
 import { setShowConfig } from '../src/services/show.js';
 import { saveResults } from '../src/services/results.js';
-import { createGraphicSet, seedGraphicSets } from '../src/services/graphicSets.js';
+import { createGraphicSet, repeatLoop, seedGraphicSets } from '../src/services/graphicSets.js';
 import { generalSheet, resultsSheet, sailorsSheet, setCurrentStage, teamsSheet } from '../src/services/workbookSheets.js';
 
 const png = () => { const p = new PNG({ width: 4, height: 4 }); return PNG.sync.write(p); };
@@ -97,12 +97,14 @@ describe('workbook sheets', () => {
     expect(general.styles!['0:0']).toBe('title');
     const t = general.findIndex((r) => r.A === 'TICKERS');
     const col = Object.entries(general[t + 1]).find(([, v]) => v === 'Extra')![0];
-    expect(general.find((r, i) => i > t && r.A === 'Ticker text')![col]).toBe('A I B I ');
+    expect(general.find((r, i) => i > t && r.A === 'Ticker text')![col]).toBe(repeatLoop('A I B I '));
     expect(general[t - 1].A).toBe(''); // an empty row between blocks
     expect(general.some((r) => r.A === 'ANNOUNCEMENTS' || r.A === 'PEOPLE')).toBe(false); // own sheets
     const { announcementsSheet, peopleSheet } = await import('../src/services/workbookSheets.js');
-    expect(announcementsSheet(ctx, eventId).slice(0, 2).map((r) => [r.Version, r.Text])).toEqual([['Announcement', 'ANNOUNCEMENT'], ['False start', 'FALSE START']]);
-    expect(announcementsSheet(ctx, eventId).find((r) => r.Version === 'Penalty')).toMatchObject({ Text: 'PENALTY', 'Second line': 'BRN' });
+    expect(announcementsSheet(ctx, eventId)[0]).toMatchObject({ Version: 'P – Preparatory', Text: 'PREPARATORY SIGNAL' });
+    // the icon as vMix reads it: in the assets folder (no vMix root set here)
+    expect(announcementsSheet(ctx, eventId)[0].Icon).toMatch(/race-flags[\\/]P_preparatory\.png$/);
+    expect(announcementsSheet(ctx, eventId)[0]).not.toHaveProperty('Second line');
     expect(peopleSheet(ctx, eventId)).toEqual([]);
     const { lineupSheet } = await import('../src/services/workbookSheets.js');
     const lu = lineupSheet(ctx, eventId);

@@ -22,7 +22,7 @@ import { zipStore } from '../xlsx.js';
 import { joinVmixPath } from '../paths.js';
 import { drawTitle, Img } from './draw.js';
 import { guessScene, SCENES } from './scenes.js';
-import { clone, elements, fields, GtNode, parseXml, serializeXml, sourceName } from './model.js';
+import { clone, elements, fields, GtNode, parseXml, serializeXml, sourceName, syncLayerSizes } from './model.js';
 import { CountOpts, ImageBand, setCount } from './params.js';
 
 export const GTZIP_DIR = 'gtzip';
@@ -332,6 +332,7 @@ export class GtzipService {
     const p = this.pkg(templateId);
     p.doc = clone(doc);
     tidyLayers(p.doc); // readable layer names (fields keep theirs)
+    syncLayerSizes(p.doc); // a layer resized here is cut, never squeezed by vMix
     // embed new pictures; the same picture used twice is stored once
     const added = new Map<string, string>();
     for (const b of collect(p.doc, 'Bitmap')) {
