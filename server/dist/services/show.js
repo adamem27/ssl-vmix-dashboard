@@ -17,6 +17,8 @@ import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
 import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
+import { groupLabel, groupLetter } from './groupNames.js';
+import { currentStage } from './workbookSheets.js';
 import { parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmixResults.js';
 /**
  * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
@@ -121,10 +123,13 @@ const row8 = (...keys) => Array.from({ length: 8 }, (_, i) => keys[i] ?? null);
  * fallback page is 8 and every team has a page of its own from 9 on, its places with the sailors' names on the keys.
  */
 export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 };
-export function deckPages(cfg, teams = []) {
-    return applyKeyEdits(cfg, defaultDeckPages(cfg, teams));
+export const compareKey = (name) => groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
+export const compareInput = (key) => `ssl_compare_${key}`;
+export function deckPages(cfg, teams = [], groups = []) {
+    return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups));
 }
-function defaultDeckPages(cfg0, teams = []) {
+function defaultDeckPages(cfg0, teams = [], groups = []) {
+    const comparePage = PRESET_PAGES.teams + teams.length;
     const cfg = { ...cfg0, deck1Page: PRESET_PAGES.deck1, deck2Page: PRESET_PAGES.deck2, fallbackPage: PRESET_PAGES.fallback };
     const p1 = cfg.deck1Page, p2 = cfg.deck2Page;
     const nav = (home, prev, prevName, next, nextName) => row8(k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'), null, k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
@@ -133,7 +138,7 @@ function defaultDeckPages(cfg0, teams = []) {
             deck: 1, name: 'A BEFORE', page: p1, keys: [
                 row8(k('show:welcome', 'WELCOME', 'board'), k('comm:host', 'HOST\\nLT', 'lt'), k('comm:guest', 'GUEST\\nLT', 'lt'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:compare', 'TEAM\\nCOMPARE', 'board'), k('boardout', 'BOARD\\nOUT', 'board')),
                 row8(k('anthem:1', 'ANTHEM\\nTEAM 1', 'team'), k('anthem:2', 'ANTHEM\\nTEAM 2', 'team'), k('anthem:3', 'ANTHEM\\nTEAM 3', 'team'), k('anthem:4', 'ANTHEM\\nTEAM 4', 'team'), k('lineup:1', 'LINEUP\\nTEAM 1', 'board'), k('lineup:2', 'LINEUP\\nTEAM 2', 'board'), k('lineup:3', 'LINEUP\\nTEAM 3', 'board'), k('lineup:4', 'LINEUP\\nTEAM 4', 'board')),
-                row8(k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('comm:water', 'ON-WATER\\nLT', 'lt'), k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
+                row8(k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('comm:water', 'ON-WATER\\nLT', 'lt'), k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode'), k(`nav:${comparePage}`, 'COMPARE\\nGROUPS', 'nav')),
                 nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
             ],
         },
@@ -169,6 +174,17 @@ function defaultDeckPages(cfg0, teams = []) {
         slotPage(p2 + 3, 'BUGS 2', 'bug', SLOTS_PER_PAGE, nav(p2, p2 + 2, 'BUGS 1', p2 + 4, 'TICKERS')),
         slotPage(p2 + 4, 'TICKERS', 'ticker', 0, nav(p2, p2 + 3, 'BUGS 2', p2, 'TEAMS')),
         ...teams.map((t, i) => teamPage(t, i, teams, p2)),
+        // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
+        {
+            deck: 1, name: 'COMPARE', page: comparePage, keys: [
+                ...[0, 1].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
+                    const g = groups[r * 8 + c];
+                    return g ? k(`compare:${g.key}`, `COMPARE\\n${g.label}`, 'board') : null;
+                }))),
+                row8(k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode'), k('show:compare', 'COMPARE\\nPICKED', 'board'), null, null, null, null, null, k('boardout', 'BOARD\\nOUT', 'board')),
+                nav(p1, p1, 'BEFORE', p1 + 1, 'AFTER'),
+            ],
+        },
     ];
 }
 /** A team's page on deck 2: its lower thirds and boards, its places (sailor's name on the key), ◀ ▶ to the next team. */
@@ -328,7 +344,7 @@ export class Show {
         })));
     }
     /** The pages of both decks with a page per team. */
-    pages() { return deckPages(this.config, this.presetTeams()); }
+    pages() { return deckPages(this.config, this.presetTeams(), this.compareGroups()); }
     /** A team by key: its position in the group racing now (1–4) or its code. */
     teamRef(arg) {
         if (/^\d+$/.test(arg))
@@ -503,21 +519,61 @@ export class Show {
                 await this.set(input, f);
         }
     }
-    /** Team comparison of the group picked at the top, with the flag or the emblem by each team (COMPARE key). */
-    compareData() {
+    /** Team comparison of a group (default: the one picked at the top), with the flag or the emblem by each team (COMPARE key). */
+    compareData(fleetId = this.config.fleetId) {
         const ev = activeEvent(this.ctx.db);
-        return compareFields(this.ctx, ev.id, this.config.fleetId, todayIn(ev.timezone), { mark: this.state.compareMark, emblemSlot: getLtConfig(this.ctx.db).emblemSlot });
+        return compareFields(this.ctx, ev.id, fleetId, todayIn(ev.timezone), { mark: this.state.compareMark, emblemSlot: getLtConfig(this.ctx.db).emblemSlot });
     }
-    /** Flag ⇄ emblem on Team comparison; the title shows the change at once (on air too, as a data change). */
+    /** The groups of the stage picked at the top (every stage when none is), each with its key: A, B… or FINAL. */
+    compareGroups() {
+        return this.cached('compareGroups', () => {
+            const ev = activeEvent(this.ctx.db).id;
+            const stage = currentStage(this.ctx.db, ev);
+            const sets = stage ? [stage.id] : listSets(this.ctx.db, ev).map((x) => x.id);
+            const seen = new Set();
+            return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: groupLabel(f.name) }))
+                .filter((g) => g.key && !seen.has(g.key) && !!seen.add(g.key));
+        });
+    }
+    /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */
+    compareTargets(inputs) {
+        const out = [];
+        for (const g of this.compareGroups()) {
+            const i = inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
+            if (i)
+                out.push({ input: i, fleetId: g.fleetId });
+        }
+        const shared = this.resolve(this.graphic('compare'), inputs);
+        if (shared && this.config.fleetId && !out.some((x) => x.input.key === shared.key))
+            out.push({ input: shared, fleetId: this.config.fleetId });
+        return out;
+    }
+    /** A group's Team comparison (COMPARE A…): its data into its own input, then in on the boards overlay; again = out. */
+    async compareGroup(arg) {
+        const groups = this.compareGroups();
+        const grp = groups.find((x) => x.key === compareKey(arg) || x.fleetId === arg);
+        if (!grp)
+            throw notFound(`Group ${arg} in this stage`);
+        const g = this.graphic('compare');
+        const snap = await this.snapshot();
+        const own = snap.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(grp.key).toLowerCase());
+        const input = own ?? this.need(g, snap.inputs);
+        if (snap.overlays[g.overlay] === input.number) {
+            this.pushUndo(snap.overlays);
+            await this.overlayOut(g.overlay, snap.overlays);
+            return { out: 'compare', group: grp.label };
+        }
+        await this.set(input, this.compareData(grp.fleetId));
+        await this.bringIn(g, input, snap);
+        return { in: 'compare', group: grp.label, input: input.title };
+    }
+    /** Flag ⇄ emblem on Team comparison; every group's title shows the change at once (on air too, as a data change). */
     async compareMark() {
         const mark = this.state.compareMark === 'emblem' ? 'flag' : 'emblem';
         this.patchState({ compareMark: mark });
-        if (this.config.fleetId) {
-            const { inputs } = await this.snapshot();
-            const input = this.resolve(this.graphic('compare'), inputs);
-            if (input)
-                await this.set(input, new Map([...this.compareData()].filter(([k]) => /flag\.source$/i.test(k))));
-        }
+        const { inputs } = await this.snapshot();
+        for (const t of this.compareTargets(inputs))
+            await this.set(t.input, new Map([...this.compareData(t.fleetId)].filter(([k]) => /flag\.source$/i.test(k))));
         return { compareMark: mark };
     }
     /** The lineup lower third: the places in the set order, split into the first five and the rest. */
@@ -887,7 +943,8 @@ export class Show {
     }
     async dispatch(kind, arg) {
         switch (kind) {
-            case 'show': return arg === 'lineup5' ? this.lineupLt() : this.toggle(arg);
+            case 'show': return arg === 'lineup5' ? this.lineupLt() : arg === 'compare' && this.config.fleetId && this.compareGroups().some((g) => g.fleetId === this.config.fleetId) ? this.compareGroup(this.config.fleetId) : this.toggle(arg);
+            case 'compare': return this.compareGroup(arg);
             case 'qualified': return this.qualified(arg);
             case 'comm': return this.commentator(arg);
             case 'anthem': return this.lt.showTeam(this.teamRef(arg).code);
@@ -1021,6 +1078,10 @@ export class Show {
         }
         if (kind === 'show')
             onAir = isOn(arg);
+        if (kind === 'compare' && ctxt) {
+            const i = ctxt.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(compareKey(arg)).toLowerCase());
+            onAir = !!i && ov[1] === i.number;
+        }
         if (key.action === 'show:lineup5' && st.lineupPart)
             text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
         if (kind === 'break')
@@ -1141,14 +1202,18 @@ export class Show {
         try {
             const { inputs } = await this.snapshot();
             const fleetId = this.config.fleetId;
-            for (const id of ['schedule', 'results', 'compare']) {
-                if (id !== 'schedule' && !fleetId)
-                    continue;
-                const input = this.resolve(this.graphic(id), inputs);
-                if (!input)
-                    continue;
-                const f = id === 'schedule' ? showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() })
-                    : id === 'results' ? resultFieldsFor(this.ctx, fleetId, input).fields : this.compareData();
+            const jobs = [];
+            const sched = this.resolve(this.graphic('schedule'), inputs);
+            if (sched)
+                jobs.push({ input: sched, f: () => showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+            const res = fleetId ? this.resolve(this.graphic('results'), inputs) : undefined;
+            if (res)
+                jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, fleetId, res).fields });
+            // Team comparison: every group's own input, and the shared one for the group picked at the top
+            for (const t of this.compareTargets(inputs))
+                jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
+            for (const { input, f: make } of jobs) {
+                const f = make();
                 if (!f)
                     continue;
                 const match = titleFieldMatcher(input.fields);
@@ -1187,11 +1252,16 @@ export class Show {
             fs.writeFileSync(file, encodePng(1920, 1080, (x, y) => (x < 24 && y < 24 ? [245, 158, 11, 255] : [0, 0, 0, 0])));
         const root = getSetting(this.ctx.db, 'paths.vmixAssetsRoot');
         const vmixPath = root ? joinVmixPath(root, 'placeholders/placeholder.png') : file;
-        for (const g of this.graphics()) {
+        const want = this.graphics().flatMap((g) => {
+            if (g.id === 'compare')
+                return this.compareGroups().map((x) => compareInput(x.key)); // a Team comparison per group
             if (this.resolve(g, inputs))
-                continue;
+                return [];
             const name = g.inputs.map((x) => x.replace('{n}', String(this.boats().length || 4)).replace('{crew}', '9')).find((x) => !x.includes('{'));
-            if (!name)
+            return name ? [name] : [];
+        });
+        for (const name of want) {
+            if (inputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === name.toLowerCase()))
                 continue;
             await this.vmix(`?Function=AddInput&Value=${encodeURIComponent(`Image|${vmixPath}`)}`);
             const after = parseVmixXml(await this.vmix(''));

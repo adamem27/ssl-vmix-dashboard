@@ -1,8 +1,14 @@
 {
-  "version": "1.0.131",
-  "commit": "6c0fbaa",
-  "date": "2026-11-10T21:00:14Z",
+  "version": "1.0.132",
+  "commit": "6176285",
+  "date": "2026-11-10T21:15:43Z",
   "changes": [
+    {
+      "version": "1.0.132",
+      "commit": "6176285",
+      "date": "2026-11-10T21:15:43Z",
+      "text": "Team comparison: an input per group (ssl_compare_A…), COMPARE page with a key per group, placeholders and live data for each"
+    },
     {
       "version": "1.0.131",
       "commit": "6c0fbaa",
@@ -476,12 +482,6 @@
       "commit": "5ad1f6a",
       "date": "2026-11-08T17:09:24Z",
       "text": "Team profile icon next to team names in Teams & crews, Fleets, PNG generator and Matchboard"
-    },
-    {
-      "version": "1.0.38",
-      "commit": "c4ad1b1",
-      "date": "2026-11-08T16:59:42Z",
-      "text": "Matchboard: rows are box standings (drag or arrows), starred teams fill the next round's linked rows"
     }
   ]
 }
