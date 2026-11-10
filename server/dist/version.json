@@ -1,8 +1,14 @@
 {
-  "version": "1.0.108",
-  "commit": "9eebcf2",
-  "date": "2026-11-10T02:12:38Z",
+  "version": "1.0.109",
+  "commit": "d6b4565",
+  "date": "2026-11-10T02:22:02Z",
   "changes": [
+    {
+      "version": "1.0.109",
+      "commit": "d6b4565",
+      "date": "2026-11-10T02:22:02Z",
+      "text": "GTZIP generator: Standard animation, the house In/Out pattern from the finals titles in one click (board, lower third, bug, bar, L-bar; tempo; data change fades)"
+    },
     {
       "version": "1.0.108",
       "commit": "9eebcf2",
@@ -476,12 +482,6 @@
       "commit": "ed9f4ec",
       "date": "2026-10-19T10:32:59Z",
       "text": "Add app.cjs startup file for Passenger-based Node hosting (DirectAdmin)"
-    },
-    {
-      "version": "1.0.13",
-      "commit": "2d229bd",
-      "date": "2026-10-19T09:57:54Z",
-      "text": "Online mode: password, Dockerfile and a sync program that mirrors files to the vMix machine"
     }
   ]
 }
