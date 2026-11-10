@@ -175,7 +175,7 @@ export class LowerThirds {
     async show(inputName, fields, next) {
         const cfg = this.config;
         if (!inputName.trim())
-            throw badRequest('Set the vMix inputs of the lower thirds on the Lower thirds tab.');
+            throw badRequest('Set the vMix inputs of the lower thirds in Show control → Lower thirds.');
         if (this.pendingOut) {
             clearTimeout(this.pendingOut);
             this.pendingOut = null;
@@ -184,7 +184,7 @@ export class LowerThirds {
         const xml = await this.vmix('');
         const input = findInput(parseVmixXml(xml), inputName);
         if (!input)
-            throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name on the Lower thirds tab.`);
+            throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
         const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
         fields = this.fitToTitle(input, fields, next.teamId);
         const has = new Set(input.fields);

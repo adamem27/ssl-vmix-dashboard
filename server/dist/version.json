@@ -1,8 +1,14 @@
 {
-  "version": "1.0.126",
-  "commit": "6ab0933",
-  "date": "2026-11-10T18:46:45Z",
+  "version": "1.0.127",
+  "commit": "1e995d2",
+  "date": "2026-11-10T19:55:56Z",
   "changes": [
+    {
+      "version": "1.0.127",
+      "commit": "1e995d2",
+      "date": "2026-11-10T19:55:56Z",
+      "text": "Show control takes over the Lower thirds tab; results bars and comparison panels in team colours; flag/emblem key"
+    },
     {
       "version": "1.0.126",
       "commit": "6ab0933",
@@ -476,12 +482,6 @@
       "commit": "fab9a3a",
       "date": "2026-11-08T00:13:16Z",
       "text": "Launcher: a launcher file that cannot be replaced no longer fails the update"
-    },
-    {
-      "version": "1.0.33",
-      "commit": "f574121",
-      "date": "2026-11-08T00:07:05Z",
-      "text": "SSL26 design: team gradients and orange stroke"
     }
   ]
 }

@@ -14,6 +14,7 @@ import { loadLineup } from './lineups.js';
 import { crewOf } from './lowerthirds.js';
 import { overview } from './overview.js';
 import { listTeams } from './teams.js';
+import { teamPictureFor } from './ltTitle.js';
 import { currentStage } from './workbookSheets.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 const up = (s) => (s ?? '').trim().toUpperCase();
@@ -137,7 +138,7 @@ export function showDataFields(ctx, graphicId, o) {
  * the captain's photo, flag. Each value goes under the names of both kinds of title: 1 COUNTRY, 1 NICKNAME,
  * RANK 1 / RANK NUM 1, 1 WEIGHT NUM, 1 CPT NAME, 1 CPT SURNAME, 1 FLAG, 1 PHOTO / PHOTO 1, and T1Name, T1Nick, T1Rank…
  */
-export function compareFields(ctx, eventId, fleetId, today) {
+export function compareFields(ctx, eventId, fleetId, today, o = {}) {
     const f = new Map();
     const fleet = ctx.db.prepare('SELECT name, fleet_set_id AS setId FROM fleets WHERE id = ?').get(fleetId);
     const welcome = first(ctx, eventId, 'welcome');
@@ -154,14 +155,18 @@ export function compareFields(ctx, eventId, fleetId, today) {
         const photo = t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '';
         const w = t ? String(weights.get(t.id) ?? '') : '';
         const name = (t?.name ?? '').toUpperCase(), nick = t?.nickname ?? '', rank = t?.ranking ?? '';
-        const flag = img(a.flag_big) || img(a.flag_small);
+        // the small flag, or the team's emblem (COMPARE: FLAG ⇄ EMBLEM key)
+        const flag = o.mark === 'emblem' ? img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark) : img(a.flag_small) || img(a.flag_big);
+        // the team's panel from the PNG generator: left for teams 1 and 3, right for 2 and 4 (851×390)
+        const side = n % 2 ? 'left' : 'right';
+        const panel = t ? teamPictureFor(ctx, t, { w: 851, h: 390, key: `panel${side}` }) : ''; // null: the title keeps its own
         for (const [k, v] of [
             [`${n} COUNTRY.Text`, name], [`T${n}Name.Text`, name], [`${n} NICKNAME.Text`, nick], [`T${n}Nick.Text`, nick],
             [`RANK ${n}.Text`, rank], [`RANK NUM ${n}.Text`, rank], [`T${n}Rank.Text`, rank],
             [`${n} WEIGHT NUM.Text`, w ? `${w} kg` : ''], [`T${n}Weight.Text`, w],
             [`${n} CPT NAME.Text`, cpt?.firstName ?? ''], [`${n} CPT SURNAME.Text`, (cpt?.lastName ?? '').toUpperCase()],
             [`T${n}Captain.Text`, cpt ? `${cpt.firstName} ${cpt.lastName}`.trim() : ''],
-            [`${n} FLAG.Source`, flag], [`T${n}Flag.Source`, flag], [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
+            [`${n} FLAG.Source`, flag], [`T${n}Flag.Source`, flag], ...(panel === null ? [] : [[`${n} BG.Source`, panel], [`T${n}Panel.Source`, panel]]), [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
         ])
             f.set(k, v);
     }

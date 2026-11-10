@@ -4,6 +4,7 @@ import { groupLabel } from './groupNames.js';
 import { badRequest } from './errors.js';
 import { getResults } from './results.js';
 import { listTeams } from './teams.js';
+import { teamPictureFor } from './ltTitle.js';
 /**
  * Sends a group's overall results straight into a vMix title through the vMix Web API
  * (SetText / SetImage), so the title needs no Data Source mapping. Field names follow the
@@ -68,6 +69,11 @@ export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
             f.set(`R${j} points${n}.Text`, r && k >= 0 ? r.races[k] ?? '' : '');
         }
         f.set(`Total${n}.Text`, r ? r.total : '');
+        // the row's bar in the team's colours: its long bar from the PNG generator (CODE_bar_long.png, 1130×75)
+        // (a team with no generated bar keeps the title's own; a row with no team gets none)
+        const bar = t ? teamPictureFor(ctx, t, { w: 1130, h: 75, key: 'barlong' }) : '';
+        if (bar !== null)
+            f.set(`bar${n}.Source`, bar);
     }
     return f;
 }
