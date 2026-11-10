@@ -62,6 +62,10 @@ export const showConfigSchema = z.object({
     /** write key texts and colours into Companion (HTTP remote control) */
     labels: z.boolean().default(true),
     /** places on the lineup lower third, in this order: the first 5, then the rest on the second press */
+    /** Stream Deck key edits by place ("<page index>/<row>/<col>"): another action ('' = empty key), own text ({auto} = the live text), key and text colour */
+    keys: z.record(z.string(), z.object({ action: z.string().optional(), text: z.string().optional(), bg: z.string().optional(), fg: z.string().optional() })).default({}),
+    /** key colour per kind of key (board, lt, bug, …), overriding the built-in palette */
+    kindColours: z.record(z.string(), z.string()).default({}),
     lineup5: z.array(z.string()).default(['Tactician', 'Helm', 'Main', 'Trimmer1', 'Trimmer', 'Grinder', 'Pit', 'Midbow', 'Bow']),
 });
 const CFG = 'show.config';
@@ -94,6 +98,9 @@ export const overlayOf = (xml, n) => xml.match(new RegExp(`<overlay number="${n}
 const k = (action, text, kind) => ({ action, text, kind });
 const row8 = (...keys) => Array.from({ length: 8 }, (_, i) => keys[i] ?? null);
 export function deckPages(cfg) {
+    return applyKeyEdits(cfg, defaultDeckPages(cfg));
+}
+function defaultDeckPages(cfg) {
     const p1 = cfg.deck1Page, p2 = cfg.deck2Page;
     const nav = (home, prev, prevName, next, nextName) => row8(k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'), null, k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
     return [
@@ -130,6 +137,46 @@ export function deckPages(cfg) {
             ],
         },
     ];
+}
+export const KEY_COLOURS = { board: '#1e3a8a', lt: '#166534', bug: '#a16207', scene: '#0f766e', team: '#1e3a5f', sailor: '#27303f', nav: '#3f3f46', safety: '#7c2d12', mode: '#4c1d95' };
+const SPECIAL_BG = { undo: '#6b21a8', allout: '#c2410c', panic: '#991b1b' };
+/** The colour a key has when nothing is on air: its own, else its kind's. */
+export const keyBg = (cfg, key) => key.bg || cfg.kindColours[key.kind] || SPECIAL_BG[key.action] || KEY_COLOURS[key.kind] || '#3f3f46';
+/** Every action a key can have, with the text and kind a key with that action gets by default. */
+export function keyActions(cfg) {
+    const out = new Map();
+    for (const p of defaultDeckPages(cfg))
+        for (const row of p.keys)
+            for (const key of row)
+                if (key && !out.has(key.action))
+                    out.set(key.action, { action: key.action, text: key.text, kind: key.kind });
+    for (const g of DEFAULT_GRAPHICS)
+        if (!out.has(`show:${g.id}`))
+            out.set(`show:${g.id}`, { action: `show:${g.id}`, text: g.label.toUpperCase(), kind: g.kind });
+    return [...out.values()];
+}
+function applyKeyEdits(cfg, pages) {
+    if (!Object.keys(cfg.keys).length)
+        return pages;
+    const actions = new Map(keyActions(cfg).map((a) => [a.action, a]));
+    return pages.map((p, pi) => ({
+        ...p,
+        keys: p.keys.map((row, r) => row.map((key, c) => {
+            const o = cfg.keys[`${pi}/${r}/${c}`];
+            if (!o)
+                return key;
+            let next = key;
+            if (o.action !== undefined) {
+                if (!o.action)
+                    return null;
+                const a = actions.get(o.action);
+                next = a ? { ...a } : { action: o.action, text: o.action.toUpperCase(), kind: 'mode' };
+            }
+            if (!next)
+                return null;
+            return { ...next, ...(o.text ? { custom: o.text } : {}), ...(o.bg ? { bg: o.bg } : {}), ...(o.fg ? { fg: o.fg } : {}) };
+        })),
+    }));
 }
 export class Show {
     ctx;
@@ -681,21 +728,17 @@ export class Show {
             text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
         if (kind === 'break')
             onAir = isOn('break');
-        const colours = { board: '#1e3a8a', lt: '#166534', bug: '#a16207', scene: '#0f766e', team: '#1e3a5f', sailor: '#27303f', nav: '#3f3f46', safety: '#7c2d12', mode: '#4c1d95' };
-        let bg = colours[key.kind] ?? '#3f3f46';
-        if (key.action === 'undo')
-            bg = '#6b21a8';
-        if (key.action === 'allout')
-            bg = '#c2410c';
-        if (key.action === 'panic')
-            bg = '#991b1b';
+        if (key.custom)
+            text = key.custom.replace(/\{auto\}/g, text);
+        let bg = keyBg(this.config, key);
+        const fg = key.fg || '#ffffff';
         if (active)
             bg = '#d97706';
         if (onAir)
             bg = '#dc2626';
         if (empty)
             bg = '#18181b';
-        return { text, bg, onAir, active, empty };
+        return { text, bg, fg, onAir, active, empty };
     }
     async view() {
         const snap = await this.snapshot().catch(() => null);
@@ -710,7 +753,7 @@ export class Show {
                 return { ...g, input: i?.title ?? null, onAir: !!(i && snap.overlays[g.overlay] === i.number), fields: i?.fields.length ?? 0 };
             }),
             boats: this.boats(), sailors: this.sailors().map((s) => ({ slot: s.slot, number: s.number, name: `${s.firstName} ${s.lastName}`.trim(), position: s.position, photo: !!s.photo })),
-            pages: looks,
+            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS,
         };
     }
     /** Key texts and colours into Companion (POST /api/location/<page>/<row>/<col>/style), only what changed. */
@@ -730,7 +773,7 @@ export class Show {
                         if (!key || key.kind === 'nav')
                             continue;
                         const l = await this.keyLook(key, snap);
-                        const q = `text=${encodeURIComponent(l.text)}&bgcolor=${encodeURIComponent(l.bg)}&color=${encodeURIComponent('#ffffff')}&size=auto`;
+                        const q = `text=${encodeURIComponent(l.text)}&bgcolor=${encodeURIComponent(l.bg)}&color=${encodeURIComponent(l.fg)}&size=auto`;
                         const id = `${p.page}/${r}/${c}`;
                         if (this.labels.get(id) === q)
                             continue;
@@ -787,9 +830,10 @@ export class Show {
 }
 // ---------- Companion page files ----------
 const COLOURS = (kind) => ({ board: 0x1e3a8a, lt: 0x166534, bug: 0xa16207, scene: 0x0f766e, team: 0x1e3a5f, sailor: 0x27303f, nav: 0x3f3f46, safety: 0x7c2d12, mode: 0x4c1d95 }[kind] ?? 0x3f3f46);
-const control = (text, bg, down) => ({
+const hex = (c) => parseInt(c.replace('#', ''), 16) || 0;
+const control = (text, bg, down, fg = 0xffffff) => ({
     type: 'button',
-    style: { text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center', color: 0xffffff, bgcolor: bg, show_topbar: 'default' },
+    style: { text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center', color: fg, bgcolor: bg, show_topbar: 'default' },
     options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
     feedbacks: [],
     steps: { 0: { action_sets: { down, up: [] }, options: { runWhileHeld: [] } } },
@@ -816,7 +860,7 @@ export function companionFiles(cfg, base, vmixBase, graphics) {
                 return;
             const id = `p${p.page}r${r}c${c}`;
             const act = key.kind === 'nav' ? setPage(id, Number(key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(key.action)}`);
-            (controls[r] ??= {})[c] = control(key.text, COLOURS(key.kind), [act]);
+            (controls[r] ??= {})[c] = control(key.custom ? key.custom.replace(/\{auto\}/g, key.text) : key.text, hex(keyBg(cfg, key)), [act], key.fg ? hex(key.fg) : 0xffffff);
         }));
         files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, controls) });
     }
