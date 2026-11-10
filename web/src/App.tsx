@@ -5,6 +5,7 @@ import { api, Meta } from './api';
 import { cx } from './components/ui';
 import { StagePicker } from './components/StagePicker';
 import { VersionBadge } from './components/VersionBadge';
+import { CommentatorLinkButton } from './components/CommentatorLink';
 import { CommentatorPage } from './pages/Commentator';
 import { OverviewPage } from './pages/Overview';
 import { GeneralPage } from './pages/General';
@@ -65,6 +66,7 @@ function TopBar() {
         <div className="truncate text-xs text-ink-400" title="Active event">
           {meta.data && <>Event: <span className="font-medium text-ink-200">{meta.data.event.name}</span> · {meta.data.event.timezone}</>}
         </div>
+        <CommentatorLinkButton />
         <VmixPcBadge />
         <VersionBadge />
       </div>
