@@ -64,7 +64,7 @@ export function jsonSailors(ctx, eventId, date, teamCode) {
 export function jsonFleetSet(ctx, setId) {
     const { db } = ctx;
     if (!db.prepare('SELECT 1 FROM fleet_sets WHERE id = ?').get(setId))
-        throw notFound('Fleet set');
+        throw notFound('Stage');
     const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
     const fleets = db.prepare('SELECT id, name, placeholders, size FROM fleets WHERE fleet_set_id = ? ORDER BY sort, created_at').all(setId);
     const slots = db.prepare('SELECT fleet_id, position, team_id FROM fleet_slots WHERE fleet_set_id = ?').all(setId);

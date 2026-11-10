@@ -296,7 +296,7 @@ export async function buildApp(deps) {
         if (position === undefined) {
             const free = fleets.firstFreePosition(db, b.fleetId);
             if (free === null)
-                throw badRequest('This fleet is full. Choose a specific place to swap, or add places to the fleet.');
+                throw badRequest('This group is full. Choose a specific place to swap, or add places to the group.');
             position = free;
         }
         const result = fleets.placeTeam(db, req.params.id, { teamId: b.teamId, fleetId: b.fleetId, position, onOccupied: b.onOccupied });

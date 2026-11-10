@@ -1,8 +1,14 @@
 {
-  "version": "1.0.112",
-  "commit": "c5581aa",
-  "date": "2026-11-10T14:08:12Z",
+  "version": "1.0.113",
+  "commit": "d6ac839",
+  "date": "2026-11-10T14:10:26Z",
   "changes": [
+    {
+      "version": "1.0.113",
+      "commit": "d6ac839",
+      "date": "2026-11-10T14:10:26Z",
+      "text": "One name for each thing: Groups and Stages instead of fleets and fleet sets, teams instead of boats; Racing now sheet: one row about the group racing now for universal vMix titles"
+    },
     {
       "version": "1.0.112",
       "commit": "c5581aa",
@@ -476,12 +482,6 @@
       "commit": "6aa2cfc",
       "date": "2026-10-22T14:54:39+02:00",
       "text": "Generator: gradient stroke with per-element checkbox and angle (#3)"
-    },
-    {
-      "version": "1.0.18",
-      "commit": "9d9ccf4",
-      "date": "2026-10-22T12:33:12Z",
-      "text": "PNG generator: Copacabana waves and element sizes from gradienty.ai"
     }
   ]
 }
