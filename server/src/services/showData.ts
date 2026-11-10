@@ -10,6 +10,10 @@ import { getSetDetail } from './fleets.js';
 import { getWeather, listSchedule } from './general.js';
 import { GRAPHIC_KINDS, imagePath, listGraphicSets, TickerAuto } from './graphicSets.js';
 import { groupLabel } from './groupNames.js';
+import { loadLineup } from './lineups.js';
+import { crewOf } from './lowerthirds.js';
+import { overview } from './overview.js';
+import { listTeams } from './teams.js';
 import { currentStage } from './workbookSheets.js';
 
 type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: string | null } | undefined | null;
@@ -125,3 +129,37 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
   }
 }
 
+/**
+ * Team comparison of a group (its teams in group order, 1–4): name, nickname, SSL ranking, team weight, captain and
+ * the captain's photo, flag. Each value goes under the names of both kinds of title: 1 COUNTRY, 1 NICKNAME,
+ * RANK 1 / RANK NUM 1, 1 WEIGHT NUM, 1 CPT NAME, 1 CPT SURNAME, 1 FLAG, 1 PHOTO / PHOTO 1, and T1Name, T1Nick, T1Rank…
+ */
+export function compareFields(ctx: AssetCtx, eventId: string, fleetId: string, today: string): Map<string, string> {
+  const f = new Map<string, string>();
+  const fleet = ctx.db.prepare('SELECT name, fleet_set_id AS setId FROM fleets WHERE id = ?').get(fleetId) as { name: string; setId: string } | undefined;
+  const welcome = first(ctx, eventId, 'welcome');
+  f.set('Group.Text', groupLabel(fleet?.name));
+  f.set('SUBTITLE.Text', groupLabel(fleet?.name));
+  f.set('TITLE.Text', up(welcome.stage) || up(welcome.event));
+  const ids = fleet ? getSetDetail(ctx.db, fleet.setId).fleets.find((x) => x.id === fleetId)?.positions ?? [] : [];
+  const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
+  const weights = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t.declaration?.totalWeight ?? '']));
+  for (let n = 1; n <= 4; n++) {
+    const t = teams.get(ids[n - 1] ?? '');
+    const a = (t?.assets ?? {}) as Record<string, Asset>;
+    const cpt = t ? loadLineup(ctx.db, eventId, t.id).data.rows.find((r) => r.captain) : undefined;
+    const photo = t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '';
+    const w = t ? String(weights.get(t.id) ?? '') : '';
+    const name = (t?.name ?? '').toUpperCase(), nick = t?.nickname ?? '', rank = t?.ranking ?? '';
+    const flag = img(a.flag_big) || img(a.flag_small);
+    for (const [k, v] of [
+      [`${n} COUNTRY.Text`, name], [`T${n}Name.Text`, name], [`${n} NICKNAME.Text`, nick], [`T${n}Nick.Text`, nick],
+      [`RANK ${n}.Text`, rank], [`RANK NUM ${n}.Text`, rank], [`T${n}Rank.Text`, rank],
+      [`${n} WEIGHT NUM.Text`, w ? `${w} kg` : ''], [`T${n}Weight.Text`, w],
+      [`${n} CPT NAME.Text`, cpt?.firstName ?? ''], [`${n} CPT SURNAME.Text`, (cpt?.lastName ?? '').toUpperCase()],
+      [`T${n}Captain.Text`, cpt ? `${cpt.firstName} ${cpt.lastName}`.trim() : ''],
+      [`${n} FLAG.Source`, flag], [`T${n}Flag.Source`, flag], [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
+    ] as const) f.set(k, v);
+  }
+  return f;
+}

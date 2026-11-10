@@ -246,6 +246,39 @@ describe('show control', () => {
     expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
   });
 
+  it("fills the producer's own titles (overall_results, team_comparison, team_lineup) and keeps them in step without a key", async () => {
+    const { s, teams } = race();
+    saveLineup(s.ctx, activeEvent(s.db).id, teams[0], { rows: [
+      { slot: 'Trimmer', firstName: 'Joan', lastName: 'Cardona', number: '7' },
+      { slot: 'Trimmer1', firstName: 'Iker', lastName: 'Martinez', number: '8' },
+      { slot: 'Tactician', firstName: 'Florian', lastName: 'Trittel', number: '2', captain: true },
+    ] });
+    const v = fakeVmix({
+      ssl_results_group: ['COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
+      ssl_compare: ['Group.Text', '1 COUNTRY.Text', '1 NICKNAME.Text', 'RANK 1.Text', 'RANK NUM 3.Text', '1 CPT NAME.Text', '1 CPT SURNAME.Text', '1 FLAG.Source', '1 PHOTO.Source', 'PHOTO 2.Source'],
+      ssl_lineup: ['TeamName.Text', 'Trimmer1NAME.Text', 'Trimmer1Positio.Text', 'Trimmer2SURNAME.Text', 'TacticianSURNAM.Text', 'BowPosition.Text', 'PitPOSITION.Text'],
+      ssl_schedule: ['DateText.Text'],
+    });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    // picking the group (top of the dashboard) is enough: results and comparison follow it
+    const r = await show.syncData();
+    expect(r.sent).toBeGreaterThan(5);
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=COUNTRY1.Text&Value=TEAM ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Group A.Text&Value=FLEET 1');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=TEAM ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=TRITTEL');
+    expect(v.calls.some((c) => c.includes('SelectedName=DateText.Text'))).toBe(true);
+    // nothing changed: nothing sent again
+    v.calls.length = 0;
+    expect((await show.syncData()).sent).toBe(0);
+    // the lineup: GT's cut names and the trimmers numbered 1 and 2
+    await show.run('lineup:ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer1NAME.Text&Value=JOAN');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer2SURNAME.Text&Value=MARTINEZ');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TacticianSURNAM.Text&Value=TRITTEL');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TeamName.Text&Value=TEAM ESP');
+  });
+
   it('a team page key shows that place of that team, whatever team is picked', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);

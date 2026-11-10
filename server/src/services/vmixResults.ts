@@ -1,4 +1,6 @@
-import { DB, getSetting, setSetting } from '../db/db.js';
+import { activeEvent, DB, getSetting, setSetting } from '../db/db.js';
+import { listGraphicSets } from './graphicSets.js';
+import { groupLabel } from './groupNames.js';
 import { AssetCtx } from './assets.js';
 import { badRequest } from './errors.js';
 import { getResults } from './results.js';
@@ -38,7 +40,15 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
   const shown = Math.min(g.races, c);
   const first = g.races - shown; // index of the first race shown
   const raceAt = (col: number) => { const k = col - (c - shown) - 1; return k >= 0 && k < shown ? first + k : -1; };
-  for (let j = 1; j <= 12; j++) { const k = j <= c ? raceAt(j) : -1; f.set(`H${j}.Text`, k >= 0 ? `R${k + 1}` : ''); }
+  for (let j = 1; j <= 12; j++) { const k = j <= c ? raceAt(j) : -1; f.set(`H${j}.Text`, k >= 0 ? `R${k + 1}` : ''); f.set(`R${j}.Text`, k >= 0 ? `R${k + 1}` : ''); }
+  // titles named the other way (overall_results: STAGE, LOCALIZATION, "Group A", position 1, flag 1, COUNTRY1,
+  // R1 points1…, Total1): the stage and place from Welcome (General graphics), the group's name
+  const welcome = listGraphicSets(ctx.db, activeEvent(ctx.db).id, 'welcome')[0]?.data ?? {};
+  const up = (v: string | undefined) => (v ?? '').trim().toUpperCase();
+  f.set('STAGE.Text', up(welcome.stage) || up(welcome.event));
+  f.set('LOCALIZATION.Text', up(welcome.location));
+  f.set('Group A.Text', groupLabel(g.fleetName));
+  f.set('GROUP.Text', groupLabel(g.fleetName));
   for (let n = 1; n <= Math.max(rowsInTitle, g.rows.length); n++) {
     const r = g.rows[n - 1];
     const t = r ? teams.get(r.teamId) : undefined;
@@ -47,11 +57,32 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
     f.set(`FLAG ${n}.Source`, img(t?.assets.flag_small));
     for (let j = 1; j <= 12; j++) { const k = j <= c ? raceAt(j) : -1; f.set(`R${j} ${n}.Text`, r && k >= 0 ? r.races[k] ?? '' : ''); }
     f.set(`POINTS ${n}.Text`, r ? r.total : '');
+    f.set(`position ${n}.Text`, r ? String(n) : '');
+    f.set(`COUNTRY${n}.Text`, (t?.name ?? '').toUpperCase());
+    f.set(`flag ${n}.Source`, img(t?.assets.flag_small));
+    for (let j = 1; j <= 12; j++) { const k = j <= c ? raceAt(j) : -1; f.set(`R${j} points${n}.Text`, r && k >= 0 ? r.races[k] ?? '' : ''); }
+    f.set(`Total${n}.Text`, r ? r.total : '');
   }
   return f;
 }
 
 /** values: what each title field holds now (<text name="Name.Text">South Korea</text>, <image …>path</image>). */
+/**
+ * The title's own name for a field: the same name in any case, or the name GT cut at 15 characters
+ * (TacticianSURNAME → TacticianSURNAM.Text), with the same .Text / .Source; undefined when the title has none.
+ */
+export function titleFieldMatcher(titleFields: string[]) {
+  const exact = new Map(titleFields.map((f) => [f.toLowerCase(), f]));
+  const split = (f: string) => { const i = f.lastIndexOf('.'); return [f.slice(0, i).toLowerCase(), f.slice(i).toLowerCase()]; };
+  const cut = titleFields.map((f) => [...split(f), f] as const).filter(([b]) => b.length >= 15);
+  return (name: string) => {
+    const e = exact.get(name.toLowerCase());
+    if (e) return e;
+    const [b, ext] = split(name);
+    return cut.find(([cb, cext]) => cext === ext && b.length > cb.length && b.startsWith(cb))?.[2];
+  };
+}
+
 export interface VmixInput { key: string; number: string; title: string; fields: string[]; values?: Record<string, string> }
 
 /** Inputs of the running vMix with their title fields, from the XML at /api. */
@@ -68,6 +99,13 @@ export function parseVmixXml(xml: string): VmixInput[] {
     out.push({ key: attr(open, 'key'), number: attr(open, 'number'), title: unxml(attr(open, 'title')), fields, values });
   }
   return out;
+}
+
+/** The results fields for one title: as many rows and race columns as it has. */
+export function resultFieldsFor(ctx: AssetCtx, fleetId: string, input: { fields: string[] }) {
+  const rowsInTitle = Math.max(0, ...input.fields.map((f) => Number(f.match(/^(?:TEAM |COUNTRY)(\d+)\.Text$/i)?.[1] ?? 0)));
+  const cols = Math.max(0, ...input.fields.map((f) => Number(f.match(/^R(\d+) (?:points)?1\.Text$/i)?.[1] ?? 0)));
+  return { rowsInTitle, cols, fields: resultFields(ctx, fleetId, rowsInTitle, cols) };
 }
 
 export function findInput(inputs: VmixInput[], wanted: string): VmixInput | undefined {
@@ -94,13 +132,14 @@ export async function pushResults(ctx: AssetCtx, fleetId: string, inputName: str
   const inputs = parseVmixXml(await call(''));
   const input = findInput(inputs, inputName);
   if (!input) throw badRequest(`vMix has no input “${inputName}”. Use the input's name or number as shown in vMix.`);
-  const rowsInTitle = Math.max(0, ...input.fields.map((f) => Number(f.match(/^TEAM (\d+)\.Text$/)?.[1] ?? 0)));
-  const cols = Math.max(0, ...input.fields.map((f) => Number(f.match(/^R(\d+) 1\.Text$/)?.[1] ?? 0)));
-  const fields = resultFields(ctx, fleetId, rowsInTitle, cols);
-  const has = new Set(input.fields);
+  const { rowsInTitle, cols, fields } = resultFieldsFor(ctx, fleetId, input);
+  const match = titleFieldMatcher(input.fields);
+  const done = new Set<string>();
   let sent = 0;
-  for (const [name, value] of fields) {
-    if (!has.has(name)) continue;
+  for (const [name0, value] of fields) {
+    const name = match(name0);
+    if (!name || done.has(name)) continue;
+    done.add(name);
     const fn = name.endsWith('.Source') ? 'SetImage' : 'SetText';
     await call(`?Function=${fn}&Input=${encodeURIComponent(input.key || input.number)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
     sent++;
