@@ -14,9 +14,9 @@ import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
 import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
-import { showDataFields } from './showData.js';
+import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
-import { parseVmixXml, pushResults, vmixUrl } from './vmixResults.js';
+import { parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmixResults.js';
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS = [
     { id: 'welcome', label: 'Welcome', kind: 'board', overlay: 1, inputs: ['ssl_welcome'] },
@@ -393,13 +393,16 @@ export class Show {
             throw badRequest(`vMix has no input ${g.inputs.join(' / ')} for ${g.label}. Add it (or its placeholder) on the Show control tab.`);
         return i;
     }
+    /** Fields into the title, by its own field names (any case, GT's names cut at 15 characters too); one call each. */
     async set(input, fields) {
-        const has = new Map(input.fields.map((f) => [f.toLowerCase(), f]));
+        const match = titleFieldMatcher(input.fields);
+        const done = new Set();
         let n = 0;
         for (const [name, value] of fields) {
-            const real = has.get(name.toLowerCase());
-            if (!real)
+            const real = match(name);
+            if (!real || done.has(real))
                 continue;
+            done.add(real);
             await this.vmix(`?Function=${real.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(input.key || input.number)}&SelectedName=${encodeURIComponent(real)}&Value=${encodeURIComponent(value)}`);
             n++;
         }
@@ -459,6 +462,11 @@ export class Show {
             if (!this.config.fleetId)
                 throw badRequest('Pick the race (group) on the Show control tab.');
             await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
+        }
+        else if (g.id === 'compare') {
+            if (!this.config.fleetId)
+                throw badRequest('Pick the race (group) on the Show control tab.');
+            await this.set(input, compareFields(this.ctx, ev, this.config.fleetId, todayIn(activeEvent(this.ctx.db).timezone)));
         }
         else if (g.id === 'ticker') {
             await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
@@ -603,15 +611,25 @@ export class Show {
         const team = listTeams(this.ctx).find((t) => t.id === b.id);
         const a = team.assets;
         const crew = new Map(crewOf(this.ctx, b.id).map((s) => [s.slot, s]));
-        const f = new Map([['Flag.Source', img(a.flag_big)], ['Emblem.Source', img(a.emblem_light)]]);
+        const f = new Map([['Flag.Source', img(a.flag_big)], ['Emblem.Source', img(a.emblem_light)],
+            ['TeamName.Text', (lu.teamName || team.name).toUpperCase()], ['LineupText.Text', lu.title]]);
+        // titles that number the trimmers 1 and 2 (Trimmer1NAME = Trimmer 1, Trimmer2NAME = Trimmer 2, TrimmerPHOTO1/2)
+        const twoTrimmers = input.fields.some((x) => /^Trimmer2/i.test(x));
+        const names = (d) => {
+            if (!twoTrimmers || (d.key !== 'Trimmer' && d.key !== 'Trimmer1'))
+                return d.fields;
+            const n = d.key === 'Trimmer' ? 1 : 2;
+            return { name: `Trimmer${n}NAME`, surname: `Trimmer${n}SURNAME`, number: `Trimmer${n}NUMBER`, position: `Trimmer${n}POSITION`, photo: `TrimmerPHOTO${n}` };
+        };
         for (const d of slotDefs(lu.extra)) {
             const r = lu.rows.find((x) => x.slot === d.key);
             const s = crew.get(d.key);
-            f.set(`${d.fields.name}.Text`, (r?.firstName ?? '').toUpperCase());
-            f.set(`${d.fields.surname}.Text`, (r?.lastName ?? '').toUpperCase());
-            f.set(`${d.fields.number}.Text`, r?.number ?? '');
-            f.set(`${d.fields.position}.Text`, (r?.position ?? '').toUpperCase());
-            f.set(`${d.fields.photo}.Source`, s?.photo ?? '');
+            const fl = names(d);
+            f.set(`${fl.name}.Text`, (r?.firstName ?? '').toUpperCase());
+            f.set(`${fl.surname}.Text`, (r?.lastName ?? '').toUpperCase());
+            f.set(`${fl.number}.Text`, r?.number ?? '');
+            f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
+            f.set(`${fl.photo}.Source`, s?.photo ?? '');
         }
         await this.set(input, f);
         await this.bringIn(g, input, snap);
@@ -1051,7 +1069,57 @@ export class Show {
         return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
     }
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
-    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }
+    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); }, ms); this.timer.unref?.(); }
+    syncSig = '';
+    syncing = false;
+    syncError = '';
+    /**
+     * Keeps the data titles in step with the dashboard without a key press: Day schedule (Schedule tab), Group results
+     * and Team comparison of the group picked at the top. After any change in the dashboard (or a new day), only the
+     * fields whose value differs from what vMix shows in the title are set.
+     */
+    async syncData() {
+        if (this.syncing)
+            return { sent: 0 };
+        const ev = activeEvent(this.ctx.db);
+        const today = todayIn(ev.timezone);
+        const sig = `${this.ctx.db.prepare('SELECT total_changes() AS n').get().n}|${today}`;
+        if (sig === this.syncSig)
+            return { sent: 0 };
+        this.syncing = true;
+        let sent = 0;
+        try {
+            const { inputs } = await this.snapshot();
+            const fleetId = this.config.fleetId;
+            for (const id of ['schedule', 'results', 'compare']) {
+                if (id !== 'schedule' && !fleetId)
+                    continue;
+                const input = this.resolve(this.graphic(id), inputs);
+                if (!input)
+                    continue;
+                const f = id === 'schedule' ? showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() })
+                    : id === 'results' ? resultFieldsFor(this.ctx, fleetId, input).fields : compareFields(this.ctx, ev.id, fleetId, today);
+                if (!f)
+                    continue;
+                const match = titleFieldMatcher(input.fields);
+                const changed = new Map([...f].filter(([k, v]) => { const r = match(k); return r !== undefined && (input.values?.[r] ?? '') !== v; }));
+                if (changed.size)
+                    sent += await this.set(input, changed);
+            }
+            this.syncSig = sig;
+            this.syncError = '';
+        }
+        catch (e) {
+            const msg = String(e?.message ?? e);
+            if (msg !== this.syncError)
+                this.log(`vMix data: ${msg}`);
+            this.syncError = msg;
+        }
+        finally {
+            this.syncing = false;
+        }
+        return { sent };
+    }
     stop() { if (this.timer)
         clearInterval(this.timer); this.stopRotation(); }
     /**

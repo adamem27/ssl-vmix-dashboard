@@ -1,8 +1,14 @@
 {
-  "version": "1.0.125",
-  "commit": "f97f269",
-  "date": "2026-11-10T18:43:14Z",
+  "version": "1.0.126",
+  "commit": "6ab0933",
+  "date": "2026-11-10T18:46:45Z",
   "changes": [
+    {
+      "version": "1.0.126",
+      "commit": "6ab0933",
+      "date": "2026-11-10T18:46:45Z",
+      "text": "Data titles follow the dashboard: group results, team comparison and schedule without a key; producer's field names"
+    },
     {
       "version": "1.0.125",
       "commit": "f97f269",
@@ -476,12 +482,6 @@
       "commit": "f574121",
       "date": "2026-11-08T00:07:05Z",
       "text": "SSL26 design: team gradients and orange stroke"
-    },
-    {
-      "version": "1.0.32",
-      "commit": "68538f0",
-      "date": "2026-11-07T22:13:10Z",
-      "text": "Crews from the official Florida rooming list"
     }
   ]
 }
