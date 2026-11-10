@@ -7,6 +7,9 @@ import { getSetting } from '../db/db.js';
 import { listSets, getSetDetail } from './fleets.js';
 import { activeEvent } from '../db/db.js';
 import { listGraphicSets } from './graphicSets.js';
+import { compareTab, setCompareOverride } from './showData.js';
+import { getLtConfig } from './lowerthirds.js';
+import { todayIn } from './dates.js';
 
 /** Show control: one GET per Stream Deck key (/api/show/do?a=…), the tab's view and the Companion page files. */
 export function registerShowRoutes(app: FastifyInstance, ctx: AssetCtx, show: Show) {
@@ -28,6 +31,19 @@ export function registerShowRoutes(app: FastifyInstance, ctx: AssetCtx, show: Sh
     if (!a) throw badRequest('Add ?a=<action>, e.g. ?a=show:welcome');
     return show.run(a);
   };
+  // General graphics → Team comparison: the current stage's groups, what each shows by itself and what is typed over it
+  app.get('/api/compare', async () => {
+    const ev = activeEvent(db);
+    return compareTab(ctx, ev.id, todayIn(ev.timezone), { emblemSlot: getLtConfig(db).emblemSlot });
+  });
+  app.put('/api/compare/:fleetId', async (req: any) => {
+    const b = (req.body ?? {}) as { n?: number; field?: string; value?: string };
+    const n = Number(b.n ?? 0);
+    if (!Number.isInteger(n) || n < 0 || n > 4 || !b.field) throw badRequest('Send { n: 0–4, field, value }.');
+    try { setCompareOverride(db, String(req.params.fleetId), n, b.field, String(b.value ?? '')); } catch (e) { throw badRequest((e as Error).message); }
+    void show.syncData().catch(() => undefined);
+    return { ok: true };
+  });
   app.get('/api/show/do', act);
   app.post('/api/show/do', act);
   app.post('/api/show/labels', async () => show.pushLabels(true));

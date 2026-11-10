@@ -5,6 +5,7 @@ import { api, Asset, FleetSetDetail, FleetSetSummary } from '../api';
 import { Button, cx, ErrorBox, Loading, todayIn, useToast } from '../components/ui';
 import { Cell, ImgCell, SelectCell } from '../components/cells';
 import { GraphicSetsSections } from './GraphicSets';
+import { ComparePanel } from './CompareTab';
 import { useStage } from '../components/StagePicker';
 import { groupLabel } from '../../../server/src/services/groupNames';
 
@@ -13,7 +14,7 @@ const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW'
 const WIND_UNITS = ['kn', 'm/s', 'km/h', 'mph'];
 const LANGUAGES = ['English', 'Polish', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese', 'Japanese'];
 
-const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People']];
+const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People'], ['g-compare', 'Team comparison']];
 
 const shiftDate = (d: string, days: number) => new Date(Date.parse(d + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
 
@@ -31,6 +32,7 @@ export function GeneralPage() {
       <div id="g-weather" className="scroll-mt-28"><WeatherPanel /></div>
       <GraphicSetsSections kinds={['announcement', 'ticker', 'officials', 'socials']} />
       <div id="g-people" className="scroll-mt-28"><PeoplePanel /></div>
+      <div id="g-compare" className="scroll-mt-28"><ComparePanel /></div>
     </div>
   );
 }

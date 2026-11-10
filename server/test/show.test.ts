@@ -11,6 +11,9 @@ import { LowerThirds } from '../src/services/lowerthirds.js';
 import { companionFiles, deckPages, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 import { setCurrentStage } from '../src/services/workbookSheets.js';
+import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
+import { createScheduleItem } from '../src/services/general.js';
+import { groupLabel } from '../src/services/groupNames.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -65,6 +68,19 @@ function race() {
 }
 
 describe('show control', () => {
+  it('schedule rows find their group and its flags with no stage picked, and in another stage than the picked one', () => {
+    const { s, ev, f1 } = race();
+    setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL');
+    createScheduleItem(s.db, ev, { date: '2026-01-01', time: '12:00', race: '1', fleet: groupLabel(f1.name) });
+    const flags = () => scheduleRows(s.ctx, ev, '2026-01-01')[0].flags.length;
+    setCurrentStage(s.db, ev, null);
+    expect(flags()).toBe(4);
+    const other = createSet(s.db, ev, 'Finals', 1, 4);
+    setCurrentStage(s.db, ev, other);
+    expect(scheduleRows(s.ctx, ev, '2026-01-01')[0].group).toBe(groupLabel(f1.name));
+    expect(flags()).toBe(4);
+  });
+
   it('toggles a board on overlay 1 and takes a lower third off when a board comes in', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);
@@ -119,7 +135,7 @@ describe('show control', () => {
     const { s, ev } = race();
     seedGraphicSets(s.db, ev);
     setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL\\assets');
-    const v = fakeVmix({ ...TITLES, ssl_bug: ['TEXT.Text', 'ICON.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['EVENT.Text', 'LOCATION.Text', 'DATE.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
+    const v = fakeVmix({ ...TITLES, ssl_bug: ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['EVENT.Text', 'LOCATION.Text', 'DATE.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const pages = (await show.view()).pages;
     const bugs1 = pages.find((p) => p.name === 'BUGS 1')!;
@@ -127,7 +143,8 @@ describe('show control', () => {
     // the announcement on its key: one line of text and the flag's PNG from the vMix assets folder
     await show.run('bug:6');
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
-    expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=ICON.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
+    expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=Race flag.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
+    expect(v.calls.some((c) => /icon_background|bar\.Source/.test(c))).toBe(false);
     expect(v.overlays[3]).toBe('4');
     await show.run('bug:6');
     expect(v.overlays[3]).toBe('');
@@ -184,7 +201,7 @@ describe('show control', () => {
     expect(v.overlays[2]).toBe('');
 
     await show.run('qualified:2');
-    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=QUALIFIED');
+    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=Qualified for the finals of SSL Gold Cup');
     expect(v.overlays[2]).toBe('10');
   });
 
@@ -259,13 +276,13 @@ describe('show control', () => {
     const v = fakeVmix({
       ssl_results_group: ['COUNTRY1.Text', 'COUNTRY2.Text', 'position 1.Text', 'flag 1.Source', 'bar1.Source', 'R1 points1.Text', 'R2 points1.Text', 'Total1.Text', 'R1.Text', 'Group A.Text'],
       ssl_compare: ['Group.Text', '1 COUNTRY.Text', '1 NICKNAME.Text', 'RANK 1.Text', 'RANK NUM 3.Text', '1 CPT NAME.Text', '1 CPT SURNAME.Text', '1 FLAG.Source', '1 BG.Source', '1 PHOTO.Source', 'PHOTO 2.Source'],
-      ssl_lineup: ['TeamName.Text', 'Trimmer1NAME.Text', 'Trimmer1Positio.Text', 'Trimmer2SURNAME.Text', 'TacticianSURNAM.Text', 'BowPosition.Text', 'PitPOSITION.Text'],
+      ssl_lineup: ['BG.Source', 'HelmBG.Source', 'Trimmer1BG.Source', 'TeamName.Text', 'Trimmer1NAME.Text', 'Trimmer1Positio.Text', 'Trimmer2SURNAME.Text', 'TacticianSURNAM.Text', 'BowPosition.Text', 'PitPOSITION.Text'],
       ssl_schedule: ['DateText.Text'],
     });
     // the team's PNGs from the generator: its long bar (results) and its left panel (comparison)
     const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'ESP');
     fs.mkdirSync(dir, { recursive: true });
-    for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
+    for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_bar_results.png', 1129, 76], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390], ['ESP_square.png', 210, 134]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     // picking the group (top of the dashboard) is enough: results and comparison follow it
     const r = await show.syncData();
@@ -275,7 +292,7 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=TEAM ESP');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=TRITTEL');
     expect(v.calls.some((c) => c.includes('SelectedName=DateText.Text'))).toBe(true);
-    expect(v.calls.find((c) => c.includes('SelectedName=bar1.Source'))).toMatch(/ESP_bar_long\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=bar1.Source'))).toMatch(/ESP_bar_results\.png$/);
     expect(v.calls.find((c) => c.includes('SelectedName=1 BG.Source'))).toMatch(/ESP_panel_left\.png$/);
     // nothing changed: nothing sent again
     v.calls.length = 0;
@@ -291,6 +308,20 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer2SURNAME.Text&Value=MARTINEZ');
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TacticianSURNAM.Text&Value=TRITTEL');
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TeamName.Text&Value=TEAM ESP');
+    // the box behind each photo in the team's square; the big background stays
+    expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_square\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=Trimmer1BG.Source'))).toMatch(/ESP_square\.png$/);
+    expect(v.calls.some((c) => c.includes('SelectedName=BG.Source'))).toBe(false);
+    // General graphics → Team comparison: what is typed there wins
+    const fleetId = show.config.fleetId;
+    setCompareOverride(s.ctx.db, fleetId, 1, 'nick', 'The Bulls');
+    setCompareOverride(s.ctx.db, fleetId, 0, 'group', 'GROUP X');
+    const tab = compareTab(s.ctx, activeEvent(s.ctx.db).id, '2026-01-01');
+    expect(tab.groups.find((g) => g.fleetId === fleetId)?.over.teams?.['1']?.nick).toBe('The Bulls');
+    v.calls.length = 0;
+    await show.syncData();
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 NICKNAME.Text&Value=The Bulls');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Group.Text&Value=GROUP X');
   });
 
   it('a team page key shows that place of that team, whatever team is picked', async () => {
