@@ -144,7 +144,8 @@ function plan(sc: Scenario, list: Unit[]): { inA: GtNode[]; outA: GtNode[] } {
   } else if (sc === 'lowerthird') {
     bg.forEach((u) => { inA.push(anim('Reveal', u.name, 0, 0.6, 'Left')); outA.push(anim('Reveal', u.name, 0.15, 0.5, 'Left')); });
     const t = bg.length ? 1 : 0;
-    photo.forEach((u) => { inA.push(anim('Fly', u.name, 0.3 * t, 0.5, 'Bottom')); outA.push(anim('Fade', u.name, 0, 0.3)); });
+    // the photo rises a moment after the bar is in, and goes down first on the way out
+    photo.forEach((u) => { inA.push(anim('Fly', u.name, 0.4 * t, 0.55, 'Bottom')); outA.push(anim('Fly', u.name, 0, 0.4, 'Bottom')); });
     const { sorted } = order([...rest, ...header, ...ticker]);
     sorted.forEach((u, i) => { inA.push(anim('Fade', u.name, 0.45 * t + i * 0.05, 0.4)); outA.push(anim('Fade', u.name, 0, 0.3)); });
     badge.forEach((u) => { inA.push(anim('Reveal', u.name, 0.6 * t, 0.5, 'Bottom')); outA.push(anim('Reveal', u.name, 0, 0.4, 'Bottom')); });
@@ -165,6 +166,17 @@ function plan(sc: Scenario, list: Unit[]): { inA: GtNode[]; outA: GtNode[] } {
 }
 
 const total = (as: GtNode[]) => Math.max(0, ...as.map((a) => Number(a.attrs.Delay ?? 0) + Number(a.attrs.Duration ?? 1)));
+
+/** The named picture with a mask inside a layer (PHOTO masked by Rectangle1), if there is one. */
+function maskedImage(layer: GtNode): string | null {
+  const inner = innerComposition(layer);
+  for (const c of inner?.children ?? []) {
+    if (!isElement(c) || !c.attrs.Name) continue;
+    if (c.children.some((h) => h.tag === `${c.tag}.Mask`)) return c.attrs.Name;
+    if (c.tag === 'Layer') { const m = maskedImage(c); if (m) return m; }
+  }
+  return null;
+}
 
 /** Text fields of the title (TextBlocks with a name), for the data-change fades. */
 function textNames(root: GtNode): string[] {
@@ -195,6 +207,13 @@ export function applyStandardAnimation(root: GtNode, o: StandardOpts = {}): Stan
     if (u.role !== 'background') continue;
     if (seenBg && !/^(bg|background|plate)/i.test(u.name)) u.role = sc === 'board' || sc === 'lbar' ? 'item' : 'text';
     seenBg = true;
+  }
+  // a photo in a layer with its mask: the photo itself moves and the mask stays, so it rises from behind its frame
+  // (moving the whole layer moves the mask too, and vMix shows little more than a fade)
+  for (const u of withRoles) {
+    if (u.role !== 'photo' || u.node.tag !== 'Layer') continue;
+    const masked = maskedImage(u.node);
+    if (masked) u.name = masked;
   }
   const ordered = list.map((u) => withRoles.find((w) => w.node === u.node)!);
   const { inA, outA } = plan(sc, ordered);

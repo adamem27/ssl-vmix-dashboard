@@ -35,6 +35,18 @@ describe('standard animation', () => {
     expect(storyboards(root).filter((s) => s.node.attrs.DataName === 'Role.Text').map((s) => s.type).sort()).toEqual(['DataChangeIn', 'DataChangeOut']);
   });
 
+  it('a masked photo in its own layer rises from behind its mask after the bar; a nearly full-frame layer is still a lower third', () => {
+    const { root } = parseXml(`<Composition Width="1920" Height="1080">
+      <Layer Name="Main bar group" Dimensions="1920,1080,0"><Layer.Composition><Composition Width="1920" Height="1080"><Image Name="Bar" Dimensions="802,105,0" Location="559,920,0" /><TextBlock Name="Name" Dimensions="517,46,0" Location="709,933,0" /></Composition></Layer.Composition></Layer>
+      <Layer Name="Photo group" Dimensions="1920,1025,0"><Layer.Composition><Composition Width="1920" Height="1025"><Image Name="PHOTO" Dimensions="425,425,0" Location="465,777,0"><Image.Mask><Mask Object="Rectangle1" /></Image.Mask></Image><Rectangle Name="Rectangle1" Dimensions="300,298,0" Location="559,727,0" /></Composition></Layer.Composition></Layer>
+    </Composition>`);
+    expect(detectScenario(root)).toBe('lowerthird');
+    applyStandardAnimation(root);
+    const inA = animationsOf(storyboards(root)[0].node).map((a) => [a.tag, a.attrs.Object, a.attrs.Direction, a.attrs.Delay]);
+    expect(inA).toContainEqual(['Fly', 'PHOTO', 'Bottom', '0.4']);
+    expect(inA.some((a) => a[1] === 'Photo group')).toBe(false);
+  });
+
   it('flies a small top bug in and out from the top; tempo makes it faster', () => {
     const root = doc(layer('BAR layer', img('BAR', 719, 54, 562, 66)));
     const r = applyStandardAnimation(root, { tempo: 1.25 });
