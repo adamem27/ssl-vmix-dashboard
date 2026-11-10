@@ -6,6 +6,7 @@ import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
 import { listPeople } from './general.js';
 import { listGraphicSets, tickerText } from './graphicSets.js';
+import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState } from './lowerthirds.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
@@ -426,8 +427,10 @@ export class Show {
         const cfg = this.config;
         const sets = listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'ticker');
         const id = this.state.tickerMode === 'end' ? cfg.tickerEnd : cfg.tickerNext;
-        const s = sets.find((x) => x.id === id) ?? sets[this.state.tickerMode === 'end' ? 1 : 0] ?? sets[0];
-        return s ? tickerText(s.data) : '';
+        // unset: the fixed WARNING SIGNAL ticker before the next race, THANKS FOR WATCHING at the end
+        const preset = this.state.tickerMode === 'end' ? 'thanks' : 'warning';
+        const s = sets.find((x) => x.id === id) ?? sets.find((x) => x.data.preset === preset) ?? sets[0];
+        return s ? tickerText(s.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : '';
     }
     // ---------- actions ----------
     async toggle(id) {

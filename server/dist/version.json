@@ -1,8 +1,14 @@
 {
-  "version": "1.0.111",
-  "commit": "51ea2a9",
-  "date": "2026-11-10T14:06:15Z",
+  "version": "1.0.112",
+  "commit": "c5581aa",
+  "date": "2026-11-10T14:08:12Z",
   "changes": [
+    {
+      "version": "1.0.112",
+      "commit": "c5581aa",
+      "date": "2026-11-10T14:08:12Z",
+      "text": "Tickers: fixed Warning signal, Thanks for watching, Delay and Custom text tickers with only their changing parts (group and race filled from the group racing now), no Label; schedule without status and note; groups named GROUP H on every graphic; group racing now picked next to Stage; announcements get a second line and the finals versions; race course data"
+    },
     {
       "version": "1.0.111",
       "commit": "51ea2a9",
@@ -476,12 +482,6 @@
       "commit": "9d9ccf4",
       "date": "2026-10-22T12:33:12Z",
       "text": "PNG generator: Copacabana waves and element sizes from gradienty.ai"
-    },
-    {
-      "version": "1.0.16",
-      "commit": "0cb8a0c",
-      "date": "2026-10-22T11:22:51Z",
-      "text": "PNG generator: wider number fields in the elements table"
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { groupLabel } from './groups.js';
 import { nowIso } from '../db/db.js';
 import { notFound } from './errors.js';
 import { listTeams } from './teams.js';
@@ -32,7 +33,7 @@ function load(db, fleetId) {
     const seen = new Set(stored.map((x) => x.teamId));
     const rows = [...stored, ...f.teamIds.filter((id) => !seen.has(id)).map((teamId) => ({ teamId, races: [], points: '' }))]
         .map((x) => ({ teamId: x.teamId, races: Array.from({ length: races }, (_, i) => String(x.races?.[i] ?? '')), points: String(x.points ?? '') }));
-    return { data: { title: raw.title ?? f.name, subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
+    return { data: { title: raw.title ?? groupLabel(f.name), subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
 }
 export function getResults(db, fleetId) {
     const f = fleetInfo(db, fleetId);
@@ -97,7 +98,7 @@ export function resultSheetRows(ctx, eventId) {
     const out = [];
     for (const s of sets) {
         for (const g of listResults(db, s.id)) {
-            const row = { set: g.setName, group: g.fleetName, Title: g.title, Subtitle: g.subtitle, Races: String(g.races) };
+            const row = { set: g.setName, group: groupLabel(g.fleetName), Title: g.title, Subtitle: g.subtitle, Races: String(g.races) };
             for (let i = 1; i <= g.races; i++)
                 row[`R${i}Label`] = `R${i}`;
             g.rows.forEach((r, i) => {
