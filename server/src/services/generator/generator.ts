@@ -45,6 +45,8 @@ const templateFields = {
   patternOpacity: pct,
   patternScale: z.number().min(5).max(1000),
   enabled: z.boolean(),
+  /** a see-through strip below the shape (px): the PNG keeps its full height, the shape stops above it (lineup photo box) */
+  padBottom: z.number().min(0).max(4096).optional(),
 };
 /** Stored elements from before the gradient stroke get its defaults. */
 export const templateSchema = z.object({ ...templateFields, scope: templateFields.scope.default('teams'), corner: templateFields.corner.default('round'), cutX: templateFields.cutX.default(0), cutY: templateFields.cutY.default(0), cutSides: templateFields.cutSides.default('both'), strokeGradient: z.boolean().default(false), strokeAngle: templateFields.strokeAngle.default(-45) });
@@ -306,8 +308,10 @@ export function plannedJobs(ctx: GenCtx): Job[] {
 }
 
 export function renderJob(ctx: GenCtx, job: Job): Buffer {
-  const r = renderElement(job.spec, job.gradient, 1, job.spec.strokeGradient ? getStrokeGradient(ctx.db) : null);
-  return encodePng(r.width, r.height, (x, y) => {
+  const pad = Math.min(Math.max(0, Math.round((job.spec as { padBottom?: number }).padBottom ?? 0)), job.spec.height - 1);
+  const r = renderElement({ ...job.spec, height: job.spec.height - pad }, job.gradient, 1, job.spec.strokeGradient ? getStrokeGradient(ctx.db) : null);
+  return encodePng(r.width, r.height + pad, (x, y) => {
+    if (y >= r.height) return [0, 0, 0, 0];
     const o = (y * r.width + x) * 4;
     return [r.data[o], r.data[o + 1], r.data[o + 2], r.data[o + 3]];
   });
@@ -451,7 +455,17 @@ export const STARTER_TEMPLATES: z.infer<typeof templateSchema>[] = [
   { ...ELEMENT_DEFAULTS, name: 'Bar long', fileName: 'bar_long', variant: 1, width: 1130, height: 75 },
   { ...ELEMENT_DEFAULTS, name: 'Bar small', fileName: 'bar_small', variant: 1, width: 289, height: 40, patternScale: 53.3 },
   { ...ELEMENT_DEFAULTS, name: 'Square', fileName: 'square', variant: 2, width: 210, height: 134, radius: 12, flip: true, patternScale: 53.3 },
+  // the box behind each sailor's photo in the team line-up (211×135; the shape stops 12 px up, where the name bar starts)
+  { ...ELEMENT_DEFAULTS, name: 'Lineup photo', fileName: 'lineup_photo', variant: 2, width: 211, height: 135, padBottom: 12, radius: 12, flip: true, patternScale: 53.3, ...AI_STROKE },
 ];
+
+/** Elements added to the starters after a dashboard was set up: each goes in once, if no element has its file name. */
+function addLaterStarters(db: DB) {
+  if (getSetting(db, 'generator.lineupPhoto') === 'true' || getSetting(db, 'generator.seeded') !== 'true') return;
+  const names = new Set(listTemplates(db).map((t) => t.fileName.toLowerCase()));
+  for (const t of STARTER_TEMPLATES.filter((x) => x.fileName === 'lineup_photo')) if (!names.has(t.fileName)) createTemplate(db, t);
+  setSetting(db, 'generator.lineupPhoto', 'true');
+}
 
 /** Starter sizes before the Illustrator file arrived; elements still at these get the file's values. */
 const FIRST_GUESS: Record<string, [number, number]> = {
@@ -599,6 +613,7 @@ export function seedGenerator(db: DB) {
   upgradeStarterTemplates(db);
   splitNeutralElements(db);
   if (getSetting(db, 'generator.seeded') !== 'true') seedStarters(db);
+  addLaterStarters(db);
   applySsl26Design(db);
   applyPanamColours(db);
 }

@@ -282,7 +282,7 @@ describe('show control', () => {
     // the team's PNGs from the generator: its long bar (results) and its left panel (comparison)
     const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'ESP');
     fs.mkdirSync(dir, { recursive: true });
-    for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_bar_results.png', 1129, 76], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390], ['ESP_square.png', 210, 134]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
+    for (const [f, w, h] of [['ESP_bar_long.png', 1130, 75], ['ESP_bar_results.png', 1129, 76], ['ESP_panel_left.png', 851, 390], ['ESP_panel_right.png', 851, 390], ['ESP_square.png', 210, 134], ['ESP_lineup_photo.png', 211, 135]] as const) fs.writeFileSync(path.join(dir, f), encodePng(w, h, () => [0, 0, 0, 255]));
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     // picking the group (top of the dashboard) is enough: results and comparison follow it
     const r = await show.syncData();
@@ -309,8 +309,8 @@ describe('show control', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TacticianSURNAM.Text&Value=TRITTEL');
     expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TeamName.Text&Value=TEAM ESP');
     // the box behind each photo in the team's square; the big background stays
-    expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_square\.png$/);
-    expect(v.calls.find((c) => c.includes('SelectedName=Trimmer1BG.Source'))).toMatch(/ESP_square\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_lineup_photo\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=Trimmer1BG.Source'))).toMatch(/ESP_lineup_photo\.png$/);
     expect(v.calls.some((c) => c.includes('SelectedName=BG.Source'))).toBe(false);
     // General graphics → Team comparison: what is typed there wins
     const fleetId = show.config.fleetId;
