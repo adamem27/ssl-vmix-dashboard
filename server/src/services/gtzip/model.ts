@@ -140,6 +140,33 @@ export const fmtNum = (n: number) => String(Math.round(n * 10000) / 10000);
 export function setVec(n: GtNode, attr: 'Location' | 'Dimensions', x: number, y: number) {
   const z = vec(n.attrs[attr])[2];
   n.attrs[attr] = `${fmtNum(x)},${fmtNum(y)},${fmtNum(z)}`;
+  if (attr === 'Dimensions' && n.tag === 'Layer') syncLayer(n);
+}
+
+/**
+ * A layer's composition has the layer's size. vMix scales a composition into its layer when the two differ (a layer
+ * 1920×1025 over a 1920×1080 composition squeezes everything in it by 5 %: a masked photo lands higher than its bar),
+ * while resizing a layer here means cutting it. So the composition always takes the layer's size.
+ */
+function syncLayer(n: GtNode) {
+  const c = innerComposition(n);
+  if (!c || !n.attrs.Dimensions) return;
+  const [w, h] = vec(n.attrs.Dimensions);
+  c.attrs.Width = fmtNum(w); c.attrs.Height = fmtNum(h);
+}
+/** Every layer of a title cut to its own size (see syncLayer); returns how many were fixed. */
+export function syncLayerSizes(root: GtNode): number {
+  let fixed = 0;
+  const walk = (x: GtNode) => {
+    if (x.tag === 'Layer' && x.attrs.Dimensions) {
+      const c = innerComposition(x);
+      const [w, h] = vec(x.attrs.Dimensions);
+      if (c && (Math.abs(Number(c.attrs.Width) - w) > 0.01 || Math.abs(Number(c.attrs.Height) - h) > 0.01)) { syncLayer(x); fixed++; }
+    }
+    x.children.forEach(walk);
+  };
+  walk(root);
+  return fixed;
 }
 export const isVisible = (n: GtNode) => n.attrs.Visible !== 'False';
 
