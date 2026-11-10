@@ -1,8 +1,14 @@
 {
-  "version": "1.0.117",
-  "commit": "cf60d79",
-  "date": "2026-11-10T17:02:16Z",
+  "version": "1.0.118",
+  "commit": "2bc3b2b",
+  "date": "2026-11-10T17:13:11Z",
   "changes": [
+    {
+      "version": "1.0.118",
+      "commit": "2bc3b2b",
+      "date": "2026-11-10T17:13:11Z",
+      "text": "Standard animation: a masked photo rises from behind its mask after the bar"
+    },
     {
       "version": "1.0.117",
       "commit": "cf60d79",
@@ -476,12 +482,6 @@
       "commit": "09fef95",
       "date": "2026-11-07T19:24:39Z",
       "text": "Windows launcher: CI test that it downloads the release and starts"
-    },
-    {
-      "version": "1.0.24",
-      "commit": "972d5a0",
-      "date": "2026-11-07T19:22:09Z",
-      "text": "Windows package: build on windows-2022 so better-sqlite3 can compile"
     }
   ]
 }
