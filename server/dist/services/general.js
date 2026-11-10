@@ -4,7 +4,7 @@ import { assertDate } from './declarations.js';
 import { notFound } from './errors.js';
 // ---------- weather (one current record) ----------
 /** wind_degrees is the direction in degrees as typed (e.g. 050), next to the compass point in wind_direction. */
-export const WEATHER_FIELDS = ['forecast', 'air_temp', 'water_temp', 'wind_speed', 'wind_direction', 'wind_degrees', 'wind_unit'];
+export const WEATHER_FIELDS = ['forecast', 'air_temp', 'wind_speed', 'wind_direction', 'wind_degrees', 'wind_unit'];
 export function getWeather(db) {
     let v = {};
     try {
