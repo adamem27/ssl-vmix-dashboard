@@ -30,7 +30,7 @@ import { parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, vmixUrl 
  * State (what is on air) is always read from vMix, never remembered from key presses.
  */
 /** The bottom line of the qualified team lower third. */
-export const QUALIFIED_TEXT = 'Qualified for the finals of SSL Gold Cup';
+export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS = [
     { id: 'welcome', label: 'Welcome', kind: 'board', overlay: 1, inputs: ['ssl_welcome'] },

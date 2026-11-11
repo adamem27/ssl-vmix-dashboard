@@ -8,7 +8,7 @@
 import { listAssets } from './assets.js';
 import { getSetDetail, listSets } from './fleets.js';
 import { getWeather, listSchedule } from './general.js';
-import { GRAPHIC_KINDS, imagePath, listGraphicSets } from './graphicSets.js';
+import { GRAPHIC_KINDS, imagePath, listGraphicSets, OFFICIAL_NAMES, OFFICIAL_ROLES } from './graphicSets.js';
 import { groupLabel } from './groupNames.js';
 import { loadLineup } from './lineups.js';
 import { crewOf } from './lowerthirds.js';
@@ -83,22 +83,20 @@ export function showDataFields(ctx, graphicId, o) {
     };
     switch (graphicId) {
         case 'welcome': {
-            versionFields(ctx, 'welcome', welcome, f);
-            // the SSL26 welcome bar (welcome_graphic.gtzip): stage on top; below it day, today's date, place and country
-            const loc = (welcome.location ?? '').trim();
-            const cut = loc.lastIndexOf(',');
+            // the SSL26 Welcome bar (Welcome 2.gtzip): the stage on top, the day and the date below; its other texts stay as
+            // in the title (older titles named them Top text and Day number)
+            const day = up(welcome.day), date = (welcome.date ?? '').trim() || dotted(today);
+            f.set('stage.Text', (welcome.stage ?? '').trim());
             f.set('Top text.Text', (welcome.stage ?? '').trim());
-            f.set('Day number.Text', up(welcome.day));
-            f.set('Date.Text', dotted(today));
-            f.set('City.Text', up(cut > 0 ? loc.slice(0, cut) : loc));
-            f.set('Country.Text', up(cut > 0 ? loc.slice(cut + 1) : ''));
+            f.set('Day.Text', day);
+            f.set('Day number.Text', day);
+            f.set('Date.Text', date);
             return f;
         }
         case 'schedule':
             f.set('DayText.Text', up(welcome.day));
-            f.set('DateText.Text', dotted(today));
+            f.set('DateText.Text', (welcome.date ?? '').trim() || dotted(today));
             f.set('EVENT.Text', up(welcome.stage));
-            f.set('LOCATION.Text', up(welcome.location));
             sched();
             return f;
         case 'lbar':
@@ -119,11 +117,13 @@ export function showDataFields(ctx, graphicId, o) {
             return f;
         }
         case 'officials': {
+            // Race officials (Race_officials_PanAm.gtzip): TITLE, ROLE 1–8 and NAME 1–11, as typed on the tab
             const x = first(ctx, eventId, 'officials');
-            versionFields(ctx, 'officials', x, f);
-            f.set('TITLE.Text', up(x.heading));
-            [x.pro_title, x.director_title, x.jury_title].forEach((v, i) => f.set(`ROLE ${i + 1}.Text`, up(v)));
-            [x.pro_name, x.director_name, x.jury_1, x.jury_2, x.jury_3, x.jury_4, x.jury_5].forEach((v, i) => f.set(`NAME ${i + 1}.Text`, (v ?? '').trim()));
+            f.set('TITLE.Text', up(x.title));
+            for (let i = 1; i <= OFFICIAL_ROLES.length; i++)
+                f.set(`ROLE ${i}.Text`, up(x[`role_${i}`]));
+            for (let i = 1; i <= OFFICIAL_NAMES; i++)
+                f.set(`NAME ${i}.Text`, (x[`name_${i}`] ?? '').trim());
             return f;
         }
         case 'weather': {
