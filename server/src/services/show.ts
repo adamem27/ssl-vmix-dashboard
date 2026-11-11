@@ -10,7 +10,7 @@ import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.j
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor, ltFields, ltTeams } from './lowerthirds.js';
-import { teamPictureFor } from './ltTitle.js';
+import { ltRoles, teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
@@ -690,6 +690,10 @@ export class Show {
     const f = ltFields(this.ctx, lt, b.id, null);
     f.set(`${lt.fields.bottom}.Text`, QUALIFIED_TEXT);
     const out = this.lt.fitToTitle(input, f, b.id);
+    // the bar of every other lower third (lowerthird PNG), not one guessed from this title
+    const barField = ltRoles(lt.fields, input.fields).bar;
+    const bar = this.lt.standardBar(b.id);
+    if (barField && bar) out.set(barField, bar);
     // titles with a field of their own for the line (QualifiedText, Qualified…) get it too
     for (const x of input.fields) if (/qualif/i.test(x) && x.endsWith('.Text') && !out.has(x)) out.set(x, QUALIFIED_TEXT);
     await this.set(input, out);
@@ -1190,6 +1194,9 @@ export class Show {
       const { inputs } = await this.snapshot();
       const fleetId = this.config.fleetId;
       const jobs: { input: VmixInput; f: () => Map<string, string> | null }[] = [];
+      // the Welcome bar follows the Welcome tab (and today's date) without a key
+      const wel = this.resolve(this.graphic('welcome'), inputs);
+      if (wel) jobs.push({ input: wel, f: () => showDataFields(this.ctx, 'welcome', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
       const sched = this.resolve(this.graphic('schedule'), inputs);
       if (sched) jobs.push({ input: sched, f: () => showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
       const res = fleetId ? this.resolve(this.graphic('results'), inputs) : undefined;

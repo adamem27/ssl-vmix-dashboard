@@ -24,12 +24,10 @@ export interface GraphicKind { kind: string; label: string; sheet: string; descr
 export const GRAPHIC_KINDS: GraphicKind[] = [
   {
     kind: 'welcome', label: 'Welcome', sheet: 'Welcome',
-    description: 'Opening board: event name, place and dates.',
+    description: 'Welcome bar: the stage on top; below it the day, today’s date, city and country.',
     fields: [
-      { key: 'event', label: 'Event', default: 'SSL GOLD CUP 2026' },
-      { key: 'stage', label: 'Stage', placeholder: 'FINAL SERIES' },
-      { key: 'location', label: 'Location', default: 'RIO DE JANEIRO, BRAZIL' },
-      { key: 'dates', label: 'Dates', placeholder: '19 NOV - 13 DEC 2026' },
+      { key: 'stage', label: 'Stage', placeholder: 'African & Oceanian Qualifiers', hint: 'top line of the Welcome bar' },
+      { key: 'location', label: 'Location', default: 'RIO DE JANEIRO, BRAZIL', hint: 'City, Country: the last comma splits them' },
       { key: 'day', label: 'Day', placeholder: 'DAY 1' },
       { key: 'subtitle', label: 'Subtitle', wide: true },
     ],

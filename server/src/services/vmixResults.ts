@@ -48,7 +48,7 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
   // the Results tab gives the group's title (Group A / GROUP) and the subtitle (the place: LOCALIZATION / LOCATION);
   // Welcome only fills in a subtitle left empty, and the stage
   const place = g.subtitle.trim() || welcome.location || '';
-  f.set('STAGE.Text', up(welcome.stage) || up(welcome.event));
+  f.set('STAGE.Text', up(welcome.stage));
   f.set('LOCALIZATION.Text', up(place));
   f.set('LOCATION.Text', up(place));
   f.set('Group A.Text', up(g.title) || groupLabel(g.fleetName));
