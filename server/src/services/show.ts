@@ -33,7 +33,7 @@ import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatche
  */
 
 /** The bottom line of the qualified team lower third. */
-export const QUALIFIED_TEXT = 'Qualified for the finals of SSL Gold Cup';
+export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
 
 export type Kind = 'board' | 'lt' | 'bug' | 'scene';
 export interface Graphic { id: string; label: string; kind: Kind; overlay: number; inputs: string[]; aliases?: string[] }

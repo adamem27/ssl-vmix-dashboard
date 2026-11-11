@@ -182,7 +182,7 @@ describe('show control', () => {
     const { s, ev } = race();
     seedGraphicSets(s.db, ev);
     setSetting(s.db, 'paths.vmixAssetsRoot', 'D:\\SSL\\assets');
-    const v = fakeVmix({ ...TITLES, ssl_bug: ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['Top text.Text', 'SSL Gold Cup.Text', 'Brazil 2026.Text', 'Day number.Text', 'Date.Text', 'City.Text', 'Country.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
+    const v = fakeVmix({ ...TITLES, ssl_bug: ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['stage.Text', 'SSL Gold Cup.Text', 'Brazil 2026.Text', 'Day.Text', 'Date.Text', 'City.Text', 'Country.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'ROLE 8.Text', 'NAME 1.Text', 'NAME 11.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const pages = (await show.view()).pages;
     // the announcements used most on BUGS OFTEN, the rest on BUGS RARE, each in its order
@@ -219,21 +219,26 @@ describe('show control', () => {
 
     // a board gets General graphics at the press
     const w = listGraphicSets(s.db, ev, 'welcome')[0];
-    updateGraphicSet(s.db, w.id, { data: { stage: 'African & Oceanian Qualifiers', location: 'Lac de Neuchâtel, Switzerland', day: 'Day 1' } });
-    const o = listGraphicSets(s.db, ev, 'officials')[0];
-    updateGraphicSet(s.db, o.id, { data: { pro_name: 'Jan Kowalski' } });
+    updateGraphicSet(s.db, w.id, { data: { stage: 'Pan-American Qualifiers', day: 'Day 1' } });
     v.calls.length = 0;
     await show.run('show:welcome');
-    // the Welcome bar (Welcome.gtzip): stage on top, then day, today, city and country; its fixed texts stay
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Top text.Text&Value=African & Oceanian Qualifiers');
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Day number.Text&Value=DAY 1');
+    // the Welcome bar (Welcome 2.gtzip): the stage, the day and the date (empty = today); its fixed texts stay
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=stage.Text&Value=Pan-American Qualifiers');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Day.Text&Value=DAY 1');
     expect(v.calls.some((c) => /SelectedName=Date\.Text&Value=\d\d\.\d\d\.\d{4}$/.test(c))).toBe(true);
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=City.Text&Value=LAC DE NEUCHÂTEL');
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Country.Text&Value=SWITZERLAND');
-    expect(v.calls.some((c) => /SSL Gold Cup|Brazil 2026/.test(c))).toBe(false);
+    expect(v.calls.some((c) => /SSL Gold Cup|Brazil 2026|City|Country/.test(c))).toBe(false);
+    updateGraphicSet(s.db, w.id, { data: { date: '02.12.2026' } });
+    await show.run('show:welcome');
+    await show.run('show:welcome');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Date.Text&Value=02.12.2026');
+    // Race officials: the panel's roles and names, filled from the officials list until changed on the tab
+    const o = listGraphicSets(s.db, ev, 'officials')[0];
+    updateGraphicSet(s.db, o.id, { data: { name_11: 'Jan Kowalski (POL)' } });
     await show.run('show:officials');
-    expect(v.calls.some((c) => c.includes('SelectedName=ROLE 1.Text&Value=PRINCIPAL RACE OFFICER'))).toBe(true);
-    expect(v.calls.some((c) => c.includes('SelectedName=NAME 1.Text&Value=Jan Kowalski'))).toBe(true);
+    expect(v.calls).toContain('?Function=SetText&Input=k12&SelectedName=ROLE 1.Text&Value=REGATTA DIRECTOR'.replace('k12', `k${v.num('ssl_officials')}`));
+    expect(v.calls.some((c) => c.includes('SelectedName=ROLE 8.Text&Value=JURY (REMOTE)'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('SelectedName=NAME 1.Text&Value=Paul Hutton-Ashkenny (GBR)'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('SelectedName=NAME 11.Text&Value=Jan Kowalski (POL)'))).toBe(true);
   });
 
   it('splits the lineup lower third into the first five and the rest, then goes out; shows a qualified team', async () => {
@@ -267,7 +272,7 @@ describe('show control', () => {
     fs.writeFileSync(path.join(dir, `${code}_lowerthird.png`), encodePng(4, 1, () => [0, 0, 0, 255]));
     fs.writeFileSync(path.join(dir, `${code}_qualified_bar.png`), encodePng(4, 1, () => [0, 0, 0, 255]));
     await show.run('qualified:2');
-    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=Qualified for the finals of SSL Gold Cup');
+    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=Qualified for the SSL Gold Cup finals');
     expect(v.calls.find((c) => c.includes('SelectedName=Bar.Source'))).toMatch(new RegExp(`${code}_lowerthird\\.png$`));
     expect(v.overlays[1]).toBe('10');
   });
