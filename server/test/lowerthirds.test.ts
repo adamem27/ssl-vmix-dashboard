@@ -57,7 +57,7 @@ describe('lower thirds', () => {
     const r = await lt.showSailor(null, 'pit');
     expect(r).toMatchObject({ kind: 'sailor', slot: 'Pit', cameIn: true, input: 'lowerthird_no_photo' });
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Martine GRAEL');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9  I  PIT');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9 | PIT');
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k2');
 
     // best results: only Bottom text changes, no transition
@@ -66,7 +66,7 @@ describe('lower thirds', () => {
     expect(v.calls).toEqual(['?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=Olympic gold 2016']);
     v.calls.length = 0;
     await lt.nextLine(); await lt.nextLine();
-    expect(v.calls.at(-1)).toBe('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9  I  PIT');
+    expect(v.calls.at(-1)).toBe('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9 | PIT');
 
     // another sailor of the same team on air: only names change (data change animations), no transition
     v.calls.length = 0;

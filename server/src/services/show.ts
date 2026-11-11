@@ -86,7 +86,7 @@ export const showConfigSchema = z.object({
   /** write key texts and colours into Companion (HTTP remote control) */
   labels: z.boolean().default(true),
   /** places on the lineup lower third, in this order: the first 5, then the rest on the second press */
-  /** Stream Deck key edits by place ("<page index>/<row>/<col>"): another action ('' = empty key), own text ({auto} = the live text), key and text colour */
+  /** Stream Deck key edits by place ("<page name>/<row>/<col>"): another action ('' = empty key), own text ({auto} = the live text), key and text colour */
   keys: z.record(z.string(), z.object({ action: z.string().optional(), text: z.string().optional(), bg: z.string().optional(), fg: z.string().optional() })).default({}),
   /** key colour per kind of key (board, lt, bug, …), overriding the built-in palette */
   kindColours: z.record(z.string(), z.string()).default({}),
@@ -149,7 +149,7 @@ const row8 = (...keys: (DeckKey | null)[]) => Array.from({ length: 8 }, (_, i) =
 export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 } as const;
 
 /** A team page: the team and its places (slot, place label, the name on the key). */
-export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string }[] }
+export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string; number?: string }[] }
 
 /** A group of the stage with a Team comparison of its own: key A, B… (FINAL…), its input ssl_compare_<key>. */
 export interface PresetGroup { fleetId: string; key: string; label: string }
@@ -248,7 +248,7 @@ function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: numb
   const page = PRESET_PAGES.teams + i;
   const other = (d: number) => teams[(i + d + teams.length) % teams.length];
   const tk = (action: string, text: string, kind: DeckKey['kind']): DeckKey => ({ ...k(action, text, kind), team: t.code });
-  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name.toUpperCase().slice(0, 14) || '—'}`, 'sailor'));
+  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
   return {
     deck: 2, name: t.code, page, keys: [
       row8(tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'),
@@ -284,10 +284,10 @@ export function keyActions(cfg: ShowConfig): DeckKey[] {
 function applyKeyEdits(cfg: ShowConfig, pages: DeckPage[]): DeckPage[] {
   if (!Object.keys(cfg.keys).length) return pages;
   const actions = new Map(keyActions(cfg).map((a) => [a.action, a]));
-  return pages.map((p, pi) => ({
+  return pages.map((p) => ({
     ...p,
     keys: p.keys.map((row, r) => row.map((key, c) => {
-      const o = cfg.keys[`${pi}/${r}/${c}`];
+      const o = cfg.keys[`${p.name}/${r}/${c}`];
       if (!o) return key;
       let next: DeckKey | null = key;
       if (o.action !== undefined) {
@@ -379,11 +379,39 @@ export class Show {
   presetTeams(): PresetTeam[] {
     return this.cached('presetTeams', () => ltTeams(this.ctx).filter((t) => t.code).map((t) => ({
       code: t.code, name: t.name,
-      crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName })),
+      crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName, number: c.number })),
     })));
   }
   /** The pages of both decks with a page per team. */
-  pages() { return deckPages(this.config, this.presetTeams(), this.deckCompareGroups()); }
+  pages() {
+    const teams = this.presetTeams(), groups = this.deckCompareGroups();
+    this.keyEditsByName(teams, groups);
+    return deckPages(this.config, teams, groups);
+  }
+
+  /**
+   * Key edits were kept by page position ("12/0/2"): a page added before (BUGS OFTEN/RARE, another stage with more
+   * teams) moved them onto other pages. Now they are kept by page name ("PUR/0/2"); the old ones move once, where
+   * they show now, except onto the LINEUP LT keys (new in 1.0.140, so an edit there is one that slid onto them).
+   */
+  private keyEditsByName(teams: PresetTeam[], groups: PresetGroup[]) {
+    const cfg = this.config;
+    const old = Object.keys(cfg.keys).filter((id) => /^\d+\/\d+\/\d+$/.test(id));
+    if (!old.length) return;
+    const pages = defaultDeckPages(cfg, teams, groups);
+    const keys = { ...cfg.keys };
+    for (const id of old) {
+      const [pi, r, c] = id.split('/').map(Number);
+      const o = keys[id];
+      delete keys[id];
+      const p = pages[pi];
+      const key = p?.keys[r]?.[c];
+      if (!p || (key && /^lult/.test(key.action))) continue;
+      const name = `${p.name}/${r}/${c}`;
+      if (!keys[name]) keys[name] = o;
+    }
+    setShowConfig(this.ctx.db, { keys });
+  }
 
   /** A team by key: its position in the group racing now (1–4) or its code. */
   teamRef(arg: string) {
@@ -509,12 +537,20 @@ export class Show {
   private async overlayIn(n: number, input: VmixInput, overlays: Record<string, string>) {
     if (overlays[n] === input.number) return false;
     await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+    if (overlays[n]) this.ltLeft(overlays[n]);
     return true;
   }
   private async overlayOut(n: number, overlays: Record<string, string>) {
     if (!overlays[n]) return false;
     await this.vmix(`?Function=OverlayInput${n}Out`);
+    this.ltLeft(overlays[n]);
     return true;
+  }
+
+  /** A lower third title that left the screen some other way than its OUT: its photo is emptied off air, so the next sailor comes in at once. */
+  private ltLeft(number: string) {
+    const input = this.lastInputs.find((i) => i.number === number);
+    if (input && this.isLtTitle(input)) this.lt.clearPhotoOffAir(input);
   }
 
   /** Bring a graphic in on its overlay, after its data is in; takes off what it must not sit on. */
@@ -653,8 +689,9 @@ export class Show {
     const f = new Map<string, string>();
     for (let i = 1; i <= 9; i++) {
       const s = part === 1 ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
-      f.set(`NAME ${i}.Text`, s ? s.lastName.toUpperCase() : '');
-      f.set(`POSITION ${i}.Text`, s ? s.position.toUpperCase() : '');
+      // I. SLADDER and 5 | MIDBOW
+      f.set(`NAME ${i}.Text`, s ? [s.firstName.trim() ? `${s.firstName.trim()[0].toUpperCase()}.` : '', s.lastName.toUpperCase()].filter(Boolean).join(' ') : '');
+      f.set(`POSITION ${i}.Text`, s ? [s.number, s.position.toUpperCase()].filter(Boolean).join(' | ') : '');
       f.set(`PHOTO ${i}.Source`, s?.photo ?? '');
     }
     const t = listTeams(this.ctx).find((x) => x.id === teamId);
@@ -902,12 +939,10 @@ export class Show {
     if (!s) throw badRequest(shirt ? `No sailor with number ${shirt} in ${this.boats()[this.state.boat - 1]?.code ?? 'this team'}.` : 'No sailor on this key.');
     const b = this.boat(this.state.boat);
     const mode = this.state.photo;
-    const cfg = getLtConfig(this.ctx.db);
     const snap = await this.snapshot();
-    if (snap.overlays[1]) { this.pushUndo(snap.overlays); await this.overlayOut(1, snap.overlays); }
+    await this.clearForSailor(snap);
     // photo mode: the lower thirds pick the photo title when the sailor has a photo; OFF forces the other one
     if (mode === 'off' && s.photo) return this.lt.showSailor(b.code, s.slot, { forceNoPhoto: true });
-    void cfg;
     return this.lt.showSailor(b.code, s.slot);
   }
 
@@ -915,8 +950,28 @@ export class Show {
   async sailorOf(code: string, slot: string) {
     const t = this.teamRef(code);
     const snap = await this.snapshot();
-    if (snap.overlays[1]) { this.pushUndo(snap.overlays); await this.overlayOut(1, snap.overlays); }
+    await this.clearForSailor(snap);
     return this.lt.showSailor(t.code, slot, { forceNoPhoto: this.state.photo === 'off' });
+  }
+
+  /** Is this vMix input one of the lower third titles (photo / no photo)? */
+  private isLtTitle(input?: VmixInput) {
+    const cfg = getLtConfig(this.ctx.db);
+    const name = (input?.title ?? '').toLowerCase().replace(/\.gtzip$/, '');
+    return !!name && [cfg.photoInput, cfg.noPhotoInput].some((x) => x && x.toLowerCase() === name);
+  }
+
+  /**
+   * Before a sailor's lower third: a board on OV1 goes out; a lower third stays on, so the next sailor is only a data
+   * change (taking it out first left its photo in the title, and the next one waited ~3 s for that photo to fly away).
+   */
+  private async clearForSailor(snap: { inputs: VmixInput[]; overlays: Record<string, string> }) {
+    const on = snap.overlays[1];
+    if (!on) return;
+    this.pushUndo(snap.overlays);
+    const input = snap.inputs.find((i) => i.number === on);
+    if (getLtConfig(this.ctx.db).overlay === 1 && this.isLtTitle(input)) return;
+    await this.overlayOut(1, snap.overlays);
   }
 
   async undo() {

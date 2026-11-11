@@ -256,22 +256,23 @@ describe('show control', () => {
     await show.run('show:lineup5');
     // bow first: Bow, Midbow/Pit, Grinder, Trimmer, Trimmer1 in slots 1-5; 6-9 empty
     const name = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
-    expect(v.calls).toContain(name(1, 'BOW'));
-    expect(v.calls).toContain(name(3, 'GRI'));
-    expect(v.calls).toContain(name(5, 'TR2'));
+    expect(v.calls).toContain(name(1, 'G. BOW'));
+    expect(v.calls).toContain(name(3, 'F. GRI'));
+    expect(v.calls).toContain(name(5, 'D. TR2'));
     expect(v.calls).toContain(name(6, ''));
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=POSITION 1.Text&Value=7 | BOW');
     expect(v.overlays[1]).toBe('9');
     v.calls.length = 0;
     await show.run('lultswap');
     // the four toward the stern go to slots 6-9, slots 1-5 empty, no overlay change
-    expect(v.calls).toContain(name(6, 'MAI'));
-    expect(v.calls).toContain(name(7, 'HEL'));
-    expect(v.calls).toContain(name(8, 'TAC'));
+    expect(v.calls).toContain(name(6, 'C. MAI'));
+    expect(v.calls).toContain(name(7, 'B. HEL'));
+    expect(v.calls).toContain(name(8, 'A. TAC'));
     expect(v.calls).toContain(name(1, ''));
     expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
     v.calls.length = 0;
     await show.run('lultswap');
-    expect(v.calls).toContain(name(1, 'BOW'));
+    expect(v.calls).toContain(name(1, 'G. BOW'));
     await show.run(`lult:${show.boat(show.state.boat).code}`);
     expect(v.overlays[1]).toBe('');
     await expect(show.run('lultswap')).rejects.toThrow(/LINEUP LT/);
@@ -326,7 +327,7 @@ describe('show control', () => {
     const esp = f.pages[10];
     expect(esp.name).toBe('SSL ESP');
     expect(esp.controls[1][0].style.text).toBe('BOW\\nPONS');
-    expect(esp.controls[1][2].style.text).toBe('PIT\\nRUIZ');
+    expect(esp.controls[1][2].style.text).toBe('PIT\\n#12 RUIZ');
     expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
     expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=qualified%3AESP');
     // the team lower thirds sit on TEAMS, under each team's page key (not on the team's own page)
@@ -470,11 +471,29 @@ describe('show control', () => {
     expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
     await show.run('teamlt:ESP');
     expect(v.calls.some((c) => c.includes('Value=TEAM ESP') || c.includes('Value=ESP'))).toBe(true);
+    // a lower third on air: the next sailor is a data change, it is not taken out first (that made the next one wait)
+    v.calls.length = 0;
+    await show.run('sailorof:ESP/Pit');
+    expect(v.calls.some((c) => c.includes('OverlayInput1Out'))).toBe(false);
+    expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
+  });
+
+  it('keeps key edits by page name; old ones by position move once, never onto the LINEUP LT keys', async () => {
+    const { s } = race();
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const pages = show.pages();
+    const esp = pages.findIndex((p) => p.name === 'ESP');
+    setShowConfig(s.db, { keys: { [`${esp}/0/2`]: { action: 'show:weather' }, [`${esp}/0/4`]: { text: 'MINE' } } });
+    const after = show.pages();
+    expect(Object.keys(show.config.keys)).toEqual(['ESP/0/4']);
+    const p = after.find((x) => x.name === 'ESP')!;
+    expect(p.keys[0][2]).toMatchObject({ action: 'lult:ESP' });
+    expect(p.keys[0][3]).toMatchObject({ action: 'lultswap' });
   });
 
   it('lets keys be edited like a Stream Deck: text, colours, another action, an empty place', async () => {
     const { s } = race();
-    setShowConfig(s.ctx.db, { keys: { '0/0/0': { text: 'HELLO\\n{auto}', bg: '#16a34a', fg: '#000000' }, '0/0/1': { action: 'show:weather' }, '0/0/2': { action: '' } }, kindColours: { board: '#7c3aed' } });
+    setShowConfig(s.ctx.db, { keys: { 'A BEFORE/0/0': { text: 'HELLO\\n{auto}', bg: '#16a34a', fg: '#000000' }, 'A BEFORE/0/1': { action: 'show:weather' }, 'A BEFORE/0/2': { action: '' } }, kindColours: { board: '#7c3aed' } });
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
     const p = deckPages(show.config)[0];
     expect(p.keys[0][1]).toMatchObject({ action: 'show:weather', text: 'WEATHER', kind: 'board' });
@@ -502,7 +521,7 @@ describe('show control', () => {
     expect(espKey).toMatchObject({ bg: esp.normal.bg, fg: esp.normal.fg });
     const espPage = pages.find((p) => p.name === 'ESP')!;
     const sailor = await show.keyLook(espPage.keys[1][2]!);
-    expect(sailor).toMatchObject({ text: 'PIT\\nRUIZ', bg: esp.normal.bg });
+    expect(sailor).toMatchObject({ text: 'PIT\\n#12 RUIZ', bg: esp.normal.bg });
     expect((await show.keyLook(pages[2].keys[0][0]!)).bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
     // a colour set on the key in the key editor still wins
     setShowConfig(s.db, { keys: { '2/0/1': { bg: '#123456' } } });

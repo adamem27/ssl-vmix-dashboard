@@ -111,8 +111,8 @@ export function crewOf(ctx: AssetCtx, teamId: string): LtSailor[] {
 }
 
 const fullName = (s: { firstName: string; lastName: string }) => [s.firstName.trim(), s.lastName.trim().toUpperCase()].filter(Boolean).join(' ');
-/** The lines Bottom text cycles through for a sailor: number and position first, then each best result. */
-export const sailorLines = (s: LtSailor) => [[s.number, s.position.toUpperCase()].filter(Boolean).join('  I  '), ...s.best].filter(Boolean);
+/** The lines Bottom text cycles through for a sailor: number and position first (9 | MIDBOW, as the best results are typed), then each best result. */
+export const sailorLines = (s: LtSailor) => [[s.number, s.position.toUpperCase()].filter(Boolean).join(' | '), ...s.best].filter(Boolean);
 
 export interface LtState { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
 const STATE_KEY = 'lt.state';
@@ -192,12 +192,14 @@ export class LowerThirds {
     if (!inputName.trim()) throw badRequest('Set the vMix inputs of the lower thirds in Show control → Lower thirds.');
     if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; await this.vmix(`?Function=OverlayInput${cfg.overlay}Out`); }
     const xml = await this.vmix('');
-    const input: VmixInput | undefined = findInput(parseVmixXml(xml), inputName);
+    const all = parseVmixXml(xml);
+    const input: VmixInput | undefined = findInput(all, inputName);
     if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
     const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
     fields = this.fitToTitle(input, fields, next.teamId);
     const has = new Set(input.fields);
     const id = input.key || input.number;
+    this.cancelClear(id); // its photo is still in: emptied below, before it comes in
     const last = sent.get(id) ?? new Map<string, string>();
     const held = (name: string) => input.values?.[name] ?? last.get(name) ?? '';
     // vMix leaves a Fly on the photo in Transition In out (the photo only fades in with the title), but plays the
@@ -220,7 +222,13 @@ export class LowerThirds {
       await new Promise((r) => setTimeout(r, Math.min(move!.out + move!.in, 3) * 1000 + 100));
     }
     sent.set(id, last);
-    if (!onAir) await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
+    if (!onAir) {
+      const before = LowerThirds.onOverlay(xml, cfg.overlay);
+      await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
+      // the other lower third title it replaced (photo ⇄ no photo): its photo goes once it is off air
+      const prev = before ? all.find((i) => i.number === before) : undefined;
+      if (prev && prev !== input && [cfg.photoInput, cfg.noPhotoInput].some((x) => x && findInput([prev], x))) this.clearPhotoOffAir(prev);
+    }
     const photo = late ? fields.get(late) ?? '' : '';
     if (late && photo) { await this.set(id, late, photo); last.set(late, photo); changed++; }
     const state: LtState = { ...next, onAir: true, input: input.title };
@@ -329,6 +337,32 @@ export class LowerThirds {
     return this.show(input, ltFields(this.ctx, cfg, st.teamId, s, line), { kind: 'sailor', teamId: st.teamId, slot: s.slot, line });
   }
 
+  private clears = new Map<string, NodeJS.Timeout>();
+  private cancelClear(id: string) {
+    const t = this.clears.get(id);
+    if (t) { clearTimeout(t); this.clears.delete(id); }
+  }
+
+  /**
+   * A lower third title that left the screen (another graphic took OV1, OUT of the show, ALL OUT): its photo is
+   * emptied once the title is off air, so the next sailor on it comes in at once instead of waiting for that photo
+   * to fly away first.
+   */
+  clearPhotoOffAir(input: VmixInput, afterMs = 1500) {
+    const move = this.photoMove(input);
+    const id = input.key || input.number;
+    if (!move || !(input.values?.[move.field] ?? sent.get(id)?.get(move.field))) return;
+    this.cancelClear(id);
+    this.clears.set(id, setTimeout(() => {
+      this.clears.delete(id);
+      this.set(id, move.field, '').then(() => {
+        const last = sent.get(id) ?? new Map<string, string>();
+        last.set(move.field, '');
+        sent.set(id, last);
+      }).catch((e) => this.log(`Lower third photo not emptied: ${e?.message ?? e}`));
+    }, afterMs));
+  }
+
   async out() {
     const cfg = this.config;
     if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; }
@@ -364,7 +398,7 @@ export class LowerThirds {
       teams.map((t) => ({ action: `team:${t.code}`, text: t.code, team: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
       LINEUP_SLOTS.map((d) => {
         const s = crew.find((x) => x.slot === d.key);
-        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
+        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName ? `${s.number ? `#${s.number} ` : ''}${s.lastName.toUpperCase()}` : '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
       }),
       [
         { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', team: team?.code, active: false, onAir: !!team && st.onAir && st.kind === 'team' && st.teamId === team.id },

@@ -52,7 +52,7 @@ function Show({ data }: { data: ShowData }) {
   const [deck, setDeck] = useState<Record<number, number>>({ 1: 0, 2: 0 });
   const refresh = () => qc.invalidateQueries({ queryKey: ['show'] });
   const [edit, setEdit] = useState(false);
-  const [pick, setPick] = useState<string | null>(null); // "<page index>/<row>/<col>" of the key being edited
+  const [pick, setPick] = useState<string | null>(null); // "<page name>/<row>/<col>" of the key being edited
   const [keys, setKeys] = useState(data.config.keys);
   const [kindColours, setKindColours] = useState(data.config.kindColours);
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,7 +73,7 @@ function Show({ data }: { data: ShowData }) {
     if (Object.keys(o).length) next[id] = o; else delete next[id];
     setKeyEdits(next, delay);
   };
-  const keyAt = (id: string) => { const [pi, r, c] = id.split('/').map(Number); return data.pages[pi]?.keys[r]?.[c] ?? null; };
+  const keyAt = (id: string) => { const m = id.match(/^(.*)\/(\d+)\/(\d+)$/); return m ? data.pages.find((p) => p.name === m[1])?.keys[Number(m[2])]?.[Number(m[3])] ?? null : null; };
   /** drag one key onto another: they swap places (Alt: the dragged one is copied) */
   const moveKey = (from: string, to: string, copy: boolean) => {
     if (from === to) return;
@@ -138,7 +138,7 @@ function Show({ data }: { data: ShowData }) {
                 </div>
                 <div className="grid grid-cols-8 gap-1.5">
                   {p.keys.flatMap((row, r) => row.map((k, c) => {
-                    const id = `${data.pages.indexOf(p)}/${r}/${c}`;
+                    const id = `${p.name}/${r}/${c}`;
                     const dnd = {
                       draggable: edit,
                       onDragStart: (e: React.DragEvent) => { drag.current = id; e.dataTransfer.effectAllowed = 'copyMove'; },
@@ -156,7 +156,7 @@ function Show({ data }: { data: ShowData }) {
                     ) : <div key={id} {...dnd} onClick={() => edit && setPick(id)} className={cx('aspect-square rounded-lg border border-dashed border-ink-800', edit && 'cursor-pointer hover:border-ink-500', picked && 'outline outline-2 outline-offset-2 outline-sky-400')} />;
                   }))}
                 </div>
-                {edit && pick && Number(pick.split('/')[0]) === data.pages.indexOf(p) && (
+                {edit && pick && pick.startsWith(`${p.name}/`) && /^\d+\/\d+$/.test(pick.slice(p.name.length + 1)) && (
                   <KeyEditor key={pick} look={keyAt(pick)} edit={keys[pick] ?? {}} actions={data.actions} onChange={(patch, delay) => editKey(pick, patch, delay)} onClose={() => setPick(null)} />
                 )}
               </div>
@@ -245,9 +245,6 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
             <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
           </label>
           <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>{b.code} · {b.name}</span>)}</div>
-          <label className="block text-xs text-ink-400">Lineup LT (5 sailors): places in order
-            <input className="input mt-1 w-72 py-1 text-sm" value={c.lineup5.join(', ')} onChange={(e) => setC({ ...c, lineup5: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
-          </label>
         </div>
         <div className="space-y-2">
           {sel('Ticker before the next race (D)', c.tickerNext, (v) => setC({ ...c, tickerNext: v }), data.tickers, 'first ticker')}
