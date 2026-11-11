@@ -35,6 +35,29 @@ export function listSchedule(db, eventId, date) {
     return db.prepare(`SELECT id, date, time, race, fleet, status, note FROM schedule_items WHERE event_id = ? ${date ? 'AND date = ?' : ''} ORDER BY date, time, created_at`)
         .all(...(date ? [eventId, date] : [eventId]));
 }
+export function getScheduleOptions(db) {
+    try {
+        const o = JSON.parse(getSetting(db, 'schedule.options') || '{}');
+        return { showTime: o.showTime !== false, next: o.next && typeof o.next === 'object' ? o.next : {} };
+    }
+    catch {
+        return { showTime: true, next: {} };
+    }
+}
+export function setScheduleOptions(db, patch) {
+    const o = getScheduleOptions(db);
+    if (patch.showTime !== undefined)
+        o.showTime = patch.showTime;
+    if (patch.date !== undefined && patch.next !== undefined) {
+        assertDate(patch.date);
+        if (patch.next)
+            o.next[patch.date] = patch.next;
+        else
+            delete o.next[patch.date];
+    }
+    setSetting(db, 'schedule.options', JSON.stringify(o));
+    return o;
+}
 export function listScheduleDates(db, eventId) {
     return db.prepare('SELECT date, COUNT(*) AS items FROM schedule_items WHERE event_id = ? GROUP BY date ORDER BY date').all(eventId);
 }

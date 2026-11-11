@@ -1,8 +1,14 @@
 {
-  "version": "1.0.147",
-  "commit": "c02f1da",
-  "date": "2026-11-11T22:08:13Z",
+  "version": "1.0.148",
+  "commit": "fbab737",
+  "date": "2026-11-11T22:47:38Z",
   "changes": [
+    {
+      "version": "1.0.148",
+      "commit": "fbab737",
+      "date": "2026-11-11T22:47:38Z",
+      "text": "Schedule board: TIME on/off with centred rows, highlight of the next race; Day/Date/location fields"
+    },
     {
       "version": "1.0.147",
       "commit": "c02f1da",
@@ -476,12 +482,6 @@
       "commit": "f6e0043",
       "date": "2026-11-08T22:11:29Z",
       "text": "No heading in Welcome, Follow us and Announcements; line-up places bow to helm by default and reorderable by dragging (names still drag to swap sailors); General graphics in the order welcome, schedule, weather, announcements, tickers, race officials, follow us, people"
-    },
-    {
-      "version": "1.0.60",
-      "commit": "abee512",
-      "date": "2026-11-08T21:56:19Z",
-      "text": "Panam team colours from color_panam.ai (CUB, ESA, VEN, ANT, BER, MEX, PUR): all three versions set once per team, PNGs regenerate"
     }
   ]
 }

@@ -437,6 +437,8 @@ export async function buildApp(deps) {
     app.put('/api/weather', async (req) => gen.setWeather(db, z.record(z.string(), text).parse(req.body)));
     const scheduleBody = z.object({ date: str(10), time: str(20), race: str(200), fleet: str(200), status: str(60), note: str(500) }).partial();
     app.get('/api/schedule', async (req) => gen.listSchedule(db, ev().id, req.query.date ? String(req.query.date) : undefined));
+    app.get('/api/schedule/options', async () => gen.getScheduleOptions(db));
+    app.put('/api/schedule/options', async (req) => gen.setScheduleOptions(db, z.object({ showTime: z.boolean().optional(), date: z.string().optional(), next: z.string().max(80).nullable().optional() }).parse(req.body)));
     app.get('/api/schedule/dates', async () => gen.listScheduleDates(db, ev().id));
     app.post('/api/schedule', async (req) => ({ id: gen.createScheduleItem(db, ev().id, scheduleBody.parse(req.body)) }));
     app.patch('/api/schedule/:id', async (req) => { gen.updateScheduleItem(db, req.params.id, scheduleBody.parse(req.body)); return { ok: true }; });
