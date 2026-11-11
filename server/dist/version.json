@@ -1,8 +1,14 @@
 {
-  "version": "1.0.136",
-  "commit": "8e5835d",
-  "date": "2026-11-11T00:29:38Z",
+  "version": "1.0.137",
+  "commit": "aad95ce",
+  "date": "2026-11-11T00:47:27Z",
   "changes": [
+    {
+      "version": "1.0.137",
+      "commit": "aad95ce",
+      "date": "2026-11-11T00:47:27Z",
+      "text": "Announcement bugs on BUGS OFTEN and BUGS RARE, a PEOPLE page, version keys named in Companion as they are added, COMPARE keys for the inputs vMix has"
+    },
     {
       "version": "1.0.136",
       "commit": "8e5835d",
@@ -476,12 +482,6 @@
       "commit": "6f9c575",
       "date": "2026-11-08T20:18:58Z",
       "text": "Team profile icon right after the team code so it lines up in every row"
-    },
-    {
-      "version": "1.0.43",
-      "commit": "6411358",
-      "date": "2026-11-08T19:51:01Z",
-      "text": "GTZIP scenes: sailor lower third with sponsor, recognise delay and announcement files"
     }
   ]
 }

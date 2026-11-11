@@ -18,10 +18,11 @@ export const GRAPHIC_KINDS = [
     },
     {
         kind: 'announcement', label: 'Announcements', sheet: 'Announcements',
-        description: 'Announcement bugs: one line of text and an icon (the race flag, or the SSL star). One version per race flag, plus Replay. Every version is on its own Show control key (pages BUGS 1 and BUGS 2), a new one at once.',
+        description: 'Announcement bugs: one line of text and an icon (the race flag, or the SSL star). One version per race flag, plus Replay. Every version is on its own Stream Deck key, on page BUGS OFTEN or BUGS RARE (Stream Deck field); a new one at once.',
         fields: [
             { key: 'text', label: 'Text', wide: true, default: 'ANNOUNCEMENT' },
             { key: 'icon', label: 'Icon', type: 'image', hint: 'PNG: the race flag or the SSL star' },
+            { key: 'deck', label: 'Stream Deck', type: 'select', options: ['Often', 'Rare'], default: 'Rare', hint: 'page BUGS OFTEN or BUGS RARE' },
         ],
         defaults: [],
     },
@@ -170,6 +171,11 @@ export const FLAG_ANNOUNCEMENTS = [
 ];
 /** Replay: its icon is the SSL star, empty until that PNG is added (Icon field). */
 export const REPLAY_ANNOUNCEMENT = { name: 'Replay', text: 'REPLAY', icon: '' };
+/** The announcements used most, on the BUGS OFTEN page; every other one is on BUGS RARE. */
+export const OFTEN_ANNOUNCEMENTS = ['X – Individual recall', 'First substitute – General recall', 'AP – Postponed', 'AP over A – Postponed, no more racing today',
+    'S – Shortened course', 'C – Change of course', 'Green – No penalty', 'Yellow – Penalty', 'Black – Disqualified', 'Replay'];
+/** An announcement on the BUGS OFTEN page (Stream Deck: Often). */
+export const isOften = (a) => (a.data.deck ?? '').toLowerCase() === 'often';
 /** Announcements seeded by earlier versions; they go when the flag set comes in (versions you added stay). */
 const OLD_ANNOUNCEMENTS = ['announcement', 'false start', 'warning signal', 'general recall', 'individual recall', 'penalty', 'race postponed',
     'race abandoned', 'delay – weather', 'delay – other reasons', 'thanks for watching', 'custom text'];
@@ -212,6 +218,17 @@ export function ensurePresets(db, eventId) {
         const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
         db.transaction(() => sorted.forEach((x, i) => upd.run(i + 1, x.id)))();
         setSetting(db, flags, '1');
+    }
+    // every announcement on BUGS OFTEN or BUGS RARE by its name (once per event; later the Stream Deck field decides)
+    const decks = `graphicSets.decks.${eventId}`;
+    if (!getSetting(db, decks)) {
+        const often = new Set(OFTEN_ANNOUNCEMENTS.map((n) => n.toLowerCase()));
+        const upd = db.prepare('UPDATE graphic_sets SET data = ? WHERE id = ?');
+        db.transaction(() => {
+            for (const a of listGraphicSets(db, eventId, 'announcement'))
+                upd.run(JSON.stringify({ ...a.data, deck: often.has(a.name.toLowerCase()) ? 'Often' : 'Rare' }), a.id);
+        })();
+        setSetting(db, decks, '1');
     }
 }
 /**
