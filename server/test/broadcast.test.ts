@@ -7,6 +7,8 @@ import { createManualDeclaration, addMember, getDeclaration } from '../src/servi
 import { createSet, createFleet } from '../src/services/fleets.js';
 import { allSheets } from '../src/services/workbook.js';
 import { groupLabel } from '../src/services/groups.js';
+import { groupTitle } from '../src/services/groupNames.js';
+import { realTodayIn, setDayOverride, todayIn } from '../src/services/dates.js';
 
 describe('general graphics versions', () => {
   it('seeds defaults once, copies, moves and exports one row per version', () => {
@@ -51,6 +53,15 @@ describe('general graphics versions', () => {
 
   it('names groups as the broadcast does', () => {
     expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['Group H', 'Group A', 'Group B', 'Group C', 'FINAL', 'PETIT FINAL']);
+    // a results title saved as the short name shows as the group; other titles stay as typed
+    expect(['QS H', 'qs i', 'Final day'].map(groupTitle)).toEqual(['Group H', 'Group I', 'Final day']);
+  });
+
+  it('every today follows the day picked at the top, until it is set back', () => {
+    setDayOverride('2026-11-12');
+    expect(todayIn('America/Sao_Paulo')).toBe('2026-11-12');
+    setDayOverride('');
+    expect(todayIn('America/Sao_Paulo')).toBe(realTodayIn('America/Sao_Paulo'));
   });
 });
 

@@ -180,7 +180,11 @@ export function fmtBytes(n: number | null) {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(2)} MB`;
 }
+/** The day picked at the top of the dashboard ('' = the real today): every tab's "today" follows it. */
+let dayOverride = '';
+export function setDayOverride(day: string) { dayOverride = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : ''; }
 export function todayIn(tz: string) {
+  if (dayOverride) return dayOverride;
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); }
   catch { return new Date().toISOString().slice(0, 10); }
 }

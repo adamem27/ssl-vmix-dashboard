@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { activeEvent } from '../db/db.js';
+import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import * as gs from './graphicSets.js';
 import { currentGroup, stageGroups, tickerAuto } from './groups.js';
@@ -11,7 +11,7 @@ import * as rs from './results.js';
 import { setShowConfig } from './show.js';
 import { badRequest } from './errors.js';
 import * as wb from './workbookSheets.js';
-import { todayIn } from './dates.js';
+import { DAY_SETTING, dayOverrideNow, realTodayIn, setDayOverride, todayIn } from './dates.js';
 import { getWeather, listSchedule } from './general.js';
 import { listGradients } from './generator/generator.js';
 import * as vx from './vmixResults.js';
@@ -88,14 +88,24 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
 
   // ---------- current stage (decides which teams and groups go to the workbook) ----------
   // the group racing now goes with it: one of the stage's groups (Show control keys, tickers, results boards follow it)
+  setDayOverride(getSetting(db, DAY_SETTING));
   const stageInfo = () => {
     const current = wb.currentStage(db, ev().id);
     return {
+      day: dayOverrideNow(), today: realTodayIn(ev().timezone),
       current, teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id),
       groups: current ? stageGroups(db, current.id) : [], group: currentGroup(db),
     };
   };
   app.get('/api/stage', async () => stageInfo());
+  // the day the whole dashboard works on ('' = today): line-ups, schedule, Welcome, tickers, the Excel file…
+  app.put('/api/stage/day', async (req) => {
+    const day = z.object({ day: z.string().max(10) }).parse(req.body).day;
+    if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) throw badRequest('Pick a date as YYYY-MM-DD.');
+    setSetting(db, DAY_SETTING, day);
+    setDayOverride(day);
+    return stageInfo();
+  });
   app.put('/api/stage', async (req) => {
     const stage = wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId);
     // a group of another stage is no longer racing: the stage's first group takes its place
