@@ -254,25 +254,25 @@ describe('show control', () => {
     const v = fakeVmix(TITLES);
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('show:lineup5');
-    // bow first: Bow, Midbow/Pit, Grinder, Trimmer, Trimmer1 in slots 1-5; 6-9 empty
+    // eight sailors: 4 + 4, bow first, each four on the centred places 6-9 (1-5 empty)
     const name = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
-    expect(v.calls).toContain(name(1, 'G. BOW'));
-    expect(v.calls).toContain(name(3, 'F. GRI'));
-    expect(v.calls).toContain(name(5, 'D. TR2'));
-    expect(v.calls).toContain(name(6, ''));
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=POSITION 1.Text&Value=7 | BOW');
+    expect(v.calls).toContain(name(6, 'G. BOW'));
+    expect(v.calls).toContain(name(8, 'F. GRI'));
+    expect(v.calls).toContain(name(9, 'E. TR1'));
+    expect(v.calls).toContain(name(1, ''));
+    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=POSITION 6.Text&Value=7 | BOW');
     expect(v.overlays[1]).toBe('9');
     v.calls.length = 0;
     await show.run('lultswap');
-    // the four toward the stern go to slots 6-9, slots 1-5 empty, no overlay change
-    expect(v.calls).toContain(name(6, 'C. MAI'));
-    expect(v.calls).toContain(name(7, 'B. HEL'));
-    expect(v.calls).toContain(name(8, 'A. TAC'));
-    expect(v.calls).toContain(name(1, ''));
+    // the four toward the stern on 6-9, no overlay change
+    expect(v.calls).toContain(name(6, 'D. TR2'));
+    expect(v.calls).toContain(name(7, 'C. MAI'));
+    expect(v.calls).toContain(name(8, 'B. HEL'));
+    expect(v.calls).toContain(name(9, 'A. TAC'));
     expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
     v.calls.length = 0;
     await show.run('lultswap');
-    expect(v.calls).toContain(name(1, 'G. BOW'));
+    expect(v.calls).toContain(name(6, 'G. BOW'));
     await show.run(`lult:${show.boat(show.state.boat).code}`);
     expect(v.overlays[1]).toBe('');
     await expect(show.run('lultswap')).rejects.toThrow(/LINEUP LT/);
@@ -497,6 +497,32 @@ describe('show control', () => {
     await show.syncData();
     expect(v.calls).toContain(w('Wind.Text', '15'));
     expect(personName({ name: 'jAN-erik', surname: 'van Dijk' })).toBe('Jan-Erik VAN DIJK');
+  });
+
+  it('a crew of ten with a floater: Lineup LT 5 + 5 from the bow, the numbered board for ten', async () => {
+    const { s, ev, teams } = race();
+    const slots = ['Bow', 'Midbow', 'Pit', 'Floater', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
+    saveLineup(s.ctx, ev, teams[0], { rows: [...slots].reverse().map((slot, i) => ({ slot, firstName: `F${slot}`, lastName: slot, number: String(i + 1) })) });
+    const board = (n: number) => Object.fromEntries([[`ssl_lineup_${n}`, Array.from({ length: n }, (_, i) => ['NAME', 'SURNAME', 'NUMBER', 'POSITION'].map((k) => `S${i + 1}${k}.Text`).concat(`S${i + 1}PHOTO.Source`)).flat()]]);
+    const v = fakeVmix({ ...TITLES, ...board(10) });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const code = show.boat(show.state.boat).code;
+    await show.run(`lult:${code}`);
+    const lt = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
+    expect(v.calls).toContain(lt(1, 'F. BOW'));
+    expect(v.calls).toContain(lt(4, 'F. FLOATER'));
+    expect(v.calls).toContain(lt(5, 'F. GRINDER'));
+    v.calls.length = 0;
+    await show.run('lultswap');
+    expect(v.calls).toContain(lt(1, 'F. TRIMMER'));
+    expect(v.calls).toContain(lt(5, 'F. TACTICIAN'));
+    v.calls.length = 0;
+    await show.run(`lineup:${code}`);
+    const k = v.num('ssl_lineup_10');
+    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S1SURNAME.Text&Value=BOW`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S4SURNAME.Text&Value=FLOATER`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S4POSITION.Text&Value=FLOATER`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S10SURNAME.Text&Value=TACTICIAN`);
   });
 
   it('keeps key edits by page name; old ones by position move once, never onto the LINEUP LT keys', async () => {

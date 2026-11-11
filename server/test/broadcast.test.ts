@@ -82,8 +82,8 @@ describe('line-ups', () => {
     expect(at('Helm').lastName).toBe('Bermudez');
     expect(at('Main').position).toBe('MAIN TRIMMER');
     expect([at('Trimmer').firstName, at('Trimmer1').firstName]).toEqual(['Ana', 'Jon']);
-    expect(at('Bow').firstName).toBe('Eli'); // floater fills the first free place (bow comes first)
-    expect(l.data.rows.map((x) => x.slot)).toEqual(['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Tactician', 'Helm']);
+    expect(at('Floater').firstName).toBe('Eli'); // a declared floater goes to the Floater place
+    expect(l.data.rows.map((x) => x.slot)).toEqual(['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Tactician', 'Helm', 'Floater']);
     // the team's own order of places: kept on save and on the next sync
     lu.saveLineup(ctx, eventId, teamId, { order: ['Helm', 'Tactician'] });
     expect(lu.getLineup(ctx, eventId, teamId).data.rows.slice(0, 3).map((x) => x.slot)).toEqual(['Helm', 'Tactician', 'Bow']);
@@ -99,7 +99,7 @@ describe('line-ups', () => {
 
   it('maps declared positions to boat places', () => {
     expect(['Helm', 'Mainsail trimmer', 'Main Trimmer', 'Trimmer', 'Mid-Bow', 'Bow', 'Pit', 'Grinder', 'Floater', 'Spare', ''].map(lu.slotForPosition))
-      .toEqual(['Helm', 'Main', 'Main', 'Trimmer', 'Midbow', 'Bow', 'Pit', 'Grinder', null, null, null]);
+      .toEqual(['Helm', 'Main', 'Main', 'Trimmer', 'Midbow', 'Bow', 'Pit', 'Grinder', 'Floater', null, null]);
   });
 });
 
