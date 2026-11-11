@@ -32,6 +32,8 @@ export const ltConfigSchema = z.object({
   barSlot: z.string().max(40),
   flagSlot: z.string().max(40),
   emblemSlot: z.string().max(40),
+  /** teams whose team lower third and Qualified take the Emblem light PNG whatever the Emblem place is (MEX) */
+  emblemLightTeams: z.array(z.string().max(10)).max(40),
   /** a country key also puts that team's lower third on air (otherwise it only picks the team) */
   countryShowsTeam: z.boolean(),
   /** Companion address for the key labels, e.g. http://127.0.0.1:8000 ('' = do not send labels) */
@@ -45,7 +47,7 @@ export type LtConfig = z.infer<typeof ltConfigSchema>;
 
 export const DEFAULT_LT: LtConfig = {
   photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 1,
-  barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', countryShowsTeam: false,
+  barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', emblemLightTeams: ['MEX'], countryShowsTeam: false,
   companionUrl: '', companionPage: 1, rows: 4, cols: 8,
   fields: { top: 'Top text', bottom: 'Bottom text', photo: 'PHOTO', flag: 'Flag', emblem: 'Emblem', bar: 'Bar' },
 };
@@ -129,7 +131,9 @@ export function ltFields(ctx: AssetCtx, cfg: LtConfig, teamId: string, sailor: L
   const f = new Map<string, string>();
   f.set(`${cfg.fields.bar}.Source`, img(a[cfg.barSlot]));
   f.set(`${cfg.fields.flag}.Source`, img(a[cfg.flagSlot]));
-  f.set(`${cfg.fields.emblem}.Source`, img(a[cfg.emblemSlot]));
+  // a team on the light list (MEX): its team lower third and Qualified take the Emblem light PNG
+  const light = !sailor && cfg.emblemLightTeams.some((c) => c.trim().toUpperCase() === team.code.toUpperCase());
+  f.set(`${cfg.fields.emblem}.Source`, (light && img(a.emblem_light)) || img(a[cfg.emblemSlot]));
   if (sailor) {
     const lines = sailorLines(sailor);
     f.set(`${cfg.fields.top}.Text`, fullName(sailor));

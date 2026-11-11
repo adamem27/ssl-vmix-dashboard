@@ -145,10 +145,12 @@ function FreshnessBadge() {
 function TopStrip({ x, tz, sets, activeSet, onSet, badge }: { x?: CommentatorData; tz: string; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void; badge?: ReactNode }) {
   const w = x?.weather;
   const unit = 'kn';
+  // units typed in the field (24°C) are not added twice
+  const num = (v: string) => /^\s*-?\d+([.,]\d+)?\s*$/.test(v);
   const chips: [string, string, string][] = w ? ([
-    ['Wind', w.wind_speed ? `${w.wind_speed} ${unit}` : '', '💨'],
-    ['Direction', [w.wind_direction, w.wind_degrees && `${w.wind_degrees}°`].filter(Boolean).join(' '), '🧭'],
-    ['Air', w.air_temp ? `${w.air_temp}°C` : '', '🌡'],
+    ['Wind', w.wind_speed ? `${w.wind_speed}${num(w.wind_speed) ? ` ${unit}` : ''}` : '', '💨'],
+    ['Direction', [w.wind_degrees && `${w.wind_degrees}${num(w.wind_degrees) ? '°' : ''}`, w.wind_direction].filter(Boolean).join(' '), '🧭'],
+    ['Air', w.air_temp ? `${w.air_temp}${num(w.air_temp) ? '°C' : ''}` : '', '🌡'],
     ['Forecast', w.forecast, '⛅'],
   ] as [string, string, string][]).filter(([, v]) => v) : [];
   return (

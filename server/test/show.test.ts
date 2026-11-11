@@ -371,7 +371,7 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, ssl_lt_comm_nophoto: ['Top text.Text', 'Bottom text.Text'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const people = (await show.view()).pages.find((p) => p.name === 'PEOPLE')!;
-    expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA\\nHOST COMMENTATOR', 'BEN LEE\\nGUEST', '']);
+    expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA', 'BEN\\nLEE', '']);
     await show.run('person:2');
     expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=Ben LEE`);
     // only the group whose input is in vMix gets a COMPARE key
@@ -486,12 +486,12 @@ describe('show control', () => {
 
   it('fills the Weather layers named as the fields of the Weather tab, also when the data changes', async () => {
     const { s } = race();
-    setWeather(s.db, { forecast: 'Sunny', air_temp: '24', wind_speed: '12', wind_direction: 'NW', wind_degrees: '315' });
+    setWeather(s.db, { forecast: 'Sunny', air_temp: '24°C', wind_speed: '12', wind_direction: 'NW', wind_degrees: '315°' });
     const v = fakeVmix({ ...TITLES, ssl_weather: ['Forecast.Text', 'Air C.Text', 'Wind.Text', 'Direction.Text', 'Direction in degrees.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('show:weather');
     const w = (f: string, val: string) => `?Function=SetText&Input=k${v.num('ssl_weather')}&SelectedName=${f}&Value=${val}`;
-    for (const c of [w('Forecast.Text', 'Sunny'), w('Air C.Text', '24°C'), w('Wind.Text', '12'), w('Direction.Text', 'NW'), w('Direction in degrees.Text', '315°')]) expect(v.calls).toContain(c);
+    for (const c of [w('Forecast.Text', 'Sunny'), w('Air C.Text', '24°C'), w('Wind.Text', '12'), w('Direction.Text', '315° NW'), w('Direction in degrees.Text', '315°')]) expect(v.calls).toContain(c);
     v.calls.length = 0;
     setWeather(s.db, { wind_speed: '15' });
     await show.syncData();

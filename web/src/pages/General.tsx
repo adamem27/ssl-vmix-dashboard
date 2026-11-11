@@ -1,4 +1,4 @@
-import { KeyboardEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { KeyboardEvent, ReactNode, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, Asset, FleetSetDetail, FleetSetSummary } from '../api';
@@ -11,7 +11,6 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-const LANGUAGES = ['English', 'Polish', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese', 'Japanese'];
 
 const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People'], ['g-compare', 'Team comparison']];
 
@@ -73,12 +72,12 @@ function WeatherPanel() {
     <Panel title="Weather">
       <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3 lg:grid-cols-6">
         {select('forecast', 'Forecast', CONDITIONS)}
-        {text('air_temp', 'Air °C', '24')}
+        {text('air_temp', 'Air °C', '24°C')}
         {text('wind_speed', 'Wind', '12')}
         {field('Direction', (
           <div className="flex items-center gap-1">
+            <div className="w-16 shrink-0" title="Direction in degrees, e.g. 050°"><Cell value={d.wind_degrees} onSave={(v) => save('wind_degrees', v)} label="Direction in degrees" placeholder="050°" className="font-mono text-ink-50" /></div>
             <div className="min-w-0 flex-1"><SelectCell value={d.wind_direction} options={DIRECTIONS} onSave={(v) => save('wind_direction', v)} label="Direction" className="text-ink-50" /></div>
-            <div className="w-16 shrink-0" title="Direction in degrees, e.g. 050"><Cell value={d.wind_degrees} onSave={(v) => save('wind_degrees', v)} label="Direction in degrees" placeholder="050°" className="font-mono text-ink-50" /></div>
           </div>
         ))}
       </div>
@@ -173,8 +172,6 @@ function PeoplePanel() {
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: ['people'], queryFn: () => api.get<{ people: Person[]; roles: string[] }>('/api/people') });
-  const [lang, setLang] = useState('');
-  const [newLang, setNewLang] = useState('');
   const refresh = () => qc.invalidateQueries({ queryKey: ['people'] });
   const save = async (id: string, patch: Partial<Person>) => {
     try { await api.patch(`/api/people/${id}`, patch); refresh(); } catch (e) { toast.error(e); throw e; }
@@ -184,38 +181,25 @@ function PeoplePanel() {
     try { await api.del(`/api/people/${p.id}`); refresh(); } catch (e) { toast.error(e); }
   };
   const addSet = async () => {
-    if (!newLang.trim()) return;
-    try { await api.post('/api/people/commentator-set', { language: newLang.trim() }); setLang(newLang.trim()); setNewLang(''); refresh(); } catch (e) { toast.error(e); }
+    try { await api.post('/api/people/commentator-set', {}); refresh(); } catch (e) { toast.error(e); }
   };
   const empty = { name: '', surname: '', role: '', language: '', title: '' };
   const [f, setF] = useState(empty);
-  useEffect(() => setF((x) => ({ ...x, language: lang })), [lang]);
   const add = async () => {
     if (!f.name.trim() && !f.surname.trim() && !f.role) return;
-    try { await api.post('/api/people', f); setF({ ...empty, language: lang }); refresh(); } catch (e) { toast.error(e); }
+    try { await api.post('/api/people', f); setF(empty); refresh(); } catch (e) { toast.error(e); }
   };
 
   const people = q.data?.people ?? [];
   const roles = q.data?.roles ?? [];
-  const languages = useMemo(() => [...new Set(people.map((p) => p.language).filter(Boolean))].sort(), [people]);
-  const shown = lang ? people.filter((p) => p.language === lang) : people;
-  const langSuggestions = [...new Set([...languages, ...LANGUAGES])];
+  const shown = people;
 
   return (
-    <Panel title="People" right={<>
-      <div className="flex flex-wrap gap-1">
-        {['', ...languages].map((l) => (
-          <button key={l || 'all'} onClick={() => setLang(l)} className={cx('rounded px-2 py-1 text-xs font-medium', lang === l ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:bg-ink-850 hover:text-ink-100')}>{l || 'All'}</button>
-        ))}
-      </div>
-      <input className="input w-32 py-1 text-sm" list="dl-set-lang" placeholder="Language" value={newLang} onChange={(e) => setNewLang(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void addSet()} aria-label="Language for commentator set" />
-      <datalist id="dl-set-lang">{langSuggestions.map((l) => <option key={l} value={l} />)}</datalist>
-      <Button size="sm" onClick={addSet} disabled={!newLang.trim()}>+ 3 commentators</Button>
-    </>}>
+    <Panel title="People" right={<Button size="sm" onClick={addSet}>+ 3 commentators</Button>}>
       {q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} /> : (
         <table className="w-full table-fixed text-sm">
           <thead className="text-left text-[10px] uppercase tracking-wide text-ink-500">
-            <tr><th className="w-14 px-1 py-1">Photo</th><th className="px-1 py-1">Name</th><th className="px-1 py-1">Surname</th><th className="w-52 px-1 py-1">Role</th><th className="w-36 px-1 py-1">Language</th><th className="px-1 py-1">Title</th><th className="w-8" /></tr>
+            <tr><th className="w-14 px-1 py-1">Photo</th><th className="px-1 py-1">Name</th><th className="px-1 py-1">Surname</th><th className="w-52 px-1 py-1">Role</th><th className="w-20" /><th className="w-8" /></tr>
           </thead>
           <tbody>
             {shown.map((p) => (
@@ -224,8 +208,7 @@ function PeoplePanel() {
                 <td><Cell value={p.name} onSave={(v) => save(p.id, { name: v })} label="Name" className="font-medium text-ink-50" /></td>
                 <td><Cell value={p.surname} onSave={(v) => save(p.id, { surname: v })} label="Surname" className="font-medium uppercase text-ink-50" /></td>
                 <td><SelectCell value={p.role} options={roles} onSave={(v) => save(p.id, { role: v })} label="Role" /></td>
-                <td><Cell value={p.language} onSave={(v) => save(p.id, { language: v })} label="Language" suggestions={langSuggestions} /></td>
-                <td><Cell value={p.title} onSave={(v) => save(p.id, { title: v })} label="Title" className="text-ink-300" /></td>
+                <td />
                 <td className="text-center"><button onClick={() => remove(p)} className="invisible px-1 text-ink-500 hover:text-red-300 group-hover:visible" aria-label={`Delete ${p.name || p.role}`}>✕</button></td>
               </tr>
             ))}
@@ -238,7 +221,6 @@ function PeoplePanel() {
                   <option value="">Role</option>{roles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </td>
-              <td className="py-1 pr-1"><input className="input py-1 text-sm" list="dl-set-lang" placeholder="Language" value={f.language} onChange={(e) => setF({ ...f, language: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && void add()} aria-label="New person language" /></td>
               <td className="py-1"><Button size="sm" variant="primary" onClick={add} disabled={!f.name.trim() && !f.surname.trim() && !f.role}>Add</Button></td>
               <td />
             </tr>

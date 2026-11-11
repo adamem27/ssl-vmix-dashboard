@@ -5,7 +5,7 @@ import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Fields { top: string; bottom: string; photo: string; flag: string; emblem: string; bar: string }
 interface Config {
-  photoInput: string; noPhotoInput: string; overlay: number; barSlot: string; flagSlot: string; emblemSlot: string; countryShowsTeam: boolean;
+  photoInput: string; noPhotoInput: string; overlay: number; barSlot: string; flagSlot: string; emblemSlot: string; emblemLightTeams: string[]; countryShowsTeam: boolean;
   companionUrl: string; companionPage: number; rows: number; cols: number; fields: Fields;
 }
 interface State { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
@@ -67,6 +67,7 @@ function Settings({ data, onSaved }: { data: LtData; onSaved: () => void }) {
           {slot('Bar', c.barSlot, (v) => setC({ ...c, barSlot: v }))}
           {slot('Flag', c.flagSlot, (v) => setC({ ...c, flagSlot: v }))}
           {slot('Emblem', c.emblemSlot, (v) => setC({ ...c, emblemSlot: v }))}
+          {text('Team LT and Qualified with Emblem light (team codes)', (c.emblemLightTeams ?? []).join(','), (v) => setC({ ...c, emblemLightTeams: v.toUpperCase().split(',').map((x) => x.slice(0, 10)) }), 'MEX', 'w-64')}
           <div className="flex flex-wrap gap-2">{field('top', 'Name field')}{field('bottom', 'Line field')}{field('photo', 'Photo field')}{field('flag', 'Flag field')}{field('emblem', 'Emblem field')}{field('bar', 'Bar field')}</div>
         </div>
       </div>
