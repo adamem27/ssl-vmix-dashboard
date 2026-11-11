@@ -126,7 +126,8 @@ export function slotForPosition(position: string): string | null {
 
 /**
  * Command: fills the line-up from the team's declaration for a day. Declared positions pick the place
- * (a second trimmer goes to Trimmer 2), everyone else fills the free places in order, then extra places.
+ * (a second trimmer goes to Trimmer 2; a floater the first usual place left empty, else Floater), everyone else fills
+ * the free places in order, then extra places.
  * Title, team name and extra places the operator added are kept; the sailors are replaced.
  */
 export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId: string, date: string) {
@@ -146,10 +147,20 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
   ];
   const placed = new Map<string, LineupRow>();
   const rest: typeof crew = [];
+  const floaters: typeof crew = [];
   for (const c of crew) {
     let key = slotForPosition(c.position);
+    if (key === 'Floater') { floaters.push(c); continue; }
     if (key === 'Trimmer' && placed.has('Trimmer')) key = 'Trimmer1';
     if (key && !placed.has(key)) placed.set(key, { slot: key, ...c, position: LINEUP_SLOTS.find((d) => d.key === key)!.position });
+    else rest.push(c);
+  }
+  // a floater takes a usual place nobody was declared on (bow, midbow, pit, grinder, trimmers, main, helm, tactician),
+  // the first in the team's order of places, with the floater's own data; with every usual place taken, the Floater place
+  const emptyUsual = cur.rows.map((r) => r.slot).filter((k) => k !== 'Floater' && LINEUP_SLOTS.some((d) => d.key === k) && !placed.has(k));
+  for (const c of floaters) {
+    const key = emptyUsual.shift() ?? (placed.has('Floater') ? null : 'Floater');
+    if (key) placed.set(key, { slot: key, ...c, position: 'FLOATER' });
     else rest.push(c);
   }
   // free places in the team's own order of places

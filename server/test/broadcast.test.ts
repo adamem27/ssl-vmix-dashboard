@@ -82,7 +82,9 @@ describe('line-ups', () => {
     expect(at('Helm').lastName).toBe('Bermudez');
     expect(at('Main').position).toBe('MAIN TRIMMER');
     expect([at('Trimmer').firstName, at('Trimmer1').firstName]).toEqual(['Ana', 'Jon']);
-    expect(at('Floater').firstName).toBe('Eli'); // a declared floater goes to the Floater place
+    // nobody declared on Bow or Grinder: the floater takes the first of them (Bow), with the floater's own data
+    expect(at('Bow')).toMatchObject({ firstName: 'Eli', lastName: 'Floater', number: '8', position: 'FLOATER' });
+    expect(at('Floater').firstName).toBe('');
     expect(l.data.rows.map((x) => x.slot)).toEqual(['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Tactician', 'Helm', 'Floater']);
     // the team's own order of places: kept on save and on the next sync
     lu.saveLineup(ctx, eventId, teamId, { order: ['Helm', 'Tactician'] });
@@ -95,6 +97,20 @@ describe('line-ups', () => {
     const row = lu.lineupSheetRows(ctx, eventId)[0];
     expect(row).toMatchObject({ TeamName: 'SPAIN', HelmSURNAME: 'BERMUDEZ', HelmNUMBER: '1', TacticianSURNAM: 'GONZALEZ', Trimmer1POSITIO: 'TRIMMER', CaptainSlot: 'Helm', PitCAPTAIN: '' });
     expect(lu.syncLineupFromDeclaration(ctx, eventId, teamId, '2026-11-20')).toMatchObject({ synced: false });
+  });
+
+  it('a floater with every usual place taken goes to the Floater place', () => {
+    const { db, ctx, eventId } = setup();
+    const names = ['A Bow', 'B Mid', 'C Pit', 'D Gri', 'E Tr', 'F Tr', 'G Main', 'H Tac', 'I Helm', 'J Flo'];
+    const { teamId, sailorIds } = seedTeam(db, 'ITA', names);
+    const date = '2026-11-19';
+    const d = createManualDeclaration(ctx, eventId, teamId, date, 'empty');
+    const pos = ['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer', 'Main trimmer', 'Tactician', 'Helm', 'Floater'];
+    sailorIds.forEach((id, i) => addMember(ctx, d.id, { sailorId: id, position: pos[i], number: String(i + 1) }));
+    lu.syncLineupFromDeclaration(ctx, eventId, teamId, date);
+    const rows = lu.getLineup(ctx, eventId, teamId).data.rows;
+    expect(rows.find((x) => x.slot === 'Floater')).toMatchObject({ lastName: 'Flo', position: 'FLOATER' });
+    expect(rows.find((x) => x.slot === 'Bow')!.lastName).toBe('Bow');
   });
 
   it('maps declared positions to boat places', () => {
