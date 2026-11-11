@@ -352,4 +352,13 @@ CREATE TABLE race_runs (
 );
 `,
   },
+  {
+    version: 9,
+    name: 'people: name and surname',
+    sql: `
+-- People: the surname of its own (lt_comm_photo shows Name, then SURNAME); "Jan Kowalski" → Jan / Kowalski.
+ALTER TABLE people ADD COLUMN surname TEXT NOT NULL DEFAULT '';
+UPDATE people SET surname = trim(substr(name, instr(name, ' ') + 1)), name = substr(name, 1, instr(name, ' ') - 1) WHERE instr(name, ' ') > 0;
+`,
+  },
 ];

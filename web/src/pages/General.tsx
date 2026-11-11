@@ -167,7 +167,7 @@ function SchedulePanel() {
 }
 
 // ---------- people ----------
-interface Person { id: string; name: string; role: string; language: string; title: string; photo: Asset | null }
+interface Person { id: string; name: string; surname: string; role: string; language: string; title: string; photo: Asset | null }
 
 function PeoplePanel() {
   const qc = useQueryClient();
@@ -187,11 +187,11 @@ function PeoplePanel() {
     if (!newLang.trim()) return;
     try { await api.post('/api/people/commentator-set', { language: newLang.trim() }); setLang(newLang.trim()); setNewLang(''); refresh(); } catch (e) { toast.error(e); }
   };
-  const empty = { name: '', role: '', language: '', title: '' };
+  const empty = { name: '', surname: '', role: '', language: '', title: '' };
   const [f, setF] = useState(empty);
   useEffect(() => setF((x) => ({ ...x, language: lang })), [lang]);
   const add = async () => {
-    if (!f.name.trim() && !f.role) return;
+    if (!f.name.trim() && !f.surname.trim() && !f.role) return;
     try { await api.post('/api/people', f); setF({ ...empty, language: lang }); refresh(); } catch (e) { toast.error(e); }
   };
 
@@ -215,13 +215,14 @@ function PeoplePanel() {
       {q.isLoading ? <Loading /> : q.error ? <ErrorBox error={q.error} /> : (
         <table className="w-full table-fixed text-sm">
           <thead className="text-left text-[10px] uppercase tracking-wide text-ink-500">
-            <tr><th className="w-14 px-1 py-1">Photo</th><th className="px-1 py-1">Name</th><th className="w-52 px-1 py-1">Role</th><th className="w-36 px-1 py-1">Language</th><th className="px-1 py-1">Title</th><th className="w-8" /></tr>
+            <tr><th className="w-14 px-1 py-1">Photo</th><th className="px-1 py-1">Name</th><th className="px-1 py-1">Surname</th><th className="w-52 px-1 py-1">Role</th><th className="w-36 px-1 py-1">Language</th><th className="px-1 py-1">Title</th><th className="w-8" /></tr>
           </thead>
           <tbody>
             {shown.map((p) => (
               <tr key={p.id} className="group border-t border-ink-800/60">
-                <td className="py-0.5"><ImgCell kind="people" ownerId={p.id} slot="photo" label={`${p.name || p.role} · Photo`} asset={p.photo} onChanged={refresh} accept="png+jpg" /></td>
+                <td className="py-0.5"><ImgCell kind="people" ownerId={p.id} slot="photo" label={`${[p.name, p.surname].filter(Boolean).join(' ') || p.role} · Photo`} asset={p.photo} onChanged={refresh} accept="png+jpg" /></td>
                 <td><Cell value={p.name} onSave={(v) => save(p.id, { name: v })} label="Name" className="font-medium text-ink-50" /></td>
+                <td><Cell value={p.surname} onSave={(v) => save(p.id, { surname: v })} label="Surname" className="font-medium uppercase text-ink-50" /></td>
                 <td><SelectCell value={p.role} options={roles} onSave={(v) => save(p.id, { role: v })} label="Role" /></td>
                 <td><Cell value={p.language} onSave={(v) => save(p.id, { language: v })} label="Language" suggestions={langSuggestions} /></td>
                 <td><Cell value={p.title} onSave={(v) => save(p.id, { title: v })} label="Title" className="text-ink-300" /></td>
@@ -231,13 +232,14 @@ function PeoplePanel() {
             <tr className="border-t border-ink-800/60">
               <td className="text-center text-ink-500">+</td>
               <td className="py-1 pr-1"><input className="input py-1 text-sm" placeholder="Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && void add()} aria-label="New person name" /></td>
+              <td className="py-1 pr-1"><input className="input py-1 text-sm" placeholder="Surname" value={f.surname} onChange={(e) => setF({ ...f, surname: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && void add()} aria-label="New person surname" /></td>
               <td className="py-1 pr-1">
                 <select className="input py-1 text-sm" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} aria-label="New person role">
                   <option value="">Role</option>{roles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </td>
               <td className="py-1 pr-1"><input className="input py-1 text-sm" list="dl-set-lang" placeholder="Language" value={f.language} onChange={(e) => setF({ ...f, language: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && void add()} aria-label="New person language" /></td>
-              <td className="py-1"><Button size="sm" variant="primary" onClick={add} disabled={!f.name.trim() && !f.role}>Add</Button></td>
+              <td className="py-1"><Button size="sm" variant="primary" onClick={add} disabled={!f.name.trim() && !f.surname.trim() && !f.role}>Add</Button></td>
               <td />
             </tr>
           </tbody>

@@ -15,7 +15,7 @@ import { companionFiles, deckPages, getShowConfig, setShowConfig, Show } from '.
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
-import { createPerson, createScheduleItem } from '../src/services/general.js';
+import { createPerson, createScheduleItem, personName, setWeather } from '../src/services/general.js';
 import { groupLabel, groupLetter } from '../src/services/groupNames.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
@@ -314,8 +314,8 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
     const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
     expect(f).toMatchObject({ version: 4, type: 'full' });
-    // deck 1: 1–2, deck 2: 3–7, fallback 8, teams (by code) 9–12
-    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    // deck 1: 1–2, deck 2: 3–6, fallback 8, teams (by code) 9–12
+    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14]);
     const url = (c: any) => c.steps[0].action_sets.down[0].options.url;
     expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
     expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
@@ -330,17 +330,23 @@ describe('show control', () => {
     expect(esp.controls[1][2].style.text).toBe('PIT\\n#12 RUIZ');
     expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
     expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=qualified%3AESP');
-    // the team lower thirds sit on TEAMS, under each team's page key (not on the team's own page)
-    expect(url(f.pages[3].controls[1][1])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
+    // the team lower thirds sit on TEAMS, a row below each team's page key (not on the team's own page)
+    expect(f.pages[3].controls[1] ?? {}).toEqual({});
+    expect(url(f.pages[3].controls[2][1])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
     expect(Object.values(esp.controls).flatMap((r: any) => Object.values(r)).some((c: any) => /teamlt/.test(c?.steps?.[0]?.action_sets?.down?.[0]?.options?.url ?? ''))).toBe(false);
     expect(esp.controls[3][1].steps[0].action_sets.down[0].options.page).toBe(9); // ◀ BRA
     expect(esp.controls[3][2].steps[0].action_sets.down[0].options.page).toBe(11); // ▶ GBR
     expect(f.pages[12].controls[3][2].steps[0].action_sets.down[0].options.page).toBe(9); // after the last team: the first
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of show.pages()) expect(p.keys[3].slice(4).map((k) => k?.action)).toEqual(['out', 'undo', 'allout', 'panic']);
+    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+    // no OUT key; PHOTO mode on every team page and on PEOPLE, SOCIALS on BEFORE and AFTER
+    expect(show.pages().some((p) => p.keys.flat().some((k) => k?.action === 'out'))).toBe(false);
+    expect(show.pages().filter((p) => p.keys[3][4]?.action === 'photo').map((p) => p.name)).toEqual(['BRA', 'ESP', 'GBR', 'ITA', 'PEOPLE']);
+    expect(show.pages().filter((p) => p.keys.flat().some((k) => k?.action === 'show:socials')).map((p) => p.name)).toEqual(['A BEFORE', 'C-E AFTER / BREAK']);
+    expect(show.pages().some((p) => p.name === 'EXTRAS')).toBe(false);
     // each action on one key only (navigation and the bottom row aside), no anthem keys
-    const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next' && k.action !== 'lultswap').map((k) => k!.action);
+    const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next' && k.action !== 'lultswap' && k.action !== 'show:socials').map((k) => k!.action);
     expect(acts.filter((a, i) => acts.indexOf(a) !== i)).toEqual([]);
     expect(acts.some((a) => a.startsWith('anthem'))).toBe(false);
   });
@@ -360,14 +366,14 @@ describe('show control', () => {
   it('everyone in People has a key; the COMPARE keys follow the Team comparison inputs vMix has', async () => {
     const { s, ev, f1, f2 } = race();
     createPerson(s.db, ev, { name: 'Ana Costa', role: 'Host commentator', title: 'Host' });
-    createPerson(s.db, ev, { name: 'Ben Lee', role: 'Guest', title: 'Olympic champion' });
+    createPerson(s.db, ev, { name: 'BEN', surname: 'lee', role: 'Guest', title: 'Olympic champion' });
     const [, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
     const v = fakeVmix({ ...TITLES, ssl_lt_comm_nophoto: ['Top text.Text', 'Bottom text.Text'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const people = (await show.view()).pages.find((p) => p.name === 'PEOPLE')!;
     expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA\\nHOST COMMENTATOR', 'BEN LEE\\nGUEST', '']);
     await show.run('person:2');
-    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=BEN LEE`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=Ben LEE`);
     // only the group whose input is in vMix gets a COMPARE key
     const compare = show.pages().find((p) => p.name === 'COMPARE')!;
     expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k2}`]);
@@ -476,6 +482,21 @@ describe('show control', () => {
     await show.run('sailorof:ESP/Pit');
     expect(v.calls.some((c) => c.includes('OverlayInput1Out'))).toBe(false);
     expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
+  });
+
+  it('fills the Weather layers named as the fields of the Weather tab, also when the data changes', async () => {
+    const { s } = race();
+    setWeather(s.db, { forecast: 'Sunny', air_temp: '24', wind_speed: '12', wind_direction: 'NW', wind_degrees: '315' });
+    const v = fakeVmix({ ...TITLES, ssl_weather: ['Forecast.Text', 'Air C.Text', 'Wind.Text', 'Direction.Text', 'Direction in degrees.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:weather');
+    const w = (f: string, val: string) => `?Function=SetText&Input=k${v.num('ssl_weather')}&SelectedName=${f}&Value=${val}`;
+    for (const c of [w('Forecast.Text', 'Sunny'), w('Air C.Text', '24°C'), w('Wind.Text', '12'), w('Direction.Text', 'NW'), w('Direction in degrees.Text', '315°')]) expect(v.calls).toContain(c);
+    v.calls.length = 0;
+    setWeather(s.db, { wind_speed: '15' });
+    await show.syncData();
+    expect(v.calls).toContain(w('Wind.Text', '15'));
+    expect(personName({ name: 'jAN-erik', surname: 'van Dijk' })).toBe('Jan-Erik VAN DIJK');
   });
 
   it('keeps key edits by page name; old ones by position move once, never onto the LINEUP LT keys', async () => {

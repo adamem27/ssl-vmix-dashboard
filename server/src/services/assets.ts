@@ -91,8 +91,8 @@ export function readableBase(db: DB, owner: OwnerType, ownerId: string, slot: st
     const who = cleanName(`${(s?.last_name ?? '').toUpperCase()} ${s?.first_name ?? ''}`, 'Sailor');
     return path.join(OWNER_DIR.sailor, teamFolder(s?.code ? s : undefined), cleanName(`${who} - ${slotLabel(owner, slot)}`));
   }
-  const p = db.prepare('SELECT name, role, language FROM people WHERE id = ?').get(ownerId) as any;
-  const who = cleanName([p?.name || p?.role || 'Person', p?.language].filter(Boolean).join(' - '), 'Person');
+  const p = db.prepare('SELECT name, surname, role, language FROM people WHERE id = ?').get(ownerId) as any;
+  const who = cleanName([[p?.name, p?.surname].filter(Boolean).join(' ') || p?.role || 'Person', p?.language].filter(Boolean).join(' - '), 'Person');
   return path.join(OWNER_DIR.person, cleanName(`${who} - ${slotLabel(owner, slot)}`));
 }
 

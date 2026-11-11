@@ -146,7 +146,17 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       const deg = (v: string) => (v && /^\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()}°C` : v);
       const values = [w.wind_speed, w.wind_direction || w.wind_degrees, w.forecast, deg(w.air_temp)];
       values.forEach((v, i) => f.set(`VALUE ${i + 1}.Text`, v ?? ''));
-      for (const [k, v] of Object.entries(w)) if (k !== 'updated_at') f.set(`${k}.Text`, v);
+      // the layers named as the fields of the Weather tab (Forecast, Air °C, Wind, Direction, Direction in degrees)
+      const degrees = w.wind_degrees && /^\d+(\.\d+)?$/.test(w.wind_degrees.trim()) ? `${w.wind_degrees.trim()}°` : w.wind_degrees;
+      const named: [string[], string][] = [
+        [['Forecast', 'Conditions'], w.forecast],
+        [['Air °C', 'Air', 'Air temp', 'Air temperature', 'Temperature', 'Temp'], deg(w.air_temp)],
+        [['Wind', 'Wind speed', 'Speed'], w.wind_speed],
+        [['Direction', 'Wind direction'], w.wind_direction || degrees],
+        [['Direction in degrees', 'Degrees', 'Wind degrees'], degrees],
+      ];
+      for (const [names, v] of named) for (const n of names) f.set(`${n}.Text`, v ?? '');
+      for (const [k, v] of Object.entries(w)) if (k !== 'updated_at' && !f.has(`${k}.Text`)) f.set(`${k}.Text`, v);
       return f;
     }
     case 'socials':

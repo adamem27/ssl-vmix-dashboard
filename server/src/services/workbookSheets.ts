@@ -142,7 +142,7 @@ export function announcementsSheet(ctx: AssetCtx, eventId: string): Record<strin
 }
 
 export function peopleSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {
-  return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Title: p.title, Photo: img(p.photo) }));
+  return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Surname: p.surname, Title: p.title, Photo: img(p.photo) }));
 }
 
 // ---------- Line-up ----------

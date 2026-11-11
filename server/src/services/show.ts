@@ -5,7 +5,7 @@ import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
-import { listPeople } from './general.js';
+import { listPeople, personName } from './general.js';
 import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
@@ -177,12 +177,13 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
         const i = n * TEAMS_PER_PAGE + c, t = teams[i];
         return t ? { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code } : null;
       })),
+      // a row between the team keys and their TEAM LT, so a press does not hit the wrong one
+      row8(),
       row8(...Array.from({ length: 8 }, (_, c) => {
         const t = teams[n * TEAMS_PER_PAGE + c];
         return t ? { ...k(`teamlt:${t.code}`, `TEAM LT\\n${t.code}`, 'lt'), team: t.code } : null;
       })),
-      row8(),
-      nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'EXTRAS'),
+      nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'BUGS OFTEN'),
     ],
   });
   const lastTeams = teamsPages - 1;
@@ -191,7 +192,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
       // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
       deck: 1, name: 'A BEFORE', page: p1, keys: [
         row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'),
-          k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), null, k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
+          k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
         row8(k('comm:host', 'HOST\\nLT', 'lt'), k('comm:guest', 'GUEST\\nLT', 'lt'), k('comm:water', 'ON-WATER\\nLT', 'lt'), k('comm:studio', 'STUDIO\\n+WATER LT', 'lt')),
         row8(),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
@@ -199,27 +200,19 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:results', 'GROUP\\nRESULTS', 'board')),
+        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
         row8(k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
       ],
     },
     teamsPageOf(0),
-    {
-      deck: 2, name: 'EXTRAS', page: p2 + 1, keys: [
-        row8(k('show:socials', 'SOCIALS', 'bug'), null, null, null, null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
-        row8(),
-        row8(),
-        nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS OFTEN'),
-      ],
-    },
     // every announcement and every ticker on a key of its own, by position: a version added in General graphics is
     // on the next free key at once (Companion keys too, they call the position)
-    slotPage(p2 + 2, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, p2 + 1, 'EXTRAS', p2 + 3, 'BUGS RARE')),
-    slotPage(p2 + 3, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 2, 'BUGS OFTEN', p2 + 4, 'TICKERS')),
+    slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS RARE')),
+    slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 1, 'BUGS OFTEN', p2 + 3, 'TICKERS')),
     // the ticker input: its versions, the automatic one (next race / end of day) and that mode
-    slotPage(p2 + 4, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 3, 'BUGS RARE', peoplePage, 'PEOPLE'),
+    slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE'),
       row8(k('show:ticker', 'TICKER\\nAUTO', 'bug'), k('tickermode', 'TICKER:\\nNEXT RACE', 'mode'))),
     ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
     // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
@@ -235,13 +228,15 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     },
     ...Array.from({ length: teamsPages - 1 }, (_, n) => teamsPageOf(n + 1)),
     // everyone in People (General graphics) on a key of their own, by position: a person added is on the next free key
-    slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, nav(p2, p2 + 4, 'TICKERS', p2, 'TEAMS')),
+    slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, withPhoto(nav(p2, p2 + 3, 'TICKERS', p2, 'TEAMS'))),
   ];
 }
 
 const TEAMS_PER_PAGE = 8;
 /** The bottom row of every page: its way around, then OUT (OV1), UNDO, ALL OUT and PANIC. */
-const navRow = (...keys: DeckKey[]) => row8(...keys, k('out', 'OUT', 'safety'), k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+const navRow = (...keys: DeckKey[]) => row8(...keys.slice(0, 4), keys[4] ?? null, k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+/** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
+const withPhoto = (row: (DeckKey | null)[]) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
 
 /** A team's page on deck 2: its qualified and line-up graphics, its places (sailor's name on the key), ◀ ▶ to the next team. */
 function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: number): DeckPage {
@@ -255,8 +250,8 @@ function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: numb
         tk(`lult:${t.code}`, `LINEUP LT\\n${t.code}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), null, null, null, k('next', 'NEXT\\nRESULT', 'lt')),
       row8(...places.slice(0, 8)),
       row8(...places.slice(8, 16)),
-      navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
-        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${other(1).code}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'EXTRAS', 'nav')),
+      withPhoto(navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
+        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${other(1).code}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'BUGS\\nOFTEN', 'nav'))),
     ],
   };
 }
@@ -787,13 +782,13 @@ export class Show {
     const roles: Record<string, string[]> = { host: ['host commentator'], guest: ['guest commentator', 'guest'], water: ['on-water commentator'], studio: ['host commentator'] };
     const want = roles[role] ?? [role.toLowerCase()];
     const ev = activeEvent(this.ctx.db).id;
-    const people = listPeople(this.ctx, ev).filter((p) => want.includes((p.role || '').toLowerCase()) && p.name);
+    const people = listPeople(this.ctx, ev).filter((p) => want.includes((p.role || '').toLowerCase()) && (p.name || p.surname));
     if (!people.length) throw badRequest(`Nobody with the role ${want[0]} in People (General graphics).`);
     return this.personLt(people[0]);
   }
 
   /** People in General graphics with a name, in their order (PEOPLE page: a key each). */
-  people() { return this.cached('people', () => listPeople(this.ctx, activeEvent(this.ctx.db).id).filter((p) => p.name)); }
+  people() { return this.cached('people', () => listPeople(this.ctx, activeEvent(this.ctx.db).id).filter((p) => p.name || p.surname)); }
 
   /** A person's lower third (PEOPLE key by position): their name and title, the photo title when they have a photo. */
   async person(n: string) {
@@ -809,7 +804,7 @@ export class Show {
     const withPhoto = photo ? this.resolve({ ...g, inputs: g.inputs.slice(0, 1) }, snap.inputs) : undefined;
     const input = withPhoto ?? this.resolve({ ...g, inputs: g.inputs.slice(1) }, snap.inputs) ?? this.need(g, snap.inputs);
     const lf = getLtConfig(this.ctx.db).fields;
-    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, p.name.toUpperCase()], [`${lf.bottom}.Text`, (p.title || p.role).toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
+    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, (p.title || p.role).toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
     // on-air swap of the same title animates; a different title comes in on the overlay
     await this.set(input, f);
     await this.bringIn({ ...g }, input, snap);
@@ -1160,7 +1155,7 @@ export class Show {
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
     } else if (kind === 'person') {
       const p = this.people()[Number(arg) - 1];
-      text = p ? `${p.name.toUpperCase().slice(0, 20)}\\n${(p.role || p.title || '').toUpperCase().slice(0, 20)}` : '';
+      text = p ? `${[p.name, p.surname].filter(Boolean).join(' ').toUpperCase().slice(0, 20)}\\n${(p.role || p.title || '').toUpperCase().slice(0, 20)}` : '';
       empty = !p;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
     else if (kind === 'comparemark') text = `COMPARE:\\n${st.compareMark === 'emblem' ? 'EMBLEM' : 'FLAG'}`;
@@ -1273,6 +1268,12 @@ export class Show {
       if (wel) jobs.push({ input: wel, f: () => showDataFields(this.ctx, 'welcome', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
       const sched = this.resolve(this.graphic('schedule'), inputs);
       if (sched) jobs.push({ input: sched, f: () => showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+      // General graphics whose data is only on their tab: Weather, Race officials, Follow us
+      for (const id of ['weather', 'officials', 'socials']) {
+        const g = this.graphics().find((x) => x.id === id);
+        const input = g && this.resolve(g, inputs);
+        if (input) jobs.push({ input, f: () => showDataFields(this.ctx, id, { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+      }
       const res = fleetId ? this.resolve(this.graphic('results'), inputs) : undefined;
       if (res) jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, fleetId, res).fields });
       // Team comparison: every group's own input, and the shared one for the group picked at the top
@@ -1281,7 +1282,9 @@ export class Show {
         const f = make();
         if (!f) continue;
         const match = titleFieldMatcher(input.fields);
-        const changed = new Map([...f].filter(([k, v]) => { const r = match(k); return r !== undefined && (input.values?.[r] ?? '') !== v; }));
+        // the first name for a field wins, as in set()
+        const seen = new Set<string>();
+        const changed = new Map([...f].filter(([k, v]) => { const r = match(k); if (r === undefined || seen.has(r)) return false; seen.add(r); return (input.values?.[r] ?? '') !== v; }));
         if (changed.size) sent += await this.set(input, changed);
       }
       this.syncSig = sig;
