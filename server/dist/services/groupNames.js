@@ -16,3 +16,7 @@ export function groupLetter(name) {
     const m = SHORT.exec((name ?? '').trim());
     return m ? m[1].toUpperCase() : groupLabel(name);
 }
+/** A title typed or saved as the matchboard's short name (QS H) is shown as the group (Group H); other titles stay. */
+export function groupTitle(title) {
+    return SHORT.test(title.trim()) ? groupLabel(title) : title;
+}

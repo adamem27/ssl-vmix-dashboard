@@ -1,4 +1,5 @@
 import { groupLabel } from './groups.js';
+import { groupTitle } from './groupNames.js';
 import { nowIso } from '../db/db.js';
 import { notFound } from './errors.js';
 import { listTeams } from './teams.js';
@@ -33,7 +34,7 @@ function load(db, fleetId) {
     const seen = new Set(stored.map((x) => x.teamId));
     const rows = [...stored, ...f.teamIds.filter((id) => !seen.has(id)).map((teamId) => ({ teamId, races: [], points: '' }))]
         .map((x) => ({ teamId: x.teamId, races: Array.from({ length: races }, (_, i) => String(x.races?.[i] ?? '')), points: String(x.points ?? '') }));
-    return { data: { title: raw.title ?? groupLabel(f.name), subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
+    return { data: { title: raw.title != null ? groupTitle(String(raw.title)) : groupLabel(f.name), subtitle: raw.subtitle ?? '', races, rows, vmixInput: String(raw.vmixInput ?? '') }, updatedAt: r?.updated_at ?? null };
 }
 export function getResults(db, fleetId) {
     const f = fleetInfo(db, fleetId);

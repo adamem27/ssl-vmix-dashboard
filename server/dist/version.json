@@ -1,8 +1,14 @@
 {
-  "version": "1.0.143",
-  "commit": "a1aac9b",
-  "date": "2026-11-11T17:49:28Z",
+  "version": "1.0.144",
+  "commit": "0f27391",
+  "date": "2026-11-11T18:35:59Z",
   "changes": [
+    {
+      "version": "1.0.144",
+      "commit": "0f27391",
+      "date": "2026-11-11T18:35:59Z",
+      "text": "Group results: a title saved as QS H shows as GROUP H; a Date picker next to Stage and Racing that every tab's today follows"
+    },
     {
       "version": "1.0.143",
       "commit": "a1aac9b",
@@ -476,12 +482,6 @@
       "commit": "c2162b9",
       "date": "2026-11-08T21:31:29Z",
       "text": "Empty team backgrounds and lower thirds take the PNG generator files (Panel left, Square, Bar waves, Bar long); an operator's own file or a cleared place is left alone"
-    },
-    {
-      "version": "1.0.54",
-      "commit": "42c6e9a",
-      "date": "2026-11-08T21:31:29Z",
-      "text": "General sheet laid out in titled blocks: Event, Matchboard and Weather on top, each general graphic with its versions in columns, People, then today's schedule; empty rows between blocks, shaded titles"
     }
   ]
 }
