@@ -48,6 +48,11 @@ function scheduleFleets(ctx, eventId) {
     const order = stage ? [stage.id, ...sets.filter((x) => x !== stage.id)] : sets;
     return order.flatMap((id) => getSetDetail(ctx.db, id).fleets);
 }
+/** The place of the event: fixed, never typed (Welcome bar City / Country; LOCATION / LOCALIZATION on the boards). */
+export const EVENT_CITY = 'RIO DE JANEIRO';
+export const EVENT_COUNTRY = 'BRAZIL';
+export const EVENT_LOCATION = `${EVENT_CITY}, ${EVENT_COUNTRY}`;
+const SCHEDULE_GROUP_LAYERS = ['GROUP A', 'GROUP B', 'GROUP A1', 'GROUP B1'];
 const groupKey = (s) => groupLabel(s).replace(/\s+/g, ' ').trim();
 /** Today's schedule rows with the flags of each group's teams (current stage first). */
 export function scheduleRows(ctx, eventId, today) {
@@ -77,6 +82,9 @@ export function showDataFields(ctx, graphicId, o) {
             f.set(`RACE ${i + 1}.Text`, r?.race ?? '');
             f.set(`TIME ${i + 1}.Text`, r?.time ?? '');
             f.set(`GROUP ${i + 1}.Text`, r?.group ?? '');
+            // the schedule board names its rows' group lines GROUP A, GROUP B, GROUP A1, GROUP B1
+            if (i < SCHEDULE_GROUP_LAYERS.length)
+                f.set(`${SCHEDULE_GROUP_LAYERS[i]}.Text`, r?.group ?? '');
             for (let j = 0; j < 4; j++)
                 f.set(`FLAG ${i * 4 + j + 1}.Source`, r?.flags[j] ?? '');
         }
@@ -85,18 +93,22 @@ export function showDataFields(ctx, graphicId, o) {
         case 'welcome': {
             // the SSL26 Welcome bar (Welcome 2.gtzip): the stage on top, the day and the date below; its other texts stay as
             // in the title (older titles named them Top text and Day number)
-            const day = up(welcome.day), date = (welcome.date ?? '').trim() || dotted(today);
+            const day = (welcome.day ?? '').trim(), date = (welcome.date ?? '').trim() || dotted(today);
             f.set('stage.Text', (welcome.stage ?? '').trim());
             f.set('Top text.Text', (welcome.stage ?? '').trim());
             f.set('Day.Text', day);
             f.set('Day number.Text', day);
             f.set('Date.Text', date);
+            f.set('City.Text', EVENT_CITY);
+            f.set('Country.Text', EVENT_COUNTRY);
             return f;
         }
         case 'schedule':
-            f.set('DayText.Text', up(welcome.day));
+            f.set('DayText.Text', (welcome.day ?? '').trim());
             f.set('DateText.Text', (welcome.date ?? '').trim() || dotted(today));
             f.set('EVENT.Text', up(welcome.stage));
+            f.set('LOCATION.Text', EVENT_LOCATION);
+            f.set('CHONBURI, THA.Text', EVENT_LOCATION); // the place line of the schedule board (its layer kept that name)
             sched();
             return f;
         case 'lbar':
@@ -129,7 +141,7 @@ export function showDataFields(ctx, graphicId, o) {
         case 'weather': {
             const w = getWeather(ctx.db);
             const deg = (v) => (v && /^\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()}°C` : v);
-            const values = [w.wind_speed ? `${w.wind_speed} ${w.wind_unit}`.trim() : '', w.wind_direction || w.wind_degrees, w.forecast, deg(w.air_temp)];
+            const values = [w.wind_speed, w.wind_direction || w.wind_degrees, w.forecast, deg(w.air_temp)];
             values.forEach((v, i) => f.set(`VALUE ${i + 1}.Text`, v ?? ''));
             for (const [k, v] of Object.entries(w))
                 if (k !== 'updated_at')

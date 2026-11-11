@@ -93,7 +93,7 @@ export function generalSheet(ctx, eventId, today) {
     const root = getSetting(db, 'paths.vmixAssetsRoot');
     const w = getWeather(db);
     const weather = [['Forecast', 'forecast'], ['Air temperature', 'air_temp'],
-        ['Wind speed', 'wind_speed'], ['Wind direction', 'wind_direction'], ['Wind degrees', 'wind_degrees'], ['Wind unit', 'wind_unit']];
+        ['Wind speed', 'wind_speed'], ['Wind direction', 'wind_direction'], ['Wind degrees', 'wind_degrees']];
     const left = block(row, 0, 'EVENT', null, [['Name', ev?.name ?? ''], ['Stage', currentStage(db, eventId)?.name ?? ''], ['Date', today]]) + 1;
     const h = Math.max(left + block(row + left, 0, 'MATCHBOARD', null, [['Image', root ? joinVmixPath(root, MATCHBOARD_REL) : path.join(ctx.assetsDir, ...MATCHBOARD_REL.split('/'))]]), block(row, 3, 'WEATHER', null, weather.map(([label, k]) => [label, w[k] ?? ''])));
     row += h + 1;

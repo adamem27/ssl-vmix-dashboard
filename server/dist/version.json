@@ -1,8 +1,14 @@
 {
-  "version": "1.0.139",
-  "commit": "24b0584",
-  "date": "2026-11-11T12:10:19Z",
+  "version": "1.0.140",
+  "commit": "762bc06",
+  "date": "2026-11-11T13:33:51Z",
   "changes": [
+    {
+      "version": "1.0.140",
+      "commit": "762bc06",
+      "date": "2026-11-11T13:33:51Z",
+      "text": "Lineup LT: 9 sailors bow to stern, 5 ⇄ 4 swap key per team; Group H labels, fixed city/location, weather unit removed"
+    },
     {
       "version": "1.0.139",
       "commit": "24b0584",
@@ -476,12 +482,6 @@
       "commit": "dd5fba0",
       "date": "2026-11-08T20:58:37Z",
       "text": "GTZIP scenes: falstart and penalty bugs, recognise L-bar files with ticker and schedule/results"
-    },
-    {
-      "version": "1.0.43",
-      "commit": "cf54391",
-      "date": "2026-11-08T20:55:56Z",
-      "text": "Readable names in the assets folder; Excel workbook in four sheets (General, Teams, Sailors, Results) following the current stage"
     }
   ]
 }

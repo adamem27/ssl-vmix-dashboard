@@ -20,7 +20,7 @@ export const GRAPHIC_KINDS = [
         description: 'Welcome bar: the stage on top, the day and the date below (SSL GOLD CUP, BRAZIL 2026, city and country are fixed in the title).',
         fields: [
             { key: 'stage', label: 'Stage', placeholder: 'Pan-American Qualifiers', hint: 'top line of the Welcome bar' },
-            { key: 'day', label: 'Day', placeholder: 'DAY 1' },
+            { key: 'day', label: 'Day', placeholder: 'Day 1' },
             { key: 'date', label: 'Date', placeholder: 'today', hint: 'DD.MM.YYYY; empty = today' },
         ],
         defaults: [{ name: 'Welcome', data: {} }],
