@@ -1,8 +1,14 @@
 {
-  "version": "1.0.141",
-  "commit": "1277de8",
-  "date": "2026-11-11T15:08:59Z",
+  "version": "1.0.142",
+  "commit": "4658aab",
+  "date": "2026-11-11T16:18:32Z",
   "changes": [
+    {
+      "version": "1.0.142",
+      "commit": "4658aab",
+      "date": "2026-11-11T16:18:32Z",
+      "text": "Weather layers by the tab's field names and kept in step; TEAM LT a row lower; no OUT key; EXTRAS gone (SOCIALS on BEFORE and AFTER, PHOTO on team pages and PEOPLE); People: Name and SURNAME"
+    },
     {
       "version": "1.0.141",
       "commit": "1277de8",
@@ -476,12 +482,6 @@
       "commit": "4a07c58",
       "date": "2026-11-08T21:26:42Z",
       "text": "GTZIP scenes: race course in horizontal and vertical layout, each shown once (1x) or twice (2x)"
-    },
-    {
-      "version": "1.0.44",
-      "commit": "9253b15",
-      "date": "2026-11-08T21:22:08Z",
-      "text": "Chosen stage filters every tab: only its teams in Teams & crews, Declarations, PNG generator, Matchboard, Results, Commentator and the Fleets pool; JSON feeds follow the stage too"
     }
   ]
 }

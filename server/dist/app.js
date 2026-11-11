@@ -441,7 +441,7 @@ export async function buildApp(deps) {
     app.post('/api/schedule', async (req) => ({ id: gen.createScheduleItem(db, ev().id, scheduleBody.parse(req.body)) }));
     app.patch('/api/schedule/:id', async (req) => { gen.updateScheduleItem(db, req.params.id, scheduleBody.parse(req.body)); return { ok: true }; });
     app.delete('/api/schedule/:id', async (req) => { gen.deleteScheduleItem(db, req.params.id); return { ok: true }; });
-    const personBody = z.object({ name: str(120), role: str(80), language: str(40), title: str(200) }).partial();
+    const personBody = z.object({ name: str(120), surname: str(120), role: str(80), language: str(40), title: str(200) }).partial();
     app.get('/api/people', async () => ({ people: gen.listPeople(ctx, ev().id), roles: gen.PERSON_ROLES }));
     app.post('/api/people', async (req) => ({ id: gen.createPerson(db, ev().id, personBody.parse(req.body)) }));
     app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).min(1) }).parse(req.body).language));

@@ -135,7 +135,7 @@ export function announcementsSheet(ctx, eventId) {
         .map((s) => ({ Version: s.name, ...Object.fromEntries(k.fields.map((f) => [f.label, f.type === 'image' ? imagePath(ctx.db, ctx.assetsDir, s.data[f.key]) : s.data[f.key] ?? ''])) }));
 }
 export function peopleSheet(ctx, eventId) {
-    return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Title: p.title, Photo: img(p.photo) }));
+    return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Surname: p.surname, Title: p.title, Photo: img(p.photo) }));
 }
 // ---------- Line-up ----------
 /**

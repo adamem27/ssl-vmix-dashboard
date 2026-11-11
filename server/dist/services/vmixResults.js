@@ -89,10 +89,19 @@ export function titleFieldMatcher(titleFields) {
     const exact = new Map(titleFields.map((f) => [f.toLowerCase(), f]));
     const split = (f) => { const i = f.lastIndexOf('.'); return [f.slice(0, i).toLowerCase(), f.slice(i).toLowerCase()]; };
     const cut = titleFields.map((f) => [...split(f), f]).filter(([b]) => b.length >= 15);
+    // "Air °C.Text" is "AIR C.Text" or "Air_C.Text" in the title: letters and digits only, any case
+    const bare = (f) => { const [b, ext] = split(f); return `${b.replace(/[^\p{L}\p{N}]+/gu, ' ').trim()}${ext}`; };
+    const loose = new Map();
+    for (const f of titleFields)
+        if (!loose.has(bare(f)))
+            loose.set(bare(f), f);
     return (name) => {
         const e = exact.get(name.toLowerCase());
         if (e)
             return e;
+        const l = loose.get(bare(name));
+        if (l && split(name)[0].replace(/[^\p{L}\p{N}]+/gu, ''))
+            return l;
         const [b, ext] = split(name);
         return cut.find(([cb, cext]) => cext === ext && b.length > cb.length && b.startsWith(cb))?.[2];
     };

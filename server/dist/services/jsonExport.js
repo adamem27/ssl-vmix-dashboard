@@ -1,6 +1,6 @@
 import { groupLabel } from './groups.js';
 import { listAssets } from './assets.js';
-import { getWeather, listPeople, listSchedule } from './general.js';
+import { getWeather, listPeople, listSchedule, personName } from './general.js';
 import { notFound } from './errors.js';
 import { overview } from './overview.js';
 import { SAILOR_SLOTS, TEAM_SLOTS } from './slots.js';
@@ -38,7 +38,7 @@ export function jsonSchedule(db, eventId, date) {
 export function jsonPeople(ctx, eventId, role, language) {
     return listPeople(ctx, eventId)
         .filter((p) => (!role || p.role.toLowerCase() === role.toLowerCase()) && (!language || p.language.toLowerCase() === language.toLowerCase()))
-        .map((p) => ({ name: p.name, role: p.role, language: p.language, title: p.title, photo: img(p.photo) }));
+        .map((p) => ({ name: p.name, surname: p.surname, full_name: personName(p), role: p.role, language: p.language, title: p.title, photo: img(p.photo) }));
 }
 export function jsonSailors(ctx, eventId, date, teamCode) {
     const ov = overview(ctx, eventId, date, null);
