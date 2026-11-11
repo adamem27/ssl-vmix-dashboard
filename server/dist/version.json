@@ -1,8 +1,14 @@
 {
-  "version": "1.0.142",
-  "commit": "4658aab",
-  "date": "2026-11-11T16:18:32Z",
+  "version": "1.0.143",
+  "commit": "a1aac9b",
+  "date": "2026-11-11T17:49:28Z",
   "changes": [
+    {
+      "version": "1.0.143",
+      "commit": "a1aac9b",
+      "date": "2026-11-11T17:49:28Z",
+      "text": "Weather: direction in degrees then letters, values as typed (no °C added); MEX team LT and Qualified with Emblem light; People without Language and Title, keys by name and surname; no TICKER AUTO / mode keys"
+    },
     {
       "version": "1.0.142",
       "commit": "4658aab",
@@ -476,12 +482,6 @@
       "commit": "42c6e9a",
       "date": "2026-11-08T21:31:29Z",
       "text": "General sheet laid out in titled blocks: Event, Matchboard and Weather on top, each general graphic with its versions in columns, People, then today's schedule; empty rows between blocks, shaded titles"
-    },
-    {
-      "version": "1.0.52",
-      "commit": "4a07c58",
-      "date": "2026-11-08T21:26:42Z",
-      "text": "GTZIP scenes: race course in horizontal and vertical layout, each shown once (1x) or twice (2x)"
     }
   ]
 }

@@ -140,17 +140,18 @@ export function showDataFields(ctx, graphicId, o) {
         }
         case 'weather': {
             const w = getWeather(ctx.db);
-            const deg = (v) => (v && /^\d+(\.\d+)?$/.test(v.trim()) ? `${v.trim()}°C` : v);
-            const values = [w.wind_speed, w.wind_direction || w.wind_degrees, w.forecast, deg(w.air_temp)];
+            // every value as typed (units too: 24°C, 12 kn, 315°); the direction in degrees first, then its letters
+            const direction = [w.wind_degrees, w.wind_direction].map((x) => x.trim()).filter(Boolean).join(' ');
+            const values = [w.wind_speed, direction, w.forecast, w.air_temp];
             values.forEach((v, i) => f.set(`VALUE ${i + 1}.Text`, v ?? ''));
-            // the layers named as the fields of the Weather tab (Forecast, Air °C, Wind, Direction, Direction in degrees)
-            const degrees = w.wind_degrees && /^\d+(\.\d+)?$/.test(w.wind_degrees.trim()) ? `${w.wind_degrees.trim()}°` : w.wind_degrees;
+            // the layers named as the fields of the Weather tab (Forecast, Air °C, Wind, Direction…)
             const named = [
                 [['Forecast', 'Conditions'], w.forecast],
-                [['Air °C', 'Air', 'Air temp', 'Air temperature', 'Temperature', 'Temp'], deg(w.air_temp)],
+                [['Air °C', 'Air', 'Air temp', 'Air temperature', 'Temperature', 'Temp'], w.air_temp],
                 [['Wind', 'Wind speed', 'Speed'], w.wind_speed],
-                [['Direction', 'Wind direction'], w.wind_direction || degrees],
-                [['Direction in degrees', 'Degrees', 'Wind degrees'], degrees],
+                [['Direction', 'Wind direction'], direction],
+                [['Direction in degrees', 'Degrees', 'Wind degrees'], w.wind_degrees],
+                [['Direction letters', 'Letters', 'Compass'], w.wind_direction],
             ];
             for (const [names, v] of named)
                 for (const n of names)

@@ -172,7 +172,7 @@ function defaultDeckPages(cfg0, teams = [], groups = []) {
         slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS RARE')),
         slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 1, 'BUGS OFTEN', p2 + 3, 'TICKERS')),
         // the ticker input: its versions, the automatic one (next race / end of day) and that mode
-        slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE'), row8(k('show:ticker', 'TICKER\\nAUTO', 'bug'), k('tickermode', 'TICKER:\\nNEXT RACE', 'mode'))),
+        slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE')),
         ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
         // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
         {
@@ -811,7 +811,7 @@ export class Show {
         const withPhoto = photo ? this.resolve({ ...g, inputs: g.inputs.slice(0, 1) }, snap.inputs) : undefined;
         const input = withPhoto ?? this.resolve({ ...g, inputs: g.inputs.slice(1) }, snap.inputs) ?? this.need(g, snap.inputs);
         const lf = getLtConfig(this.ctx.db).fields;
-        const f = this.lt.fitToTitle(input, new Map([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, (p.title || p.role).toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
+        const f = this.lt.fitToTitle(input, new Map([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, (p.role || '').toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
         // on-air swap of the same title animates; a different title comes in on the overlay
         await this.set(input, f);
         await this.bringIn({ ...g }, input, snap);
@@ -1220,7 +1220,7 @@ export class Show {
         }
         else if (kind === 'person') {
             const p = this.people()[Number(arg) - 1];
-            text = p ? `${[p.name, p.surname].filter(Boolean).join(' ').toUpperCase().slice(0, 20)}\\n${(p.role || p.title || '').toUpperCase().slice(0, 20)}` : '';
+            text = p ? [p.name, p.surname].map((x) => x.trim().toUpperCase().slice(0, 20)).filter(Boolean).join('\\n') : '';
             empty = !p;
         }
         else if (kind === 'photo')

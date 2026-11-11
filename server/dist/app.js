@@ -444,7 +444,7 @@ export async function buildApp(deps) {
     const personBody = z.object({ name: str(120), surname: str(120), role: str(80), language: str(40), title: str(200) }).partial();
     app.get('/api/people', async () => ({ people: gen.listPeople(ctx, ev().id), roles: gen.PERSON_ROLES }));
     app.post('/api/people', async (req) => ({ id: gen.createPerson(db, ev().id, personBody.parse(req.body)) }));
-    app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).min(1) }).parse(req.body).language));
+    app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).default('') }).parse(req.body ?? {}).language));
     app.patch('/api/people/:id', async (req) => { gen.updatePerson(db, req.params.id, personBody.parse(req.body)); return { ok: true }; });
     app.delete('/api/people/:id', async (req) => { gen.deletePerson(ctx, req.params.id); return { ok: true }; });
     // ---------- JSON for vMix data sources ----------
