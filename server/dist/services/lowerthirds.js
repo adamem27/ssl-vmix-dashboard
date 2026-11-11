@@ -7,7 +7,7 @@ import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 import { findInput, parseVmixXml, vmixUrl } from './vmixResults.js';
-import { ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
+import { keyOf, ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
 import { stageTeamIds } from './workbookSheets.js';
 /**
  * Lower thirds driven from a Stream Deck (Bitfocus Companion) or the dashboard's own keys.
@@ -244,6 +244,27 @@ export class LowerThirds {
      * The values (keyed by the field names on the Lower thirds tab) moved onto the fields this title really has
      * (Name, position/pb…), and the bar picture swapped for the team's PNG made like the title's own (ltTitle.ts).
      */
+    /**
+     * The team's bar of the lower thirds: the generator's <CODE>_lowerthird.png, else the bar the team's lower third
+     * title (photo / no photo) takes. Other titles with a bar (Team LT qualified) use it too, so every belt looks the same.
+     */
+    standardBar(teamId) {
+        const cfg = this.config;
+        const teams = listTeams(this.ctx);
+        const team = teams.find((t) => t.id === teamId);
+        if (!team)
+            return null;
+        const own = teamPictureFor(this.ctx, team, { w: 1, h: 1, key: keyOf('lowerthird', []), exact: true });
+        if (own)
+            return own;
+        for (const title of [cfg.noPhotoInput, cfg.photoInput]) {
+            const info = title ? ltTitleInfo(this.ctx.assetsDir, title, teams.map((t) => t.code)) : null;
+            const pic = teamPictureFor(this.ctx, team, info?.images[cfg.fields.bar.toLowerCase()]);
+            if (pic)
+                return pic;
+        }
+        return null;
+    }
     fitToTitle(input, fields, teamId) {
         const cfg = this.config;
         const roles = ltRoles(cfg.fields, input.fields);

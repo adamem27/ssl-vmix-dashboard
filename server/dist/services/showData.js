@@ -84,11 +84,10 @@ export function showDataFields(ctx, graphicId, o) {
     switch (graphicId) {
         case 'welcome': {
             versionFields(ctx, 'welcome', welcome, f);
-            f.set('DATE.Text', welcome.dates ?? '');
             // the SSL26 welcome bar (welcome_graphic.gtzip): stage on top; below it day, today's date, place and country
             const loc = (welcome.location ?? '').trim();
             const cut = loc.lastIndexOf(',');
-            f.set('Top text.Text', (welcome.stage || welcome.event || '').trim());
+            f.set('Top text.Text', (welcome.stage ?? '').trim());
             f.set('Day number.Text', up(welcome.day));
             f.set('Date.Text', dotted(today));
             f.set('City.Text', up(cut > 0 ? loc.slice(0, cut) : loc));
@@ -98,7 +97,7 @@ export function showDataFields(ctx, graphicId, o) {
         case 'schedule':
             f.set('DayText.Text', up(welcome.day));
             f.set('DateText.Text', dotted(today));
-            f.set('EVENT.Text', up(welcome.stage) || up(welcome.event));
+            f.set('EVENT.Text', up(welcome.stage));
             f.set('LOCATION.Text', up(welcome.location));
             sched();
             return f;
@@ -204,7 +203,7 @@ export function compareAuto(ctx, eventId, fleetId, today, o = {}) {
         };
         return { n, team: t ? { id: t.id, code: t.code, name: t.name } : null, values: v, panelFound: panel !== null };
     });
-    return { fleetId, name: fleet?.name ?? '', group: groupLabel(fleet?.name), title: up(welcome.stage) || up(welcome.event), teams: rows };
+    return { fleetId, name: fleet?.name ?? '', group: groupLabel(fleet?.name), title: up(welcome.stage), teams: rows };
 }
 /** The groups of the current stage (or every stage when none is picked) with their comparison data and overrides. */
 export function compareTab(ctx, eventId, today, o = {}) {
