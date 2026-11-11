@@ -15,7 +15,7 @@ import { companionFiles, deckPages, getShowConfig, setShowConfig, Show } from '.
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
-import { createScheduleItem } from '../src/services/general.js';
+import { createPerson, createScheduleItem } from '../src/services/general.js';
 import { groupLabel, groupLetter } from '../src/services/groupNames.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
@@ -185,8 +185,16 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, ssl_bug: ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'], ssl_ticker: ['Ticker1.Text'], ssl_welcome: ['EVENT.Text', 'LOCATION.Text', 'DATE.Text'], ssl_officials: ['TITLE.Text', 'ROLE 1.Text', 'NAME 1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const pages = (await show.view()).pages;
-    const bugs1 = pages.find((p) => p.name === 'BUGS 1')!;
-    expect(bugs1.keys[0][0]).toMatchObject({ action: 'bug:1', text: 'P – PREPARATORY', empty: false });
+    // the announcements used most on BUGS OFTEN, the rest on BUGS RARE, each in its order
+    const often = pages.find((p) => p.name === 'BUGS OFTEN')!;
+    expect(often.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['X – INDIVIDUAL RECALL', 'FIRST SUBSTITUTE – GENERAL R', 'AP – POSTPONED']);
+    expect(often.keys.flat().filter((k) => k && !k.empty && k.action.startsWith('bug:')).length).toBe(10);
+    const rare = pages.find((p) => p.name === 'BUGS RARE')!;
+    expect(rare.keys[0][0]).toMatchObject({ action: 'bug:r1', text: 'P – PREPARATORY', empty: false });
+    await show.run('bug:o1');
+    expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
+    await show.run('bug:o1');
+    v.calls.length = 0;
     // the announcement on its key: one line of text and the flag's PNG from the vMix assets folder
     await show.run('bug:6');
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
@@ -278,7 +286,7 @@ describe('show control', () => {
     const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
     expect(f).toMatchObject({ version: 4, type: 'full' });
     // deck 1: 1–2, deck 2: 3–7, fallback 8, teams (by code) 9–12
-    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     const url = (c: any) => c.steps[0].action_sets.down[0].options.url;
     expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
     expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
@@ -317,7 +325,23 @@ describe('show control', () => {
     setCurrentStage(s.db, ev, stage.id);
     show.invalidate();
     expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
-    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'COMPARE']);
+    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'COMPARE', 'PEOPLE']);
+  });
+
+  it('everyone in People has a key; the COMPARE keys follow the Team comparison inputs vMix has', async () => {
+    const { s, ev, f1, f2 } = race();
+    createPerson(s.db, ev, { name: 'Ana Costa', role: 'Host commentator', title: 'Host' });
+    createPerson(s.db, ev, { name: 'Ben Lee', role: 'Guest', title: 'Olympic champion' });
+    const [, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+    const v = fakeVmix({ ...TITLES, ssl_lt_comm_nophoto: ['Top text.Text', 'Bottom text.Text'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const people = (await show.view()).pages.find((p) => p.name === 'PEOPLE')!;
+    expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA\\nHOST COMMENTATOR', 'BEN LEE\\nGUEST', '']);
+    await show.run('person:2');
+    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=BEN LEE`);
+    // only the group whose input is in vMix gets a COMPARE key
+    const compare = show.pages().find((p) => p.name === 'COMPARE')!;
+    expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k2}`]);
   });
 
   it('every group of the stage has its own Team comparison input and key', async () => {

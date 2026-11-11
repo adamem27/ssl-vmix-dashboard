@@ -6,7 +6,7 @@ import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
 import { listPeople } from './general.js';
-import { imagePath, listGraphicSets, tickerText } from './graphicSets.js';
+import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor, ltFields, ltTeams } from './lowerthirds.js';
@@ -163,6 +163,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
   // TEAMS: 8 teams a page (the team's page key, its team lower third under it); more teams go on TEAMS 2… after COMPARE
   const teamsPages = Math.max(1, Math.ceil(teams.length / TEAMS_PER_PAGE));
   const teamsPage = (n: number) => (n === 0 ? p2 : comparePage + n);
+  const peoplePage = comparePage + teamsPages;
   const nav = (home: number, prev: number, prevName: string, next: number, nextName: string) => navRow(
     k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'));
   const teamsName = (n: number) => (n ? `TEAMS ${n + 1}` : 'TEAMS');
@@ -177,7 +178,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
         return t ? { ...k(`teamlt:${t.code}`, `TEAM LT\\n${t.code}`, 'lt'), team: t.code } : null;
       })),
       row8(),
-      nav(p2, n ? teamsPage(n - 1) : p2 + 4, n ? teamsName(n - 1) : 'TICKERS', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'EXTRAS'),
+      nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'EXTRAS'),
     ],
   });
   const lastTeams = teamsPages - 1;
@@ -206,15 +207,15 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
         row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lineup5', 'LINEUP\\nLT', 'lt'), null, null, null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
         row8(),
         row8(),
-        nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS 1'),
+        nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS OFTEN'),
       ],
     },
     // every announcement and every ticker on a key of its own, by position: a version added in General graphics is
     // on the next free key at once (Companion keys too, they call the position)
-    slotPage(p2 + 2, 'BUGS 1', 'bug', 0, 3, nav(p2, p2 + 1, 'EXTRAS', p2 + 3, 'BUGS 2')),
-    slotPage(p2 + 3, 'BUGS 2', 'bug', SLOTS_PER_PAGE, 3, nav(p2, p2 + 2, 'BUGS 1', p2 + 4, 'TICKERS')),
+    slotPage(p2 + 2, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, p2 + 1, 'EXTRAS', p2 + 3, 'BUGS RARE')),
+    slotPage(p2 + 3, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 2, 'BUGS OFTEN', p2 + 4, 'TICKERS')),
     // the ticker input: its versions, the automatic one (next race / end of day) and that mode
-    slotPage(p2 + 4, 'TICKERS', 'ticker', 0, 2, nav(p2, p2 + 3, 'BUGS 2', p2, 'TEAMS'),
+    slotPage(p2 + 4, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 3, 'BUGS RARE', peoplePage, 'PEOPLE'),
       row8(k('show:ticker', 'TICKER\\nAUTO', 'bug'), k('tickermode', 'TICKER:\\nNEXT RACE', 'mode'))),
     ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
     // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
@@ -229,6 +230,8 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
       ],
     },
     ...Array.from({ length: teamsPages - 1 }, (_, n) => teamsPageOf(n + 1)),
+    // everyone in People (General graphics) on a key of their own, by position: a person added is on the next free key
+    slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, nav(p2, p2 + 4, 'TICKERS', p2, 'TEAMS')),
   ];
 }
 
@@ -253,10 +256,9 @@ function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: numb
   };
 }
 
-/** Keys of a page of announcement or ticker versions: `rows` rows of 8, numbered from `from` + 1; `extra` fills the rest. */
-const SLOTS_PER_PAGE = 24;
-function slotPage(page: number, name: string, kind: 'bug' | 'ticker', from: number, rows: number, navRow: (DeckKey | null)[], ...extra: (DeckKey | null)[][]): DeckPage {
-  const slots = Array.from({ length: rows }, (_, r) => row8(...Array.from({ length: 8 }, (_, c) => k(`${kind}:${from + r * 8 + c + 1}`, '—', 'bug'))));
+/** Keys of a page of versions (announcements, tickers, people): `rows` rows of 8, action of the nth; `extra` fills the rest. */
+function slotPage(page: number, name: string, action: (n: number) => string, rows: number, navRow: (DeckKey | null)[], ...extra: (DeckKey | null)[][]): DeckPage {
+  const slots = Array.from({ length: rows }, (_, r) => row8(...Array.from({ length: 8 }, (_, c) => k(action(r * 8 + c + 1), '—', 'bug'))));
   const rest = [...extra, row8(), row8(), row8()].slice(0, 3 - rows);
   return { deck: 2, name, page, keys: [...slots, ...rest, navRow] };
 }
@@ -298,6 +300,8 @@ export class Show {
   private timer: NodeJS.Timeout | null = null;
   private rotation: NodeJS.Timeout | null = null;
   private labels = new Map<string, string>();
+  /** vMix's inputs as last read (the COMPARE keys follow the Team comparison inputs there). */
+  private lastInputs: VmixInput[] = [];
   /**
    * Data the keys read, kept for a second: one view or Companion refresh looks at 200 keys, and each team / sailor /
    * announcement key would read the group, the teams and their pictures again (seconds of a busy server on a big
@@ -374,7 +378,7 @@ export class Show {
     })));
   }
   /** The pages of both decks with a page per team. */
-  pages() { return deckPages(this.config, this.presetTeams(), this.compareGroups()); }
+  pages() { return deckPages(this.config, this.presetTeams(), this.deckCompareGroups()); }
 
   /** A team by key: its position in the group racing now (1–4) or its code. */
   teamRef(arg: string) {
@@ -424,6 +428,7 @@ export class Show {
   private async readSnapshot() {
     const xml = await this.vmix('');
     const inputs = parseVmixXml(xml);
+    this.lastInputs = inputs;
     const overlays: Record<string, string> = {};
     for (let n = 1; n <= 4; n++) overlays[n] = overlayOf(xml, n);
     return { xml, inputs, overlays };
@@ -561,17 +566,35 @@ export class Show {
     return this.cached('compareGroups', () => {
       const ev = activeEvent(this.ctx.db).id;
       const stage = currentStage(this.ctx.db, ev);
-      const sets = stage ? [stage.id] : (listSets(this.ctx.db, ev) as { id: string }[]).map((x) => x.id);
-      const seen = new Set<string>();
-      return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: groupLabel(f.name) }))
-        .filter((g) => g.key && !seen.has(g.key) && !!seen.add(g.key));
+      return this.groupsOf(stage ? [stage.id] : (listSets(this.ctx.db, ev) as { id: string }[]).map((x) => x.id));
     });
+  }
+  /** Groups of these stages, a key each (the first stage wins a key two stages share). */
+  private groupsOf(sets: string[]): PresetGroup[] {
+    const seen = new Set<string>();
+    return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: groupLabel(f.name) }))
+      .filter((g) => g.key && !seen.has(g.key) && !!seen.add(g.key));
+  }
+  /** Every group of the event, the stage picked at the top first. */
+  private allCompareGroups(): PresetGroup[] {
+    return this.cached('allCompareGroups', () => {
+      const ev = activeEvent(this.ctx.db).id;
+      const stage = currentStage(this.ctx.db, ev);
+      const all = (listSets(this.ctx.db, ev) as { id: string }[]).map((x) => x.id);
+      return this.groupsOf(stage ? [stage.id, ...all.filter((x) => x !== stage.id)] : all);
+    });
+  }
+  /** The COMPARE keys: one per Team comparison input vMix has (ssl_compare_A…), else one per group of the stage. */
+  deckCompareGroups(): PresetGroup[] {
+    const has = (g: PresetGroup) => this.lastInputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
+    const inVmix = this.allCompareGroups().filter(has);
+    return inVmix.length ? inVmix : this.compareGroups();
   }
 
   /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */
   private compareTargets(inputs: VmixInput[]) {
     const out: { input: VmixInput; fleetId: string }[] = [];
-    for (const g of this.compareGroups()) {
+    for (const g of this.allCompareGroups()) {
       const i = inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
       if (i) out.push({ input: i, fleetId: g.fleetId });
     }
@@ -582,7 +605,7 @@ export class Show {
 
   /** A group's Team comparison (COMPARE A…): its data into its own input, then in on the boards overlay; again = out. */
   async compareGroup(arg: string) {
-    const groups = this.compareGroups();
+    const groups = [...this.compareGroups(), ...this.allCompareGroups()];
     const grp = groups.find((x) => x.key === compareKey(arg) || x.fleetId === arg);
     if (!grp) throw notFound(`Group ${arg} in this stage`);
     const g = this.graphic('compare');
@@ -707,7 +730,20 @@ export class Show {
     const ev = activeEvent(this.ctx.db).id;
     const people = listPeople(this.ctx, ev).filter((p) => want.includes((p.role || '').toLowerCase()) && p.name);
     if (!people.length) throw badRequest(`Nobody with the role ${want[0]} in People (General graphics).`);
-    const p = people[0];
+    return this.personLt(people[0]);
+  }
+
+  /** People in General graphics with a name, in their order (PEOPLE page: a key each). */
+  people() { return this.cached('people', () => listPeople(this.ctx, activeEvent(this.ctx.db).id).filter((p) => p.name)); }
+
+  /** A person's lower third (PEOPLE key by position): their name and title, the photo title when they have a photo. */
+  async person(n: string) {
+    const p = this.people()[Number(n) - 1];
+    if (!p) throw badRequest(`No person ${n} in People (General graphics).`);
+    return this.personLt(p);
+  }
+
+  private async personLt(p: ReturnType<typeof listPeople>[number]) {
     const g = this.graphic('comm');
     const snap = await this.snapshot();
     const photo = p.photo ? img(p.photo as unknown as Asset) : '';
@@ -765,6 +801,9 @@ export class Show {
   /** An announcement by key: its position (bug:3), its version id, or THANKS (old keys: the Thanks ticker). */
   private announcement(which: string) {
     const list = this.announcements();
+    // by position on BUGS OFTEN (o3) or BUGS RARE (r3)
+    const m = which.match(/^([or])(\d+)$/i);
+    if (m) return list.filter((x) => isOften(x) === (m[1].toLowerCase() === 'o'))[Number(m[2]) - 1];
     return list.find((x) => x.id === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
   }
 
@@ -969,6 +1008,7 @@ export class Show {
       case 'compare': return this.compareGroup(arg);
       case 'qualified': return this.qualified(arg);
       case 'comm': return this.commentator(arg);
+      case 'person': return this.person(arg);
       case 'anthem': return this.lt.showTeam(this.teamRef(arg).code);
       case 'lineup': return this.lineup(arg);
       case 'sailorof': { const [code, slot = ''] = arg.split('/'); return this.sailorOf(code, slot); }
@@ -1039,6 +1079,10 @@ export class Show {
       text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
       empty = !t;
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
+    } else if (kind === 'person') {
+      const p = this.people()[Number(arg) - 1];
+      text = p ? `${p.name.toUpperCase().slice(0, 20)}\\n${(p.role || p.title || '').toUpperCase().slice(0, 20)}` : '';
+      empty = !p;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
     else if (kind === 'comparemark') text = `COMPARE:\\n${st.compareMark === 'emblem' ? 'EMBLEM' : 'FLAG'}`;
     else if (kind === 'tickermode') text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
@@ -1082,14 +1126,42 @@ export class Show {
     };
   }
 
-  /** Keys show no on-air feedback: the preset's texts and colours stay as they are (nothing is pushed to Companion). */
-  async pushLabels(_force = false) { return { sent: 0 }; }
+  /**
+   * The keys of the version pages (bugs, tickers, people) get their names in Companion as soon as a version is added
+   * or renamed (POST /api/location/<page>/<row>/<col>/style). Only texts and fixed colours: no on-air feedback.
+   */
+  async pushLabels(force = false) {
+    const cfg = this.config;
+    const lt = getLtConfig(this.ctx.db);
+    if (!cfg.labels || !lt.companionUrl) return { sent: 0 };
+    if (force) this.labels.clear();
+    let n = 0;
+    try {
+      for (const p of this.pages()) {
+        for (const [r, row] of p.keys.entries()) {
+          for (const [c, key] of row.entries()) {
+            if (!key || !/^(bug|ticker|person):/.test(key.action)) continue;
+            const l = await this.keyLook(key, undefined, true);
+            const q = `text=${encodeURIComponent(l.text)}&bgcolor=${encodeURIComponent(l.bg)}&color=${encodeURIComponent(l.fg)}&size=auto`;
+            const id = `${p.page}/${r}/${c}`;
+            if (this.labels.get(id) === q) continue;
+            const res = await this.fetcher(`${lt.companionUrl}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
+            if (res.ok) { this.labels.set(id, q); n++; }
+          }
+        }
+      }
+    } catch (e: any) {
+      this.log(`Companion labels: ${e?.message ?? e}`);
+    }
+    return { sent: n };
+  }
 
   /**
    * The whole Companion preset in one file (every page of both decks, a page per team, the fallback page): each key
    * has its text and colours fixed in it, as they are now (no live labels).
    */
   async companionPreset(base: string, vmixBase: string) {
+    await this.snapshot().catch(() => null);
     const pages = this.pages();
     const looks = await Promise.all(pages.map(async (p) => ({ ...p, keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
     return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());

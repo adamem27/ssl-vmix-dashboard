@@ -123,7 +123,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names), EXTRAS, every announcement (BUGS 1–2) and every ticker (TICKERS) on a key of its own. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names), EXTRAS, every announcement (BUGS OFTEN, BUGS RARE), every ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -316,7 +316,7 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
         </label>
       </div>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-300">
-        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–7 (TEAMS, EXTRAS, BUGS 1, BUGS 2, TICKERS), the fallback on page 8 and a page per team from page 9 ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
+        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–7 (TEAMS, EXTRAS, BUGS OFTEN, BUGS RARE, TICKERS), the fallback on page 8, a page per team from page 9, then COMPARE and PEOPLE ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
           <div className="mt-2"><a className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600" href={`/api/show/preset.companionconfig?base=${encodeURIComponent(origin)}`} download>Download Companion preset</a></div>
         </li>
         <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there.</li>
