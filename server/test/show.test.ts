@@ -504,7 +504,9 @@ describe('show control', () => {
     const slots = ['Bow', 'Midbow', 'Pit', 'Floater', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
     saveLineup(s.ctx, ev, teams[0], { rows: [...slots].reverse().map((slot, i) => ({ slot, firstName: `F${slot}`, lastName: slot, number: String(i + 1) })) });
     const board = (n: number) => Object.fromEntries([[`ssl_lineup_${n}`, Array.from({ length: n }, (_, i) => ['NAME', 'SURNAME', 'NUMBER', 'POSITION'].map((k) => `S${i + 1}${k}.Text`).concat(`S${i + 1}PHOTO.Source`)).flat()]]);
-    const v = fakeVmix({ ...TITLES, ...board(10) });
+    // Adam's board for ten (Team_line-up_10.gtzip): a card per place, named by the place
+    const ten = ['LineupText.Text', 'TeamName.Text', 'team partners.Text', 'BowSURNAME.Text', 'BowNAME.Text', 'BowNUMBER.Text', 'BowPosition.Text', 'MidbowSURNAME.Text', 'MidbowNAME.Text', 'MidbowNUMBER.Text', 'MidbowPosition.Text', 'TrimmerSURNAME.Text', 'TrimmerNAME.Text', 'TrimmerNUMBER.Text', 'TrimmerPosition.Text', 'Trimmer1SURNAME.Text', 'Trimmer1NAME.Text', 'Trimmer1NUMBER.Text', 'Trimmer1POSITIO.Text', 'PitSURNAME.Text', 'PitNAME.Text', 'PitNUMBER.Text', 'PitPOSITION.Text', 'GrinderPOSITION.Text', 'GrinderNUMBER.Text', 'GrinderNAME.Text', 'GrinderSURNAME.Text', 'MainPOSITION.Text', 'MainNUMBER.Text', 'MainNAME.Text', 'MainSURNAME.Text', 'TacticianPOSITI.Text', 'TacticianNUMBER.Text', 'TacticianNAME.Text', 'TacticianSURNAM.Text', 'HelmPOSITION.Text', 'HelmNUMBER.Text', 'HelmNAME.Text', 'HelmSURNAME.Text', 'FloaterSURNAME.Text', 'FloaterNUMBER.Text', 'FloaterNAME.Text', 'FloaterPOSITION.Text', 'BG.Source', 'Flag.Source', 'Emblem.Source', 'partner1.Source', 'partner2.Source', 'partner3.Source', 'Boat.Source', 'BowBG.Source', 'BowBAR.Source', 'MidbowBG.Source', 'MidbowBAR.Source', 'TrimmerBG.Source', 'TrimmerBAR.Source', 'Trimmer1BG.Source', 'Trimmer1BAR.Source', 'PitBG.Source', 'PitBAR.Source', 'GrinderBG.Source', 'GrinderBAR.Source', 'MainBG.Source', 'MainBAR.Source', 'TacticianBG.Source', 'TacticianBAR.Source', 'HelmBG.Source', 'HelmBAR.Source', 'FloaterBG.Source', 'FloaterBAR.Source', 'BowPHOTO.Source', 'MidbowPHOTO.Source', 'PitPHOTO.Source', 'TrimmerPHOTO.Source', 'TrimmerPHOTO1.Source', 'GrinderPHOTO.Source', 'MainPHOTO.Source', 'HelmPHOTO.Source', 'TacticianPHOTO.Source', 'FloaterPHOTO.Source'];
+    const v = fakeVmix({ ...TITLES, ssl_lineup_10: ten, ...board(8) });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const code = show.boat(show.state.boat).code;
     await show.run(`lult:${code}`);
@@ -519,10 +521,15 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.run(`lineup:${code}`);
     const k = v.num('ssl_lineup_10');
-    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S1SURNAME.Text&Value=BOW`);
-    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S4SURNAME.Text&Value=FLOATER`);
-    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S4POSITION.Text&Value=FLOATER`);
-    expect(v.calls).toContain(`?Function=SetText&Input=k${k}&SelectedName=S10SURNAME.Text&Value=TACTICIAN`);
+    const set = (input: string, f: string, val: string) => `?Function=${f.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=k${input}&SelectedName=${f}&Value=${val}`;
+    for (const [f, val] of [['BowSURNAME.Text', 'BOW'], ['BowPosition.Text', 'BOW'], ['FloaterSURNAME.Text', 'FLOATER'], ['FloaterPOSITION.Text', 'FLOATER'], ['TrimmerSURNAME.Text', 'TRIMMER'],
+      ['Trimmer1SURNAME.Text', 'TRIMMER1'], ['Trimmer1POSITIO.Text', 'TRIMMER'], ['TacticianSURNAM.Text', 'TACTICIAN'], ['TacticianNAME.Text', 'FTACTICIAN'], ['HelmNUMBER.Text', '2']]) expect(v.calls).toContain(set(k, f, val));
+    // eight (no Midbow, no Floater) on the numbered board: the two trimmers side by side, the grinder behind them
+    saveLineup(s.ctx, ev, teams[0], { rows: [{ slot: 'Midbow', firstName: '', lastName: '', number: '' }, { slot: 'Floater', firstName: '', lastName: '', number: '' }] });
+    v.calls.length = 0;
+    await show.run(`lineup:${code}`);
+    const k8 = v.num('ssl_lineup_8');
+    for (const [n, val] of [[1, 'BOW'], [2, 'PIT'], [3, 'TRIMMER'], [4, 'TRIMMER1'], [5, 'GRINDER'], [6, 'MAIN'], [7, 'HELM'], [8, 'TACTICIAN']] as const) expect(v.calls).toContain(set(k8, `S${n}SURNAME.Text`, val));
   });
 
   it('keeps key edits by page name; old ones by position move once, never onto the LINEUP LT keys', async () => {

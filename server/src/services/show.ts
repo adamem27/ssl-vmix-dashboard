@@ -8,7 +8,7 @@ import { getSetDetail, listSets } from './fleets.js';
 import { listPeople, personName } from './general.js';
 import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
-import { BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
+import { BOARD_BOW_TO_STERN, BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor, ltFields, ltTeams } from './lowerthirds.js';
 import { ltRoles, teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
@@ -675,9 +675,9 @@ export class Show {
     return [crew.slice(0, first), crew.slice(first)].filter((p) => p.length);
   }
   /** The team's sailors (with a name) from the bow to the stern, Floater between Pit and Grinder, extra places last. */
-  crewBowToStern(teamId: string): LtSailor[] {
+  crewBowToStern(teamId: string, order: string[] = BOW_TO_STERN): LtSailor[] {
     const all = crewOf(this.ctx, teamId).filter((s) => s.lastName || s.firstName);
-    const rank = (slot: string) => { const i = BOW_TO_STERN.indexOf(slot); return i < 0 ? BOW_TO_STERN.length : i; };
+    const rank = (slot: string) => { const i = order.indexOf(slot); return i < 0 ? order.length : i; };
     return all.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s.slot) - rank(b.s.slot) || a.i - b.i).map((x) => x.s);
   }
   /**
@@ -849,7 +849,7 @@ export class Show {
     // boards with numbered places (Team_lineup_8/9/10: S1 = bow … S10 = stern): the crew from the bow, whoever sails
     if (input.fields.some((x) => /^S1NAME\.Text$/i.test(x))) {
       const rows = new Map(lu.rows.map((r) => [r.slot, r]));
-      const crewList = this.crewBowToStern(b.id);
+      const crewList = this.crewBowToStern(b.id, BOARD_BOW_TO_STERN);
       for (let n = 1; n <= 12; n++) {
         const s = crewList[n - 1];
         const r = s ? rows.get(s.slot) : undefined;

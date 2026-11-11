@@ -34,6 +34,8 @@ export const LINEUP_SLOTS: LineupSlotDef[] = [
 ];
 /** The places from the bow to the stern (Lineup LT, numbered line-up boards); extra places (Sailor10…) after them. */
 export const BOW_TO_STERN = ['Bow', 'Midbow', 'Pit', 'Floater', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
+/** The numbered line-up boards (Team_lineup_8/9: S1 = bow): the two trimmers side by side, the grinder behind them, as on the 9-place board. */
+export const BOARD_BOW_TO_STERN = ['Bow', 'Midbow', 'Pit', 'Floater', 'Trimmer', 'Trimmer1', 'Grinder', 'Main', 'Helm', 'Tactician'];
 export const MAX_EXTRA = 6;
 const extraSlot = (n: number) => slot(`Sailor${n}`, `Sailor ${n}`, '');
 
