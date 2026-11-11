@@ -1,8 +1,20 @@
 {
-  "version": "1.0.145",
-  "commit": "b01e99e",
-  "date": "2026-11-11T19:30:26Z",
+  "version": "1.0.147",
+  "commit": "c02f1da",
+  "date": "2026-11-11T22:08:13Z",
   "changes": [
+    {
+      "version": "1.0.147",
+      "commit": "c02f1da",
+      "date": "2026-11-11T22:08:13Z",
+      "text": "Declaration sync: a floater takes the first usual place nobody was declared on, with the floater's data; the Floater place only when every usual place is taken"
+    },
+    {
+      "version": "1.0.146",
+      "commit": "db5a22f",
+      "date": "2026-11-11T20:46:25Z",
+      "text": "Numbered line-up boards: the two trimmers side by side and the grinder behind them; Adam's board for ten is filled by its place names"
+    },
     {
       "version": "1.0.145",
       "commit": "b01e99e",
@@ -470,18 +482,6 @@
       "commit": "abee512",
       "date": "2026-11-08T21:56:19Z",
       "text": "Panam team colours from color_panam.ai (CUB, ESA, VEN, ANT, BER, MEX, PUR): all three versions set once per team, PNGs regenerate"
-    },
-    {
-      "version": "1.0.58",
-      "commit": "b7b3117",
-      "date": "2026-11-08T21:51:27Z",
-      "text": "GTZIP generator: keep the animations when rows are removed and fit them to the new number of rows"
-    },
-    {
-      "version": "1.0.56",
-      "commit": "588e135",
-      "date": "2026-11-08T21:42:40Z",
-      "text": "GTZIP generator: centred titles stay centred when rows are added or removed; generated files get readable layer names"
     }
   ]
 }
