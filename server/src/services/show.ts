@@ -54,7 +54,6 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'lineup5', label: 'Lineup LT (5 sailors)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
   { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 1, inputs: ['ssl_bug'], aliases: ['Announcement_bug', 'Announcement_bug_flag'] },
   { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
-  { id: 'replay', label: 'Replay bug', kind: 'bug', overlay: 1, inputs: ['ssl_replay'], aliases: ['Replay_bug'] },
   { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
   { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 1, inputs: ['ssl_sponsors'] },
   { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: ['ssl_break'] },
@@ -471,10 +470,20 @@ export class Show {
     return n;
   }
   /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
-  private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>) {
+  private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>, blind?: () => Map<string, string>) {
     if (await this.set(input, fields)) return;
-    const has = input.fields.length ? `it has ${input.fields.join(', ')}` : 'it has no title fields: it is still the placeholder image';
-    throw badRequest(`vMix input "${input.title}" (${g.label}) takes none of the data (${has}). Load the ${g.label} GTZIP title in vMix and name it ${g.inputs[0]}.`);
+    const { inputs } = await this.snapshot();
+    const same = inputs.filter((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === input.title.toLowerCase().replace(/\.gtzip$/, ''));
+    // a title whose fields vMix did not list: the data goes in by the GTZIP's own field names all the same
+    const title = (i: VmixInput) => /^(gt|xaml|title)/i.test(i.type ?? '');
+    const gt = same.find(title) ?? (title(input) ? input : undefined);
+    if (gt && blind) {
+      for (const [name, value] of blind()) await this.vmix(`?Function=${name.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(gt.key || gt.number)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
+      return gt;
+    }
+    const list = same.map((i) => `input ${i.number} (${i.type || 'unknown type'}, ${i.fields.length ? `fields ${i.fields.join(', ')}` : 'no title fields'})`).join('; ');
+    const twice = same.length > 1 ? ` vMix has ${same.length} inputs named "${input.title}": delete the placeholder image and keep the GTZIP title.` : '';
+    throw badRequest(`vMix input "${input.title}" (${g.label}) takes none of the data: ${list || `input ${input.number}, no title fields`}.${twice} Load the ${g.label} GTZIP title in vMix and name it ${g.inputs[0]}.`);
   }
   /** The first text field of a title whose name matches, else its first text field. */
   private textField(input: VmixInput, re: RegExp) {
@@ -532,12 +541,12 @@ export class Show {
     } else if (g.id === 'bug') {
       // BUG key without a version: the announcement shown last, else the first one
       const a = (this.state.bugId && this.announcement(this.state.bugId)) || this.announcements()[0];
-      if (a) { await this.setOrExplain(input, g, this.bugFields(input, a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
+      if (a) { await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
     } else {
       // General graphics straight into the title, so a change made a moment ago is on air without waiting for Excel
       const e = activeEvent(this.ctx.db);
       const f = showDataFields(this.ctx, g.id, { eventId: ev, today: todayIn(e.timezone), auto: tickerAuto(this.ctx.db, e), tickerText: this.tickerText() });
-      if (f) await (g.id === 'replay' ? this.setOrExplain(input, g, f) : this.set(input, f));
+      if (f) await this.set(input, f);
     }
   }
 
@@ -770,6 +779,12 @@ export class Show {
     return f;
   }
 
+  /** The bug's data by the Announcement bug GTZIP's own field names (TEXT; the flag as Race flag or icon). */
+  private bugBlind(data: Record<string, string>) {
+    const icon = imagePath(this.ctx.db, this.ctx.assetsDir, data.icon);
+    return new Map([['TEXT.Text', (data.text ?? '').toUpperCase()], ['Race flag.Source', icon], ['icon.Source', icon]]);
+  }
+
   /** Announcement bug: its text and icon go into the title, then it comes in; the same key again takes it out. */
   async bug(which: string) {
     if (which === 'thanks') return this.ticker('thanks');
@@ -777,8 +792,6 @@ export class Show {
     if (!a) throw badRequest(`No announcement ${which}. Add it under General graphics → Announcements.`);
     const g = this.graphic('bug');
     const snap = await this.snapshot();
-    // Replay with no icon of its own: the Replay bug title, when vMix has it (the announcement bug would show an empty icon)
-    if (!a.data.icon?.trim() && /^replay$/i.test((a.data.text || a.name).trim()) && this.resolve(this.graphic('replay'), snap.inputs)?.fields.length) return this.toggle('replay');
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
     if (on && this.state.bugId === a.id) {
@@ -787,10 +800,10 @@ export class Show {
       this.patchState({ bugId: '' });
       return { out: 'bug' };
     }
-    await this.setOrExplain(input, g, this.bugFields(input, a.data));
+    const used = (await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data))) ?? input;
     const text = (a.data.text || a.name).toUpperCase();
     this.patchState({ bug: text, bugId: a.id });
-    await this.bringIn(g, input, snap);
+    await this.bringIn(g, used, snap);
     return { in: 'bug', text };
   }
 
@@ -1240,7 +1253,7 @@ function fallbackControls(cfg: ShowConfig, vmixBase: string, graphics: Graphic[]
   const v = vmixBase.replace(/\/+$/, '');
   const fb: Record<number, Record<number, unknown>> = {};
   const first = (g: Graphic) => g.inputs.map((x) => x.replace('{n}', '4').replace('{crew}', '9')).find((x) => !x.includes('{'))!;
-  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'replay', 'socials', 'sponsors', 'break', 'lbar'];
+  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'socials', 'sponsors', 'break', 'lbar'];
   const fbKeys = pick.map((id) => graphics.find((g) => g.id === id)).filter((g): g is Graphic => !!g);
   fbKeys.slice(0, 16).forEach((g, i) => {
     const r = Math.floor(i / 8), c = i % 8;

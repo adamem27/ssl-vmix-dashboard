@@ -27,7 +27,7 @@ function fakeVmix(titles: Record<string, string[]>) {
   const fetcher = async (url: string) => {
     const q = decodeURIComponent(url.split('/api/')[1] ?? '');
     if (q === '') {
-      const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="GT" title="${n}">${titles[n].map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}"></image>` : `<text index="0" name="${f}">x</text>`)).join('')}</input>`).join('');
+      const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="${titles[n][0] === '#Image' ? 'Image' : 'GT'}" title="${n}">${titles[n].filter((f) => !f.startsWith('#')).map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}"></image>` : `<text index="0" name="${f}">x</text>`)).join('')}</input>`).join('');
       const ov = [1, 2, 3, 4].map((n) => `<overlay number="${n}">${overlays[n] ?? ''}</overlay>`).join('');
       return { ok: true, status: 200, text: async () => `<vmix><inputs>${inputs}</inputs><overlays>${ov}</overlays></vmix>` };
     }
@@ -158,16 +158,24 @@ describe('show control', () => {
   it('finds the bug title under its GTZIP name, before a placeholder image, and says so when only the placeholder is there', async () => {
     const { s, ev } = race();
     seedGraphicSets(s.db, ev);
-    const v = fakeVmix({ ...TITLES, ssl_bug: [], 'Announcement_bug 2.gtzip': ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'] });
+    const v = fakeVmix({ ...TITLES, ssl_bug: ['#Image'], 'Announcement_bug 2.gtzip': ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('bug:6');
     const n = v.num('Announcement_bug 2.gtzip');
     expect(v.calls).toContain(`?Function=SetText&Input=k${n}&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL`);
     expect(v.calls.some((c) => c.startsWith(`?Function=SetImage&Input=k${n}&SelectedName=Race flag.Source&Value=`) && c.endsWith('X_individual_recall.png'))).toBe(true);
     expect(v.overlays[1]).toBe(n);
-    const only = fakeVmix({ ...TITLES, ssl_bug: [] });
+    const only = fakeVmix({ ...TITLES, ssl_bug: ['#Image'] });
     const show2 = new Show(s.ctx, new LowerThirds(s.ctx, only.fetcher), only.fetcher);
-    await expect(show2.run('bug:6')).rejects.toThrow(/placeholder image/);
+    await expect(show2.run('bug:6')).rejects.toThrow(/Image, no title fields/);
+    // a GTZIP title whose fields vMix does not list gets the data by the GTZIP's own names, and comes in
+    const blind = fakeVmix({ ...TITLES, ssl_bug: [] });
+    const show3 = new Show(s.ctx, new LowerThirds(s.ctx, blind.fetcher), blind.fetcher);
+    await show3.run('bug:6');
+    const b = blind.num('ssl_bug');
+    expect(blind.calls).toContain(`?Function=SetText&Input=k${b}&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL`);
+    expect(blind.calls.some((c) => c.startsWith(`?Function=SetImage&Input=k${b}&SelectedName=icon.Source`))).toBe(true);
+    expect(blind.overlays[1]).toBe(b);
   });
 
   it('bugs carry text and icon and toggle; every bug and ticker has a key, new ones too; General graphics go in at the press', async () => {

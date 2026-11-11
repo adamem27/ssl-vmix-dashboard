@@ -91,7 +91,7 @@ export function titleFieldMatcher(titleFields: string[]) {
   };
 }
 
-export interface VmixInput { key: string; number: string; title: string; fields: string[]; values?: Record<string, string> }
+export interface VmixInput { key: string; number: string; title: string; fields: string[]; values?: Record<string, string>; type?: string }
 
 /** Inputs of the running vMix with their title fields, from the XML at /api. */
 export function parseVmixXml(xml: string): VmixInput[] {
@@ -104,7 +104,7 @@ export function parseVmixXml(xml: string): VmixInput[] {
     const fields = [...m[0].matchAll(/<(?:text|image)\s[^>]*name="([^"]+)"/g)].map((x) => unxml(x[1]));
     const values: Record<string, string> = {};
     for (const x of m[0].matchAll(/<(text|image)\s[^>]*?name="([^"]+)"[^>]*?(?:\/>|>([\s\S]*?)<\/\1>)/g)) values[unxml(x[2])] = unxml(x[3] ?? '');
-    out.push({ key: attr(open, 'key'), number: attr(open, 'number'), title: unxml(attr(open, 'title')), fields, values });
+    out.push({ key: attr(open, 'key'), number: attr(open, 'number'), title: unxml(attr(open, 'title')), fields, values, type: attr(open, 'type') });
   }
   return out;
 }
