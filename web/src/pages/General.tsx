@@ -127,22 +127,42 @@ function SchedulePanel() {
   };
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter') void add(); };
 
+  // the board's options: TIME on or off (the rest of each row is centred then) and the row marked as the next race
+  const opts = useQuery({ queryKey: ['schedule-options'], queryFn: () => api.get<{ showTime: boolean; next: Record<string, string> }>('/api/schedule/options') });
+  const setOpts = async (body: { showTime?: boolean; date?: string; next?: string | null }) => {
+    try { await api.put('/api/schedule/options', body); void qc.invalidateQueries({ queryKey: ['schedule-options'] }); } catch (e) { toast.error(e); }
+  };
+  const showTime = opts.data?.showTime ?? true;
+  const list = items.data ?? [];
+  const nextId = opts.data?.next[day];
+  const nextAt = list.findIndex((it) => it.id === nextId);
+
   return (
     <Panel title="Schedule" right={
+      <div className="flex items-center gap-3">
+      <label className="flex items-center gap-1.5 text-xs text-ink-300" title="Off: the board leaves TIME out and centres the rest of each row">
+        <input type="checkbox" checked={showTime} onChange={(e) => void setOpts({ showTime: e.target.checked })} /> Show time
+      </label>
       <div className="flex items-center" role="group" aria-label="Schedule day">
         <Button size="sm" variant="ghost" onClick={() => setDate(shiftDate(day, -1))} aria-label="Previous day">‹</Button>
         <input type="date" className="input w-40 py-1 text-sm" value={day} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Schedule day" />
         <Button size="sm" variant="ghost" onClick={() => setDate(shiftDate(day, 1))} aria-label="Next day">›</Button>
       </div>
+      </div>
     }>
       {items.error ? <ErrorBox error={items.error} /> : (
         <table className="w-full table-fixed text-sm">
           <thead className="text-left text-[10px] uppercase tracking-wide text-ink-500">
-            <tr><th className="w-24 px-1 py-1">Time</th><th className="px-1 py-1">Race</th><th className="w-56 px-1 py-1">Group</th><th className="w-24" /></tr>
+            <tr><th className="w-12 px-1 py-1" title="The next race: highlighted on the board">Next</th><th className={`w-24 px-1 py-1 ${showTime ? '' : 'line-through opacity-50'}`}>Time</th><th className="px-1 py-1">Race</th><th className="w-56 px-1 py-1">Group</th><th className="w-24" /></tr>
           </thead>
           <tbody>
-            {(items.data ?? []).map((it) => (
-              <tr key={it.id} className="group border-t border-ink-800/60">
+            {list.map((it, i) => (
+              <tr key={it.id} className={`group border-t border-ink-800/60 ${i === nextAt ? 'bg-accent-500/10' : nextAt > i ? 'opacity-50' : ''}`}>
+                <td className="text-center">
+                  <button onClick={() => void setOpts({ date: day, next: i === nextAt ? null : it.id })} aria-pressed={i === nextAt}
+                    aria-label={i === nextAt ? 'Clear the next race' : 'Mark as the next race'} title={i === nextAt ? 'Next race (click to clear)' : 'Mark as the next race'}
+                    className={`h-3 w-3 rounded-full border ${i === nextAt ? 'border-accent-400 bg-accent-400' : 'border-ink-600 hover:border-ink-300'}`} />
+                </td>
                 <td><Cell value={it.time} onSave={(v) => save(it.id, { time: v })} label="Time" className="font-mono tabular-nums text-ink-50" /></td>
                 <td><Cell value={it.race} onSave={(v) => save(it.id, { race: v })} label="Race" className="text-ink-50" /></td>
                 <td><Cell value={groupLabel(it.fleet)} onSave={(v) => save(it.id, { fleet: v })} label="Group" suggestions={fleetNames} /></td>
@@ -150,6 +170,7 @@ function SchedulePanel() {
               </tr>
             ))}
             <tr className="border-t border-ink-800/60">
+              <td />
               <td className="py-1 pr-1"><input className="input py-1 font-mono text-sm" placeholder="14:00" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} onKeyDown={onKey} aria-label="New time" /></td>
               <td className="py-1 pr-1"><input className="input py-1 text-sm" placeholder="Race" value={f.race} onChange={(e) => setF({ ...f, race: e.target.value })} onKeyDown={onKey} aria-label="New race" /></td>
               <td className="py-1 pr-1">

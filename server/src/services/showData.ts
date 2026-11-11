@@ -7,7 +7,10 @@
  */
 import { AssetCtx, listAssets } from './assets.js';
 import { getSetDetail, listSets } from './fleets.js';
-import { getWeather, listSchedule } from './general.js';
+import { getScheduleOptions, getWeather, listSchedule } from './general.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { encodePng } from './png.js';
 import { GRAPHIC_KINDS, imagePath, listGraphicSets, TickerAuto, OFFICIAL_NAMES, OFFICIAL_ROLES } from './graphicSets.js';
 import { groupLabel } from './groupNames.js';
 import { loadLineup } from './lineups.js';
@@ -62,6 +65,27 @@ const SCHEDULE_GROUP_LAYERS = ['GROUP A', 'GROUP B', 'GROUP A1', 'GROUP B1'];
 
 const groupKey = (s: string | null | undefined) => groupLabel(s).replace(/\s+/g, ' ').trim();
 
+/** The band behind the next race on the schedule board (its HIGHLIGHT n layers): soft white, a brighter line at the left. */
+export const SCHEDULE_HIGHLIGHT = 'icons/schedule_highlight.png';
+function highlightPng() {
+  const W = 920, H = 58, R = 10;
+  return encodePng(W, H, (x, y) => {
+    // rounded ends: outside the corner circles stays clear
+    const cx = x < R ? R : x >= W - R ? W - R - 1 : x, cy = y < R ? R : y >= H - R ? H - R - 1 : y;
+    if ((x - cx) ** 2 + (y - cy) ** 2 > R * R) return [0, 0, 0, 0];
+    if (x < 4 && y >= 6 && y < H - 6) return [255, 255, 255, 200];
+    return [255, 255, 255, 30];
+  });
+}
+/** The highlight's path for vMix (written to the assets folder the first time). */
+export function scheduleHighlightPath(ctx: AssetCtx) {
+  if (ctx.assetsDir) {
+    const file = path.join(ctx.assetsDir, ...SCHEDULE_HIGHLIGHT.split('/'));
+    try { if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, highlightPng()); } } catch { /* read-only folder: the path is still sent */ }
+  }
+  return imagePath(ctx.db, ctx.assetsDir, SCHEDULE_HIGHLIGHT);
+}
+
 /** Today's schedule rows with the flags of each group's teams (current stage first). */
 export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
   const fleets = scheduleFleets(ctx, eventId);
@@ -73,7 +97,7 @@ export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
     const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key)];
     const f = same.find((x) => x.filled > 0) ?? same[0];
     const race = (s.race ?? '').trim();
-    return { time: s.time ?? '', race: /^\d+$/.test(race) ? `RACE ${race}` : up(race), group: label, flags: f ? f.positions.filter((x): x is string => !!x).map(flagOf) : [] };
+    return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `RACE ${race}` : up(race), group: label, flags: f ? f.positions.filter((x): x is string => !!x).map(flagOf) : [] };
   });
 }
 
@@ -83,17 +107,34 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
   const { eventId, today } = o;
   const welcome = first(ctx, eventId, 'welcome');
   const socials = first(ctx, eventId, 'socials');
-  const sched = () => {
+  /**
+   * The rows of the schedule. On the day-schedule board (board = true) TIME can be off: the row's own fields are then
+   * emptied and its centred copy (POSITION n C, RACE n C, GROUP n C, FLAG k C) filled, so no gap is left; HIGHLIGHT n
+   * marks the row picked as the next race.
+   */
+  const sched = (board = false) => {
     const rows = scheduleRows(ctx, eventId, today);
+    const opt = getScheduleOptions(ctx.db);
+    const time = !board || opt.showTime;
+    const next = board ? rows.findIndex((r) => r.id === opt.next[today]) : -1;
+    const hl = next >= 0 ? scheduleHighlightPath(ctx) : '';
     for (let i = 0; i < Math.max(rows.length, 6); i++) {
       const r = rows[i];
-      f.set(`POSITION ${i + 1}.Text`, r ? String(i + 1) : '');
-      f.set(`RACE ${i + 1}.Text`, r?.race ?? '');
-      f.set(`TIME ${i + 1}.Text`, r?.time ?? '');
-      f.set(`GROUP ${i + 1}.Text`, r?.group ?? '');
+      const on = (v: string) => (time ? v : ''), off = (v: string) => (time ? '' : v);
+      f.set(`POSITION ${i + 1}.Text`, on(r ? String(i + 1) : ''));
+      f.set(`RACE ${i + 1}.Text`, on(r?.race ?? ''));
+      f.set(`TIME ${i + 1}.Text`, on(r?.time ?? ''));
+      f.set(`GROUP ${i + 1}.Text`, on(r?.group ?? ''));
       // the schedule board names its rows' group lines GROUP A, GROUP B, GROUP A1, GROUP B1
-      if (i < SCHEDULE_GROUP_LAYERS.length) f.set(`${SCHEDULE_GROUP_LAYERS[i]}.Text`, r?.group ?? '');
-      for (let j = 0; j < 4; j++) f.set(`FLAG ${i * 4 + j + 1}.Source`, r?.flags[j] ?? '');
+      if (i < SCHEDULE_GROUP_LAYERS.length) f.set(`${SCHEDULE_GROUP_LAYERS[i]}.Text`, on(r?.group ?? ''));
+      for (let j = 0; j < 4; j++) f.set(`FLAG ${i * 4 + j + 1}.Source`, on(r?.flags[j] ?? ''));
+      if (board) {
+        f.set(`POSITION ${i + 1} C.Text`, off(r ? String(i + 1) : ''));
+        f.set(`RACE ${i + 1} C.Text`, off(r?.race ?? ''));
+        f.set(`GROUP ${i + 1} C.Text`, off(r?.group ?? ''));
+        for (let j = 0; j < 4; j++) f.set(`FLAG ${i * 4 + j + 1} C.Source`, off(r?.flags[j] ?? ''));
+        f.set(`HIGHLIGHT ${i + 1}.Source`, i === next ? hl : '');
+      }
     }
   };
   switch (graphicId) {
@@ -116,7 +157,11 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       f.set('EVENT.Text', up(welcome.stage));
       f.set('LOCATION.Text', EVENT_LOCATION);
       f.set('CHONBURI, THA.Text', EVENT_LOCATION); // the place line of the schedule board (its layer kept that name)
-      sched();
+      // day_schedule 2: Day, Date and location
+      f.set('Day.Text', (welcome.day ?? '').trim());
+      f.set('Date.Text', (welcome.date ?? '').trim() || dotted(today));
+      f.set('location.Text', EVENT_LOCATION);
+      sched(true);
       return f;
     case 'lbar': case 'break':
       f.set('TITLE.Text', 'TODAY');
