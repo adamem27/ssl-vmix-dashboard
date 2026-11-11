@@ -141,18 +141,6 @@ export function showDataFields(ctx, graphicId, o) {
             versionFields(ctx, 'socials', socials, f);
             f.set('WEB.Text', up(socials.website));
             return f;
-        case 'replay': {
-            const r = listGraphicSets(ctx.db, eventId, 'announcement').find((a) => a.name.toLowerCase() === 'replay');
-            if (!r)
-                return null;
-            f.set('TEXT.Text', up(r.data.text) || 'REPLAY');
-            if (r.data.icon) {
-                const p = imagePath(ctx.db, ctx.assetsDir, r.data.icon);
-                for (const n of ['ICON', 'STAR', 'Race flag'])
-                    f.set(`${n}.Source`, p);
-            }
-            return f;
-        }
         default:
             return null;
     }

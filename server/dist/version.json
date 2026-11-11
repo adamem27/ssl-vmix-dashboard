@@ -1,8 +1,14 @@
 {
-  "version": "1.0.135",
-  "commit": "7da9e54",
-  "date": "2026-11-10T22:27:06Z",
+  "version": "1.0.136",
+  "commit": "8e5835d",
+  "date": "2026-11-11T00:29:38Z",
   "changes": [
+    {
+      "version": "1.0.136",
+      "commit": "8e5835d",
+      "date": "2026-11-11T00:29:38Z",
+      "text": "Announcement bug: data goes into a GTZIP title even when vMix lists no fields for it; the error names every input of that name; Replay bug input removed"
+    },
     {
       "version": "1.0.135",
       "commit": "7da9e54",
@@ -476,12 +482,6 @@
       "commit": "6411358",
       "date": "2026-11-08T19:51:01Z",
       "text": "GTZIP scenes: sailor lower third with sponsor, recognise delay and announcement files"
-    },
-    {
-      "version": "1.0.42",
-      "commit": "6e8d554",
-      "date": "2026-11-08T19:38:08Z",
-      "text": "GTZIP generator: scene list with variants, save edited state as a template"
     }
   ]
 }

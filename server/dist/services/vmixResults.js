@@ -108,7 +108,7 @@ export function parseVmixXml(xml) {
         const values = {};
         for (const x of m[0].matchAll(/<(text|image)\s[^>]*?name="([^"]+)"[^>]*?(?:\/>|>([\s\S]*?)<\/\1>)/g))
             values[unxml(x[2])] = unxml(x[3] ?? '');
-        out.push({ key: attr(open, 'key'), number: attr(open, 'number'), title: unxml(attr(open, 'title')), fields, values });
+        out.push({ key: attr(open, 'key'), number: attr(open, 'number'), title: unxml(attr(open, 'title')), fields, values, type: attr(open, 'type') });
     }
     return out;
 }
