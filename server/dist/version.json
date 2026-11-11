@@ -1,8 +1,14 @@
 {
-  "version": "1.0.144",
-  "commit": "0f27391",
-  "date": "2026-11-11T18:35:59Z",
+  "version": "1.0.145",
+  "commit": "b01e99e",
+  "date": "2026-11-11T19:30:26Z",
   "changes": [
+    {
+      "version": "1.0.145",
+      "commit": "b01e99e",
+      "date": "2026-11-11T19:30:26Z",
+      "text": "Crews of 8 to 10 and a Floater: Floater place (between Pit and Grinder on the boat), Lineup LT on two even screens (5+5, 5+4, 4+4), line-up boards with numbered places S1 (bow) to S10 filled from the bow"
+    },
     {
       "version": "1.0.144",
       "commit": "0f27391",
@@ -476,12 +482,6 @@
       "commit": "588e135",
       "date": "2026-11-08T21:42:40Z",
       "text": "GTZIP generator: centred titles stay centred when rows are added or removed; generated files get readable layer names"
-    },
-    {
-      "version": "1.0.55",
-      "commit": "c2162b9",
-      "date": "2026-11-08T21:31:29Z",
-      "text": "Empty team backgrounds and lower thirds take the PNG generator files (Panel left, Square, Bar waves, Bar long); an operator's own file or a cleared place is left alone"
     }
   ]
 }

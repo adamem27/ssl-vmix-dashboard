@@ -7,7 +7,7 @@ import { getSetDetail, listSets } from './fleets.js';
 import { listPeople, personName } from './general.js';
 import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
-import { loadLineup, slotDefs } from './lineups.js';
+import { BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, ltFields, ltTeams } from './lowerthirds.js';
 import { ltRoles, teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
@@ -31,7 +31,7 @@ import { parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, vmixUrl 
  */
 /** The bottom line of the qualified team lower third. */
 /** The lineup lower third's order: from the bow to the stern. */
-export const LINEUP_LT_ORDER = ['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
+export const LINEUP_LT_ORDER = BOW_TO_STERN;
 export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS = [
@@ -668,22 +668,30 @@ export class Show {
             await this.set(t.input, new Map([...this.compareData(t.fleetId)].filter(([k]) => /flag\.source$/i.test(k))));
         return { compareMark: mark };
     }
-    /** The lineup lower third: the team's line-up from the bow to the stern (the 9 places on board), five then four. */
+    /** The lineup lower third: the team's line-up from the bow to the stern (8–10 sailors, Floater too), on two screens. */
     lineupLtParts(teamId) {
+        const crew = this.crewBowToStern(teamId).slice(0, 10);
+        // two screens of at most five, as even as can be: 10 = 5 + 5, 9 = 5 + 4, 8 = 4 + 4
+        const first = crew.length > 5 ? Math.ceil(crew.length / 2) : crew.length;
+        return [crew.slice(0, first), crew.slice(first)].filter((p) => p.length);
+    }
+    /** The team's sailors (with a name) from the bow to the stern, Floater between Pit and Grinder, extra places last. */
+    crewBowToStern(teamId) {
         const all = crewOf(this.ctx, teamId).filter((s) => s.lastName || s.firstName);
-        const crew = LINEUP_LT_ORDER.map((k) => all.find((s) => s.slot === k)).filter((s) => !!s);
-        return [crew.slice(0, 5), crew.slice(5, 9)].filter((p) => p.length);
+        const rank = (slot) => { const i = BOW_TO_STERN.indexOf(slot); return i < 0 ? BOW_TO_STERN.length : i; };
+        return all.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s.slot) - rank(b.s.slot) || a.i - b.i).map((x) => x.s);
     }
     /**
-     * Lineup_lowerthird_9.gtzip: places 1–5 show five sailors, places 6–9 four (centred); the part on screen is filled,
-     * the other emptied. NAME n = surname, POSITION n, PHOTO n; the bar is the team's lt_lineup_bar PNG.
+     * Lineup_lowerthird_9.gtzip: places 1–5 show five sailors, places 6–9 four (centred); a screen of five goes on 1–5,
+     * a screen of four on 6–9, and the other places are emptied. NAME n = surname, POSITION n, PHOTO n; the bar is the team's lt_lineup_bar PNG.
      */
     lineupLtFields(teamId, part) {
         const parts = this.lineupLtParts(teamId);
         const crew = parts[part - 1] ?? [];
         const f = new Map();
+        const five = crew.length >= 5;
         for (let i = 1; i <= 9; i++) {
-            const s = part === 1 ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
+            const s = five ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
             // I. SLADDER and 5 | MIDBOW
             f.set(`NAME ${i}.Text`, s ? [s.firstName.trim() ? `${s.firstName.trim()[0].toUpperCase()}.` : '', s.lastName.toUpperCase()].filter(Boolean).join(' ') : '');
             f.set(`POSITION ${i}.Text`, s ? [s.number, s.position.toUpperCase()].filter(Boolean).join(' | ') : '');
@@ -845,6 +853,20 @@ export class Show {
             f.set(`${fl.number}.Text`, r?.number ?? '');
             f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
             f.set(`${fl.photo}.Source`, s?.photo ?? '');
+        }
+        // boards with numbered places (Team_lineup_8/9/10: S1 = bow … S10 = stern): the crew from the bow, whoever sails
+        if (input.fields.some((x) => /^S1NAME\.Text$/i.test(x))) {
+            const rows = new Map(lu.rows.map((r) => [r.slot, r]));
+            const crewList = this.crewBowToStern(b.id);
+            for (let n = 1; n <= 12; n++) {
+                const s = crewList[n - 1];
+                const r = s ? rows.get(s.slot) : undefined;
+                f.set(`S${n}NAME.Text`, (s?.firstName ?? '').toUpperCase());
+                f.set(`S${n}SURNAME.Text`, (s?.lastName ?? '').toUpperCase());
+                f.set(`S${n}NUMBER.Text`, s?.number ?? '');
+                f.set(`S${n}POSITION.Text`, ((r?.position || s?.position) ?? '').toUpperCase());
+                f.set(`S${n}PHOTO.Source`, s?.photo ?? '');
+            }
         }
         // the box behind each photo (HelmBG, Trimmer1BG…): the team's lineup_photo_left/right from the PNG generator, when there is one
         // left: colour on the left (the team's Line-up tab picks the side); the right one mirrors it

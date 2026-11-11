@@ -19,7 +19,11 @@ export const LINEUP_SLOTS = [
     slot('Main', 'Main trimmer', 'MAIN TRIMMER'),
     slot('Tactician', 'Tactician', 'TACTICIAN', { surname: 'TacticianSURNAM', position: 'TacticianPOSITI' }),
     slot('Helm', 'Helm', 'HELM'),
+    // a crew of ten, or a floater in place of one of the usual places: between Pit and Grinder on the boat
+    slot('Floater', 'Floater', 'FLOATER'),
 ];
+/** The places from the bow to the stern (Lineup LT, numbered line-up boards); extra places (Sailor10…) after them. */
+export const BOW_TO_STERN = ['Bow', 'Midbow', 'Pit', 'Floater', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
 export const MAX_EXTRA = 6;
 const extraSlot = (n) => slot(`Sailor${n}`, `Sailor ${n}`, '');
 export const slotDefs = (extra) => [...LINEUP_SLOTS, ...Array.from({ length: Math.max(0, Math.min(MAX_EXTRA, extra)) }, (_, i) => extraSlot(10 + i))];
@@ -86,7 +90,7 @@ export function clearLineup(ctx, eventId, teamId) {
     ctx.db.prepare('DELETE FROM lineups WHERE event_id = ? AND team_id = ?').run(eventId, teamId);
     return getLineup(ctx, eventId, teamId);
 }
-/** Which boat place a declared position goes to; null for floater, spare and anything unknown. */
+/** Which boat place a declared position goes to (a floater to Floater); null for spare and anything unknown. */
 export function slotForPosition(position) {
     const p = position.toLowerCase().replace(/[^a-z]/g, '');
     if (!p)
@@ -107,6 +111,8 @@ export function slotForPosition(position) {
         return 'Midbow';
     if (p.startsWith('bow'))
         return 'Bow';
+    if (p.startsWith('float'))
+        return 'Floater';
     return null;
 }
 /**
