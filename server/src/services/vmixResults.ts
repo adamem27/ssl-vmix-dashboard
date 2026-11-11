@@ -1,6 +1,7 @@
 import { activeEvent, DB, getSetting, setSetting } from '../db/db.js';
 import { listGraphicSets } from './graphicSets.js';
 import { groupLabel } from './groupNames.js';
+import { EVENT_LOCATION } from './showData.js';
 import { AssetCtx } from './assets.js';
 import { badRequest } from './errors.js';
 import { getResults } from './results.js';
@@ -47,7 +48,7 @@ export function resultFields(ctx: AssetCtx, fleetId: string, rowsInTitle = 12, c
   const up = (v: string | undefined) => (v ?? '').trim().toUpperCase();
   // the Results tab gives the group's title (Group A / GROUP) and the subtitle (the place: LOCALIZATION / LOCATION);
   // Welcome only fills in a subtitle left empty, and the stage
-  const place = g.subtitle.trim();
+  const place = EVENT_LOCATION;
   f.set('STAGE.Text', up(welcome.stage));
   f.set('LOCALIZATION.Text', up(place));
   f.set('LOCATION.Text', up(place));

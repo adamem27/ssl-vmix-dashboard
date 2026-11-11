@@ -33,6 +33,9 @@ import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatche
  */
 
 /** The bottom line of the qualified team lower third. */
+/** The lineup lower third's order: from the bow to the stern. */
+export const LINEUP_LT_ORDER = ['Bow', 'Midbow', 'Pit', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
+
 export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
 
 export type Kind = 'board' | 'lt' | 'bug' | 'scene';
@@ -51,7 +54,7 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'weather', label: 'Weather', kind: 'board', overlay: 1, inputs: ['ssl_weather'] },
   { id: 'teamq', label: 'Team LT qualified', kind: 'lt', overlay: 1, inputs: ['ssl_lt_team_q'] },
   { id: 'comm', label: 'Commentator LT', kind: 'lt', overlay: 1, inputs: ['ssl_lt_comm_photo', 'ssl_lt_comm_nophoto'] },
-  { id: 'lineup5', label: 'Lineup LT (5 sailors)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
+  { id: 'lineup5', label: 'Lineup LT (9 sailors, 5 + 4)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
   { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 1, inputs: ['ssl_bug'], aliases: ['Announcement_bug', 'Announcement_bug_flag'] },
   { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
   { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
@@ -116,10 +119,11 @@ export interface ShowState {
   bug: string; // announcement shown on the bug
   bugId: string; // its version (General graphics → Announcements)
   tickerId: string; // the ticker version on air from a ticker key ('' = TICKER key: next race / end of day)
-  lineupPart: number; // 0 = off, 1 = first five, 2 = the rest
+  lineupPart: number; // 0 = off, 1 = the first five, 2 = the other four
+  lineupTeam: string; // the team on the lineup lower third
   compareMark: 'flag' | 'emblem'; // what Team comparison shows by each team
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0, compareMark: 'flag' };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0, lineupTeam: '', compareMark: 'flag' };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -204,7 +208,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     teamsPageOf(0),
     {
       deck: 2, name: 'EXTRAS', page: p2 + 1, keys: [
-        row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lineup5', 'LINEUP\\nLT', 'lt'), null, null, null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
+        row8(k('show:socials', 'SOCIALS', 'bug'), null, null, null, null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
         row8(),
         row8(),
         nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS OFTEN'),
@@ -247,7 +251,8 @@ function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: numb
   const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name.toUpperCase().slice(0, 14) || '—'}`, 'sailor'));
   return {
     deck: 2, name: t.code, page, keys: [
-      row8(tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'), k('next', 'NEXT\\nRESULT', 'lt')),
+      row8(tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'),
+        tk(`lult:${t.code}`, `LINEUP LT\\n${t.code}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), null, null, null, k('next', 'NEXT\\nRESULT', 'lt')),
       row8(...places.slice(0, 8)),
       row8(...places.slice(8, 16)),
       navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
@@ -542,7 +547,8 @@ export class Show {
     } else if (g.id === 'ticker') {
       await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
     } else if (g.id === 'lineup5') {
-      await this.set(input, this.lineupPartFields(1));
+      const b = this.boats()[this.state.boat - 1];
+      if (b) { await this.set(input, this.lineupLtFields(b.id, 1)); this.patchState({ lineupPart: 1, lineupTeam: b.id }); }
     } else if (g.id === 'bug') {
       // BUG key without a version: the announcement shown last, else the first one
       const a = (this.state.bugId && this.announcement(this.state.bugId)) || this.announcements()[0];
@@ -631,50 +637,62 @@ export class Show {
     return { compareMark: mark };
   }
 
-  /** The lineup lower third: the places in the set order, split into the first five and the rest. */
-  lineupParts(): LtSailor[][] {
-    const b = this.boats()[this.state.boat - 1];
-    if (!b) throw badRequest('Pick a team first.');
-    const all = crewOf(this.ctx, b.id).filter((s) => s.lastName || s.firstName);
-    const order = this.config.lineup5;
-    const crew = [...order.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s), ...all.filter((s) => !order.includes(s.slot))];
-    return [crew.slice(0, 5), crew.slice(5)].filter((p) => p.length);
+  /** The lineup lower third: the team's line-up from the bow to the stern (the 9 places on board), five then four. */
+  lineupLtParts(teamId: string): LtSailor[][] {
+    const all = crewOf(this.ctx, teamId).filter((s) => s.lastName || s.firstName);
+    const crew = LINEUP_LT_ORDER.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s);
+    return [crew.slice(0, 5), crew.slice(5, 9)].filter((p) => p.length);
   }
-  lineupPartFields(part: number) {
-    const b = this.boats()[this.state.boat - 1];
-    const crew = this.lineupParts()[part - 1] ?? [];
+  /**
+   * Lineup_lowerthird_9.gtzip: places 1–5 show five sailors, places 6–9 four (centred); the part on screen is filled,
+   * the other emptied. NAME n = surname, POSITION n, PHOTO n; the bar is the team's lt_lineup_bar PNG.
+   */
+  lineupLtFields(teamId: string, part: number) {
+    const parts = this.lineupLtParts(teamId);
+    const crew = parts[part - 1] ?? [];
     const f = new Map<string, string>();
-    for (let i = 0; i < 5; i++) {
-      const s = crew[i];
-      f.set(`NAME ${i + 1}.Text`, s ? s.lastName.toUpperCase() : '');
-      f.set(`FIRSTNAME ${i + 1}.Text`, s ? s.firstName.toUpperCase() : '');
-      f.set(`NUMBER ${i + 1}.Text`, s?.number ?? '');
-      f.set(`POSITION ${i + 1}.Text`, s ? s.position.toUpperCase() : '');
-      f.set(`PHOTO ${i + 1}.Source`, s?.photo ?? '');
+    for (let i = 1; i <= 9; i++) {
+      const s = part === 1 ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
+      f.set(`NAME ${i}.Text`, s ? s.lastName.toUpperCase() : '');
+      f.set(`POSITION ${i}.Text`, s ? s.position.toUpperCase() : '');
+      f.set(`PHOTO ${i}.Source`, s?.photo ?? '');
     }
-    const t = listTeams(this.ctx).find((x) => x.id === b?.id);
-    f.set('Flag.Source', img((t?.assets as Record<string, Asset>)?.flag_big));
-    f.set('TeamName.Text', (t?.name ?? '').toUpperCase());
+    const t = listTeams(this.ctx).find((x) => x.id === teamId);
+    const bar = t && teamPictureFor(this.ctx, t, { w: 1280, h: 140, key: 'ltlineupbar', like: /lineupbar/, exact: true });
+    if (bar) f.set('Bar.Source', bar);
     return f;
   }
-  /** First press: the first five come in; second: the rest swap in (data change); third: out. */
-  async lineupLt() {
+  /** LINEUP LT <team>: the team's first five come in (from another team: a data change); the same key again: out. */
+  async lineupLt(code?: string) {
+    const b = code ? this.teamRef(code) : this.boat(this.state.boat);
     const g = this.graphic('lineup5');
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
-    const parts = this.lineupParts().length;
-    const part = on ? this.state.lineupPart + 1 : 1;
-    if (on && part > parts) {
+    if (on && this.state.lineupTeam === b.id) {
       this.pushUndo(snap.overlays);
       await this.overlayOut(g.overlay, snap.overlays);
-      this.patchState({ lineupPart: 0 });
+      this.patchState({ lineupPart: 0, lineupTeam: '' });
       return { out: 'lineup5' };
     }
-    await this.set(input, this.lineupPartFields(part));
+    if (!this.lineupLtParts(b.id).length) throw badRequest(`No sailors in the ${b.code} line-up.`);
+    await this.set(input, this.lineupLtFields(b.id, 1));
     if (!on) await this.bringIn(g, input, snap);
+    this.patchState({ lineupPart: 1, lineupTeam: b.id });
+    return { in: 'lineup5', team: b.code, part: 1 };
+  }
+  /** LINEUP LT 5 ⇄ 4: the lineup lower third on air swaps between its five and its four (a data change). */
+  async lineupLtSwap() {
+    const g = this.graphic('lineup5');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const teamId = this.state.lineupTeam;
+    if (snap.overlays[g.overlay] !== input.number || !teamId) throw badRequest('Bring a team’s LINEUP LT in first.');
+    const parts = this.lineupLtParts(teamId).length;
+    const part = this.state.lineupPart === 1 && parts > 1 ? 2 : 1;
+    await this.set(input, this.lineupLtFields(teamId, part));
     this.patchState({ lineupPart: part });
-    return { in: 'lineup5', part, of: parts };
+    return { in: 'lineup5', part };
   }
 
   /**
@@ -1008,6 +1026,8 @@ export class Show {
   }
   private async dispatch(kind: string, arg: string): Promise<unknown> {
     switch (kind) {
+      case 'lult': return this.lineupLt(arg);
+      case 'lultswap': return this.lineupLtSwap();
       case 'show': return arg === 'lineup5' ? this.lineupLt() : arg === 'compare' && this.config.fleetId && this.compareGroups().some((g) => g.fleetId === this.config.fleetId) ? this.compareGroup(this.config.fleetId) : this.toggle(arg);
       case 'compare': return this.compareGroup(arg);
       case 'qualified': return this.qualified(arg);
@@ -1094,7 +1114,6 @@ export class Show {
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
     if (kind === 'compare' && ctxt) { const i = ctxt.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(compareKey(arg)).toLowerCase()); onAir = !!i && ov[1] === i.number; }
-    if (key.action === 'show:lineup5' && st.lineupPart) text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
     if (kind === 'break') onAir = isOn('break');
     if (neutral) { onAir = false; active = false; if (key.kind === 'mode') text = key.text; } // a fixed key: its name, not today's mode
     if (key.custom) text = key.custom.replace(/\{auto\}/g, text);

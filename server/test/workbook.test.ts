@@ -71,14 +71,14 @@ describe('workbook sheets', () => {
     expect(teamsSheet(ctx, eventId, today).map((r) => r.Code)).toEqual(['BRN', 'IND', 'MYA']); // no stage: every team
     setCurrentStage(db, eventId, setId);
     const teams = teamsSheet(ctx, eventId, today);
-    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['GROUP A', '1', 'BRN'], ['GROUP A', '2', 'IND']]);
+    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['Group A', '1', 'BRN'], ['Group A', '2', 'IND']]);
     expect(Object.keys(teams[0]).slice(0, 4)).toEqual(['Group', 'Place', 'Code', 'Name']);
 
     // Racing now: one row about the group picked at the top
     expect(nowSheet(ctx, eventId, today)[0].Group).toBe('');
     setShowConfig(db, { fleetId });
     const now = nowSheet(ctx, eventId, today)[0];
-    expect(now).toMatchObject({ Group: 'GROUP A', 'Group letter': 'A', SUBTITLE: 'GROUP A', T1Code: 'BRN', T2Code: 'IND', T3Code: '', 'POS 1': '1', 'POINTS 1': '7', 'R1 1': '4' });
+    expect(now).toMatchObject({ Group: 'Group A', 'Group letter': 'A', SUBTITLE: 'Group A', T1Code: 'BRN', T2Code: 'IND', T3Code: '', 'POS 1': '1', 'POINTS 1': '7', 'R1 1': '4' });
 
     const sailors = sailorsSheet(ctx, eventId, today);
     expect(sailors.map((r) => [r['Team code'], r['Last name'], r['Line-up place'], r.Captain])).toEqual([

@@ -17,7 +17,7 @@ interface Stop { pos: number; color: string; opacity: number }
 interface Gradient { angle: number; stops: Stop[] }
 interface LineupPlace { label: string; number: string; firstName: string; lastName: string; position: string; captain: boolean; sailorId: string | null }
 interface Standing { fleetId: string; fleetName: string; title: string; subtitle: string; races: number; rows: { teamId: string; races: string[]; total: string }[] }
-interface Weather { forecast: string; air_temp: string; wind_speed: string; wind_direction: string; wind_degrees: string; wind_unit: string }
+interface Weather { forecast: string; air_temp: string; wind_speed: string; wind_direction: string; wind_degrees: string }
 interface CommentatorData {
   event: { name: string; timezone: string }; stage: { id: string; name: string } | null; date: string;
   weather: Weather; schedule: { id: string; time: string; race: string; fleet: string; status: string; note: string }[];
@@ -144,7 +144,7 @@ function FreshnessBadge() {
 
 function TopStrip({ x, tz, sets, activeSet, onSet, badge }: { x?: CommentatorData; tz: string; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void; badge?: ReactNode }) {
   const w = x?.weather;
-  const unit = w?.wind_unit || 'kn';
+  const unit = 'kn';
   const chips: [string, string, string][] = w ? ([
     ['Wind', w.wind_speed ? `${w.wind_speed} ${unit}` : '', '💨'],
     ['Direction', [w.wind_direction, w.wind_degrees && `${w.wind_degrees}°`].filter(Boolean).join(' '), '🧭'],

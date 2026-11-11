@@ -5,7 +5,7 @@ import { notFound } from './errors.js';
 
 // ---------- weather (one current record) ----------
 /** wind_degrees is the direction in degrees as typed (e.g. 050), next to the compass point in wind_direction. */
-export const WEATHER_FIELDS = ['forecast', 'air_temp', 'wind_speed', 'wind_direction', 'wind_degrees', 'wind_unit'] as const;
+export const WEATHER_FIELDS = ['forecast', 'air_temp', 'wind_speed', 'wind_direction', 'wind_degrees'] as const;
 export type Weather = Record<(typeof WEATHER_FIELDS)[number], string> & { updated_at: string };
 
 export function getWeather(db: DB): Weather {
@@ -14,7 +14,6 @@ export function getWeather(db: DB): Weather {
   const old = v as Record<string, string | undefined>;
   if (v.forecast === undefined && old.conditions) v.forecast = old.conditions; // renamed from conditions
   const out = Object.fromEntries(WEATHER_FIELDS.map((k) => [k, String(v[k] ?? '')])) as Weather;
-  if (!out.wind_unit) out.wind_unit = 'kn';
   out.updated_at = v.updated_at ?? '';
   return out;
 }

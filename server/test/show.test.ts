@@ -50,7 +50,7 @@ const TITLES = {
   ssl_lineup_9: ['PitNAME.Text', 'PitSURNAME.Text', 'PitNUMBER.Text', 'Flag.Source'],
   lowerthird_photo: ['Top text.Text', 'Bottom text.Text', 'PHOTO.Source', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
   lowerthird_no_photo: ['Top text.Text', 'Bottom text.Text', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
-  ssl_lt_lineup5: ['NAME 1.Text', 'NAME 2.Text', 'NAME 3.Text', 'NAME 4.Text', 'NAME 5.Text', 'Flag.Source'],
+  ssl_lt_lineup5: [...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`NAME ${n}.Text`, `POSITION ${n}.Text`, `PHOTO ${n}.Source`]), 'Bar.Source'],
   ssl_lt_team_q: ['Top text.Text', 'Bottom text.Text', 'Bar.Source'],
 };
 
@@ -224,9 +224,11 @@ describe('show control', () => {
     await show.run('show:welcome');
     // the Welcome bar (Welcome 2.gtzip): the stage, the day and the date (empty = today); its fixed texts stay
     expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=stage.Text&Value=Pan-American Qualifiers');
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Day.Text&Value=DAY 1');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Day.Text&Value=Day 1');
     expect(v.calls.some((c) => /SelectedName=Date\.Text&Value=\d\d\.\d\d\.\d{4}$/.test(c))).toBe(true);
-    expect(v.calls.some((c) => /SSL Gold Cup|Brazil 2026|City|Country/.test(c))).toBe(false);
+    expect(v.calls.some((c) => /SSL Gold Cup|Brazil 2026/.test(c))).toBe(false);
+    expect(v.calls.some((c) => c.includes('SelectedName=City.Text&Value=RIO DE JANEIRO'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('SelectedName=Country.Text&Value=BRAZIL'))).toBe(true);
     updateGraphicSet(s.db, w.id, { data: { date: '02.12.2026' } });
     await show.run('show:welcome');
     await show.run('show:welcome');
@@ -252,18 +254,27 @@ describe('show control', () => {
     const v = fakeVmix(TITLES);
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('show:lineup5');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=TAC');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 5.Text&Value=TR1');
+    // bow first: Bow, Midbow/Pit, Grinder, Trimmer, Trimmer1 in slots 1-5; 6-9 empty
+    const name = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
+    expect(v.calls).toContain(name(1, 'BOW'));
+    expect(v.calls).toContain(name(3, 'GRI'));
+    expect(v.calls).toContain(name(5, 'TR2'));
+    expect(v.calls).toContain(name(6, ''));
     expect(v.overlays[1]).toBe('9');
     v.calls.length = 0;
-    await show.run('show:lineup5');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 1.Text&Value=GRI');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 2.Text&Value=RUIZ');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 3.Text&Value=BOW');
-    expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=NAME 4.Text&Value=');
+    await show.run('lultswap');
+    // the four toward the stern go to slots 6-9, slots 1-5 empty, no overlay change
+    expect(v.calls).toContain(name(6, 'MAI'));
+    expect(v.calls).toContain(name(7, 'HEL'));
+    expect(v.calls).toContain(name(8, 'TAC'));
+    expect(v.calls).toContain(name(1, ''));
     expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
-    await show.run('show:lineup5');
+    v.calls.length = 0;
+    await show.run('lultswap');
+    expect(v.calls).toContain(name(1, 'BOW'));
+    await show.run(`lult:${show.boat(show.state.boat).code}`);
     expect(v.overlays[1]).toBe('');
+    await expect(show.run('lultswap')).rejects.toThrow(/LINEUP LT/);
 
     // the bar: the team's lowerthird PNG, as on every other lower third
     const code = show.boat(2).code;
@@ -328,7 +339,7 @@ describe('show control', () => {
     // every page keeps the safety row in the same place
     for (const p of show.pages()) expect(p.keys[3].slice(4).map((k) => k?.action)).toEqual(['out', 'undo', 'allout', 'panic']);
     // each action on one key only (navigation and the bottom row aside), no anthem keys
-    const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next').map((k) => k!.action);
+    const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next' && k.action !== 'lultswap').map((k) => k!.action);
     expect(acts.filter((a, i) => acts.indexOf(a) !== i)).toEqual([]);
     expect(acts.some((a) => a.startsWith('anthem'))).toBe(false);
   });

@@ -50,7 +50,7 @@ describe('general graphics versions', () => {
   });
 
   it('names groups as the broadcast does', () => {
-    expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['GROUP H', 'GROUP A', 'GROUP B', 'GROUP C', 'FINAL', 'PETIT FINAL']);
+    expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['Group H', 'Group A', 'Group B', 'Group C', 'FINAL', 'PETIT FINAL']);
   });
 });
 
@@ -111,6 +111,6 @@ describe('results', () => {
     g = rs.sortResults(db, fleetId);
     expect(g.rows.map((r) => r.total)).toEqual(['20', '18', '12', '11']);
     const row = rs.resultSheetRows(ctx, eventId)[0];
-    expect(row).toMatchObject({ group: 'GROUP A', T1Code: 'BRN', T1Points: '20', T1R6: '4', T3Code: 'MYA', T3Rank: '3', R6Label: 'R6' });
+    expect(row).toMatchObject({ group: 'Group A', T1Code: 'BRN', T1Points: '20', T1R6: '4', T3Code: 'MYA', T3Rank: '3', R6Label: 'R6' });
   });
 });

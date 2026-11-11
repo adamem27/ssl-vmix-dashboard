@@ -88,8 +88,7 @@ function GroupCard({ g, teamById }: { g: Group; teamById: Map<string, Team> }) {
       <header className="flex flex-wrap items-end gap-2 border-b border-ink-800 px-3 py-2">
         <label className="min-w-0 flex-1"><span className="label">{g.fleetName} · Title</span>
           <SaveInput value={g.title} onSave={(title) => put({ title })} label="Title" maxLength={120} className="font-semibold" /></label>
-        <label className="w-44"><span className="label">Subtitle</span>
-          <SaveInput value={g.subtitle} onSave={(subtitle) => put({ subtitle })} label="Subtitle" placeholder="RIO DE JANEIRO, BRAZIL" maxLength={120} /></label>
+        <span className="w-44 pb-1 text-xs text-ink-500" title="LOCALIZATION / LOCATION on the board: the event's place, fixed">RIO DE JANEIRO, BRAZIL</span>
         <div className="flex items-center gap-1" aria-label="Races">
           <span className="text-xs text-ink-400">Races</span>
           <Button size="sm" variant="ghost" disabled={g.races <= 1} onClick={() => put({ races: g.races - 1 })} aria-label="One race less">−</Button>

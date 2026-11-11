@@ -11,7 +11,6 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-const WIND_UNITS = ['kn', 'm/s', 'km/h', 'mph'];
 const LANGUAGES = ['English', 'Polish', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Arabic', 'Chinese', 'Japanese'];
 
 const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People'], ['g-compare', 'Team comparison']];
@@ -82,7 +81,6 @@ function WeatherPanel() {
             <div className="w-16 shrink-0" title="Direction in degrees, e.g. 050"><Cell value={d.wind_degrees} onSave={(v) => save('wind_degrees', v)} label="Direction in degrees" placeholder="050°" className="font-mono text-ink-50" /></div>
           </div>
         ))}
-        {select('wind_unit', 'Unit', WIND_UNITS)}
       </div>
     </Panel>
   );

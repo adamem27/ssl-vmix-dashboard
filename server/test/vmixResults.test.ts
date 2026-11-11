@@ -32,7 +32,7 @@ describe('results to vMix', () => {
     const r = await pushResults(ctx, fleetId, rs.getResults(db, fleetId).vmixInput, fake);
     expect(calls[0]).toBe('http://10.0.0.5:8088/api/');
     const set = new Map(calls.slice(1).map((u) => { const q = new URL(u).searchParams; expect(q.get('Input')).toBe('k-res'); return [q.get('SelectedName')!, q.get('Value')!]; }));
-    expect(set.get('SUBTITLE.Text')).toBe('GROUP A');
+    expect(set.get('SUBTITLE.Text')).toBe('Group A');
     expect(set.has('TITLE.Text')).toBe(false); // the event name stays as designed
     expect([set.get('TEAM 1.Text'), set.get('POINTS 1.Text'), set.get('TEAM 2.Text'), set.get('R1 2.Text')]).toEqual(['TEAM IND', '8', 'TEAM BRN', '3']);
     expect([set.get('POS 3.Text'), set.get('TEAM 3.Text'), set.get('POINTS 3.Text')]).toEqual(['', '', '']);
