@@ -63,7 +63,12 @@ export const showConfigSchema = z.object({
     race: z.number().int().min(1).max(12).default(1),
     /** fleets shown in turn in the break scene (empty: every fleet of the race's set) */
     breakFleets: z.array(z.string()).default([]),
-    breakLayer: z.number().int().min(1).max(10).default(3),
+    /** the break scene's layers (ssl_break): L-bar, ticker, and the board that switches (day schedule / group results) */
+    breakLbarLayer: z.number().int().min(1).max(10).default(1),
+    breakTickerLayer: z.number().int().min(1).max(10).default(3),
+    breakBoardLayer: z.number().int().min(1).max(10).default(4),
+    /** the board in the break scene switches by itself (day schedule, then each group's results) */
+    breakAuto: z.boolean().default(true),
     rotateSeconds: z.number().int().min(4).max(120).default(12),
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
     tickerNext: z.string().default(''),
@@ -161,7 +166,7 @@ function defaultDeckPages(cfg0, teams = [], groups = []) {
         {
             deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
                 row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug')),
-                row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
+                row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
                 row8(k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
                 nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
             ],
@@ -786,11 +791,14 @@ export class Show {
                 await this.overlayOut(g.overlay, snap.overlays);
             return { out: g.id };
         }
-        await this.fill(g, input);
+        if (g.id === 'break')
+            await this.prepareBreak(input, snap.inputs);
+        else
+            await this.fill(g, input);
         if (g.id === 'ticker')
             this.patchState({ tickerId: '' });
         await this.bringIn(g, input, snap);
-        if (g.id === 'break')
+        if (g.id === 'break' && this.config.breakAuto)
             this.startRotation();
         return { in: g.id, input: input.title };
     }
@@ -945,6 +953,14 @@ export class Show {
         const snap = await this.snapshot();
         const input = this.need(g, snap.inputs);
         const on = snap.overlays[g.overlay] === input.number;
+        // the break scene on air: the ticker is its layer, so only its text changes
+        const scene = this.resolve(this.graphic('break'), snap.inputs);
+        if (scene && snap.overlays[this.graphic('break').overlay] === scene.number) {
+            const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+            await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
+            this.patchState({ tickerId: t.id });
+            return { in: 'ticker', text, scene: true };
+        }
         if (on && this.state.tickerId === t.id) {
             this.pushUndo(snap.overlays);
             await this.overlayOut(g.overlay, snap.overlays);
@@ -1064,25 +1080,54 @@ export class Show {
             out.push({ kind: 'results', fleetId: f });
         return out;
     }
-    async nextSlide() {
+    /** A layer of the break scene (SetMultiViewOverlay: layer, input). */
+    async sceneLayer(scene, layer, input) {
+        await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${encodeURIComponent(`${layer},${input.key || input.number}`)}`);
+    }
+    /**
+     * The break scene before it comes in: the L-bar (its data) on its layer, the ticker on air last (a TICKERS key) or
+     * the automatic one on its layer, and the first board (day schedule) on the board layer.
+     */
+    async prepareBreak(scene, inputs) {
+        const cfg = this.config;
+        const lbar = this.resolve(this.graphic('lbar'), inputs);
+        if (lbar) {
+            await this.fill(this.graphic('lbar'), lbar);
+            await this.sceneLayer(scene, cfg.breakLbarLayer, lbar);
+        }
+        const tk = this.resolve(this.graphic('ticker'), inputs);
+        if (tk) {
+            const t = this.state.tickerId ? this.tickerVersion(this.state.tickerId) : undefined;
+            const text = t ? tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : this.tickerText();
+            await this.set(tk, new Map([[this.textField(tk, /ticker|text/i) ?? '', text]]));
+            await this.sceneLayer(scene, cfg.breakTickerLayer, tk);
+        }
+        await this.showSlide(0, inputs);
+    }
+    async showSlide(i, inputs) {
         const slides = this.slides();
-        const st = this.state;
-        const i = (st.slide + 1) % slides.length;
         const s = slides[i];
-        const { inputs } = await this.snapshot();
+        inputs ??= (await this.snapshot()).inputs;
         const g = this.graphic(s.kind === 'schedule' ? 'schedule' : 'results');
         const input = this.need(g, inputs);
         if (s.kind === 'results' && s.fleetId)
             await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
-        const scene = this.need(this.graphic('break'), inputs);
-        await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${encodeURIComponent(`${this.config.breakLayer},${input.key || input.number}`)}`);
+        else
+            await this.fill(g, input);
+        await this.sceneLayer(this.need(this.graphic('break'), inputs), this.config.breakBoardLayer, input);
         this.patchState({ slide: i });
         return { slide: i, of: slides.length, showing: s };
+    }
+    async nextSlide() {
+        return this.showSlide((this.state.slide + 1) % this.slides().length);
     }
     startRotation() {
         this.stopRotation();
         this.patchState({ rotating: true });
-        this.rotation = setInterval(() => { this.nextSlide().catch((e) => this.log(`Break rotation: ${e?.message ?? e}`)); }, this.config.rotateSeconds * 1000);
+        this.rotation = setInterval(() => { if (!this.config.breakAuto) {
+            this.stopRotation();
+            return;
+        } this.nextSlide().catch((e) => this.log(`Break rotation: ${e?.message ?? e}`)); }, this.config.rotateSeconds * 1000);
         this.rotation.unref?.();
     }
     stopRotation() {
@@ -1092,10 +1137,18 @@ export class Show {
         if (this.state.rotating)
             this.patchState({ rotating: false });
     }
-    async toggleRotation() { if (this.rotation)
-        this.stopRotation();
-    else
-        this.startRotation(); return { rotating: !!this.rotation }; }
+    /** AUTO SWITCH on or off: kept for the next break too; on air it starts or stops at once. */
+    async toggleRotation() {
+        const on = !this.config.breakAuto;
+        setShowConfig(this.ctx.db, { breakAuto: on });
+        const snap = await this.snapshot().catch(() => null);
+        const scene = snap && this.resolve(this.graphic('break'), snap.inputs);
+        if (on && scene && snap.overlays[this.graphic('break').overlay] === scene.number)
+            this.startRotation();
+        if (!on)
+            this.stopRotation();
+        return { rotating: !!this.rotation, auto: on };
+    }
     async tickerMode() {
         const mode = this.state.tickerMode === 'next' ? 'end' : 'next';
         this.patchState({ tickerMode: mode });
@@ -1252,8 +1305,8 @@ export class Show {
         else if (kind === 'tickermode')
             text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
         else if (kind === 'rotate') {
-            text = st.rotating ? 'ROTATION\\n⏸ STOP' : 'ROTATION\\n▶ START';
-            active = st.rotating;
+            text = this.config.breakAuto ? 'AUTO SWITCH\\nON' : 'AUTO SWITCH\\nOFF';
+            active = this.config.breakAuto;
         }
         else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) {
             text = 'PANIC?\\nPRESS AGAIN';

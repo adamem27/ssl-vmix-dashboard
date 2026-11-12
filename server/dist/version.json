@@ -1,8 +1,14 @@
 {
-  "version": "1.0.151",
-  "commit": "f1cf35f",
-  "date": "2026-11-12T01:12:53Z",
+  "version": "1.0.152",
+  "commit": "26978f1",
+  "date": "2026-11-12T02:54:22Z",
   "changes": [
+    {
+      "version": "1.0.152",
+      "commit": "26978f1",
+      "date": "2026-11-12T02:54:22Z",
+      "text": "Break scene: L-bar on layer 1, ticker on layer 3 (TICKERS keys change it in place), day schedule / group results switching on layer 4; AUTO SWITCH on or off, kept"
+    },
     {
       "version": "1.0.151",
       "commit": "f1cf35f",
@@ -476,12 +482,6 @@
       "commit": "b7d9226",
       "date": "2026-11-08T22:40:18Z",
       "text": "README: Line-up sheet"
-    },
-    {
-      "version": "1.0.65",
-      "commit": "7b6d080",
-      "date": "2026-11-08T22:36:56Z",
-      "text": "Line-up sheet in Excel: one row per team with flag, emblem, line-up background and sponsors, then the places in the order set in the Line-up panel with number, names, position, captain and photo"
     }
   ]
 }
