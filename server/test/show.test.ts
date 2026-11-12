@@ -359,12 +359,14 @@ describe('show control', () => {
     expect(v.calls.some((c) => c.startsWith(`?Function=SetText&Input=${k('ssl_ticker')}`))).toBe(true);
     expect(v.calls.at(-1)).toBe(`?Function=OverlayInput3In&Input=${k('ssl_ticker')}`);
     expect(v.overlays[1] ?? '').toBe('');
-    // NEXT TICKER: the next version, the same way
+    // the AFTER / BREAK page: a key per ticker; the second ticker's key puts it on the scene the same way
+    const page = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
+    expect(page.keys[2].map((x) => x?.action)).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => `breakticker:${n}`));
     v.calls.length = 0;
-    const first = show.state.tickerId;
-    const nt = await show.run('nextticker');
-    expect(show.state.tickerId).not.toBe(first);
-    expect(nt).toMatchObject({ ticker: expect.any(String) });
+    const second = show.tickers()[1];
+    const nt = await show.run('breakticker:2');
+    expect(show.state.tickerId).toBe(second.id);
+    expect(nt).toMatchObject({ ticker: second.name, onAir: true });
     expect(v.calls[0]).toBe('?Function=OverlayInput3Out');
     expect(v.calls.at(-1)).toBe(`?Function=OverlayInput3In&Input=${k('ssl_ticker')}`);
     // AUTO SWITCH off: stops now and stays off for the next break

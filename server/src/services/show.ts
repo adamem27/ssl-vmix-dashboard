@@ -216,9 +216,10 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug')),
-        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('nextticker', 'NEXT\\nTICKER', 'scene')),
-        row8(k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
+        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
+        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
+        // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
+        row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
       ],
     },
@@ -1171,6 +1172,15 @@ export class Show {
     this.patchState({ tickerId: t.id });
     return text;
   }
+  /** A ticker key of the break scene: on air the ticker goes out and comes back with it; off air it is the one the next break shows. */
+  async breakTicker(which: string) {
+    const t = this.tickerVersion(which);
+    if (!t) throw badRequest(`No ticker ${which}. Add it under General graphics → Tickers.`);
+    const snap = await this.snapshot();
+    const input = this.need(this.graphic('ticker'), snap.inputs);
+    const text = await this.swapTicker(t, input, snap.overlays);
+    return { ticker: t.name, text, onAir: this.breakOnAir(snap) };
+  }
   /** NEXT TICKER: the next version of Tickers (General graphics); on air it goes out and comes back in with the new text. */
   async nextTicker() {
     const list = this.tickers();
@@ -1256,6 +1266,7 @@ export class Show {
       case 'rotate': return this.toggleRotation();
       case 'nextslide': return this.nextSlide();
       case 'nextticker': return this.nextTicker();
+      case 'breakticker': return this.breakTicker(arg);
       case 'tickermode': return this.tickerMode();
       case 'comparemark': return this.compareMark();
       case 'undo': return this.undo();
@@ -1310,6 +1321,11 @@ export class Show {
       text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
       empty = !t;
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
+    } else if (kind === 'breakticker') {
+      const t = this.tickerVersion(arg);
+      text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
+      empty = !t;
+      if (t) { active = st.tickerId === t.id; onAir = active && !!ctxt && this.breakOnAir({ inputs: ctxt.inputs, overlays: ov }); }
     } else if (kind === 'person') {
       const p = this.people()[Number(arg) - 1];
       text = p ? [p.name, p.surname].map((x) => x.trim().toUpperCase().slice(0, 20)).filter(Boolean).join('\\n') : '';
