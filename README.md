@@ -112,7 +112,9 @@ Ekran komentatora może być zwykłą statyczną stroną na dowolnym hostingu: n
 
 Wysyłane są tylko zmienione pliki (każdy pod tymczasową nazwą, potem zmiana nazwy, więc komentator nigdy nie czyta połowy pliku). Nazwa folderu ma losową część (`komentator-xxxxxxxx`): adres jest kluczem, a strona nie daje możliwości zmiany czegokolwiek.
 
-Konfiguracja na PC z vMixem: **Settings → Commentator online**:
+**Wysyłka po HTTPS (zalecana, działa w każdej sieci):** tryb „Upload by HTTPS (upload.php)”. Raz pobierz z dashboardu **Download upload.php** i wgraj go menedżerem plików hostingu do folderu strony (np. `public_html/commentary`). Plik zawiera tylko skrót klucza tego PC, przyjmuje wyłącznie pliki strony (`index.html`, `data.json`, `status.json`, `assets/*.js|css`, `img/<sha1>.png`) w folderach `komentator-*` i zapisuje je atomowo. W polu adresu wpisz adres folderu, np. `https://commentary.em27code.com`.
+
+Konfiguracja FTP (gdy port 21 jest dostępny; seohost może blokować FTP spoza Polski) na PC z vMixem: **Settings → Commentator online**:
 1. „Upload by FTP”: serwer, port, użytkownik i hasło FTP, folder na serwerze (puste = folder konta FTP), FTPS włączone. Na seohost: w DirectAdmin utwórz subdomenę (np. `komentator.em27code.com`) i osobne konto FTP ograniczone do jej folderu.
 2. „Web address of that folder”: adres tego folderu w przeglądarce, np. `https://komentator.em27code.com`.
 3. Save, zaznacz „Publish every 5 seconds”. Link dla komentatorów (`https://komentator.em27code.com/komentator-xxxxxxxx/`) jest pod spodem i w przycisku **🎙 Commentator link** na górnym pasku.

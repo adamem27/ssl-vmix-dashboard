@@ -450,7 +450,7 @@ function CommentatorOnlineSection() {
 
 // ---------- commentator screen as a static page ----------
 interface StaticSiteInfo {
-  mode: 'folder' | 'ftp'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
+  mode: 'folder' | 'ftp' | 'https'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
   enabled: boolean; url: string; folderName: string;
   status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
 }
@@ -486,11 +486,17 @@ function StaticPageSection() {
       desc={<>The commentator screen as a <b>static web page</b>: every 5 s this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
       <form onSubmit={save} className="space-y-3">
         <div className="flex flex-wrap gap-4 text-sm">
-          {(['ftp', 'folder'] as const).map((m) => (
-            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{m === 'ftp' ? 'Upload by FTP to the web host' : 'Only save to a folder on this PC'}</label>
+          {(['https', 'ftp', 'folder'] as const).map((m) => (
+            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{m === 'https' ? 'Upload by HTTPS (upload.php)' : m === 'ftp' ? 'Upload by FTP' : 'Only save to a folder on this PC'}</label>
           ))}
         </div>
-        {f.mode === 'ftp' ? (
+        {f.mode === 'https' ? (
+          <div className="rounded-md border border-ink-800 bg-ink-950/40 p-3 text-sm text-ink-300">
+            Works on any network (port 443, like a web page). Once: download <b>upload.php</b> and put it in the web folder of the address below
+            (e.g. <code>public_html/commentary</code>) with the hosting's file manager. It holds only a fingerprint of this PC's key and accepts nothing but the commentator page files.
+            <div className="mt-2"><a className="btn btn-secondary inline-flex items-center rounded-md border border-ink-700 px-3 py-1.5 text-sm hover:bg-ink-800" href="/api/static-site/upload.php" download>Download upload.php</a></div>
+          </div>
+        ) : f.mode === 'ftp' ? (
           <div className="grid gap-3 md:grid-cols-[2fr_100px_1fr_1fr]">
             <Field label="FTP server"><input className="input font-mono text-xs" value={f.ftpHost} onChange={(e) => set('ftpHost', e.target.value)} placeholder="h55.seohost.pl" /></Field>
             <Field label="Port"><input className="input font-mono text-xs" inputMode="numeric" value={f.ftpPort} onChange={(e) => set('ftpPort', Number(e.target.value.replace(/\D/g, '')) || 0)} /></Field>
