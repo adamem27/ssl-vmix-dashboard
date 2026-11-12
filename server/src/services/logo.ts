@@ -60,7 +60,7 @@ function clearSolidBackground(img: Rgba) {
   }
 }
 
-function trimBox(img: Rgba) {
+export function trimBox(img: Rgba) {
   let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
@@ -72,7 +72,7 @@ function trimBox(img: Rgba) {
 }
 
 /** Area-averaging resample of a box of the source (premultiplied alpha, so edges don't get dark fringes). */
-function resample(src: Rgba, box: { x0: number; y0: number; w: number; h: number }, ow: number, oh: number): Float32Array {
+export function resample(src: Rgba, box: { x0: number; y0: number; w: number; h: number }, ow: number, oh: number): Float32Array {
   const out = new Float32Array(ow * oh * 4);
   const sx = box.w / ow, sy = box.h / oh;
   for (let oy = 0; oy < oh; oy++) {

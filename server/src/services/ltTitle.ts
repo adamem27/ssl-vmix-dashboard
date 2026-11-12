@@ -129,7 +129,11 @@ function pngSize(file: string): [number, number] | null {
  * The team's PNG for a picture of the title: the one named like the title's (CODE_<key>.png), else the one of the
  * closest shape (within 4 %); null when nothing fits (the caller keeps its own choice).
  */
-export function teamPictureFor(ctx: AssetCtx, team: { id: string; code: string }, want: LtImageInfo | undefined): string | null {
+/**
+ * The team's generated picture for a box: by file key (`key`, then any key `like` matches), else (unless `exact`) the
+ * one closest in shape (within 4%). Null when nothing fits.
+ */
+export function teamPictureFor(ctx: AssetCtx, team: { id: string; code: string }, want: (LtImageInfo & { like?: RegExp; exact?: boolean }) | undefined): string | null {
   if (!want || !want.w || !want.h) return null;
   const files = listOutputs(ctx.db).filter((o) => o.teamId === team.id).map((o) => o.rel);
   // the team's own folder of generated pictures may hold more than the generator lists (an older run, a copy)
@@ -137,9 +141,9 @@ export function teamPictureFor(ctx: AssetCtx, team: { id: string; code: string }
   try { for (const f of fs.readdirSync(path.join(ctx.assetsDir, ...folder.split('/')))) if (/\.png$/i.test(f) && !files.includes(`${folder}/${f}`)) files.push(`${folder}/${f}`); } catch { /* none */ }
   const local = (rel: string) => path.join(ctx.assetsDir, ...rel.split('/'));
   const exists = files.filter((r) => fs.existsSync(local(r)));
-  const byKey = want.key ? exists.find((r) => keyOf(path.basename(r), [team.code]) === want.key) : undefined;
-  let pick = byKey;
-  if (!pick) {
+  const k = (r: string) => keyOf(path.basename(r), [team.code]);
+  let pick = (want.key ? exists.find((r) => k(r) === want.key) : undefined) ?? (want.like ? exists.find((r) => want.like!.test(k(r))) : undefined);
+  if (!pick && !want.exact) {
     const ratio = want.w / want.h;
     let best: { rel: string; d: number } | null = null;
     for (const r of exists) {

@@ -23,15 +23,15 @@ function fakeVmix() {
   const fetcher = async (url: string) => {
     const q = decodeURIComponent(url.split('/api/')[1] ?? '');
     if (q === '') {
-      const xml = `<vmix><inputs>${input(1, 'lowerthird_photo', fields)}${input(2, 'lowerthird_no_photo', fields.filter((f) => f !== 'PHOTO.Source'))}</inputs><overlays><overlay number="2">${overlay}</overlay></overlays></vmix>`;
+      const xml = `<vmix><inputs>${input(1, 'lowerthird_photo', fields)}${input(2, 'lowerthird_no_photo', fields.filter((f) => f !== 'PHOTO.Source'))}</inputs><overlays><overlay number="1">${overlay}</overlay></overlays></vmix>`;
       return { ok: true, status: 200, text: async () => xml };
     }
     calls.push(q);
     const set = q.match(/Function=Set(?:Text|Image)&Input=(k\d)&SelectedName=(.+?)&Value=(.*)$/);
     if (set) held.set(`${set[1]}/${set[2]}`, set[3]);
-    const m = q.match(/Function=OverlayInput2In&Input=k(\d)/);
+    const m = q.match(/Function=OverlayInput1In&Input=k(\d)/);
     if (m) overlay = m[1];
-    if (q.includes('OverlayInput2Out')) overlay = '';
+    if (q.includes('OverlayInput1Out')) overlay = '';
     return { ok: true, status: 200, text: async () => '' };
   };
   return { calls, fetcher };
@@ -57,8 +57,8 @@ describe('lower thirds', () => {
     const r = await lt.showSailor(null, 'pit');
     expect(r).toMatchObject({ kind: 'sailor', slot: 'Pit', cameIn: true, input: 'lowerthird_no_photo' });
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Martine GRAEL');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9  I  PIT');
-    expect(v.calls.at(-1)).toBe('?Function=OverlayInput2In&Input=k2');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9 | PIT');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k2');
 
     // best results: only Bottom text changes, no transition
     v.calls.length = 0;
@@ -66,7 +66,7 @@ describe('lower thirds', () => {
     expect(v.calls).toEqual(['?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=Olympic gold 2016']);
     v.calls.length = 0;
     await lt.nextLine(); await lt.nextLine();
-    expect(v.calls.at(-1)).toBe('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9  I  PIT');
+    expect(v.calls.at(-1)).toBe('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9 | PIT');
 
     // another sailor of the same team on air: only names change (data change animations), no transition
     v.calls.length = 0;
@@ -81,7 +81,7 @@ describe('lower thirds', () => {
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=THE CANARIES');
 
     await lt.out();
-    expect(v.calls.at(-1)).toBe('?Function=OverlayInput2Out');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput1Out');
     expect(lt.state.onAir).toBe(false);
   });
 
@@ -106,12 +106,12 @@ describe('lower thirds', () => {
     const calls: string[] = [];
     const fetcher = async (url: string) => {
       const q = decodeURIComponent(url.split('/api/')[1] ?? '');
-      if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="2">${overlay}</overlay></overlays></vmix>` };
+      if (q === '') return { ok: true, status: 200, text: async () => `<vmix><inputs>${input(1, 'lowerthird_photo 2 1.gtzip', titleFields)}</inputs><overlays><overlay number="1">${overlay}</overlay></overlays></vmix>` };
       calls.push(q);
       const set = q.match(/Function=Set(?:Text|Image)&Input=(k\d)&SelectedName=(.+?)&Value=(.*)$/);
       if (set) held.set(`${set[1]}/${set[2]}`, set[3]);
-      if (q.includes('OverlayInput2In')) overlay = '1';
-      if (q.includes('OverlayInput2Out')) overlay = '';
+      if (q.includes('OverlayInput1In')) overlay = '1';
+      if (q.includes('OverlayInput1Out')) overlay = '';
       times.push(Date.now());
       return { ok: true, status: 200, text: async () => '' };
     };
@@ -125,13 +125,13 @@ describe('lower thirds', () => {
     expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=THE CANARIES');
     const barCall = calls.find((c) => c.includes('SelectedName=Bar.Source'));
     expect(barCall).toMatch(/BRA_lowerthird\.png$/);
-    expect(calls.at(-1)).toBe('?Function=OverlayInput2In&Input=k1');
+    expect(calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k1');
     await lt.out();
 
     // vMix plays the photo's DataChange, not a Fly in Transition In: the title comes in with no photo, the photo after
     calls.length = 0; times.length = 0;
     await (lt as any).show('lowerthird_photo 2 1.gtzip', new Map([['PHOTO.Source', 'C:\\p.png']]), { kind: 'sailor', teamId, slot: 'Pit', line: 0 });
-    const inAt = calls.indexOf('?Function=OverlayInput2In&Input=k1');
+    const inAt = calls.indexOf('?Function=OverlayInput1In&Input=k1');
     expect(inAt).toBeGreaterThanOrEqual(0);
     expect(calls.slice(inAt + 1)).toEqual(['?Function=SetImage&Input=k1&SelectedName=PHOTO.Source&Value=C:\\p.png']);
     // out: the photo flies down (DataChange Out 0.3 s), then the title goes out; the key does not wait for it
@@ -141,7 +141,7 @@ describe('lower thirds', () => {
     expect(Date.now() - t0).toBeLessThan(250);
     expect(calls).toEqual(['?Function=SetImage&Input=k1&SelectedName=PHOTO.Source&Value=']);
     await new Promise((r) => setTimeout(r, 400));
-    expect(calls.at(-1)).toBe('?Function=OverlayInput2Out');
+    expect(calls.at(-1)).toBe('?Function=OverlayInput1Out');
     expect(times.at(-1)! - t0).toBeGreaterThanOrEqual(290);
   });
 
@@ -195,18 +195,14 @@ describe('lower thirds', () => {
     expect(f.page.controls[0][0].style.text).toBe('BRA');
   });
 
-  it('sends the key labels to Companion, only the ones that changed', async () => {
+  it('sends nothing to Companion: the keys show no on-air feedback', async () => {
     const s = setup();
     seedTeam(s.db, 'BRA', []);
     setLtConfig(s.db, { companionUrl: 'http://127.0.0.1:8000/', rows: 4, cols: 8 });
-    setSetting(s.db, 'show.config', JSON.stringify({ labels: false })); // Show control owns the keys otherwise
+    setSetting(s.db, 'show.config', JSON.stringify({ labels: false }));
     const urls: string[] = [];
     const lt = new LowerThirds(s.ctx, async (u: string) => { urls.push(u); return { ok: true, status: 200, text: async () => '' }; });
-    await lt.pushLabels();
-    expect(urls.length).toBe(1 + 9 + 3);
-    expect(urls[0]).toMatch(/^http:\/\/127\.0\.0\.1:8000\/api\/location\/1\/0\/0\/style\?text=BRA&bgcolor=/);
-    urls.length = 0;
-    await lt.pushLabels();
+    await lt.pushLabels(true);
     expect(urls).toEqual([]);
   });
 });

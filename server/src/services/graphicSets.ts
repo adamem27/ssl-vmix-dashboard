@@ -21,26 +21,37 @@ export interface GraphicField {
 export interface GraphicPreset { id: string; name: string; data: Record<string, string> }
 export interface GraphicKind { kind: string; label: string; sheet: string; description: string; fields: GraphicField[]; defaults: { name: string; data: Record<string, string> }[]; presets?: GraphicPreset[] }
 
+/** The Race officials panel: its roles, each with the names under it (NAME 1–11 in order), as in the officials list. */
+export const OFFICIAL_ROLES: { role: string; names: { i: number; name: string }[] }[] = (() => {
+  const list: [string, string[]][] = [
+    ['REGATTA DIRECTOR', ['Paul Hutton-Ashkenny (GBR)']], ['PRINCIPAL RACE OFFICER', ['Ricardo Navarro (BRA)']],
+    ['RACE OFFICERS', ['Walter Boddener (BRA)', 'Alejandro Martin (ESP)']], ['TECHNICAL COMMITTEE', ['Simon Bovay (SUI)', 'Oscar Alonso Rodriguez (ESP)']],
+    ['CHIEF UMPIRE', ['Gonzalo Heredia (ARG)']], ['INTERNATIONAL JURY', ['Ilha Nelson (BRA)']],
+    ['JURY CHAIRMAN (REMOTE)', ['Andrus Poksi (EST)']], ['JURY (REMOTE)', ['Neven Baren (CRO)', 'Johanna Poksi (EST)']],
+  ];
+  let n = 0;
+  return list.map(([role, names]) => ({ role, names: names.map((name) => ({ i: ++n, name })) }));
+})();
+export const OFFICIAL_NAMES = OFFICIAL_ROLES.reduce((a, r) => a + r.names.length, 0);
+
 export const GRAPHIC_KINDS: GraphicKind[] = [
   {
     kind: 'welcome', label: 'Welcome', sheet: 'Welcome',
-    description: 'Opening board: event name, place and dates.',
+    description: 'Welcome bar: the stage on top, the day and the date below (SSL GOLD CUP, BRAZIL 2026, city and country are fixed in the title).',
     fields: [
-      { key: 'event', label: 'Event', default: 'SSL GOLD CUP 2026' },
-      { key: 'stage', label: 'Stage', placeholder: 'FINAL SERIES' },
-      { key: 'location', label: 'Location', default: 'RIO DE JANEIRO, BRAZIL' },
-      { key: 'dates', label: 'Dates', placeholder: '19 NOV - 13 DEC 2026' },
-      { key: 'day', label: 'Day', placeholder: 'DAY 1' },
-      { key: 'subtitle', label: 'Subtitle', wide: true },
+      { key: 'stage', label: 'Stage', placeholder: 'Pan-American Qualifiers', hint: 'top line of the Welcome bar' },
+      { key: 'day', label: 'Day', placeholder: 'Day 1' },
+      { key: 'date', label: 'Date', placeholder: 'today', hint: 'DD.MM.YYYY; empty = today' },
     ],
     defaults: [{ name: 'Welcome', data: {} }],
   },
   {
     kind: 'announcement', label: 'Announcements', sheet: 'Announcements',
-    description: 'Announcement bugs: one line of text and an icon (the race flag, or the SSL star). One version per race flag, plus Replay. Every version is on its own Show control key (pages BUGS 1 and BUGS 2), a new one at once.',
+    description: 'Announcement bugs: one line of text and an icon (the race flag, or the SSL star). One version per race flag, plus Replay. Every version is on its own Stream Deck key, on page BUGS OFTEN or BUGS RARE (Stream Deck field); a new one at once.',
     fields: [
       { key: 'text', label: 'Text', wide: true, default: 'ANNOUNCEMENT' },
       { key: 'icon', label: 'Icon', type: 'image', hint: 'PNG: the race flag or the SSL star' },
+      { key: 'deck', label: 'Stream Deck', type: 'select', options: ['Often', 'Rare'], default: 'Rare', hint: 'page BUGS OFTEN or BUGS RARE' },
     ],
     defaults: [],
   },
@@ -85,19 +96,13 @@ export const GRAPHIC_KINDS: GraphicKind[] = [
   },
   {
     kind: 'officials', label: 'Race officials', sheet: 'Race officials',
-    description: 'Principal race officer, regatta director and jury.',
+    description: 'The officials panel (Race_officials_PanAm.gtzip): a title, 8 roles and 11 names, each name under its role as the panel shows it. An empty line stays empty.',
     fields: [
-      { key: 'heading', label: 'Heading', default: 'RACE OFFICIALS' },
-      { key: 'pro_title', label: 'PRO title', default: 'PRINCIPAL RACE OFFICER' },
-      { key: 'pro_name', label: 'PRO name' },
-      { key: 'director_title', label: 'Director title', default: 'REGATTA DIRECTOR' },
-      { key: 'director_name', label: 'Director name' },
-      { key: 'jury_title', label: 'Jury title', default: 'JURY' },
-      { key: 'jury_1', label: 'Jury 1' },
-      { key: 'jury_2', label: 'Jury 2' },
-      { key: 'jury_3', label: 'Jury 3' },
-      { key: 'jury_4', label: 'Jury 4' },
-      { key: 'jury_5', label: 'Jury 5' },
+      { key: 'title', label: 'Title', default: 'RACE OFFICIALS', wide: true },
+      ...OFFICIAL_ROLES.flatMap((r, i) => [
+        { key: `role_${i + 1}`, label: `Role ${i + 1}`, default: r.role, wide: true },
+        ...r.names.map((n) => ({ key: `name_${n.i}`, label: `Name ${n.i}`, default: n.name, hint: `under role ${i + 1}` })),
+      ]),
     ],
     defaults: [{ name: 'Race officials', data: {} }],
   },
@@ -184,6 +189,11 @@ export const FLAG_ANNOUNCEMENTS: { name: string; text: string; icon: string }[] 
 ];
 /** Replay: its icon is the SSL star, empty until that PNG is added (Icon field). */
 export const REPLAY_ANNOUNCEMENT = { name: 'Replay', text: 'REPLAY', icon: '' };
+/** The announcements used most, on the BUGS OFTEN page; every other one is on BUGS RARE. */
+export const OFTEN_ANNOUNCEMENTS = ['X – Individual recall', 'First substitute – General recall', 'AP – Postponed', 'AP over A – Postponed, no more racing today',
+  'S – Shortened course', 'C – Change of course', 'Green – No penalty', 'Yellow – Penalty', 'Black – Disqualified', 'Replay'];
+/** An announcement on the BUGS OFTEN page (Stream Deck: Often). */
+export const isOften = (a: { data: Record<string, string> }) => (a.data.deck ?? '').toLowerCase() === 'often';
 /** Announcements seeded by earlier versions; they go when the flag set comes in (versions you added stay). */
 const OLD_ANNOUNCEMENTS = ['announcement', 'false start', 'warning signal', 'general recall', 'individual recall', 'penalty', 'race postponed',
   'race abandoned', 'delay – weather', 'delay – other reasons', 'thanks for watching', 'custom text'];
@@ -220,6 +230,28 @@ export function ensurePresets(db: DB, eventId: string) {
     const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
     db.transaction(() => sorted.forEach((x, i) => upd.run(i + 1, x.id)))();
     setSetting(db, flags, '1');
+  }
+  // Race officials: the panel's fields (title, roles, names), filled from the officials list once where empty
+  const off = `graphicSets.officials2.${eventId}`;
+  if (!getSetting(db, off)) {
+    const k = GRAPHIC_KINDS.find((x) => x.kind === 'officials')!;
+    const upd = db.prepare('UPDATE graphic_sets SET data = ? WHERE id = ?');
+    for (const o of listGraphicSets(db, eventId, 'officials')) {
+      const data = { ...o.data };
+      for (const fd of k.fields) if (!data[fd.key]?.trim() && fd.default) data[fd.key] = fd.default;
+      upd.run(JSON.stringify(data), o.id);
+    }
+    setSetting(db, off, '1');
+  }
+  // every announcement on BUGS OFTEN or BUGS RARE by its name (once per event; later the Stream Deck field decides)
+  const decks = `graphicSets.decks.${eventId}`;
+  if (!getSetting(db, decks)) {
+    const often = new Set(OFTEN_ANNOUNCEMENTS.map((n) => n.toLowerCase()));
+    const upd = db.prepare('UPDATE graphic_sets SET data = ? WHERE id = ?');
+    db.transaction(() => {
+      for (const a of listGraphicSets(db, eventId, 'announcement')) upd.run(JSON.stringify({ ...a.data, deck: often.has(a.name.toLowerCase()) ? 'Often' : 'Rare' }), a.id);
+    })();
+    setSetting(db, decks, '1');
   }
 }
 

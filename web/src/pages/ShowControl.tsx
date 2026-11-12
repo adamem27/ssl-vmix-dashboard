@@ -1,11 +1,12 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { LowerThirdSettings } from './LowerThirds';
 import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLayer: number; rotateSeconds: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -20,7 +21,7 @@ interface ShowData {
   vmix: { ok: boolean; overlays: Record<string, string> };
   graphics: Graphic[]; boats: { id: string; code: string; name: string }[];
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
-  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string;
+  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; breakGroups: { id: string; name: string }[]; breakShown: string[];
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
@@ -35,7 +36,7 @@ function Panel({ title, right, children }: { title: string; right?: ReactNode; c
   );
 }
 
-const OVERLAY = ['', 'OV1 boards', 'OV2 lower thirds', 'OV3 bugs', 'OV4 scene / PiP'];
+const OVERLAY = ['', 'OV1', 'OV2', 'OV3', 'OV4 break scene'];
 
 export function ShowControlPage() {
   const q = useQuery({ queryKey: ['show'], queryFn: () => api.get<ShowData>('/api/show'), refetchInterval: 2000 });
@@ -51,7 +52,7 @@ function Show({ data }: { data: ShowData }) {
   const [deck, setDeck] = useState<Record<number, number>>({ 1: 0, 2: 0 });
   const refresh = () => qc.invalidateQueries({ queryKey: ['show'] });
   const [edit, setEdit] = useState(false);
-  const [pick, setPick] = useState<string | null>(null); // "<page index>/<row>/<col>" of the key being edited
+  const [pick, setPick] = useState<string | null>(null); // "<page name>/<row>/<col>" of the key being edited
   const [keys, setKeys] = useState(data.config.keys);
   const [kindColours, setKindColours] = useState(data.config.kindColours);
   const saving = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,7 +73,7 @@ function Show({ data }: { data: ShowData }) {
     if (Object.keys(o).length) next[id] = o; else delete next[id];
     setKeyEdits(next, delay);
   };
-  const keyAt = (id: string) => { const [pi, r, c] = id.split('/').map(Number); return data.pages[pi]?.keys[r]?.[c] ?? null; };
+  const keyAt = (id: string) => { const m = id.match(/^(.*)\/(\d+)\/(\d+)$/); return m ? data.pages.find((p) => p.name === m[1])?.keys[Number(m[2])]?.[Number(m[3])] ?? null : null; };
   /** drag one key onto another: they swap places (Alt: the dragged one is copied) */
   const moveKey = (from: string, to: string, copy: boolean) => {
     if (from === to) return;
@@ -122,7 +123,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names), EXTRAS, every announcement (BUGS 1–2) and every ticker (TICKERS) on a key of its own. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names and shirt numbers, PHOTO mode), every announcement (BUGS OFTEN, BUGS RARE), every ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -137,7 +138,7 @@ function Show({ data }: { data: ShowData }) {
                 </div>
                 <div className="grid grid-cols-8 gap-1.5">
                   {p.keys.flatMap((row, r) => row.map((k, c) => {
-                    const id = `${data.pages.indexOf(p)}/${r}/${c}`;
+                    const id = `${p.name}/${r}/${c}`;
                     const dnd = {
                       draggable: edit,
                       onDragStart: (e: React.DragEvent) => { drag.current = id; e.dataTransfer.effectAllowed = 'copyMove'; },
@@ -155,7 +156,7 @@ function Show({ data }: { data: ShowData }) {
                     ) : <div key={id} {...dnd} onClick={() => edit && setPick(id)} className={cx('aspect-square rounded-lg border border-dashed border-ink-800', edit && 'cursor-pointer hover:border-ink-500', picked && 'outline outline-2 outline-offset-2 outline-sky-400')} />;
                   }))}
                 </div>
-                {edit && pick && Number(pick.split('/')[0]) === data.pages.indexOf(p) && (
+                {edit && pick && pick.startsWith(`${p.name}/`) && /^\d+\/\d+$/.test(pick.slice(p.name.length + 1)) && (
                   <KeyEditor key={pick} look={keyAt(pick)} edit={keys[pick] ?? {}} actions={data.actions} onChange={(patch, delay) => editKey(pick, patch, delay)} onClose={() => setPick(null)} />
                 )}
               </div>
@@ -165,6 +166,7 @@ function Show({ data }: { data: ShowData }) {
       </Panel>
       <Race data={data} onSaved={refresh} />
       <Registry data={data} onSaved={refresh} />
+      <LowerThirdSettings />
       <CompanionSetup data={data} onSaved={refresh} />
     </div>
   );
@@ -243,9 +245,6 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
             <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
           </label>
           <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>{b.code} · {b.name}</span>)}</div>
-          <label className="block text-xs text-ink-400">Lineup LT (5 sailors): places in order
-            <input className="input mt-1 w-72 py-1 text-sm" value={c.lineup5.join(', ')} onChange={(e) => setC({ ...c, lineup5: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
-          </label>
         </div>
         <div className="space-y-2">
           {sel('Ticker before the next race (D)', c.tickerNext, (v) => setC({ ...c, tickerNext: v }), data.tickers, 'first ticker')}
@@ -253,9 +252,34 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           <p className="text-xs text-ink-500">Ticker texts are edited under General graphics → Tickers. Now: {data.state.tickerMode === 'end' ? 'end of day (E)' : 'next race (D)'}.</p>
         </div>
         <div className="space-y-2">
-          <label className="block text-xs text-ink-400">Break scene: board layer<input type="number" min={1} max={10} className="input mt-1 w-20 py-1 text-sm" value={c.breakLayer} onChange={(e) => setC({ ...c, breakLayer: Number(e.target.value) || 3 })} /></label>
-          <label className="block text-xs text-ink-400">Rotation every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 12 })} /></label>
-          <p className="text-xs text-ink-500">The break scene rotates the day schedule and the results of every group of the stage.</p>
+          <div className="text-xs font-semibold text-ink-300">Break scene: overlay channels</div>
+          <div className="flex gap-2">
+            {([['L-bar', 'breakLbarLayer', 2], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
+              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={2} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
+            ))}
+          </div>
+          {data.breakGroups.length > 0 && (
+            <div className="text-xs text-ink-400">Group results shown
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                {data.breakGroups.map((g) => {
+                  const shown = c.breakFleets.length ? c.breakFleets.filter((id) => data.breakGroups.some((x) => x.id === id)) : data.breakShown;
+                  const on = shown.includes(g.id);
+                  return (
+                    <label key={g.id} className="flex items-center gap-1 text-ink-200">
+                      <input type="checkbox" checked={on} onChange={() => setC({ ...c, breakFleets: data.breakGroups.map((x) => x.id).filter((id) => (id === g.id ? !on : shown.includes(id))) })} /> {groupLabel(g.name)}
+                    </label>
+                  );
+                })}
+              </div>
+              <span className="text-ink-500">None ticked: every group but the Last Chance Race.</span>
+            </div>
+          )}
+          <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakSchedule !== false} onChange={(e) => setC({ ...c, breakSchedule: e.target.checked })} /> Day schedule in the switching (off: the scene starts on the first group results)</label>
+          <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakAuto} onChange={(e) => setC({ ...c, breakAuto: e.target.checked })} /> Switch day schedule / group results by itself</label>
+          <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
+          <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
+          <label className="block text-xs text-ink-400">Team comparison: wait for the flags' out animation (ms)<input type="number" min={0} max={3000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.flagChangeMs ?? 500} onChange={(e) => setC({ ...c, flagChangeMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
+          <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off.</p>
         </div>
       </div>
       {data.sailors.length > 0 && (
@@ -297,7 +321,7 @@ function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set on the Lower thirds tab (overlay 2 recommended).</p>
+      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set in the Lower thirds panel below (overlay 1, like every graphic but the break scene).</p>
     </Panel>
   );
 }
@@ -314,12 +338,12 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
         </label>
       </div>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-300">
-        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–7 (TEAMS, EXTRAS, BUGS 1, BUGS 2, TICKERS), the fallback on page 8 and a page per team from page 9 ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
+        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–6 (TEAMS, BUGS OFTEN, BUGS RARE, TICKERS), the fallback on page 8, a page per team from page 9, then COMPARE and PEOPLE ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
           <div className="mt-2"><a className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600" href={`/api/show/preset.companionconfig?base=${encodeURIComponent(origin)}`} download>Download Companion preset</a></div>
         </li>
         <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there.</li>
         <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page 1 and deck 2 on page 3.</li>
-        <li>On deck 2, TEAMS opens a team's page: its places with the sailors' names, TEAM LT, QUALIFIED, LINEUP, NEXT RESULT; ◀ ▶ go to the previous and next team. The key texts are fixed in the preset: download and import it again after the line-ups, teams, announcements or tickers change.</li>
+        <li>On deck 2, TEAMS opens a team's page: its places with the sailors' names, QUALIFIED, LINEUP, LINEUP LT, NEXT RESULT and PHOTO mode; ◀ ▶ go to the previous and next team. The key texts are fixed in the preset: download and import it again after the line-ups, teams, announcements or tickers change.</li>
         <li>PANIC cuts everything only on a second press within 3 seconds. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
       </ol>
     </Panel>

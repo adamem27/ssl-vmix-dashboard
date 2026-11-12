@@ -20,7 +20,7 @@ describe('general graphics and captains', () => {
     const db = openDb(':memory:');
     const ev = activeEvent(db).id;
     gen.setWeather(db, { wind_speed: '12', wind_direction: 'NW' });
-    expect(gen.getWeather(db)).toMatchObject({ wind_speed: '12', wind_direction: 'NW', wind_unit: 'kn' });
+    expect(gen.getWeather(db)).toMatchObject({ wind_speed: '12', wind_direction: 'NW' });
     gen.setWeather(db, { wind_degrees: '050', forecast: 'Sunny', location: 'gone', note: 'gone' });
     const w = gen.getWeather(db) as unknown as Record<string, string>;
     expect(w).toMatchObject({ wind_degrees: '050', forecast: 'Sunny' });

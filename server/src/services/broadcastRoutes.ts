@@ -2,18 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { activeEvent } from '../db/db.js';
+import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import * as gs from './graphicSets.js';
 import { currentGroup, stageGroups, tickerAuto } from './groups.js';
 import * as lu from './lineups.js';
 import * as rs from './results.js';
-import * as rr from './raceRuns.js';
-import { getShowConfig, setShowConfig } from './show.js';
+import { setShowConfig } from './show.js';
 import { badRequest } from './errors.js';
 import * as wb from './workbookSheets.js';
-import { todayIn } from './dates.js';
-import { getWeather, listSchedule } from './general.js';
+import { DAY_SETTING, dayOverrideNow, realTodayIn, setDayOverride, todayIn } from './dates.js';
+import { getScheduleOptions, getWeather, listPeople, listSchedule } from './general.js';
+import { listSets } from './fleets.js';
+import { listTeams } from './teams.js';
 import { listGradients } from './generator/generator.js';
 import * as vx from './vmixResults.js';
 
@@ -60,7 +61,7 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   app.get('/api/lineups', async () => lu.lineupStatus(db, ev().id));
   app.get<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) => lu.getLineup(ctx, ev().id, req.params.teamId));
   app.put<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) =>
-    lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20), order: z.array(s(20)).max(20) }).partial().parse(req.body)));
+    lu.saveLineup(ctx, ev().id, req.params.teamId, z.object({ title: s(60), teamName: s(80), photoSide: z.enum(['left', 'right']), extra: z.number().int().min(0).max(lu.MAX_EXTRA), rows: z.array(row).max(20), order: z.array(s(20)).max(20) }).partial().parse(req.body)));
   app.delete<{ Params: { teamId: string } }>('/api/lineups/:teamId', async (req) => lu.clearLineup(ctx, ev().id, req.params.teamId));
   const date = z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
   app.post<{ Params: { teamId: string } }>('/api/lineups/:teamId/sync', async (req) => {
@@ -84,34 +85,29 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     if (b.input !== undefined) rs.saveResults(db, req.params.fleetId, { vmixInput: b.input });
     return vx.pushResults(ctx, req.params.fleetId, rs.getResults(db, req.params.fleetId).vmixInput);
   });
-  // ---------- one race of a group: times at the marks ----------
-  type RP = { Params: { fleetId: string; race: string } };
-  const raceNo = (v: string) => z.coerce.number().int().min(1).max(rs.MAX_RACES).parse(v);
-  app.get<RP>('/api/races/:fleetId/:race', async (req) => rr.getRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
-  app.put<RP>('/api/races/:fleetId/:race', async (req) => {
-    const race = raceNo(req.params.race);
-    const r = rr.saveRaceRun(db, req.params.fleetId, race, z.object({
-      marks: z.array(s(16)).max(rr.MAX_MARKS),
-      rows: z.array(z.object({ teamId: s(64), times: z.array(s(12)).max(rr.MAX_MARKS).optional(), points: s(12).optional() })).max(32),
-    }).partial().parse(req.body));
-    // typing a race of the group on air makes it the race the Race results key shows
-    if (getShowConfig(db).fleetId === req.params.fleetId) setShowConfig(db, { race });
-    return r;
-  });
-  app.delete<RP>('/api/races/:fleetId/:race', async (req) => rr.clearRaceRun(db, req.params.fleetId, raceNo(req.params.race)));
   app.get('/api/settings/vmix', async () => ({ apiUrl: vx.vmixUrl(db), default: vx.DEFAULT_VMIX_URL }));
   app.put('/api/settings/vmix', async (req) => vx.setVmixUrl(db, z.object({ apiUrl: s(200) }).parse(req.body).apiUrl));
 
   // ---------- current stage (decides which teams and groups go to the workbook) ----------
   // the group racing now goes with it: one of the stage's groups (Show control keys, tickers, results boards follow it)
+  setDayOverride(getSetting(db, DAY_SETTING));
   const stageInfo = () => {
     const current = wb.currentStage(db, ev().id);
     return {
+      day: dayOverrideNow(), today: realTodayIn(ev().timezone),
       current, teamIds: wb.stageTeamIds(db, ev().id), stages: db.prepare('SELECT id, name FROM fleet_sets WHERE event_id = ? ORDER BY sort, created_at').all(ev().id),
       groups: current ? stageGroups(db, current.id) : [], group: currentGroup(db),
     };
   };
   app.get('/api/stage', async () => stageInfo());
+  // the day the whole dashboard works on ('' = today): line-ups, schedule, Welcome, tickers, the Excel file…
+  app.put('/api/stage/day', async (req) => {
+    const day = z.object({ day: z.string().max(10) }).parse(req.body).day;
+    if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day)) throw badRequest('Pick a date as YYYY-MM-DD.');
+    setSetting(db, DAY_SETTING, day);
+    setDayOverride(day);
+    return stageInfo();
+  });
   app.put('/api/stage', async (req) => {
     const stage = wb.setCurrentStage(db, ev().id, z.object({ setId: z.string().max(64).nullable() }).parse(req.body).setId);
     // a group of another stage is no longer racing: the stage's first group takes its place
@@ -148,12 +144,37 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
         position: r.position, captain: r.captain, sailorId: r.sailorId,
       }));
     }
+    const first = (kind: string): Record<string, string> => gs.listGraphicSets(db, e.id, kind)[0]?.data ?? {};
+    // the officials as typed on Race officials: each role with its names
+    const officials = () => {
+      const x = first('officials');
+      return gs.OFFICIAL_ROLES.map((r, i) => ({ role: (x[`role_${i + 1}`] ?? r.role).trim(), names: r.names.map((n) => (x[`name_${n.i}`] ?? n.name).trim()).filter(Boolean) }))
+        .filter((r) => r.role && r.names.length);
+    };
+    // each team's places in the other stages (rank in its group, points)
+    const history: Record<string, { stage: string; group: string; rank: number; of: number; total: string }[]> = {};
+    for (const st of listSets(db, e.id) as { id: string; name: string }[]) {
+      if (st.id === setId) continue;
+      for (const g of rs.listResults(db, st.id)) {
+        if (!g.rows.some((r) => r.total !== '')) continue;
+        g.rows.forEach((r, i) => { if (teamIds.has(r.teamId)) (history[r.teamId] ??= []).push({ stage: st.name, group: g.title || g.fleetName, rank: i + 1, of: g.rows.length, total: r.total }); });
+      }
+    }
     return {
       event: { name: (db.prepare('SELECT name FROM events WHERE id = ?').get(e.id) as { name: string } | undefined)?.name ?? '', timezone: e.timezone },
       stage: wb.currentStage(db, e.id), setId, date,
       weather: getWeather(db), schedule: listSchedule(db, e.id, date),
       results: results.map((g) => ({ fleetId: g.fleetId, fleetName: g.fleetName, title: g.title, subtitle: g.subtitle, races: g.races, rows: g.rows.map((r) => ({ teamId: r.teamId, races: r.races, total: r.total })) })),
       colours, lineups,
+      // what else the dashboard knows and a commentator can use
+      welcome: { stage: (first('welcome').stage ?? '').trim(), day: (first('welcome').day ?? '').trim() },
+      nextRace: getScheduleOptions(db).next[date] ?? null,
+      // the team's notes, without the line an import leaves (From the … matchboard / workbook)
+      notes: Object.fromEntries(listTeams(ctx).filter((t) => teamIds.has(t.id)).map((t) => [t.id, (t.notes ?? '').split(/\r?\n/).filter((l: string) => !/^\s*(imported )?from the .*(matchboard|workbook|import|sheet)\.?\s*$/i.test(l)).join('\n').trim()]).filter(([, n]) => n)),
+      history,
+      officials: officials(),
+      people: listPeople(ctx, e.id).map((p) => ({ name: [p.name, p.surname].filter(Boolean).join(' '), role: p.role })).filter((p) => p.name),
+      socials: (() => { const x = first('socials'); return { website: x.website ?? '', hashtag: x.hashtag ?? '', handles: [x.instagram, x.facebook, x.youtube, x.tiktok, x.x].map((v) => (v ?? '').trim()).filter((v, i, a) => v && a.indexOf(v) === i) }; })(),
     };
   });
 

@@ -431,14 +431,16 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.put('/api/weather', async (req) => gen.setWeather(db, z.record(z.string(), text).parse(req.body)));
   const scheduleBody = z.object({ date: str(10), time: str(20), race: str(200), fleet: str(200), status: str(60), note: str(500) }).partial();
   app.get<{ Querystring: { date?: string } }>('/api/schedule', async (req) => gen.listSchedule(db, ev().id, req.query.date ? String(req.query.date) : undefined));
+  app.get('/api/schedule/options', async () => gen.getScheduleOptions(db));
+  app.put('/api/schedule/options', async (req) => gen.setScheduleOptions(db, z.object({ showTime: z.boolean().optional(), date: z.string().optional(), next: z.string().max(80).nullable().optional() }).parse(req.body)));
   app.get('/api/schedule/dates', async () => gen.listScheduleDates(db, ev().id));
   app.post('/api/schedule', async (req) => ({ id: gen.createScheduleItem(db, ev().id, scheduleBody.parse(req.body)) }));
   app.patch<{ Params: { id: string } }>('/api/schedule/:id', async (req) => { gen.updateScheduleItem(db, req.params.id, scheduleBody.parse(req.body)); return { ok: true }; });
   app.delete<{ Params: { id: string } }>('/api/schedule/:id', async (req) => { gen.deleteScheduleItem(db, req.params.id); return { ok: true }; });
-  const personBody = z.object({ name: str(120), role: str(80), language: str(40), title: str(200) }).partial();
+  const personBody = z.object({ name: str(120), surname: str(120), role: str(80), language: str(40), title: str(200) }).partial();
   app.get('/api/people', async () => ({ people: gen.listPeople(ctx, ev().id), roles: gen.PERSON_ROLES }));
   app.post('/api/people', async (req) => ({ id: gen.createPerson(db, ev().id, personBody.parse(req.body)) }));
-  app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).min(1) }).parse(req.body).language));
+  app.post('/api/people/commentator-set', async (req) => gen.addCommentatorSet(db, ev().id, z.object({ language: str(40).default('') }).parse(req.body ?? {}).language));
   app.patch<{ Params: { id: string } }>('/api/people/:id', async (req) => { gen.updatePerson(db, req.params.id, personBody.parse(req.body)); return { ok: true }; });
   app.delete<{ Params: { id: string } }>('/api/people/:id', async (req) => { gen.deletePerson(ctx, req.params.id); return { ok: true }; });
 

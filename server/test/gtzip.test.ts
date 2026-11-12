@@ -238,6 +238,14 @@ describe('gtzip part counts', () => {
       + row(1) + row(2) + row(3) + '<Rectangle Name="SPONSORS" Dimensions="900,60,0" Location="510,700,0" />',
     '<Fly Object="BAR 1" Delay="0.2" /><Fly Object="BAR 2" Delay="0.3" /><Fly Object="BAR 3" Delay="0.4" />');
 
+  it('counts a row whose elements are in another order (day schedule: the flags above the race text) as a row too', () => {
+    const swapped = layer('BAR 3', 150, '<TextBlock Name="POSITION 3" Dimensions="40,40,0" Location="570,410,0" Text="3" /><Rectangle Name="ROWBG 3" Dimensions="800,60,0" Location="560,400,0" /><TextBlock Name="RACE 3" Dimensions="120,40,0" Location="1200,410,0" Text="RACE 3" />');
+    const root = doc(row(1) + row(2) + swapped);
+    const [g] = repeatGroups(root);
+    expect(g.count).toBe(3);
+    expect(named(setCount(root, g.id, 5, { shiftAfter: true }).root, 'RACE 5')).toBeDefined();
+  });
+
   it('finds numbered rows and adds one below with the next numbers, moving what comes after and growing the panel', () => {
     const root = schedule();
     const [g] = repeatGroups(root);

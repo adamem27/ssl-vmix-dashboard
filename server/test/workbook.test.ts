@@ -71,14 +71,14 @@ describe('workbook sheets', () => {
     expect(teamsSheet(ctx, eventId, today).map((r) => r.Code)).toEqual(['BRN', 'IND', 'MYA']); // no stage: every team
     setCurrentStage(db, eventId, setId);
     const teams = teamsSheet(ctx, eventId, today);
-    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['GROUP A', '1', 'BRN'], ['GROUP A', '2', 'IND']]);
+    expect(teams.map((r) => [r.Group, r.Place, r.Code])).toEqual([['Group A', '1', 'BRN'], ['Group A', '2', 'IND']]);
     expect(Object.keys(teams[0]).slice(0, 4)).toEqual(['Group', 'Place', 'Code', 'Name']);
 
     // Racing now: one row about the group picked at the top
     expect(nowSheet(ctx, eventId, today)[0].Group).toBe('');
     setShowConfig(db, { fleetId });
     const now = nowSheet(ctx, eventId, today)[0];
-    expect(now).toMatchObject({ Group: 'GROUP A', 'Group letter': 'A', SUBTITLE: 'GROUP A', T1Code: 'BRN', T2Code: 'IND', T3Code: '', 'POS 1': '1', 'POINTS 1': '7', 'R1 1': '4' });
+    expect(now).toMatchObject({ Group: 'Group A', 'Group letter': 'A', SUBTITLE: 'Group A', T1Code: 'BRN', T2Code: 'IND', T3Code: '', 'POS 1': '1', 'POINTS 1': '7', 'R1 1': '4' });
 
     const sailors = sailorsSheet(ctx, eventId, today);
     expect(sailors.map((r) => [r['Team code'], r['Last name'], r['Line-up place'], r.Captain])).toEqual([
@@ -137,6 +137,16 @@ describe('current stage in the API', () => {
     expect(c.setId).toBe(setId);
     expect(c.results.map((g: { fleetName: string }) => g.fleetName)).toEqual(['Group A']);
     expect(c.lineups[a.teamId].map((p: { label: string; lastName: string }) => [p.label, p.lastName])).toEqual([['Helm', 'Hassan']]);
+    // and what else a commentator can use: officials, team notes (without the import's line), the next race
+    expect(c.officials[0]).toMatchObject({ role: 'REGATTA DIRECTOR' });
+    expect(c.notes).toEqual({});
+    await app.inject({ method: 'PATCH', url: `/api/teams/${a.teamId}`, payload: { notes: 'From the SSL Gold Cup 2026 matchboard.\nOlympic medallist on helm' } });
+    const day = c.date;
+    const item = (await app.inject({ method: 'POST', url: '/api/schedule', payload: { date: day, time: '10:00', race: '1', fleet: 'Group A' } })).json().id;
+    await app.inject({ method: 'PUT', url: '/api/schedule/options', payload: { date: day, next: item } });
+    const c2 = (await app.inject({ url: '/api/commentator' })).json();
+    expect(c2.notes[a.teamId]).toBe('Olympic medallist on helm');
+    expect(c2.nextRace).toBe(item);
     await app.close();
   });
 });

@@ -66,8 +66,25 @@ export function teamKeyColours(db: DB | null, code: string): TeamKeyColours | nu
   const base = lum(main) > 0.25 ? mix(main, '#000000', 0.3) : main;
   const active = mix(main, '#ffffff', 0.45);
   const onAir = second ? (lum(second) < 0.08 ? mix(second, '#ffffff', 0.35) : second) : mix(main, '#ffffff', 0.7);
-  return { normal: { bg: base, fg: textOn(base) }, active: { bg: active, fg: textOn(active) }, onAir: { bg: onAir, fg: textOn(onAir) } };
+  const out = { normal: { bg: base, fg: textOn(base) }, active: { bg: active, fg: textOn(active) }, onAir: { bg: onAir, fg: textOn(onAir) } };
+  // teams whose keys take their shirt colours (as the producer asked): the key and its selected look, on air as before
+  const shirt = SHIRTS[code.toUpperCase()];
+  if (shirt) {
+    const bg = shirt.bg ?? base, fg = shirt.fg;
+    out.normal = { bg, fg };
+    out.active = { bg: lum(bg) > 0.6 ? mix(bg, '#000000', 0.18) : mix(bg, '#ffffff', 0.3), fg };
+  }
+  return out;
 }
+
+/** Key colours from the team shirts: background (none: the national colour as before) and text. */
+const SHIRTS: Record<string, { bg?: string; fg: string }> = {
+  URU: { bg: '#4aa8e0', fg: '#ffffff' }, // light blue, white text
+  PUR: { bg: '#ffffff', fg: '#1d4fa3' }, // white, blue text
+  VEN: { bg: '#7b1e2e', fg: '#ffffff' }, // maroon, white text
+  ANT: { bg: '#000000', fg: '#ffe95c' }, // black, light yellow text
+  CUB: { bg: '#e03a3e', fg: '#0a2a8c' }, // red, blue text
+};
 
 /** The look of a key in the team's colours, with a marker in the text when it is selected (▶) or on air (●). */
 export function teamKeyLook(c: TeamKeyColours, text: string, state: { active?: boolean; onAir?: boolean }): KeyLook & { text: string } {

@@ -5,7 +5,7 @@ import { notFound } from './errors.js';
 
 // ---------- weather (one current record) ----------
 /** wind_degrees is the direction in degrees as typed (e.g. 050), next to the compass point in wind_direction. */
-export const WEATHER_FIELDS = ['forecast', 'air_temp', 'water_temp', 'wind_speed', 'wind_direction', 'wind_degrees', 'wind_unit'] as const;
+export const WEATHER_FIELDS = ['forecast', 'air_temp', 'wind_speed', 'wind_direction', 'wind_degrees'] as const;
 export type Weather = Record<(typeof WEATHER_FIELDS)[number], string> & { updated_at: string };
 
 export function getWeather(db: DB): Weather {
@@ -14,7 +14,6 @@ export function getWeather(db: DB): Weather {
   const old = v as Record<string, string | undefined>;
   if (v.forecast === undefined && old.conditions) v.forecast = old.conditions; // renamed from conditions
   const out = Object.fromEntries(WEATHER_FIELDS.map((k) => [k, String(v[k] ?? '')])) as Weather;
-  if (!out.wind_unit) out.wind_unit = 'kn';
   out.updated_at = v.updated_at ?? '';
   return out;
 }
@@ -35,6 +34,25 @@ export function listSchedule(db: DB, eventId: string, date?: string) {
   if (date) assertDate(date);
   return db.prepare(`SELECT id, date, time, race, fleet, status, note FROM schedule_items WHERE event_id = ? ${date ? 'AND date = ?' : ''} ORDER BY date, time, created_at`)
     .all(...(date ? [eventId, date] : [eventId])) as Record<string, string>[];
+}
+
+/** Day-schedule board options: TIME on or off, and the row marked as the next race (by schedule item, per day). */
+export interface ScheduleOptions { showTime: boolean; next: Record<string, string> }
+export function getScheduleOptions(db: DB): ScheduleOptions {
+  try {
+    const o = JSON.parse(getSetting(db, 'schedule.options') || '{}');
+    return { showTime: o.showTime !== false, next: o.next && typeof o.next === 'object' ? o.next : {} };
+  } catch { return { showTime: true, next: {} }; }
+}
+export function setScheduleOptions(db: DB, patch: { showTime?: boolean; date?: string; next?: string | null }) {
+  const o = getScheduleOptions(db);
+  if (patch.showTime !== undefined) o.showTime = patch.showTime;
+  if (patch.date !== undefined && patch.next !== undefined) {
+    assertDate(patch.date);
+    if (patch.next) o.next[patch.date] = patch.next; else delete o.next[patch.date];
+  }
+  setSetting(db, 'schedule.options', JSON.stringify(o));
+  return o;
 }
 
 export function listScheduleDates(db: DB, eventId: string) {
@@ -63,20 +81,24 @@ export function deleteScheduleItem(db: DB, id: string) {
 }
 
 // ---------- people (lowerthirds) ----------
+/** Jan-erik → Jan-Erik: a capital at the start of each part of the name, the rest small. */
+export const titleCase = (v: string) => v.trim().toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
+/** How a person's name is shown: Name in title case, SURNAME in capitals (lt_comm_photo). */
+export const personName = (p: { name: string; surname?: string }) => [titleCase(p.name), (p.surname ?? '').trim().toUpperCase()].filter(Boolean).join(' ');
 export const PERSON_ROLES = ['Host commentator', 'Guest commentator', 'On-water commentator', 'Guest', 'Other'];
-const PERSON_FIELDS = ['name', 'role', 'language', 'title'] as const;
+const PERSON_FIELDS = ['name', 'surname', 'role', 'language', 'title'] as const;
 type PersonInput = Partial<Record<(typeof PERSON_FIELDS)[number], string>>;
 
 export function listPeople(ctx: AssetCtx, eventId: string) {
   const rows = ctx.db.prepare('SELECT * FROM people WHERE event_id = ? ORDER BY sort, created_at').all(eventId) as any[];
-  return rows.map((r) => ({ id: r.id, name: r.name, role: r.role, language: r.language, title: r.title, photo: listAssets(ctx, 'person', r.id).photo ?? null }));
+  return rows.map((r) => ({ id: r.id, name: r.name, surname: r.surname ?? '', role: r.role, language: r.language, title: r.title, photo: listAssets(ctx, 'person', r.id).photo ?? null }));
 }
 
 export function createPerson(db: DB, eventId: string, input: PersonInput) {
   const id = newId(); const t = nowIso();
   const sort = (db.prepare('SELECT COALESCE(MAX(sort), 0) + 1 AS n FROM people WHERE event_id = ?').get(eventId) as { n: number }).n;
-  db.prepare('INSERT INTO people (id, event_id, name, role, language, title, sort, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(id, eventId, (input.name ?? '').trim(), (input.role ?? '').trim(), (input.language ?? '').trim(), (input.title ?? '').trim(), sort, t, t);
+  db.prepare('INSERT INTO people (id, event_id, name, surname, role, language, title, sort, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(id, eventId, (input.name ?? '').trim(), (input.surname ?? '').trim(), (input.role ?? '').trim(), (input.language ?? '').trim(), (input.title ?? '').trim(), sort, t, t);
   return id;
 }
 
@@ -84,7 +106,7 @@ export function updatePerson(db: DB, id: string, input: PersonInput) {
   const cur = db.prepare('SELECT * FROM people WHERE id = ?').get(id) as any;
   if (!cur) throw notFound('Person');
   const v = Object.fromEntries(PERSON_FIELDS.map((k) => [k, input[k] !== undefined ? String(input[k]).trim() : cur[k]]));
-  db.prepare('UPDATE people SET name = ?, role = ?, language = ?, title = ?, updated_at = ? WHERE id = ?').run(v.name, v.role, v.language, v.title, nowIso(), id);
+  db.prepare('UPDATE people SET name = ?, surname = ?, role = ?, language = ?, title = ?, updated_at = ? WHERE id = ?').run(v.name, v.surname, v.role, v.language, v.title, nowIso(), id);
 }
 
 export function deletePerson(ctx: AssetCtx, id: string) {

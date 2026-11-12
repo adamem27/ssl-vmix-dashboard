@@ -29,12 +29,19 @@ export const LINEUP_SLOTS: LineupSlotDef[] = [
   slot('Main', 'Main trimmer', 'MAIN TRIMMER'),
   slot('Tactician', 'Tactician', 'TACTICIAN', { surname: 'TacticianSURNAM', position: 'TacticianPOSITI' }),
   slot('Helm', 'Helm', 'HELM'),
+  // a crew of ten, or a floater in place of one of the usual places: between Pit and Grinder on the boat
+  slot('Floater', 'Floater', 'FLOATER'),
 ];
+/** The places from the bow to the stern (Lineup LT, numbered line-up boards); extra places (Sailor10…) after them. */
+export const BOW_TO_STERN = ['Bow', 'Midbow', 'Pit', 'Floater', 'Grinder', 'Trimmer', 'Trimmer1', 'Main', 'Helm', 'Tactician'];
+/** The numbered line-up boards (Team_lineup_8/9: S1 = bow): the two trimmers side by side, the grinder behind them, as on the 9-place board. */
+export const BOARD_BOW_TO_STERN = ['Bow', 'Midbow', 'Pit', 'Floater', 'Trimmer', 'Trimmer1', 'Grinder', 'Main', 'Helm', 'Tactician'];
 export const MAX_EXTRA = 6;
 const extraSlot = (n: number) => slot(`Sailor${n}`, `Sailor ${n}`, '');
 
 export interface LineupRow { slot: string; sailorId: string | null; firstName: string; lastName: string; number: string; position: string; captain: boolean }
-export interface LineupData { title: string; teamName: string; extra: number; rows: LineupRow[]; order?: string[] }
+/** photoSide: which way the team's photo boxes face in the line-up (lineup_photo_left / _right from the PNG generator) */
+export interface LineupData { title: string; teamName: string; photoSide?: 'left' | 'right'; extra: number; rows: LineupRow[]; order?: string[] }
 
 export const slotDefs = (extra: number) => [...LINEUP_SLOTS, ...Array.from({ length: Math.max(0, Math.min(MAX_EXTRA, extra)) }, (_, i) => extraSlot(10 + i))];
 
@@ -48,7 +55,7 @@ function normalize(raw: Partial<LineupData>): LineupData {
   const order = (raw.order ?? []).filter((k, i, a) => defs.some((d) => d.key === k) && a.indexOf(k) === i);
   const ordered = [...order.map((k) => defs.find((d) => d.key === k)!), ...defs.filter((d) => !order.includes(d.key))];
   return {
-    title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', extra,
+    title: raw.title ?? 'Lineup', teamName: raw.teamName ?? '', photoSide: raw.photoSide === 'right' ? 'right' : 'left', extra,
     rows: ordered.map((d) => {
       const r = byKey.get(d.key);
       return r ? { ...emptyRow(d), ...r, slot: d.key, captain: !!r.captain } : emptyRow(d);
@@ -78,10 +85,10 @@ export function getLineup(ctx: AssetCtx, eventId: string, teamId: string) {
   return { teamId, ...l, slots: slotDefs(l.data.extra).map((d) => ({ key: d.key, label: d.label, position: d.position })) };
 }
 
-export function saveLineup(ctx: AssetCtx, eventId: string, teamId: string, patch: { title?: string; teamName?: string; extra?: number; rows?: Partial<LineupRow>[]; order?: string[] }) {
+export function saveLineup(ctx: AssetCtx, eventId: string, teamId: string, patch: { title?: string; teamName?: string; photoSide?: 'left' | 'right'; extra?: number; rows?: Partial<LineupRow>[]; order?: string[] }) {
   getTeam(ctx, teamId);
   const cur = loadLineup(ctx.db, eventId, teamId).data;
-  const next: Partial<LineupData> = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
+  const next: Partial<LineupData> = { ...cur, ...(patch.title !== undefined && { title: patch.title }), ...(patch.teamName !== undefined && { teamName: patch.teamName }), ...(patch.photoSide !== undefined && { photoSide: patch.photoSide }), ...(patch.extra !== undefined && { extra: patch.extra }), ...(patch.order !== undefined && { order: patch.order }) };
   const rows = new Map(cur.rows.map((r) => [r.slot, r]));
   for (const p of patch.rows ?? []) {
     if (!p.slot) continue;
@@ -101,7 +108,7 @@ export function clearLineup(ctx: AssetCtx, eventId: string, teamId: string) {
   return getLineup(ctx, eventId, teamId);
 }
 
-/** Which boat place a declared position goes to; null for floater, spare and anything unknown. */
+/** Which boat place a declared position goes to (a floater to Floater); null for spare and anything unknown. */
 export function slotForPosition(position: string): string | null {
   const p = position.toLowerCase().replace(/[^a-z]/g, '');
   if (!p) return null;
@@ -113,12 +120,14 @@ export function slotForPosition(position: string): string | null {
   if (p === 'pit' || p.startsWith('pitman')) return 'Pit';
   if (p.startsWith('mid')) return 'Midbow';
   if (p.startsWith('bow')) return 'Bow';
+  if (p.startsWith('float')) return 'Floater';
   return null;
 }
 
 /**
  * Command: fills the line-up from the team's declaration for a day. Declared positions pick the place
- * (a second trimmer goes to Trimmer 2), everyone else fills the free places in order, then extra places.
+ * (a second trimmer goes to Trimmer 2; a second grinder to Main beside the grinder, the main trimmer then to Tactician; a floater the first usual place left empty, else Floater), everyone else fills
+ * the free places in order, then extra places.
  * Title, team name and extra places the operator added are kept; the sailors are replaced.
  */
 export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId: string, date: string) {
@@ -138,10 +147,29 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
   ];
   const placed = new Map<string, LineupRow>();
   const rest: typeof crew = [];
+  const floaters: typeof crew = [];
   for (const c of crew) {
     let key = slotForPosition(c.position);
+    if (key === 'Floater') { floaters.push(c); continue; }
     if (key === 'Trimmer' && placed.has('Trimmer')) key = 'Trimmer1';
     if (key && !placed.has(key)) placed.set(key, { slot: key, ...c, position: LINEUP_SLOTS.find((d) => d.key === key)!.position });
+    else rest.push(c);
+  }
+  // a second grinder sits beside the grinder (the Main place, the pair under it on the boards); the main trimmer then
+  // moves aft to the Tactician place, when nobody was declared there
+  const g2 = rest.findIndex((c) => slotForPosition(c.position) === 'Grinder');
+  if (g2 >= 0 && placed.has('Grinder') && !(placed.has('Main') && placed.has('Tactician'))) {
+    const [c] = rest.splice(g2, 1);
+    const main = placed.get('Main');
+    if (main) placed.set('Tactician', { ...main, slot: 'Tactician' });
+    placed.set('Main', { slot: 'Main', ...c, position: 'GRINDER' });
+  }
+  // a floater takes a usual place nobody was declared on (bow, midbow, pit, grinder, trimmers, main, helm, tactician),
+  // the first in the team's order of places, with the floater's own data; with every usual place taken, the Floater place
+  const emptyUsual = cur.rows.map((r) => r.slot).filter((k) => k !== 'Floater' && LINEUP_SLOTS.some((d) => d.key === k) && !placed.has(k));
+  for (const c of floaters) {
+    const key = emptyUsual.shift() ?? (placed.has('Floater') ? null : 'Floater');
+    if (key) placed.set(key, { slot: key, ...c, position: 'FLOATER' });
     else rest.push(c);
   }
   // free places in the team's own order of places
@@ -152,7 +180,7 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
     if (!d) break;
     placed.set(d.key, { slot: d.key, ...c, position: (c.position || d.position).toUpperCase() });
   }
-  const data = normalize({ title: cur.title, teamName: cur.teamName, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
+  const data = normalize({ title: cur.title, teamName: cur.teamName, photoSide: cur.photoSide, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
   store(ctx.db, eventId, teamId, data, date);
   return { synced: true as const, sailors: crew.length };
 }

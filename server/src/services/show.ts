@@ -1,37 +1,46 @@
 import fs from 'node:fs';
+import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
-import { listPeople } from './general.js';
-import { imagePath, listGraphicSets, tickerText } from './graphicSets.js';
+import { listPeople, personName } from './general.js';
+import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
-import { loadLineup, slotDefs } from './lineups.js';
-import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor } from './lowerthirds.js';
+import { BOARD_BOW_TO_STERN, BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
+import { crewOf, getLtConfig, getLtState, LowerThirds, LtSailor, ltFields, ltTeams } from './lowerthirds.js';
+import { ltRoles, teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
-import { raceRunFields } from './raceRuns.js';
 import { joinVmixPath } from './paths.js';
-import { showDataFields } from './showData.js';
+import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
-import { findInput, parseVmixXml, pushResults, VmixInput, vmixUrl } from './vmixResults.js';
+import { groupLabel, groupLetter } from './groupNames.js';
+import { currentStage } from './workbookSheets.js';
+import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, VmixInput, vmixUrl } from './vmixResults.js';
 
 /**
  * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
  * driven from two Stream Decks through Companion. Each key calls /api/show/do?a=<action>; the dashboard fills the
  * title through the vMix Web API, brings it in on its overlay channel and keeps the rules:
- *  - OV1 boards, OV2 lower thirds, OV3 bugs and tickers, OV4 the break scene, L-bar and PiP frames
- *  - a board coming in takes the lower third and the break scene off; the break scene takes boards and lower thirds off
+ *  - every graphic on OV1 (one replaces the other), only the break scene on OV4
+ *  - a board coming in takes the break scene off; the break scene takes OV1 off
  *  - UNDO puts every overlay back as it was before the last action; ALL OUT takes everything out with its
  *    animation; PANIC (pressed twice) cuts everything at once
  * State (what is on air) is always read from vMix, never remembered from key presses.
  */
 
+/** The bottom line of the qualified team lower third. */
+/** The lineup lower third's order: from the bow to the stern. */
+export const LINEUP_LT_ORDER = BOW_TO_STERN;
+
+export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
+
 export type Kind = 'board' | 'lt' | 'bug' | 'scene';
-export interface Graphic { id: string; label: string; kind: Kind; overlay: number; inputs: string[] }
+export interface Graphic { id: string; label: string; kind: Kind; overlay: number; inputs: string[]; aliases?: string[] }
 
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS: Graphic[] = [
@@ -39,25 +48,23 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'schedule', label: 'Day schedule', kind: 'board', overlay: 1, inputs: ['ssl_schedule'] },
   { id: 'matchboard', label: 'Matchboard', kind: 'board', overlay: 1, inputs: ['ssl_matchboard'] },
   { id: 'results', label: 'Group results', kind: 'board', overlay: 1, inputs: ['ssl_results_group_{n}', 'ssl_results_group'] },
-  { id: 'raceresults', label: 'Race results', kind: 'board', overlay: 1, inputs: ['ssl_results_race_{n}', 'ssl_results_race'] },
   { id: 'compare', label: 'Team comparison', kind: 'board', overlay: 1, inputs: ['ssl_compare_{n}', 'ssl_compare'] },
   { id: 'lineup', label: 'Team lineup', kind: 'board', overlay: 1, inputs: ['ssl_lineup_{crew}', 'ssl_lineup'] },
   { id: 'course', label: 'Race course', kind: 'board', overlay: 1, inputs: ['ssl_course'] },
   { id: 'officials', label: 'Race officials', kind: 'board', overlay: 1, inputs: ['ssl_officials'] },
   { id: 'weather', label: 'Weather', kind: 'board', overlay: 1, inputs: ['ssl_weather'] },
-  { id: 'teamq', label: 'Team LT qualified', kind: 'lt', overlay: 2, inputs: ['ssl_lt_team_q'] },
-  { id: 'comm', label: 'Commentator LT', kind: 'lt', overlay: 2, inputs: ['ssl_lt_comm_photo', 'ssl_lt_comm_nophoto'] },
-  { id: 'lineup5', label: 'Lineup LT (5 sailors)', kind: 'lt', overlay: 2, inputs: ['ssl_lt_lineup5'] },
-  { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 3, inputs: ['ssl_bug'] },
-  { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 3, inputs: ['ssl_ticker'] },
-  { id: 'replay', label: 'Replay bug', kind: 'bug', overlay: 3, inputs: ['ssl_replay'] },
-  { id: 'socials', label: 'Socials', kind: 'bug', overlay: 3, inputs: ['ssl_socials'] },
-  { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 3, inputs: ['ssl_sponsors'] },
-  { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: ['ssl_break'] },
-  { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 4, inputs: ['ssl_lbar'] },
-  { id: 'pip_replay', label: 'PiP replay + onboard', kind: 'scene', overlay: 4, inputs: ['ssl_pip_replay'] },
-  { id: 'pip_live', label: 'PiP onboard + live', kind: 'scene', overlay: 4, inputs: ['ssl_pip_live'] },
-  { id: 'pip_4', label: 'PiP 4 onboards', kind: 'scene', overlay: 4, inputs: ['ssl_pip_4'] },
+  { id: 'teamq', label: 'Team LT qualified', kind: 'lt', overlay: 1, inputs: ['ssl_lt_team_q'] },
+  { id: 'comm', label: 'Commentator LT', kind: 'lt', overlay: 1, inputs: ['ssl_lt_comm_photo', 'ssl_lt_comm_nophoto'] },
+  { id: 'lineup5', label: 'Lineup LT (9 sailors, 5 + 4)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
+  { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 1, inputs: ['ssl_bug'], aliases: ['Announcement_bug', 'Announcement_bug_flag'] },
+  { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
+  { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
+  { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 1, inputs: ['ssl_sponsors'] },
+  // no input of its own: the L-bar, the ticker and the boards each on an overlay channel of their own (2, 3, 4)
+  { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: [] },
+  { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
+  // the second L-bar (ranking): a key of its own, never part of the break scene
+  { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
 ];
 
 export const showConfigSchema = z.object({
@@ -69,8 +76,21 @@ export const showConfigSchema = z.object({
   race: z.number().int().min(1).max(12).default(1),
   /** fleets shown in turn in the break scene (empty: every fleet of the race's set) */
   breakFleets: z.array(z.string()).default([]),
-  breakLayer: z.number().int().min(1).max(10).default(3),
-  rotateSeconds: z.number().int().min(4).max(120).default(12),
+  /** the day schedule is one of the boards of the break scene (off: it starts with the first group's results) */
+  breakSchedule: z.boolean().default(true),
+  /** the break scene's overlay channels: L-bar, ticker, and the board that switches (day schedule / group results) */
+  breakLbarLayer: z.number().int().min(2).max(4).default(2),
+  breakTickerLayer: z.number().int().min(2).max(4).default(3),
+  breakBoardLayer: z.number().int().min(2).max(4).default(4),
+  /** the board in the break scene switches by itself (day schedule, then each group's results) */
+  breakAuto: z.boolean().default(true),
+  rotateSeconds: z.number().int().min(4).max(120).default(30),
+  /** ms the board's out animation takes before the next board goes in on the break scene */
+  breakOutMs: z.number().int().min(0).max(5000).default(1500),
+  /** ms the comparison's flag fade-out takes (FLAG ⇄ EMBLEM on air): the other flags change after it */
+  flagChangeMs: z.number().int().min(0).max(3000).default(500),
+  /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
+  cfgVersion: z.number().int().default(4),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
   tickerNext: z.string().default(''),
   tickerEnd: z.string().default(''),
@@ -82,10 +102,8 @@ export const showConfigSchema = z.object({
   vmixForCompanion: z.string().default(''),
   /** write key texts and colours into Companion (HTTP remote control) */
   labels: z.boolean().default(true),
-  /** live key texts and on-air colours written into Companion while the show runs: off, the preset carries the texts */
-  liveKeys: z.boolean().default(false),
   /** places on the lineup lower third, in this order: the first 5, then the rest on the second press */
-  /** Stream Deck key edits by place ("<page index>/<row>/<col>"): another action ('' = empty key), own text ({auto} = the live text), key and text colour */
+  /** Stream Deck key edits by place ("<page name>/<row>/<col>"): another action ('' = empty key), own text ({auto} = the live text), key and text colour */
   keys: z.record(z.string(), z.object({ action: z.string().optional(), text: z.string().optional(), bg: z.string().optional(), fg: z.string().optional() })).default({}),
   /** key colour per kind of key (board, lt, bug, …), overriding the built-in palette */
   kindColours: z.record(z.string(), z.string()).default({}),
@@ -98,7 +116,13 @@ const STATE = 'show.state';
 export function getShowConfig(db: AssetCtx['db']): ShowConfig {
   let raw: unknown = {};
   try { raw = JSON.parse(getSetting(db, CFG) || '{}'); } catch { /* defaults */ }
-  return showConfigSchema.parse(raw);
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  if (!r.cfgVersion && r.rotateSeconds === 12) r.rotateSeconds = 30;
+  // 3: the break scene uses overlay channels 2, 3, 4 (no ssl_break input): layer numbers saved before become those
+  if (Number(r.cfgVersion ?? 0) < 3) { r.breakLbarLayer = 2; r.breakTickerLayer = 3; r.breakBoardLayer = 4; }
+  // 4: the results' out animation takes up to 1.2 s, so the next board waits 1.5 s (an old 1000 ms becomes 1500)
+  if (Number(r.cfgVersion ?? 0) < 4 && (r.breakOutMs === undefined || r.breakOutMs === 1000)) r.breakOutMs = 1500;
+  return showConfigSchema.parse(r);
 }
 export function setShowConfig(db: AssetCtx['db'], patch: Partial<ShowConfig>) {
   const next = showConfigSchema.parse({ ...getShowConfig(db), ...patch });
@@ -118,9 +142,11 @@ export interface ShowState {
   bug: string; // announcement shown on the bug
   bugId: string; // its version (General graphics → Announcements)
   tickerId: string; // the ticker version on air from a ticker key ('' = TICKER key: next race / end of day)
-  lineupPart: number; // 0 = off, 1 = first five, 2 = the rest
+  lineupPart: number; // 0 = off, 1 = the first five, 2 = the other four
+  lineupTeam: string; // the team on the lineup lower third
+  compareMark: 'flag' | 'emblem'; // what Team comparison shows by each team
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0 };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0, lineupTeam: '', compareMark: 'flag' };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -146,93 +172,138 @@ const row8 = (...keys: (DeckKey | null)[]) => Array.from({ length: 8 }, (_, i) =
 export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 } as const;
 
 /** A team page: the team and its places (slot, place label, the name on the key). */
-export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string }[] }
+export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string; number?: string }[] }
 
-export function deckPages(cfg: ShowConfig, teams: PresetTeam[] = []): DeckPage[] {
-  return applyKeyEdits(cfg, defaultDeckPages(cfg, teams));
+/** A group of the stage with a Team comparison of its own: key A, B… (FINAL…), its input ssl_compare_<key>. */
+export interface PresetGroup { fleetId: string; key: string; label: string }
+export const compareKey = (name: string) => groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
+export const compareInput = (key: string) => `ssl_compare_${key}`;
+/** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
+export const resultsInput = (key: string) => `ssl_results_${key}`;
+
+export function deckPages(cfg: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = [], resultGroups: PresetGroup[] = groups): DeckPage[] {
+  return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups, resultGroups).map((p) => (p.name === 'PEOPLE' ? keptPeople(p) : p)));
+}
+/**
+ * The PEOPLE page as the producer set it up in Companion: its own keys win (dashboard keys show here as they are,
+ * vMix / ATEM keys only in Companion), the person keys it took away stay away; new keys only in its free places.
+ */
+function keptPeople(p: DeckPage): DeckPage {
+  return { ...p, keys: p.keys.map((row, r) => row.map((key, c) => {
+    if (KEPT_PEOPLE_PLACES.has(`${r}/${c}`)) {
+      const a = keptPeopleAction(r, c);
+      if (key?.action.startsWith('nav:')) return key;
+      if (!a || a === 'undo') return null;
+      return key?.action === a ? key : (a.startsWith('person:') ? k(a, '—', 'bug') : { action: a, text: a.toUpperCase(), kind: 'mode' as const });
+    }
+    return key && /^person:/.test(key.action) ? null : key;
+  })) };
 }
 
-function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = []): DeckPage[] {
+function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = [], resultGroups: PresetGroup[] = groups): DeckPage[] {
+  const comparePage = PRESET_PAGES.teams + teams.length;
   const cfg = { ...cfg0, deck1Page: PRESET_PAGES.deck1, deck2Page: PRESET_PAGES.deck2, fallbackPage: PRESET_PAGES.fallback };
   const p1 = cfg.deck1Page, p2 = cfg.deck2Page;
-  const nav = (home: number, prev: number, prevName: string, next: number, nextName: string) => row8(
-    k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'),
-    k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'), null,
-    k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+  // TEAMS: 8 teams a page (the team's page key, its team lower third under it); more teams go on TEAMS 2… after COMPARE
+  const teamsPages = Math.max(1, Math.ceil(teams.length / TEAMS_PER_PAGE));
+  const teamsPage = (n: number) => (n === 0 ? p2 : comparePage + n);
+  const peoplePage = comparePage + teamsPages;
+  const nav = (home: number, prev: number, prevName: string, next: number, nextName: string) => navRow(
+    k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'));
+  const teamsName = (n: number) => (n ? `TEAMS ${n + 1}` : 'TEAMS');
+  const teamsPageOf = (n: number): DeckPage => ({
+    deck: 2, name: teamsName(n), page: teamsPage(n), keys: [
+      row8(...Array.from({ length: 8 }, (_, c) => {
+        const i = n * TEAMS_PER_PAGE + c, t = teams[i];
+        return t ? { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code } : null;
+      })),
+      // a row between the team keys and their TEAM LT, so a press does not hit the wrong one
+      row8(),
+      row8(...Array.from({ length: 8 }, (_, c) => {
+        const t = teams[n * TEAMS_PER_PAGE + c];
+        return t ? { ...k(`teamlt:${t.code}`, `TEAM LT\\n${t.code}`, 'lt'), team: t.code } : null;
+      })),
+      nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'BUGS OFTEN'),
+    ],
+  });
+  const lastTeams = teamsPages - 1;
   return [
     {
+      // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
       deck: 1, name: 'A BEFORE', page: p1, keys: [
-        row8(k('show:welcome', 'WELCOME', 'board'), k('comm:host', 'HOST\\nLT', 'lt'), k('comm:guest', 'GUEST\\nLT', 'lt'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'),
-          k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:compare', 'TEAM\\nCOMPARE', 'board'), k('boardout', 'BOARD\\nOUT', 'board')),
-        row8(k('anthem:1', 'ANTHEM\\nTEAM 1', 'team'), k('anthem:2', 'ANTHEM\\nTEAM 2', 'team'), k('anthem:3', 'ANTHEM\\nTEAM 3', 'team'), k('anthem:4', 'ANTHEM\\nTEAM 4', 'team'),
-          k('lineup:1', 'LINEUP\\nTEAM 1', 'board'), k('lineup:2', 'LINEUP\\nTEAM 2', 'board'), k('lineup:3', 'LINEUP\\nTEAM 3', 'board'), k('lineup:4', 'LINEUP\\nTEAM 4', 'board')),
-        row8(k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('comm:water', 'ON-WATER\\nLT', 'lt'),
-          k('comm:studio', 'STUDIO\\n+WATER LT', 'lt'), k('ltout', 'LT OUT', 'lt')),
+        row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'),
+          k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
+        row8(),
+        row8(),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
       ],
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:raceresults', 'RACE\\nRESULTS', 'board'), k('show:results', 'GROUP\\nRESULTS', 'board'), k('boardout', 'BOARD\\nOUT', 'board'),
-          k('qualified:1', 'QUALIFIED\\nTEAM 1', 'team'), k('qualified:2', 'QUALIFIED\\nTEAM 2', 'team'), k('qualified:3', 'QUALIFIED\\nTEAM 3', 'team'), k('qualified:4', 'QUALIFIED\\nTEAM 4', 'team'), k('ltout', 'LT OUT', 'lt')),
-        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'ROTATION\\n⏯', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
-          k('tickermode', 'TICKER:\\nNEXT RACE', 'mode')),
-        row8(k('ticker:thanks', 'THANKS FOR\\nWATCHING', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug')),
+        row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
+          // a key per group: its own results input (ssl_results_<KEY>)
+          ...resultGroups.slice(0, 4).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
+        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
+        // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
+        row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
       ],
     },
-    {
-      // every team on a key: it opens the team's own page (its places with the sailors' names)
-      deck: 2, name: 'TEAMS', page: p2, keys: [
-        ...[0, 1, 2].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
-          const t = teams[r * 8 + c];
-          return t ? { ...k(`nav:${PRESET_PAGES.teams + r * 8 + c}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code } : null;
-        }))),
-        nav(p2, p2 + 4, 'TICKERS', p2 + 1, 'EXTRAS'),
-      ],
-    },
-    {
-      deck: 2, name: 'EXTRAS', page: p2 + 1, keys: [
-        row8(...Array.from({ length: 8 }, (_, i) => k(`bug:${i + 1}`, '—', 'bug'))),
-        row8(k('show:ticker', 'TICKER', 'bug'), k('bugout', 'BUG OUT', 'bug'), k('show:replay', 'REPLAY\\nBUG', 'bug'), k('show:socials', 'SOCIALS', 'bug'),
-          k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lineup5', 'LINEUP\\nLT', 'lt')),
-        row8(k('show:pip_replay', 'PiP\\nREPLAY+OB', 'scene'), k('show:pip_live', 'PiP\\nOB+LIVE', 'scene'), k('show:pip_4', 'PiP\\n4 ONBOARDS', 'scene'), k('scene4out', 'PiP OUT', 'scene'), null, null, null, k('photo', 'PHOTO\\nMODE', 'mode')),
-        nav(p2, p2, 'TEAMS', p2 + 2, 'BUGS 1'),
-      ],
-    },
+    teamsPageOf(0),
     // every announcement and every ticker on a key of its own, by position: a version added in General graphics is
     // on the next free key at once (Companion keys too, they call the position)
-    slotPage(p2 + 2, 'BUGS 1', 'bug', 0, nav(p2, p2 + 1, 'EXTRAS', p2 + 3, 'BUGS 2')),
-    slotPage(p2 + 3, 'BUGS 2', 'bug', SLOTS_PER_PAGE, nav(p2, p2 + 2, 'BUGS 1', p2 + 4, 'TICKERS')),
-    slotPage(p2 + 4, 'TICKERS', 'ticker', 0, nav(p2, p2 + 3, 'BUGS 2', p2, 'TEAMS')),
-    ...teams.map((t, i) => teamPage(t, i, teams, p2)),
+    slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS RARE')),
+    slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 1, 'BUGS OFTEN', p2 + 3, 'TICKERS')),
+    // the ticker input: its versions, the automatic one (next race / end of day) and that mode
+    slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE')),
+    ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
+    // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
+    {
+      deck: 1, name: 'COMPARE', page: comparePage, keys: [
+        ...[0, 1].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
+          const g = groups[r * 8 + c];
+          return g ? k(`compare:${g.key}`, `COMPARE\\n${g.label}`, 'board') : null;
+        }))),
+        row8(k('show:compare', 'COMPARE\\nPICKED', 'board'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
+        nav(p1, p1, 'BEFORE', p1 + 1, 'AFTER'),
+      ],
+    },
+    ...Array.from({ length: teamsPages - 1 }, (_, n) => teamsPageOf(n + 1)),
+    // everyone in People (General graphics) on a key of their own, by position: a person added is on the next free key
+    slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, withPhoto(nav(p2, p2 + 3, 'TICKERS', p2, 'TEAMS'))),
   ];
 }
 
-/** A team's page on deck 2: its lower thirds and boards, its places (sailor's name on the key), ◀ ▶ to the next team. */
+const TEAMS_PER_PAGE = 8;
+/** The bottom row of every page: its way around, then OUT (OV1), UNDO, ALL OUT and PANIC. */
+// no UNDO key (the producer's ask); its place takes the ATEM downstream key in Companion where 2/7 is taken
+const navRow = (...keys: DeckKey[]) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+/** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
+const withPhoto = (row: (DeckKey | null)[]) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
+
+/** A team's page on deck 2: its qualified and line-up graphics, its places (sailor's name on the key), ◀ ▶ to the next team. */
 function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: number): DeckPage {
   const page = PRESET_PAGES.teams + i;
   const other = (d: number) => teams[(i + d + teams.length) % teams.length];
   const tk = (action: string, text: string, kind: DeckKey['kind']): DeckKey => ({ ...k(action, text, kind), team: t.code });
-  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name.toUpperCase().slice(0, 14) || '—'}`, 'sailor'));
+  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
   return {
     deck: 2, name: t.code, page, keys: [
-      row8(tk(`teamlt:${t.code}`, `TEAM LT\\n${t.code}`, 'lt'), tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'),
-        k('next', 'NEXT\\nRESULT', 'lt'), null, null, k('boardout', 'BOARD\\nOUT', 'board'), k('ltout', 'LT OUT', 'lt')),
+      row8(tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'),
+        tk(`lult:${t.code}`, `LINEUP LT\\n${t.code}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), null, null, null, k('next', 'NEXT\\nRESULT', 'lt')),
       row8(...places.slice(0, 8)),
       row8(...places.slice(8, 16)),
-      row8(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
-        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${other(1).code}`, 'nav'), k(`nav:${teamsPage + 1}`, 'EXTRAS', 'nav'), null,
-        k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety')),
+      withPhoto(navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
+        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${other(1).code}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'BUGS\\nOFTEN', 'nav'))),
     ],
   };
 }
 
-/** Keys of a page of announcement or ticker versions: 3 rows of 8, numbered from `from` + 1. */
-const SLOTS_PER_PAGE = 24;
-function slotPage(page: number, name: string, kind: 'bug' | 'ticker', from: number, navRow: (DeckKey | null)[]): DeckPage {
-  const rows = [0, 1, 2].map((r) => row8(...Array.from({ length: 8 }, (_, c) => k(`${kind}:${from + r * 8 + c + 1}`, '—', 'bug'))));
-  return { deck: 2, name, page, keys: [...rows, navRow] };
+/** Keys of a page of versions (announcements, tickers, people): `rows` rows of 8, action of the nth; `extra` fills the rest. */
+function slotPage(page: number, name: string, action: (n: number) => string, rows: number, navRow: (DeckKey | null)[], ...extra: (DeckKey | null)[][]): DeckPage {
+  const slots = Array.from({ length: rows }, (_, r) => row8(...Array.from({ length: 8 }, (_, c) => k(action(r * 8 + c + 1), '—', 'bug'))));
+  const rest = [...extra, row8(), row8(), row8()].slice(0, 3 - rows);
+  return { deck: 2, name, page, keys: [...slots, ...rest, navRow] };
 }
 
 export const KEY_COLOURS: Record<string, string> = { board: '#1e3a8a', lt: '#166534', bug: '#a16207', scene: '#0f766e', team: '#1e3a5f', sailor: '#27303f', nav: '#3f3f46', safety: '#7c2d12', mode: '#4c1d95' };
@@ -251,10 +322,10 @@ export function keyActions(cfg: ShowConfig): DeckKey[] {
 function applyKeyEdits(cfg: ShowConfig, pages: DeckPage[]): DeckPage[] {
   if (!Object.keys(cfg.keys).length) return pages;
   const actions = new Map(keyActions(cfg).map((a) => [a.action, a]));
-  return pages.map((p, pi) => ({
+  return pages.map((p) => ({
     ...p,
     keys: p.keys.map((row, r) => row.map((key, c) => {
-      const o = cfg.keys[`${pi}/${r}/${c}`];
+      const o = cfg.keys[`${p.name}/${r}/${c}`];
       if (!o) return key;
       let next: DeckKey | null = key;
       if (o.action !== undefined) {
@@ -271,7 +342,11 @@ function applyKeyEdits(cfg: ShowConfig, pages: DeckPage[]): DeckPage[] {
 export class Show {
   private timer: NodeJS.Timeout | null = null;
   private rotation: NodeJS.Timeout | null = null;
+  /** a board of the break scene is switching (its data must not be overwritten meanwhile) */
+  private switching = false;
   private labels = new Map<string, string>();
+  /** vMix's inputs as last read (the COMPARE keys follow the Team comparison inputs there). */
+  private lastInputs: VmixInput[] = [];
   /**
    * Data the keys read, kept for a second: one view or Companion refresh looks at 200 keys, and each team / sailor /
    * announcement key would read the group, the teams and their pictures again (seconds of a busy server on a big
@@ -288,8 +363,22 @@ export class Show {
   invalidate() { this.memo.clear(); }
   constructor(readonly ctx: AssetCtx, readonly lt: LowerThirds, private fetcher: Fetch = fetch as unknown as Fetch, private log: (m: string) => void = () => {}) {}
 
-  get config() { return getShowConfig(this.ctx.db); }
-  get state() { return getShowState(this.ctx.db); }
+  // the config and state are read by every key of a view (hundreds): parsed again only when the stored text changes
+  private cfgCache = { raw: '\u0000', v: null as unknown as ShowConfig };
+  private stCache = { raw: '\u0000', v: null as unknown as ShowState };
+  get config() {
+    const raw = getSetting(this.ctx.db, CFG) || '';
+    if (raw !== this.cfgCache.raw) this.cfgCache = { raw, v: getShowConfig(this.ctx.db) };
+    return this.cfgCache.v;
+  }
+  get state() {
+    const raw = getSetting(this.ctx.db, STATE) || '';
+    if (raw !== this.stCache.raw) this.stCache = { raw, v: getShowState(this.ctx.db) };
+    return { ...this.stCache.v };
+  }
+  /** The event's teams (read once per view) and a team's key colours. */
+  private teams() { return this.cached('teams', () => listTeams(this.ctx)); }
+  private nation(code: string) { return this.cached(`nation:${code}`, () => teamKeyColours(this.ctx.db, code)); }
   private patchState(p: Partial<ShowState>) { const s = { ...this.state, ...p }; saveShowState(this.ctx.db, s); return s; }
 
   private async vmix(q: string) {
@@ -323,20 +412,51 @@ export class Show {
     }
     return [];
   }
-  /** Every team of the event with its places, for its page (sorted by code, as on the TEAMS page). */
+  /**
+   * The teams of the stage picked at the top of the dashboard (group by group, in fleet order), each with its places,
+   * for its page; every team only when no stage is picked.
+   */
   presetTeams(): PresetTeam[] {
-    return this.cached('presetTeams', () => [...listTeams(this.ctx)].filter((t) => t.code).sort((a, b) => a.code.localeCompare(b.code)).map((t) => ({
+    return this.cached('presetTeams', () => ltTeams(this.ctx).filter((t) => t.code).map((t) => ({
       code: t.code, name: t.name,
-      crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName })),
+      crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName, number: c.number })),
     })));
   }
   /** The pages of both decks with a page per team. */
-  pages() { return deckPages(this.config, this.presetTeams()); }
+  pages() {
+    const teams = this.presetTeams(), groups = this.deckCompareGroups();
+    this.keyEditsByName(teams, groups);
+    return deckPages(this.config, teams, groups, this.compareGroups());
+  }
+
+  /**
+   * Key edits were kept by page position ("12/0/2"): a page added before (BUGS OFTEN/RARE, another stage with more
+   * teams) moved them onto other pages. Now they are kept by page name ("PUR/0/2"); the old ones move once, where
+   * they show now, except onto the LINEUP LT keys (new in 1.0.140, so an edit there is one that slid onto them).
+   */
+  private keyEditsByName(teams: PresetTeam[], groups: PresetGroup[]) {
+    const cfg = this.config;
+    const old = Object.keys(cfg.keys).filter((id) => /^\d+\/\d+\/\d+$/.test(id));
+    if (!old.length) return;
+    const pages = defaultDeckPages(cfg, teams, groups);
+    const keys = { ...cfg.keys };
+    for (const id of old) {
+      const [pi, r, c] = id.split('/').map(Number);
+      const o = keys[id];
+      delete keys[id];
+      const p = pages[pi];
+      const key = p?.keys[r]?.[c];
+      if (!p || (key && /^lult/.test(key.action))) continue;
+      const name = `${p.name}/${r}/${c}`;
+      if (!keys[name]) keys[name] = o;
+    }
+    setShowConfig(this.ctx.db, { keys });
+  }
 
   /** A team by key: its position in the group racing now (1–4) or its code. */
   teamRef(arg: string) {
     if (/^\d+$/.test(arg)) return this.boat(Number(arg));
-    const t = listTeams(this.ctx).find((x) => x.code.toLowerCase() === arg.toLowerCase());
+    const t = this.teams().find((x) => x.code.toLowerCase() === arg.toLowerCase());
     if (!t) throw notFound(`Team ${arg}`);
     return { id: t.id, code: t.code, name: t.name };
   }
@@ -356,16 +476,24 @@ export class Show {
 
   announcements() { return this.cached('announcements', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement')); }
 
+  /** The groups of the stage of the group racing now (the ones the break scene can show). */
+  breakStageFleets(): { id: string; name: string }[] {
+    const cfg = this.config;
+    const ev = activeEvent(this.ctx.db).id;
+    for (const st of listSets(this.ctx.db, ev) as { id: string }[]) {
+      const fleets = getSetDetail(this.ctx.db, st.id).fleets;
+      if (fleets.some((f) => f.id === cfg.fleetId)) return fleets.map((f) => ({ id: f.id, name: f.name }));
+    }
+    return [];
+  }
   /** Fleets that rotate in the break scene. */
   breakFleets(): string[] {
     const cfg = this.config;
-    if (cfg.breakFleets.length) return cfg.breakFleets;
-    const ev = activeEvent(this.ctx.db).id;
-    for (const s of listSets(this.ctx.db, ev) as { id: string }[]) {
-      const d = getSetDetail(this.ctx.db, s.id);
-      if (d.fleets.some((f) => f.id === cfg.fleetId)) return d.fleets.map((f) => f.id);
-    }
-    return cfg.fleetId ? [cfg.fleetId] : [];
+    const stage = this.breakStageFleets();
+    // picked on Show control (in the stage's order); none picked: every group but the Last Chance Race
+    const picked = stage.filter((f) => cfg.breakFleets.includes(f.id));
+    if (picked.length) return picked.map((f) => f.id);
+    return stage.filter((f) => !/last\s*chance|\blcr\b/i.test(f.name)).map((f) => f.id);
   }
 
   // ---------- vMix state ----------
@@ -381,6 +509,7 @@ export class Show {
   private async readSnapshot() {
     const xml = await this.vmix('');
     const inputs = parseVmixXml(xml);
+    this.lastInputs = inputs;
     const overlays: Record<string, string> = {};
     for (let n = 1; n <= 4; n++) overlays[n] = overlayOf(xml, n);
     return { xml, inputs, overlays };
@@ -392,12 +521,17 @@ export class Show {
     const crew = Number(vars.crew) || 9;
     // a crew without its own title takes the nearest bigger one (empty places stay blank), then smaller ones
     const crews = [...Array.from({ length: 13 - crew }, (_, i) => crew + i), ...Array.from({ length: crew - 1 }, (_, i) => crew - 1 - i)];
-    for (const raw of g.inputs) {
-      const names = raw.includes('{crew}') ? crews.map((c) => raw.replace('{crew}', String(c))) : [raw.replace('{n}', String(vars.n ?? n))];
-      for (const name of names) {
-        const exact = inputs.find((i) => i.title.toLowerCase() === name.toLowerCase() || i.title.toLowerCase().replace(/\.gtzip$/, '') === name.toLowerCase());
-        if (exact) return exact;
-      }
+    const names = g.inputs.flatMap((raw) => (raw.includes('{crew}') ? crews.map((c) => raw.replace('{crew}', String(c))) : [raw.replace('{n}', String(vars.n ?? n))]));
+    const exact = (i: VmixInput, name: string) => i.title.toLowerCase() === name.toLowerCase() || i.title.toLowerCase().replace(/\.gtzip$/, '') === name.toLowerCase();
+    // a GTZIP loaded under its own file name (Announcement_bug 2.gtzip) is found by that name too
+    const loose = (v: string) => v.toLowerCase().replace(/\.gtzip$/, '').replace(/[^a-z0-9]+/g, '').replace(/\d+$/, '');
+    const alias = (i: VmixInput) => (g.aliases ?? []).some((a) => loose(i.title) === loose(a));
+    // a real title (with fields) before a placeholder image of the same name
+    for (const titled of [true, false]) {
+      const ok = (i: VmixInput) => !titled || i.fields.length > 0;
+      for (const name of names) { const hit = inputs.find((i) => ok(i) && exact(i, name)); if (hit) return hit; }
+      const hit = inputs.find((i) => ok(i) && alias(i));
+      if (hit) return hit;
     }
     return undefined;
   }
@@ -407,16 +541,35 @@ export class Show {
     return i;
   }
 
+  /** Fields into the title, by its own field names (any case, GT's names cut at 15 characters too); one call each. */
   private async set(input: VmixInput, fields: Map<string, string>) {
-    const has = new Map(input.fields.map((f) => [f.toLowerCase(), f]));
+    const match = titleFieldMatcher(input.fields);
+    const done = new Set<string>();
     let n = 0;
     for (const [name, value] of fields) {
-      const real = has.get(name.toLowerCase());
-      if (!real) continue;
+      const real = match(name);
+      if (!real || done.has(real)) continue;
+      done.add(real);
       await this.vmix(`?Function=${real.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(input.key || input.number)}&SelectedName=${encodeURIComponent(real)}&Value=${encodeURIComponent(value)}`);
       n++;
     }
     return n;
+  }
+  /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
+  private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>, blind?: () => Map<string, string>) {
+    if (await this.set(input, fields)) return;
+    const { inputs } = await this.snapshot();
+    const same = inputs.filter((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === input.title.toLowerCase().replace(/\.gtzip$/, ''));
+    // a title whose fields vMix did not list: the data goes in by the GTZIP's own field names all the same
+    const title = (i: VmixInput) => /^(gt|xaml|title)/i.test(i.type ?? '');
+    const gt = same.find(title) ?? (title(input) ? input : undefined);
+    if (gt && blind) {
+      for (const [name, value] of blind()) await this.vmix(`?Function=${name.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(gt.key || gt.number)}&SelectedName=${encodeURIComponent(name)}&Value=${encodeURIComponent(value)}`);
+      return gt;
+    }
+    const list = same.map((i) => `input ${i.number} (${i.type || 'unknown type'}, ${i.fields.length ? `fields ${i.fields.join(', ')}` : 'no title fields'})`).join('; ');
+    const twice = same.length > 1 ? ` vMix has ${same.length} inputs named "${input.title}": delete the placeholder image and keep the GTZIP title.` : '';
+    throw badRequest(`vMix input "${input.title}" (${g.label}) takes none of the data: ${list || `input ${input.number}, no title fields`}.${twice} Load the ${g.label} GTZIP title in vMix and name it ${g.inputs[0]}.`);
   }
   /** The first text field of a title whose name matches, else its first text field. */
   private textField(input: VmixInput, re: RegExp) {
@@ -432,46 +585,102 @@ export class Show {
   private async overlayIn(n: number, input: VmixInput, overlays: Record<string, string>) {
     if (overlays[n] === input.number) return false;
     await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+    if (overlays[n]) this.ltLeft(overlays[n]);
     return true;
   }
   private async overlayOut(n: number, overlays: Record<string, string>) {
     if (!overlays[n]) return false;
     await this.vmix(`?Function=OverlayInput${n}Out`);
+    this.ltLeft(overlays[n]);
     return true;
+  }
+
+  /** A lower third title that left the screen some other way than its OUT: its photo is emptied off air, so the next sailor comes in at once. */
+  private ltLeft(number: string) {
+    const input = this.lastInputs.find((i) => i.number === number);
+    if (input && this.isLtTitle(input)) this.lt.clearPhotoOffAir(input);
   }
 
   /** Bring a graphic in on its overlay, after its data is in; takes off what it must not sit on. */
   private async bringIn(g: Graphic, input: VmixInput, snap: { overlays: Record<string, string> }) {
     this.pushUndo(snap.overlays);
-    if (g.kind === 'board') { await this.overlayOut(getLtConfig(this.ctx.db).overlay, snap.overlays); if (snap.overlays[4]) await this.sceneOut(snap.overlays); }
-    if (g.kind === 'scene') { await this.overlayOut(1, snap.overlays); await this.overlayOut(getLtConfig(this.ctx.db).overlay, snap.overlays); }
+    const lt = getLtConfig(this.ctx.db).overlay;
+    // what must go first; a graphic on the same channel simply replaces what is there
+    const off = new Set<number>(g.kind === 'board' ? [lt] : g.kind === 'scene' ? [1, lt] : []);
+    off.delete(g.overlay);
+    // the break scene's own layers (L-bar, ticker, boards) leave another overlay at once: their out animation would
+    // leave the title out, so hidden inside the scene
+    for (const n of off) await this.overlayOut(n, snap.overlays);
+    if (g.kind === 'board' && this.breakOnAir({ inputs: this.lastInputs, overlays: snap.overlays })) await this.sceneOut(snap.overlays);
     if (g.kind === 'scene' && g.id !== 'break') this.stopRotation();
     await this.overlayIn(g.overlay, input, snap.overlays);
   }
 
+  /** The break scene off: its overlay channels (L-bar, ticker, board) go out with their animations. */
   private async sceneOut(overlays: Record<string, string>) {
     this.stopRotation();
-    await this.overlayOut(4, overlays);
+    const cfg = this.config;
+    for (const n of [cfg.breakBoardLayer, cfg.breakTickerLayer, cfg.breakLbarLayer]) await this.overlayOut(n, overlays);
+  }
+  /** On air: the L-bar on its channel, or a board (day schedule / group results) on the board channel. */
+  breakOnAir(snap: { inputs: VmixInput[]; overlays: Record<string, string> }) {
+    const cfg = this.config;
+    const on = (id: string, n: number) => { const i = this.resolve(this.graphic(id), snap.inputs); return !!i && snap.overlays[n] === i.number; };
+    const board = snap.overlays[cfg.breakBoardLayer];
+    return on('lbar', cfg.breakLbarLayer) || on('schedule', cfg.breakBoardLayer) || (!!board && this.resultsTargets(snap.inputs).some((t) => t.input.number === board));
+  }
+  /** A group's own results input (ssl_results_H), if vMix has it. */
+  private ownResults(fleetId: string, inputs: VmixInput[]) {
+    const g = this.allCompareGroups().find((x) => x.fleetId === fleetId);
+    return g ? inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === resultsInput(g.key).toLowerCase()) : undefined;
+  }
+  /** The results input of a group: its own (ssl_results_H), else the shared one. */
+  private resultsFor(fleetId: string, inputs: VmixInput[]) {
+    return this.ownResults(fleetId, inputs) ?? this.need(this.graphic('results'), inputs);
+  }
+  /** Every group's own results input, and the shared one. */
+  private resultsTargets(inputs: VmixInput[]) {
+    const out: { input: VmixInput; fleetId: string | null }[] = [];
+    for (const g of this.allCompareGroups()) { const i = this.ownResults(g.fleetId, inputs); if (i) out.push({ input: i, fleetId: g.fleetId }); }
+    const shared = this.resolve(this.graphic('results'), inputs);
+    if (shared && !out.some((x) => x.input.number === shared.number)) out.push({ input: shared, fleetId: null });
+    return out;
+  }
+  /** GROUP RESULTS of one group (RESULTS H…): its data into its own input (else the shared one), then in; again = out. */
+  async resultsGroup(arg: string) {
+    const grp = [...this.compareGroups(), ...this.allCompareGroups()].find((x) => x.key === compareKey(arg) || x.fleetId === arg);
+    if (!grp) throw notFound(`Group ${arg} in this stage`);
+    const g = this.graphic('results');
+    const snap = await this.snapshot();
+    const input = this.resultsFor(grp.fleetId, snap.inputs);
+    if (snap.overlays[g.overlay] === input.number) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      return { out: 'results', group: grp.label };
+    }
+    await pushResults(this.ctx, grp.fleetId, input.key || input.number, this.fetcher);
+    await this.bringIn(g, input, snap);
+    return { in: 'results', group: grp.label, input: input.title };
   }
 
   /** The data of a graphic, set right before it comes in. */
   private async fill(g: Graphic, input: VmixInput) {
     const ev = activeEvent(this.ctx.db).id;
-    if (g.id === 'raceresults') {
-      if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
-      const rows = Math.max(0, ...input.fields.map((f) => Number(f.match(/^TEAM (\d+)\.Text$/i)?.[1] ?? 0)));
-      await this.set(input, raceRunFields(this.ctx, this.config.fleetId, this.config.race, rows));
-    } else if (g.id === 'results') {
+    if (g.id === 'results') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
       await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
+    } else if (g.id === 'compare') {
+      if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
+      await this.set(input, this.compareData());
     } else if (g.id === 'ticker') {
       await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
     } else if (g.id === 'lineup5') {
-      await this.set(input, this.lineupPartFields(1));
+      const b = this.boats()[this.state.boat - 1];
+      if (b) { await this.set(input, this.lineupLtFields(b.id, 1)); this.patchState({ lineupPart: 1, lineupTeam: b.id }); }
     } else if (g.id === 'bug') {
       // BUG key without a version: the announcement shown last, else the first one
       const a = (this.state.bugId && this.announcement(this.state.bugId)) || this.announcements()[0];
-      if (a) { await this.set(input, this.bugFields(input, a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
+      if (a) { await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
     } else {
       // General graphics straight into the title, so a change made a moment ago is on air without waiting for Excel
       const e = activeEvent(this.ctx.db);
@@ -480,64 +689,180 @@ export class Show {
     }
   }
 
-  /** The lineup lower third: the places in the set order, split into the first five and the rest. */
-  lineupParts(): LtSailor[][] {
-    const b = this.boats()[this.state.boat - 1];
-    if (!b) throw badRequest('Pick a team first.');
-    const all = crewOf(this.ctx, b.id).filter((s) => s.lastName || s.firstName);
-    const order = this.config.lineup5;
-    const crew = [...order.map((k) => all.find((s) => s.slot === k)).filter((s): s is LtSailor => !!s), ...all.filter((s) => !order.includes(s.slot))];
-    return [crew.slice(0, 5), crew.slice(5)].filter((p) => p.length);
+  /** Team comparison of a group (default: the one picked at the top), with the flag or the emblem by each team (COMPARE key). */
+  private compareData(fleetId = this.config.fleetId) {
+    const ev = activeEvent(this.ctx.db);
+    return compareFields(this.ctx, ev.id, fleetId, todayIn(ev.timezone), { mark: this.state.compareMark, emblemSlot: getLtConfig(this.ctx.db).emblemSlot });
   }
-  lineupPartFields(part: number) {
-    const b = this.boats()[this.state.boat - 1];
-    const crew = this.lineupParts()[part - 1] ?? [];
-    const f = new Map<string, string>();
-    for (let i = 0; i < 5; i++) {
-      const s = crew[i];
-      f.set(`NAME ${i + 1}.Text`, s ? s.lastName.toUpperCase() : '');
-      f.set(`FIRSTNAME ${i + 1}.Text`, s ? s.firstName.toUpperCase() : '');
-      f.set(`NUMBER ${i + 1}.Text`, s?.number ?? '');
-      f.set(`POSITION ${i + 1}.Text`, s ? s.position.toUpperCase() : '');
-      f.set(`PHOTO ${i + 1}.Source`, s?.photo ?? '');
+
+  /** The groups of the stage picked at the top (every stage when none is), each with its key: A, B… or FINAL. */
+  compareGroups(): PresetGroup[] {
+    return this.cached('compareGroups', () => {
+      const ev = activeEvent(this.ctx.db).id;
+      const stage = currentStage(this.ctx.db, ev);
+      return this.groupsOf(stage ? [stage.id] : (listSets(this.ctx.db, ev) as { id: string }[]).map((x) => x.id));
+    });
+  }
+  /** Groups of these stages, a key each (the first stage wins a key two stages share). */
+  private groupsOf(sets: string[]): PresetGroup[] {
+    const seen = new Set<string>();
+    return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: groupLabel(f.name) }))
+      .filter((g) => g.key && !seen.has(g.key) && !!seen.add(g.key));
+  }
+  /** Every group of the event, the stage picked at the top first. */
+  private allCompareGroups(): PresetGroup[] {
+    return this.cached('allCompareGroups', () => {
+      const ev = activeEvent(this.ctx.db).id;
+      const stage = currentStage(this.ctx.db, ev);
+      const all = (listSets(this.ctx.db, ev) as { id: string }[]).map((x) => x.id);
+      return this.groupsOf(stage ? [stage.id, ...all.filter((x) => x !== stage.id)] : all);
+    });
+  }
+  /** The COMPARE keys: one per Team comparison input vMix has (ssl_compare_A…), else one per group of the stage. */
+  deckCompareGroups(): PresetGroup[] {
+    const has = (g: PresetGroup) => this.lastInputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
+    const inVmix = this.allCompareGroups().filter(has);
+    return inVmix.length ? inVmix : this.compareGroups();
+  }
+
+  /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */
+  private compareTargets(inputs: VmixInput[]) {
+    const out: { input: VmixInput; fleetId: string }[] = [];
+    for (const g of this.allCompareGroups()) {
+      const i = inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
+      if (i) out.push({ input: i, fleetId: g.fleetId });
     }
-    const t = listTeams(this.ctx).find((x) => x.id === b?.id);
-    f.set('Flag.Source', img((t?.assets as Record<string, Asset>)?.flag_big));
+    const shared = this.resolve(this.graphic('compare'), inputs);
+    if (shared && this.config.fleetId && !out.some((x) => x.input.key === shared.key)) out.push({ input: shared, fleetId: this.config.fleetId });
+    return out;
+  }
+
+  /** A group's Team comparison (COMPARE A…): its data into its own input, then in on the boards overlay; again = out. */
+  async compareGroup(arg: string) {
+    const groups = [...this.compareGroups(), ...this.allCompareGroups()];
+    const grp = groups.find((x) => x.key === compareKey(arg) || x.fleetId === arg);
+    if (!grp) throw notFound(`Group ${arg} in this stage`);
+    const g = this.graphic('compare');
+    const snap = await this.snapshot();
+    const own = snap.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(grp.key).toLowerCase());
+    const input = own ?? this.need(g, snap.inputs);
+    if (snap.overlays[g.overlay] === input.number) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      return { out: 'compare', group: grp.label };
+    }
+    await this.set(input, this.compareData(grp.fleetId));
+    await this.bringIn(g, input, snap);
+    return { in: 'compare', group: grp.label, input: input.title };
+  }
+
+  /** Flag ⇄ emblem on Team comparison; every group's title shows the change at once (on air too, as a data change). */
+  async compareMark() {
+    const mark = this.state.compareMark === 'emblem' ? 'flag' : 'emblem';
+    this.patchState({ compareMark: mark });
+    const { inputs, overlays } = await this.snapshot();
+    // the title's flag change animation (DataChangeOut / In) is started by the last flag (4 FLAG): that one goes first,
+    // the others once the flags have faded out, so every flag changes inside the animation instead of before it
+    const num = (k: string) => Number(k.match(/(\d+)/)?.[1] ?? 0);
+    for (const t of this.compareTargets(inputs)) {
+      const flags = [...this.compareData(t.fleetId)].filter(([k]) => /flag\.source$/i.test(k)).sort((a, b) => num(b[0]) - num(a[0]));
+      const onAir = Object.values(overlays).includes(t.input.number);
+      const top = num(flags[0]?.[0] ?? '');
+      const first = flags.filter(([k]) => num(k) === top), rest = flags.filter(([k]) => num(k) !== top);
+      const sent = await this.set(t.input, new Map(first));
+      if (onAir && sent) await this.wait(this.config.flagChangeMs);
+      await this.set(t.input, new Map(rest));
+    }
+    return { compareMark: mark };
+  }
+
+  /** The lineup lower third: the team's line-up from the bow to the stern (8–10 sailors, Floater too), on two screens. */
+  lineupLtParts(teamId: string): LtSailor[][] {
+    const crew = this.crewBowToStern(teamId).slice(0, 10);
+    // two screens of at most five, as even as can be: 10 = 5 + 5, 9 = 5 + 4, 8 = 4 + 4
+    const first = crew.length > 5 ? Math.ceil(crew.length / 2) : crew.length;
+    return [crew.slice(0, first), crew.slice(first)].filter((p) => p.length);
+  }
+  /** The team's sailors (with a name) from the bow to the stern, Floater between Pit and Grinder, extra places last. */
+  crewBowToStern(teamId: string, order: string[] = BOW_TO_STERN): LtSailor[] {
+    const all = crewOf(this.ctx, teamId).filter((s) => s.lastName || s.firstName);
+    const rank = (slot: string) => { const i = order.indexOf(slot); return i < 0 ? order.length : i; };
+    return all.map((s, i) => ({ s, i })).sort((a, b) => rank(a.s.slot) - rank(b.s.slot) || a.i - b.i).map((x) => x.s);
+  }
+  /**
+   * Lineup_lowerthird_9.gtzip: places 1–5 show five sailors, places 6–9 four (centred); a screen of five goes on 1–5,
+   * a screen of four on 6–9, and the other places are emptied. NAME n = surname, POSITION n, PHOTO n; the bar is the team's lt_lineup_bar PNG.
+   */
+  lineupLtFields(teamId: string, part: number) {
+    const parts = this.lineupLtParts(teamId);
+    const crew = parts[part - 1] ?? [];
+    const f = new Map<string, string>();
+    const five = crew.length >= 5;
+    for (let i = 1; i <= 9; i++) {
+      const s = five ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
+      // I. SLADDER and 5 | MIDBOW
+      f.set(`NAME ${i}.Text`, s ? [s.firstName.trim() ? `${s.firstName.trim()[0].toUpperCase()}.` : '', s.lastName.toUpperCase()].filter(Boolean).join(' ') : '');
+      f.set(`POSITION ${i}.Text`, s ? [s.number, s.position.toUpperCase()].filter(Boolean).join(' | ') : '');
+      f.set(`PHOTO ${i}.Source`, s?.photo ?? '');
+    }
+    const t = listTeams(this.ctx).find((x) => x.id === teamId);
+    const bar = t && teamPictureFor(this.ctx, t, { w: 1280, h: 140, key: 'ltlineupbar', like: /lineupbar/, exact: true });
+    if (bar) f.set('Bar.Source', bar);
     return f;
   }
-  /** First press: the first five come in; second: the rest swap in (data change); third: out. */
-  async lineupLt() {
+  /** LINEUP LT <team>: the team's first five come in (from another team: a data change); the same key again: out. */
+  async lineupLt(code?: string) {
+    const b = code ? this.teamRef(code) : this.boat(this.state.boat);
     const g = this.graphic('lineup5');
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
-    const parts = this.lineupParts().length;
-    const part = on ? this.state.lineupPart + 1 : 1;
-    if (on && part > parts) {
+    if (on && this.state.lineupTeam === b.id) {
       this.pushUndo(snap.overlays);
       await this.overlayOut(g.overlay, snap.overlays);
-      this.patchState({ lineupPart: 0 });
+      this.patchState({ lineupPart: 0, lineupTeam: '' });
       return { out: 'lineup5' };
     }
-    await this.set(input, this.lineupPartFields(part));
+    if (!this.lineupLtParts(b.id).length) throw badRequest(`No sailors in the ${b.code} line-up.`);
+    await this.set(input, this.lineupLtFields(b.id, 1));
     if (!on) await this.bringIn(g, input, snap);
+    this.patchState({ lineupPart: 1, lineupTeam: b.id });
+    return { in: 'lineup5', team: b.code, part: 1 };
+  }
+  /** LINEUP LT 5 ⇄ 4: the lineup lower third on air swaps between its five and its four (a data change). */
+  async lineupLtSwap() {
+    const g = this.graphic('lineup5');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const teamId = this.state.lineupTeam;
+    if (snap.overlays[g.overlay] !== input.number || !teamId) throw badRequest('Bring a team’s LINEUP LT in first.');
+    const parts = this.lineupLtParts(teamId).length;
+    const part = this.state.lineupPart === 1 && parts > 1 ? 2 : 1;
+    await this.set(input, this.lineupLtFields(teamId, part));
     this.patchState({ lineupPart: part });
-    return { in: 'lineup5', part, of: parts };
+    return { in: 'lineup5', part };
   }
 
-  /** Team lower third, qualified version: its own title, team fields like the team lower third. */
+  /**
+   * Team lower third, qualified version: the same data and pictures as the team lower third with no photo (name, flag,
+   * emblem, the team's bar) on its own title; only the bottom line reads QUALIFIED_TEXT.
+   */
   async qualified(boat: number | string) {
     const b = this.teamRef(String(boat));
     const g = this.graphic('teamq');
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     const lt = getLtConfig(this.ctx.db);
-    const t = listTeams(this.ctx).find((x) => x.id === b.id)!;
-    const a = t.assets as Record<string, Asset>;
-    await this.set(input, this.lt.fitToTitle(input, new Map([
-      [`${lt.fields.top}.Text`, t.name.toUpperCase()], [`${lt.fields.bottom}.Text`, 'QUALIFIED'],
-      [`${lt.fields.flag}.Source`, img(a[lt.flagSlot])], [`${lt.fields.emblem}.Source`, img(a[lt.emblemSlot])], [`${lt.fields.bar}.Source`, img(a[lt.barSlot])],
-    ]), t.id));
+    const f = ltFields(this.ctx, lt, b.id, null);
+    f.set(`${lt.fields.bottom}.Text`, QUALIFIED_TEXT);
+    const out = this.lt.fitToTitle(input, f, b.id);
+    // the bar of every other lower third (lowerthird PNG), not one guessed from this title
+    const barField = ltRoles(lt.fields, input.fields).bar;
+    const bar = this.lt.standardBar(b.id);
+    if (barField && bar) out.set(barField, bar);
+    // titles with a field of their own for the line (QualifiedText, Qualified…) get it too
+    for (const x of input.fields) if (/qualif/i.test(x) && x.endsWith('.Text') && !out.has(x)) out.set(x, QUALIFIED_TEXT);
+    await this.set(input, out);
     await this.bringIn({ ...g, overlay: lt.overlay }, input, snap);
     return { in: 'teamq', team: b.code };
   }
@@ -554,18 +879,22 @@ export class Show {
 
   // ---------- actions ----------
   async toggle(id: string) {
+    if (id === 'break') return this.toggleBreak();
+    if (id === 'results' && this.config.fleetId) {
+      const { inputs } = await this.snapshot();
+      if (this.ownResults(this.config.fleetId, inputs)) return this.resultsGroup(this.config.fleetId);
+    }
     const g = this.graphic(id);
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     if (snap.overlays[g.overlay] === input.number) {
       this.pushUndo(snap.overlays);
-      if (g.id === 'break') await this.sceneOut(snap.overlays); else await this.overlayOut(g.overlay, snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
       return { out: g.id };
     }
     await this.fill(g, input);
     if (g.id === 'ticker') this.patchState({ tickerId: '' });
     await this.bringIn(g, input, snap);
-    if (g.id === 'break') this.startRotation();
     return { in: g.id, input: input.title };
   }
 
@@ -573,16 +902,29 @@ export class Show {
     const roles: Record<string, string[]> = { host: ['host commentator'], guest: ['guest commentator', 'guest'], water: ['on-water commentator'], studio: ['host commentator'] };
     const want = roles[role] ?? [role.toLowerCase()];
     const ev = activeEvent(this.ctx.db).id;
-    const people = listPeople(this.ctx, ev).filter((p) => want.includes((p.role || '').toLowerCase()) && p.name);
+    const people = listPeople(this.ctx, ev).filter((p) => want.includes((p.role || '').toLowerCase()) && (p.name || p.surname));
     if (!people.length) throw badRequest(`Nobody with the role ${want[0]} in People (General graphics).`);
-    const p = people[0];
+    return this.personLt(people[0]);
+  }
+
+  /** People in General graphics with a name, in their order (PEOPLE page: a key each). */
+  people() { return this.cached('people', () => listPeople(this.ctx, activeEvent(this.ctx.db).id).filter((p) => p.name || p.surname)); }
+
+  /** A person's lower third (PEOPLE key by position): their name and title, the photo title when they have a photo. */
+  async person(n: string) {
+    const p = this.people()[Number(n) - 1];
+    if (!p) throw badRequest(`No person ${n} in People (General graphics).`);
+    return this.personLt(p);
+  }
+
+  private async personLt(p: ReturnType<typeof listPeople>[number]) {
     const g = this.graphic('comm');
     const snap = await this.snapshot();
     const photo = p.photo ? img(p.photo as unknown as Asset) : '';
     const withPhoto = photo ? this.resolve({ ...g, inputs: g.inputs.slice(0, 1) }, snap.inputs) : undefined;
     const input = withPhoto ?? this.resolve({ ...g, inputs: g.inputs.slice(1) }, snap.inputs) ?? this.need(g, snap.inputs);
     const lf = getLtConfig(this.ctx.db).fields;
-    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, p.name.toUpperCase()], [`${lf.bottom}.Text`, (p.title || p.role).toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
+    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, (p.role || '').toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
     // on-air swap of the same title animates; a different title comes in on the overlay
     await this.set(input, f);
     await this.bringIn({ ...g }, input, snap);
@@ -598,16 +940,45 @@ export class Show {
     const team = listTeams(this.ctx).find((t) => t.id === b.id)!;
     const a = team.assets as Record<string, Asset>;
     const crew = new Map(crewOf(this.ctx, b.id).map((s) => [s.slot, s]));
-    const f = new Map<string, string>([['Flag.Source', img(a.flag_big)], ['Emblem.Source', img(a.emblem_light)]]);
+    const f = new Map<string, string>([['Flag.Source', img(a.flag_big)], ['Emblem.Source', img(a.emblem_light)],
+      ['TeamName.Text', (lu.teamName || team.name).toUpperCase()], ['LineupText.Text', lu.title]]);
+    // titles that number the trimmers 1 and 2 (Trimmer1NAME = Trimmer 1, Trimmer2NAME = Trimmer 2, TrimmerPHOTO1/2)
+    const twoTrimmers = input.fields.some((x) => /^Trimmer2/i.test(x));
+    const names = (d: ReturnType<typeof slotDefs>[number]) => {
+      if (!twoTrimmers || (d.key !== 'Trimmer' && d.key !== 'Trimmer1')) return d.fields;
+      const n = d.key === 'Trimmer' ? 1 : 2;
+      return { name: `Trimmer${n}NAME`, surname: `Trimmer${n}SURNAME`, number: `Trimmer${n}NUMBER`, position: `Trimmer${n}POSITION`, photo: `TrimmerPHOTO${n}` };
+    };
     for (const d of slotDefs(lu.extra)) {
       const r = lu.rows.find((x) => x.slot === d.key);
       const s = crew.get(d.key);
-      f.set(`${d.fields.name}.Text`, (r?.firstName ?? '').toUpperCase());
-      f.set(`${d.fields.surname}.Text`, (r?.lastName ?? '').toUpperCase());
-      f.set(`${d.fields.number}.Text`, r?.number ?? '');
-      f.set(`${d.fields.position}.Text`, (r?.position ?? '').toUpperCase());
-      f.set(`${d.fields.photo}.Source`, s?.photo ?? '');
+      const fl = names(d);
+      f.set(`${fl.name}.Text`, (r?.firstName ?? '').toUpperCase());
+      f.set(`${fl.surname}.Text`, (r?.lastName ?? '').toUpperCase());
+      f.set(`${fl.number}.Text`, r?.number ?? '');
+      f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
+      f.set(`${fl.photo}.Source`, s?.photo ?? '');
     }
+    // boards with numbered places (Team_lineup_8/9/10: S1 = bow … S10 = stern): the crew from the bow, whoever sails
+    if (input.fields.some((x) => /^S1NAME\.Text$/i.test(x))) {
+      const rows = new Map(lu.rows.map((r) => [r.slot, r]));
+      const crewList = this.crewBowToStern(b.id, BOARD_BOW_TO_STERN);
+      for (let n = 1; n <= 12; n++) {
+        const s = crewList[n - 1];
+        const r = s ? rows.get(s.slot) : undefined;
+        f.set(`S${n}NAME.Text`, (s?.firstName ?? '').toUpperCase());
+        f.set(`S${n}SURNAME.Text`, (s?.lastName ?? '').toUpperCase());
+        f.set(`S${n}NUMBER.Text`, s?.number ?? '');
+        f.set(`S${n}POSITION.Text`, ((r?.position || s?.position) ?? '').toUpperCase());
+        f.set(`S${n}PHOTO.Source`, s?.photo ?? '');
+      }
+    }
+    // the box behind each photo (HelmBG, Trimmer1BG…): the team's lineup_photo_left/right from the PNG generator, when there is one
+    // left: colour on the left (the team's Line-up tab picks the side); the right one mirrors it
+    const side = lu.photoSide === 'right' ? 'right' : 'left';
+    const square = teamPictureFor(this.ctx, team, { w: 211, h: 135, key: `lineupphoto${side}`, exact: true })
+      ?? teamPictureFor(this.ctx, team, { w: 211, h: 135, key: 'lineupphoto', like: /lineup|photobg|square/ });
+    if (square) for (const x of input.fields) if (/^\w+BG\.Source$/i.test(x) && !/^BG\.Source$/i.test(x)) f.set(x, square);
     await this.set(input, f);
     await this.bringIn(g, input, snap);
     return { in: 'lineup', team: b.code, input: input.title };
@@ -618,17 +989,27 @@ export class Show {
   /** An announcement by key: its position (bug:3), its version id, or THANKS (old keys: the Thanks ticker). */
   private announcement(which: string) {
     const list = this.announcements();
+    // by position on BUGS OFTEN (o3) or BUGS RARE (r3)
+    const m = which.match(/^([or])(\d+)$/i);
+    if (m) return list.filter((x) => isOften(x) === (m[1].toLowerCase() === 'o'))[Number(m[2]) - 1];
     return list.find((x) => x.id === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
   }
 
-  /** The bug's text and icon, by the title's field names (TEXT, ICON / FLAG / STAR…). */
+  /** The bug's text and icon, by the title's field names (TEXT; Race flag, ICON, FLAG, STAR… but not icon_background). */
   private bugFields(input: VmixInput, data: Record<string, string>) {
     const f = new Map<string, string>();
     const text = this.textField(input, /text/i);
     if (text) f.set(text, (data.text ?? '').toUpperCase());
-    const icon = input.fields.find((x) => x.endsWith('.Source') && /icon|flag|star|logo/i.test(x));
+    const pics = input.fields.filter((x) => x.endsWith('.Source') && !/background|\bbg\b|_bg|bar/i.test(x));
+    const icon = [/race ?flag/i, /^icon\./i, /flag/i, /icon/i, /star/i, /logo/i].map((re) => pics.find((x) => re.test(x))).find(Boolean);
     if (icon) f.set(icon, imagePath(this.ctx.db, this.ctx.assetsDir, data.icon));
     return f;
+  }
+
+  /** The bug's data by the Announcement bug GTZIP's own field names (TEXT; the flag as Race flag or icon). */
+  private bugBlind(data: Record<string, string>) {
+    const icon = imagePath(this.ctx.db, this.ctx.assetsDir, data.icon);
+    return new Map([['TEXT.Text', (data.text ?? '').toUpperCase()], ['Race flag.Source', icon], ['icon.Source', icon]]);
   }
 
   /** Announcement bug: its text and icon go into the title, then it comes in; the same key again takes it out. */
@@ -638,8 +1019,6 @@ export class Show {
     if (!a) throw badRequest(`No announcement ${which}. Add it under General graphics → Announcements.`);
     const g = this.graphic('bug');
     const snap = await this.snapshot();
-    // Replay with no icon of its own: the Replay bug title, when vMix has it (the announcement bug would show an empty icon)
-    if (!a.data.icon?.trim() && /^replay$/i.test((a.data.text || a.name).trim()) && this.resolve(this.graphic('replay'), snap.inputs)) return this.toggle('replay');
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
     if (on && this.state.bugId === a.id) {
@@ -648,10 +1027,10 @@ export class Show {
       this.patchState({ bugId: '' });
       return { out: 'bug' };
     }
-    await this.set(input, this.bugFields(input, a.data));
+    const used = (await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data))) ?? input;
     const text = (a.data.text || a.name).toUpperCase();
     this.patchState({ bug: text, bugId: a.id });
-    await this.bringIn(g, input, snap);
+    await this.bringIn(g, used, snap);
     return { in: 'bug', text };
   }
 
@@ -669,6 +1048,11 @@ export class Show {
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
+    // the break scene on air: the ticker on its channel goes out, takes the text and comes back in
+    if (this.breakOnAir(snap)) {
+      const text = await this.swapTicker(t, input, snap.overlays);
+      return { in: 'ticker', text, scene: true };
+    }
     if (on && this.state.tickerId === t.id) {
       this.pushUndo(snap.overlays);
       await this.overlayOut(g.overlay, snap.overlays);
@@ -689,12 +1073,10 @@ export class Show {
     if (!s) throw badRequest(shirt ? `No sailor with number ${shirt} in ${this.boats()[this.state.boat - 1]?.code ?? 'this team'}.` : 'No sailor on this key.');
     const b = this.boat(this.state.boat);
     const mode = this.state.photo;
-    const cfg = getLtConfig(this.ctx.db);
     const snap = await this.snapshot();
-    if (snap.overlays[1]) { this.pushUndo(snap.overlays); await this.overlayOut(1, snap.overlays); }
+    await this.clearForSailor(snap);
     // photo mode: the lower thirds pick the photo title when the sailor has a photo; OFF forces the other one
     if (mode === 'off' && s.photo) return this.lt.showSailor(b.code, s.slot, { forceNoPhoto: true });
-    void cfg;
     return this.lt.showSailor(b.code, s.slot);
   }
 
@@ -702,8 +1084,28 @@ export class Show {
   async sailorOf(code: string, slot: string) {
     const t = this.teamRef(code);
     const snap = await this.snapshot();
-    if (snap.overlays[1]) { this.pushUndo(snap.overlays); await this.overlayOut(1, snap.overlays); }
+    await this.clearForSailor(snap);
     return this.lt.showSailor(t.code, slot, { forceNoPhoto: this.state.photo === 'off' });
+  }
+
+  /** Is this vMix input one of the lower third titles (photo / no photo)? */
+  private isLtTitle(input?: VmixInput) {
+    const cfg = getLtConfig(this.ctx.db);
+    const name = (input?.title ?? '').toLowerCase().replace(/\.gtzip$/, '');
+    return !!name && [cfg.photoInput, cfg.noPhotoInput].some((x) => x && x.toLowerCase() === name);
+  }
+
+  /**
+   * Before a sailor's lower third: a board on OV1 goes out; a lower third stays on, so the next sailor is only a data
+   * change (taking it out first left its photo in the title, and the next one waited ~3 s for that photo to fly away).
+   */
+  private async clearForSailor(snap: { inputs: VmixInput[]; overlays: Record<string, string> }) {
+    const on = snap.overlays[1];
+    if (!on) return;
+    this.pushUndo(snap.overlays);
+    const input = snap.inputs.find((i) => i.number === on);
+    if (getLtConfig(this.ctx.db).overlay === 1 && this.isLtTitle(input)) return;
+    await this.overlayOut(1, snap.overlays);
   }
 
   async undo() {
@@ -719,6 +1121,20 @@ export class Show {
     }
     this.patchState({ undo: st.undo.slice(0, -1) });
     return { restored: prev };
+  }
+
+  /** OUT: whatever is on OV1 goes out with its animation (a lower third through its own out, so its photo flies down first). */
+  async layerOut() {
+    const s = await this.snapshot();
+    const on = s.overlays[1];
+    if (!on) return { out: '' };
+    this.pushUndo(s.overlays);
+    const cfg = getLtConfig(this.ctx.db);
+    const input = s.inputs.find((i) => i.number === on);
+    const name = (input?.title ?? '').toLowerCase().replace(/\.gtzip$/, '');
+    if (cfg.overlay === 1 && [cfg.photoInput, cfg.noPhotoInput].some((x) => x && x.toLowerCase() === name)) await this.lt.out();
+    else await this.overlayOut(1, s.overlays);
+    return { out: name };
   }
 
   async allOut() {
@@ -741,29 +1157,125 @@ export class Show {
   }
 
   // ---------- break scene ----------
-  slides() {
-    const out: { kind: 'schedule' | 'results'; fleetId?: string }[] = [{ kind: 'schedule' }];
+  slides(): { kind: 'schedule' | 'results'; fleetId?: string }[] {
+    const out: { kind: 'schedule' | 'results'; fleetId?: string }[] = this.config.breakSchedule ? [{ kind: 'schedule' }] : [];
     for (const f of this.breakFleets()) out.push({ kind: 'results', fleetId: f });
-    return out;
+    return out.length ? out : [{ kind: 'schedule' as const }];
+  }
+  private wait(ms: number) { return ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve(); }
+  /**
+   * BREAK SCENE: three inputs on three overlay channels, each with its own in and out animation: the L-bar (channel 2),
+   * the ticker (3: the ticker picked last, else the automatic one) and the day schedule (4), which then switches with
+   * the group results. Again: all three go out.
+   */
+  private async toggleBreak() {
+    const snap = await this.snapshot();
+    const cfg = this.config;
+    if (this.breakOnAir(snap)) {
+      this.pushUndo(snap.overlays);
+      await this.sceneOut(snap.overlays);
+      return { out: 'break' };
+    }
+    this.pushUndo(snap.overlays);
+    const lbar = this.resolve(this.graphic('lbar'), snap.inputs);
+    const tk = this.resolve(this.graphic('ticker'), snap.inputs);
+    const board = this.slideInput(this.slides()[0], snap.inputs);
+    // what sits on channel 1 or on the lower third channel goes; an input of the scene leaves at once (no out animation),
+    // so it comes in on its own channel with its in animation
+    const mine = new Set([lbar, tk, board].filter(Boolean).map((i) => i!.number));
+    for (const n of new Set([1, getLtConfig(this.ctx.db).overlay])) {
+      if (!snap.overlays[n] || [cfg.breakLbarLayer, cfg.breakTickerLayer, cfg.breakBoardLayer].includes(n)) continue;
+      if (mine.has(snap.overlays[n])) await this.vmix(`?Function=OverlayInput${n}Off`);
+      else await this.overlayOut(n, snap.overlays);
+    }
+    if (lbar) { await this.fill(this.graphic('lbar'), lbar); await this.overlayIn(cfg.breakLbarLayer, lbar, snap.overlays); }
+    else this.log('Break scene: no L-bar input in vMix (ssl_lbar).');
+    if (tk) {
+      const t = this.state.tickerId ? this.tickerVersion(this.state.tickerId) : undefined;
+      const text = t ? tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : this.tickerText();
+      await this.set(tk, new Map([[this.textField(tk, /ticker|text/i) ?? '', text]]));
+      await this.overlayIn(cfg.breakTickerLayer, tk, snap.overlays);
+    }
+    await this.fillSlide(this.slides()[0], board);
+    await this.overlayIn(cfg.breakBoardLayer, board, snap.overlays);
+    this.patchState({ slide: 0 });
+    if (cfg.breakAuto) this.startRotation();
+    return { in: 'break', lbar: lbar?.title ?? null, ticker: tk?.title ?? null, board: board.title };
+  }
+  private slideInput(s: { kind: 'schedule' | 'results'; fleetId?: string }, inputs: VmixInput[]) {
+    if (s.kind === 'results' && s.fleetId) return this.resultsFor(s.fleetId, inputs);
+    return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);
+  }
+  private async fillSlide(s: { kind: 'schedule' | 'results'; fleetId?: string }, input: VmixInput) {
+    if (s.kind === 'results' && s.fleetId) await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
+    else await this.fill(this.graphic('schedule'), input);
+  }
+  /**
+   * The next board on the board channel. On air the board there goes out (its out animation), the next one gets its
+   * data and comes in (its in animation); off air only the data and the place in the order change.
+   */
+  private async showSlide(i: number) {
+    const slides = this.slides();
+    const s = slides[i];
+    const snap = await this.snapshot();
+    const n = this.config.breakBoardLayer;
+    const input = this.slideInput(s, snap.inputs);
+    const onAir = this.breakOnAir(snap);
+    // the same title for two groups (group H, then group I): out first, the new group's data only once it is off
+    // air, then in; meanwhile the data sync leaves the title alone
+    this.switching = true;
+    try {
+      if (onAir && snap.overlays[n]) {
+        await this.vmix(`?Function=OverlayInput${n}Out`);
+        await this.wait(this.config.breakOutMs);
+      }
+      this.patchState({ slide: i });
+      await this.fillSlide(s, input);
+      if (onAir) await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+    } finally { this.switching = false; }
+    return { slide: i, of: slides.length, showing: s };
+  }
+  /** A ticker version on the ticker on air (break channel or channel 1): out, the new text, in. */
+  private async swapTicker(t: { id: string; data: Record<string, string> }, input: VmixInput, overlays: Record<string, string>) {
+    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+    const field = this.textField(input, /ticker|text/i) ?? '';
+    const n = [this.config.breakTickerLayer, this.graphic('ticker').overlay].find((x) => overlays[x] === input.number);
+    if (n) {
+      await this.vmix(`?Function=OverlayInput${n}Out`);
+      await this.wait(this.config.breakOutMs);
+      await this.set(input, new Map([[field, text]]));
+      await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+    } else await this.set(input, new Map([[field, text]]));
+    this.patchState({ tickerId: t.id });
+    return text;
+  }
+  /** A ticker key of the break scene: on air the ticker goes out and comes back with it; off air it is the one the next break shows. */
+  async breakTicker(which: string) {
+    const t = this.tickerVersion(which);
+    if (!t) throw badRequest(`No ticker ${which}. Add it under General graphics → Tickers.`);
+    const snap = await this.snapshot();
+    const input = this.need(this.graphic('ticker'), snap.inputs);
+    const text = await this.swapTicker(t, input, snap.overlays);
+    return { ticker: t.name, text, onAir: this.breakOnAir(snap) };
+  }
+  /** NEXT TICKER: the next version of Tickers (General graphics); on air it goes out and comes back in with the new text. */
+  async nextTicker() {
+    const list = this.tickers();
+    if (!list.length) throw badRequest('No tickers. Add them under General graphics → Tickers.');
+    const at = list.findIndex((x) => x.id === this.state.tickerId);
+    const t = list[(at + 1) % list.length];
+    const snap = await this.snapshot();
+    const input = this.need(this.graphic('ticker'), snap.inputs);
+    const text = await this.swapTicker(t, input, snap.overlays);
+    return { ticker: t.name, text };
   }
   async nextSlide() {
-    const slides = this.slides();
-    const st = this.state;
-    const i = (st.slide + 1) % slides.length;
-    const s = slides[i];
-    const { inputs } = await this.snapshot();
-    const g = this.graphic(s.kind === 'schedule' ? 'schedule' : 'results');
-    const input = this.need(g, inputs);
-    if (s.kind === 'results' && s.fleetId) await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
-    const scene = this.need(this.graphic('break'), inputs);
-    await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${encodeURIComponent(`${this.config.breakLayer},${input.key || input.number}`)}`);
-    this.patchState({ slide: i });
-    return { slide: i, of: slides.length, showing: s };
+    return this.showSlide((this.state.slide + 1) % this.slides().length);
   }
   startRotation() {
     this.stopRotation();
     this.patchState({ rotating: true });
-    this.rotation = setInterval(() => { this.nextSlide().catch((e) => this.log(`Break rotation: ${e?.message ?? e}`)); }, this.config.rotateSeconds * 1000);
+    this.rotation = setInterval(() => { if (!this.config.breakAuto) { this.stopRotation(); return; } this.nextSlide().catch((e) => this.log(`Break rotation: ${e?.message ?? e}`)); }, this.config.rotateSeconds * 1000);
     this.rotation.unref?.();
   }
   stopRotation() {
@@ -771,7 +1283,15 @@ export class Show {
     this.rotation = null;
     if (this.state.rotating) this.patchState({ rotating: false });
   }
-  async toggleRotation() { if (this.rotation) this.stopRotation(); else this.startRotation(); return { rotating: !!this.rotation }; }
+  /** AUTO SWITCH on or off: kept for the next break too; on air it starts or stops at once. */
+  async toggleRotation() {
+    const on = !this.config.breakAuto;
+    setShowConfig(this.ctx.db, { breakAuto: on });
+    const snap = await this.snapshot().catch(() => null);
+    if (on && snap && this.breakOnAir(snap)) this.startRotation();
+    if (!on) this.stopRotation();
+    return { rotating: !!this.rotation, auto: on };
+  }
 
   async tickerMode() {
     const mode = this.state.tickerMode === 'next' ? 'end' : 'next';
@@ -799,9 +1319,14 @@ export class Show {
   }
   private async dispatch(kind: string, arg: string): Promise<unknown> {
     switch (kind) {
-      case 'show': return arg === 'lineup5' ? this.lineupLt() : this.toggle(arg);
+      case 'lult': return this.lineupLt(arg);
+      case 'lultswap': return this.lineupLtSwap();
+      case 'show': return arg === 'lineup5' ? this.lineupLt() : arg === 'compare' && this.config.fleetId && this.compareGroups().some((g) => g.fleetId === this.config.fleetId) ? this.compareGroup(this.config.fleetId) : this.toggle(arg);
+      case 'compare': return this.compareGroup(arg);
+      case 'results': return this.resultsGroup(arg);
       case 'qualified': return this.qualified(arg);
       case 'comm': return this.commentator(arg);
+      case 'person': return this.person(arg);
       case 'anthem': return this.lt.showTeam(this.teamRef(arg).code);
       case 'lineup': return this.lineup(arg);
       case 'sailorof': { const [code, slot = ''] = arg.split('/'); return this.sailorOf(code, slot); }
@@ -811,15 +1336,17 @@ export class Show {
       case 'photo': { const m = ({ auto: 'on', on: 'off', off: 'auto' } as const)[this.state.photo]; this.patchState({ photo: m }); return { photo: m }; }
       case 'next': return this.lt.nextLine();
       case 'teamlt': return this.lt.showTeam(arg ? this.teamRef(arg).code : this.boat(this.state.boat).code);
-      case 'ltout': return this.lt.out();
+      case 'out': case 'ltout': case 'boardout': return this.layerOut();
       case 'bug': return this.bug(arg);
       case 'ticker': return this.ticker(arg);
-      case 'bugout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(3, s.overlays); return { out: 'bug' }; }
-      case 'boardout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(1, s.overlays); return { out: 'board' }; }
-      case 'breakout': case 'scene4out': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
+      case 'bugout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(this.graphic('bug').overlay, s.overlays); return { out: 'bug' }; }
+      case 'breakout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
       case 'rotate': return this.toggleRotation();
       case 'nextslide': return this.nextSlide();
+      case 'nextticker': return this.nextTicker();
+      case 'breakticker': return this.breakTicker(arg);
       case 'tickermode': return this.tickerMode();
+      case 'comparemark': return this.compareMark();
       case 'undo': return this.undo();
       case 'allout': return this.allOut();
       case 'panic': return this.panic();
@@ -841,7 +1368,7 @@ export class Show {
     let team: { id: string; code: string } | undefined; // the team whose national colours the key takes
     if (key.team) {
       // a key of a team's page (or the TEAMS page): its text is fixed, the team gives the colours
-      const t = listTeams(this.ctx).find((x) => x.code === key.team);
+      const t = this.teams().find((x) => x.code === key.team);
       team = t;
       if (t && kind === 'sailorof') onAir = lt.onAir && lt.kind === 'sailor' && lt.teamId === t.id && lt.slot === arg.split('/')[1];
       if (t && (kind === 'teamlt' || kind === 'anthem')) onAir = lt.onAir && lt.kind === 'team' && lt.teamId === t.id;
@@ -872,18 +1399,30 @@ export class Show {
       text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
       empty = !t;
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
+    } else if (kind === 'breakticker') {
+      const t = this.tickerVersion(arg);
+      text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
+      empty = !t;
+      if (t) { active = st.tickerId === t.id; onAir = active && !!ctxt && this.breakOnAir({ inputs: ctxt.inputs, overlays: ov }); }
+    } else if (kind === 'person') {
+      const p = this.people()[Number(arg) - 1];
+      text = p ? [p.name, p.surname].map((x) => x.trim().toUpperCase().slice(0, 20)).filter(Boolean).join('\\n') : '';
+      empty = !p;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
+    else if (kind === 'comparemark') text = `COMPARE:\\n${st.compareMark === 'emblem' ? 'EMBLEM' : 'FLAG'}`;
+    else if (kind === 'nextticker') { const t = st.tickerId ? this.tickers().find((x) => x.id === st.tickerId) : undefined; text = `NEXT TICKER\\n${(t?.name ?? 'AUTO').toUpperCase().slice(0, 14)}`; }
     else if (kind === 'tickermode') text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
-    else if (kind === 'rotate') { text = st.rotating ? 'ROTATION\\n⏸ STOP' : 'ROTATION\\n▶ START'; active = st.rotating; }
+    else if (kind === 'rotate') { text = this.config.breakAuto ? 'AUTO SWITCH\\nON' : 'AUTO SWITCH\\nOFF'; active = this.config.breakAuto; }
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
-    if (key.action === 'show:lineup5' && st.lineupPart) text = `LINEUP LT\\n${st.lineupPart === 1 ? '▶ PART 2' : 'OUT'}`;
-    if (kind === 'break') onAir = isOn('break');
-    if (neutral) { onAir = false; active = false; }
+    if (kind === 'results' && ctxt) { const grp = this.allCompareGroups().find((x) => x.key === compareKey(arg)); const i = grp && this.ownResults(grp.fleetId, ctxt.inputs); onAir = !!i && ov[1] === i.number; }
+    if (kind === 'compare' && ctxt) { const i = ctxt.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(compareKey(arg)).toLowerCase()); onAir = !!i && ov[1] === i.number; }
+    if (kind === 'break') onAir = !!ctxt && this.breakOnAir({ inputs: ctxt.inputs, overlays: ov });
+    if (neutral) { onAir = false; active = false; if (key.kind === 'mode') text = key.text; } // a fixed key: its name, not today's mode
     if (key.custom) text = key.custom.replace(/\{auto\}/g, text);
     // team and sailor keys in the team's national colours, the feedback (selected / on air) in its colours too;
     // a colour set on the key or on its kind in the key editor still wins
-    const nation = team && !empty && !key.bg && !this.config.kindColours[key.kind] ? teamKeyColours(this.ctx.db, team.code) : null;
+    const nation = team && !empty && !key.bg && !this.config.kindColours[key.kind] ? this.nation(team.code) : null;
     if (nation) {
       const l = teamKeyLook(nation, text, { active, onAir });
       return { text: l.text, bg: l.bg, fg: key.fg || l.fg, onAir, active, empty };
@@ -913,20 +1452,22 @@ export class Show {
     };
   }
 
-  /** Key texts and colours into Companion (POST /api/location/<page>/<row>/<col>/style), only what changed. */
+  /**
+   * The keys of the version pages (bugs, tickers, people) get their names in Companion as soon as a version is added
+   * or renamed (POST /api/location/<page>/<row>/<col>/style). Only texts and fixed colours: no on-air feedback.
+   */
   async pushLabels(force = false) {
     const cfg = this.config;
     const lt = getLtConfig(this.ctx.db);
-    if (!cfg.labels || !cfg.liveKeys || !lt.companionUrl) return { sent: 0 };
+    if (!cfg.labels || !lt.companionUrl) return { sent: 0 };
     if (force) this.labels.clear();
     let n = 0;
     try {
-      const snap = await this.snapshot().catch(() => undefined);
       for (const p of this.pages()) {
         for (const [r, row] of p.keys.entries()) {
           for (const [c, key] of row.entries()) {
-            if (!key || key.kind === 'nav') continue;
-            const l = await this.keyLook(key, snap);
+            if (!key || !/^(bug|ticker|person):/.test(key.action)) continue;
+            const l = await this.keyLook(key, undefined, true);
             const q = `text=${encodeURIComponent(l.text)}&bgcolor=${encodeURIComponent(l.bg)}&color=${encodeURIComponent(l.fg)}&size=auto`;
             const id = `${p.page}/${r}/${c}`;
             if (this.labels.get(id) === q) continue;
@@ -946,13 +1487,74 @@ export class Show {
    * has its text and colours fixed in it, as they are now (no live labels).
    */
   async companionPreset(base: string, vmixBase: string) {
+    await this.snapshot().catch(() => null);
     const pages = this.pages();
     const looks = await Promise.all(pages.map(async (p) => ({ ...p, keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
     return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
   }
 
   /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
-  start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }
+  start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); }, ms); this.timer.unref?.(); }
+
+  private syncSig = '';
+  private syncing = false;
+  private syncError = '';
+  /**
+   * Keeps the data titles in step with the dashboard without a key press: Day schedule (Schedule tab), Group results
+   * and Team comparison of the group picked at the top. After any change in the dashboard (or a new day), only the
+   * fields whose value differs from what vMix shows in the title are set.
+   */
+  async syncData() {
+    if (this.syncing) return { sent: 0 };
+    const ev = activeEvent(this.ctx.db);
+    const today = todayIn(ev.timezone);
+    const sig = `${(this.ctx.db.prepare('SELECT total_changes() AS n').get() as { n: number }).n}|${today}`;
+    if (sig === this.syncSig) return { sent: 0 };
+    this.syncing = true;
+    let sent = 0;
+    try {
+      const { inputs, overlays } = await this.snapshot();
+      const fleetId = this.config.fleetId;
+      const jobs: { input: VmixInput; f: () => Map<string, string> | null }[] = [];
+      // the Welcome bar follows the Welcome tab (and today's date) without a key
+      const wel = this.resolve(this.graphic('welcome'), inputs);
+      if (wel) jobs.push({ input: wel, f: () => showDataFields(this.ctx, 'welcome', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+      const sched = this.resolve(this.graphic('schedule'), inputs);
+      if (sched) jobs.push({ input: sched, f: () => showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+      // General graphics whose data is only on their tab: Weather, Race officials, Follow us
+      for (const id of ['weather', 'officials', 'socials']) {
+        const g = this.graphics().find((x) => x.id === id);
+        const input = g && this.resolve(g, inputs);
+        if (input) jobs.push({ input, f: () => showDataFields(this.ctx, id, { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+      }
+      // the results title shows the group of the break scene's board while the scene is on air (one input, the
+      // groups in turn), else the group picked at the top; not touched while the board is switching
+      const slide = this.slides()[this.state.slide];
+      const resFleet = this.breakOnAir({ inputs, overlays }) && slide?.kind === 'results' && slide.fleetId ? slide.fleetId : fleetId;
+      const res = resFleet && !this.switching ? this.resolve(this.graphic('results'), inputs) : undefined;
+      if (res && !this.resultsTargets(inputs).some((t) => t.fleetId && t.input.number === res.number)) jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, resFleet, res).fields });
+      // each group's own results input (ssl_results_H…) keeps its group's data
+      if (!this.switching) for (const t of this.resultsTargets(inputs)) if (t.fleetId) { const fid = t.fleetId; jobs.push({ input: t.input, f: () => resultFieldsFor(this.ctx, fid, t.input).fields }); }
+      // Team comparison: every group's own input, and the shared one for the group picked at the top
+      for (const t of this.compareTargets(inputs)) jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
+      for (const { input, f: make } of jobs) {
+        const f = make();
+        if (!f) continue;
+        const match = titleFieldMatcher(input.fields);
+        // the first name for a field wins, as in set()
+        const seen = new Set<string>();
+        const changed = new Map([...f].filter(([k, v]) => { const r = match(k); if (r === undefined || seen.has(r)) return false; seen.add(r); return (input.values?.[r] ?? '') !== v; }));
+        if (changed.size) sent += await this.set(input, changed);
+      }
+      this.syncSig = sig;
+      this.syncError = '';
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      if (msg !== this.syncError) this.log(`vMix data: ${msg}`);
+      this.syncError = msg;
+    } finally { this.syncing = false; }
+    return { sent };
+  }
   stop() { if (this.timer) clearInterval(this.timer); this.stopRotation(); }
 
   /**
@@ -969,10 +1571,14 @@ export class Show {
     if (!fs.existsSync(file)) fs.writeFileSync(file, encodePng(1920, 1080, (x, y) => (x < 24 && y < 24 ? [245, 158, 11, 255] : [0, 0, 0, 0])));
     const root = getSetting(this.ctx.db, 'paths.vmixAssetsRoot');
     const vmixPath = root ? joinVmixPath(root, 'placeholders/placeholder.png') : file;
-    for (const g of this.graphics()) {
-      if (this.resolve(g, inputs)) continue;
+    const want = this.graphics().flatMap((g) => {
+      if (g.id === 'compare') return this.compareGroups().map((x) => compareInput(x.key)); // a Team comparison per group
+      if (this.resolve(g, inputs)) return [];
       const name = g.inputs.map((x) => x.replace('{n}', String(this.boats().length || 4)).replace('{crew}', '9')).find((x) => !x.includes('{'));
-      if (!name) continue;
+      return name ? [name] : [];
+    });
+    for (const name of want) {
+      if (inputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === name.toLowerCase())) continue;
       await this.vmix(`?Function=AddInput&Value=${encodeURIComponent(`Image|${vmixPath}`)}`);
       const after = parseVmixXml(await this.vmix(''));
       const fresh = after.find((i) => !inputs.some((o) => o.key === i.key));
@@ -988,71 +1594,126 @@ export class Show {
 // ---------- Companion page files ----------
 type KeyLook = { text: string; bg: string; fg: string; empty: boolean };
 
-/** Companion's full export (format 4, which every later Companion upgrades on import): all pages, one HTTP connection. */
+/** Companion 5.1's export format (12): what Companion 5.1 exports itself, imported as it is. */
+const FILE_VERSION = 12;
+const BUILD = '5.1.2';
+type Controls = Record<number, Record<number, unknown>>;
+
+/** The keys of a deck page as Companion buttons; on the PEOPLE page the producer's own keys stay as they are. */
+function pageControls(cfg: ShowConfig, p: Pick<DeckPage, 'page' | 'name'>, keys: ({ key: DeckKey; text: string; bg: string; fg: string } | null)[][], b: string, taken = new Set<string>()): Controls {
+  const controls: Controls = {};
+  keys.forEach((row, r) => row.forEach((x, c) => {
+    if (!x) return;
+    const id = `p${p.page}r${r}c${c}`;
+    const act = x.key.action.startsWith('nav:') ? setPage(id, Number(x.key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(x.key.action)}`);
+    (controls[r] ??= {})[c] = control(x.text, hex(x.bg), [act], hex(x.fg));
+  }));
+  // the producer's PEOPLE page: each of its keys as it is (its dashboard calls to this dashboard's address)
+  if (p.name === 'PEOPLE') for (const [r, row] of Object.entries(keptControls(b))) for (const [c, ctl] of Object.entries(row)) (controls[Number(r)] ??= {})[Number(c)] = ctl;
+  else addDsk(controls, p.page, (r, c) => !!keys[r]?.[c] || taken.has(`${r}/${c}`));
+  return controls;
+}
+/**
+ * The ATEM key of the PEOPLE page (DOWNSTREAM KEY: run auto transmission) on every page: in its place there (row 3,
+ * last key) or, where a key is there, in the first free place of the bottom rows (UNDO's old place first).
+ */
+function addDsk(controls: Controls, page: number, used: (r: number, c: number) => boolean) {
+  const dsk = KEPT_PEOPLE_PAGE.controls[DSK_AT[0]]?.[DSK_AT[1]];
+  if (!dsk) return;
+  const free = (r: number, c: number) => !used(r, c) && !controls[r]?.[c];
+  const order: [number, number][] = [DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c] as [number, number]))];
+  const at = order.find(([r, c]) => free(r, c));
+  if (!at) return;
+  const ctl = JSON.parse(JSON.stringify(dsk).replace(/"id":"([A-Za-z0-9_-]{21})"/g, `"id":"$1p${page}"`));
+  (controls[at[0]] ??= {})[at[1]] = ctl;
+}
+/** Where the downstream key is on the producer's PEOPLE page (row 2, last column). */
+const DSK_AT: [number, number] = [2, 7];
+/** The kept page's keys without UNDO (no UNDO key on any page). */
+function keptControls(b: string): Controls {
+  const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
+  const out: Controls = JSON.parse(json);
+  for (const row of Object.values(out)) for (const [c, ctl] of Object.entries(row)) if (/api\/show\/do\?a=undo"/.test(JSON.stringify(ctl))) delete row[Number(c)];
+  return out;
+}
+/** The places of the producer's PEOPLE page that have a key ("row/col"). */
+export const KEPT_PEOPLE_PLACES = new Set(Object.entries(KEPT_PEOPLE_PAGE.controls).flatMap(([r, row]) => Object.keys(row).map((c) => `${r}/${c}`)));
+/** The dashboard action of a key of the producer's PEOPLE page, if it calls this dashboard. */
+export function keptPeopleAction(r: number, c: number): string | null {
+  const url: string = KEPT_PEOPLE_PAGE.controls[r]?.[c]?.steps?.[0]?.action_sets?.down?.find((a: any) => a.definitionId === 'get')?.options?.url?.value ?? '';
+  const m = url.match(/\/api\/show\/do\?a=([^&]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/** The producer's own connection to the dashboard on that page: the preset's one instead. */
+const KEPT_HTTP = Object.entries(KEPT_PEOPLE_PAGE.connections).find(([, x]) => x.moduleId === 'generic-http')?.[0] ?? '';
+const connections = () => ({ ...Object.fromEntries(Object.entries(KEPT_PEOPLE_PAGE.connections).filter(([id]) => id !== KEPT_HTTP)), [CONN]: CONN_DEF });
+
+/** Companion's full export: all pages, the dashboard's HTTP connection (and the producer's vMix / ATEM ones, matched by name). */
 export function companionPresetFile(cfg: ShowConfig, pages: (Omit<DeckPage, 'keys'> & { keys: ({ key: DeckKey; look: KeyLook } | null)[][] })[], base: string, vmixBase: string, graphics: Graphic[]) {
   const b = base.replace(/\/+$/, '');
-  const out: Record<number, { name: string; controls: Record<number, Record<number, unknown>>; gridSize: unknown }> = {};
+  const out: Record<number, { name: string; controls: Controls; gridSize: unknown }> = {};
   for (const p of pages) {
-    const controls: Record<number, Record<number, unknown>> = {};
-    p.keys.forEach((row, r) => row.forEach((x, c) => {
-      if (!x || (x.look.empty && x.key.kind !== 'nav')) return;
-      const { key, look } = x;
-      const id = `p${p.page}r${r}c${c}`;
-      const act = key.action.startsWith('nav:') ? setPage(id, Number(key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(key.action)}`);
-      (controls[r] ??= {})[c] = control(look.text, hex(look.bg), [act], hex(look.fg));
-    }));
-    out[p.page] = { name: `SSL ${p.name}`, controls, gridSize: GRID };
+    const keys = p.keys.map((row) => row.map((x) => (!x || (x.look.empty && x.key.kind !== 'nav') ? null : { key: x.key, text: x.look.text, bg: x.look.bg, fg: x.look.fg })));
+    // a key with no text now (a free version place) keeps its place: its name comes when the version is added
+    const taken = new Set(p.keys.flatMap((row, r) => row.flatMap((x, c) => (x ? [`${r}/${c}`] : []))));
+    out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b, taken), gridSize: GRID };
   }
   const fb = fallbackControls(cfg, vmixBase, graphics);
+  addDsk(fb, PRESET_PAGES.fallback, () => false);
   out[PRESET_PAGES.fallback] = { name: 'SSL FALLBACK', controls: fb, gridSize: GRID };
   return {
-    version: 4, type: 'full',
+    version: FILE_VERSION, type: 'full', companionBuild: BUILD,
     pages: out,
     triggers: {},
     custom_variables: {},
-    instances: { [CONN]: CONN_DEF },
+    instances: connections(),
+    connectionCollections: [],
   };
 }
 const GRID = { minColumn: 0, maxColumn: 7, minRow: 0, maxRow: 3 };
 const COLOURS = (kind: string) => ({ board: 0x1e3a8a, lt: 0x166534, bug: 0xa16207, scene: 0x0f766e, team: 0x1e3a5f, sailor: 0x27303f, nav: 0x3f3f46, safety: 0x7c2d12, mode: 0x4c1d95 } as Record<string, number>)[kind] ?? 0x3f3f46;
 
 const hex = (c: string) => parseInt(c.replace('#', ''), 16) || 0;
+const v = <T>(value: T) => ({ value, isExpression: false });
+/** A button as Companion 5.1 has it: a background box and a text layer. */
 const control = (text: string, bg: number, down: unknown[], fg = 0xffffff) => ({
-  type: 'button',
-  style: { text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center', color: fg, bgcolor: bg, show_topbar: 'default' },
-  options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
+  type: 'button-layered',
+  style: { layers: [
+    { id: 'canvas', name: 'Canvas', usage: 'auto', type: 'canvas', decoration: v('default'), showStatusIcons: v('default') },
+    { id: 'box0', name: 'Background', usage: 'auto', type: 'box', pinnedProperties: ['color'], enabled: v(true), opacity: v(100), x: v(0), y: v(0), width: v(100), height: v(100), rotation: v(0), color: v(bg), cornerRadius: v(0), borderWidth: v(0), borderColor: v(0), borderPosition: v('inside') },
+    { id: 'text0', name: 'Text', usage: 'auto', type: 'text', pinnedProperties: ['text', 'fontsize', 'fontsizeAllowShrink', 'color', 'halign', 'valign'], enabled: v(true), opacity: v(100), x: v(0), y: v(0), width: v(100), height: v(100), rotation: v(0), text: v(text), color: v(fg), halign: v('center'), valign: v('center'), fontsize: v(100), fontsizeAllowShrink: v(true), font: v('companion-sans'), weight: v('normal'), styles: v([]), outlineColor: v(4278190080) },
+  ] },
+  options: { stepProgression: 'auto', stepExpression: '', rotaryActions: false, canModifyStyleInApis: true, notes: '' },
   feedbacks: [],
   steps: { 0: { action_sets: { down, up: [] }, options: { runWhileHeld: [] } } },
+  localVariables: [],
 });
 const CONN = 'ssl_dashboard_show';
-const http = (id: string, url: string) => ({ id, action: 'get', instance: CONN, options: { url, header: '' }, delay: 0 });
-const setPage = (id: string, page: number) => ({ id, action: 'set_page', instance: 'internal', options: { controller: 'self', controller_from_variable: false, controller_variable: '', page, page_from_variable: false, page_variable: '' }, delay: 0 });
+const http = (id: string, url: string) => ({ type: 'action', id, definitionId: 'get', connectionId: CONN, options: { url: v(url), header: v('') }, upgradeIndex: 3 });
+const setPage = (id: string, page: number) => ({ type: 'action', id, definitionId: 'set_page', connectionId: 'internal', options: { page: v(page), surfaceId: v('self') }, children: {} });
 
-const CONN_DEF = { instance_type: 'generic-http', label: 'ssl_dashboard_show', enabled: true, isFirstInit: false, lastUpgradeIndex: -1, sortOrder: 0, config: { prefix: '', proxyAddress: '', rejectUnauthorized: true } };
-function pageFile(name: string, page: number, controls: Record<number, Record<number, unknown>>) {
+const CONN_DEF = { moduleInstanceType: 'connection', moduleId: 'generic-http', moduleVersionId: '3.2.0', sortOrder: 0, label: 'ssl_dashboard_show', isFirstInit: false, config: { prefix: '', proxyAddress: '', rejectUnauthorized: true, insecureHTTPParser: false, authType: 'none' }, secrets: {}, lastUpgradeIndex: 3, enabled: true };
+function pageFile(name: string, page: number, controls: Controls) {
   return {
-    version: 4, type: 'page',
-    page: { name, controls, gridSize: { minColumn: 0, maxColumn: 7, minRow: 0, maxRow: 3 } },
-    instances: { [CONN]: CONN_DEF },
+    version: FILE_VERSION, type: 'page', companionBuild: BUILD,
+    page: { name, controls, gridSize: GRID },
+    instances: connections(),
+    connectionCollections: [],
     oldPageNumber: page,
   };
 }
 
-/** One Companion page export (format 4, upgraded by every later Companion on import) per deck page, plus the fallback page. */
+/** One Companion page export per deck page, plus the fallback page. */
 export function companionFiles(cfg: ShowConfig, base: string, vmixBase: string, graphics: Graphic[]) {
   const b = base.replace(/\/+$/, '');
   const files: { name: string; page: number; file: ReturnType<typeof pageFile> }[] = [];
   for (const p of deckPages(cfg)) {
-    const controls: Record<number, Record<number, unknown>> = {};
-    p.keys.forEach((row, r) => row.forEach((key, c) => {
-      if (!key) return;
-      const id = `p${p.page}r${r}c${c}`;
-      const act = key.action.startsWith('nav:') ? setPage(id, Number(key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(key.action)}`);
-      (controls[r] ??= {})[c] = control(key.custom ? key.custom.replace(/\{auto\}/g, key.text) : key.text, hex(keyBg(cfg, key)), [act], key.fg ? hex(key.fg) : 0xffffff);
-    }));
-    files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, controls) });
+    const keys = p.keys.map((row) => row.map((key) => (key ? { key, text: key.custom ? key.custom.replace(/\{auto\}/g, key.text) : key.text, bg: keyBg(cfg, key), fg: key.fg || '#ffffff' } : null)));
+    files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, pageControls(cfg, p, keys, b)) });
   }
   const fb = fallbackControls(cfg, vmixBase, graphics);
+  addDsk(fb, PRESET_PAGES.fallback, () => false);
   files.push({ name: 'fallback', page: PRESET_PAGES.fallback, file: pageFile('SSL FALLBACK', cfg.fallbackPage, fb) });
   return files;
 }
@@ -1060,9 +1721,9 @@ export function companionFiles(cfg: ShowConfig, base: string, vmixBase: string, 
 /** The fallback page: straight to vMix, no dashboard needed; the data stays as it was last set. */
 function fallbackControls(cfg: ShowConfig, vmixBase: string, graphics: Graphic[]) {
   const v = vmixBase.replace(/\/+$/, '');
-  const fb: Record<number, Record<number, unknown>> = {};
+  const fb: Controls = {};
   const first = (g: Graphic) => g.inputs.map((x) => x.replace('{n}', '4').replace('{crew}', '9')).find((x) => !x.includes('{'))!;
-  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'raceresults', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'replay', 'socials', 'sponsors', 'break', 'lbar'];
+  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'socials', 'sponsors', 'lbar'];
   const fbKeys = pick.map((id) => graphics.find((g) => g.id === id)).filter((g): g is Graphic => !!g);
   fbKeys.slice(0, 16).forEach((g, i) => {
     const r = Math.floor(i / 8), c = i % 8;

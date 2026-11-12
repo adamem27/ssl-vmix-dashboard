@@ -8,7 +8,7 @@ import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 import { findInput, parseVmixXml, VmixInput, vmixUrl } from './vmixResults.js';
-import { LtRole, ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
+import { keyOf, LtRole, ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
 import { stageTeamIds } from './workbookSheets.js';
 
 /**
@@ -32,6 +32,8 @@ export const ltConfigSchema = z.object({
   barSlot: z.string().max(40),
   flagSlot: z.string().max(40),
   emblemSlot: z.string().max(40),
+  /** teams whose team lower third and Qualified take the Emblem light PNG whatever the Emblem place is (MEX) */
+  emblemLightTeams: z.array(z.string().max(10)).max(40),
   /** a country key also puts that team's lower third on air (otherwise it only picks the team) */
   countryShowsTeam: z.boolean(),
   /** Companion address for the key labels, e.g. http://127.0.0.1:8000 ('' = do not send labels) */
@@ -44,18 +46,28 @@ export const ltConfigSchema = z.object({
 export type LtConfig = z.infer<typeof ltConfigSchema>;
 
 export const DEFAULT_LT: LtConfig = {
-  photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 2,
-  barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', countryShowsTeam: false,
+  photoInput: 'lowerthird_photo', noPhotoInput: 'lowerthird_no_photo', overlay: 1,
+  barSlot: 'lowerthird_photo', flagSlot: 'flag_big', emblemSlot: 'emblem_light', emblemLightTeams: ['MEX'], countryShowsTeam: false,
   companionUrl: '', companionPage: 1, rows: 4, cols: 8,
   fields: { top: 'Top text', bottom: 'Bottom text', photo: 'PHOTO', flag: 'Flag', emblem: 'Emblem', bar: 'Bar' },
 };
 
 const CONFIG_KEY = 'lt.config';
+const LAYER1_KEY = 'lt.config.layer1';
 export function getLtConfig(db: AssetCtx['db']): LtConfig {
   try {
     const saved = JSON.parse(getSetting(db, CONFIG_KEY) || '{}');
     return ltConfigSchema.parse({ ...DEFAULT_LT, ...saved, fields: { ...DEFAULT_LT.fields, ...(saved.fields ?? {}) } });
   } catch { return DEFAULT_LT; }
+}
+/** Every graphic is on OV1 now (only the break scene keeps OV4): lower thirds saved on another overlay move over, once. */
+export function moveLtToLayer1(db: AssetCtx['db']) {
+  if (getSetting(db, LAYER1_KEY)) return;
+  setSetting(db, LAYER1_KEY, '1');
+  try {
+    const saved = JSON.parse(getSetting(db, CONFIG_KEY) || '{}');
+    if (saved.overlay && saved.overlay !== 1) setSetting(db, CONFIG_KEY, JSON.stringify({ ...saved, overlay: 1 }));
+  } catch { /* nothing saved */ }
 }
 export function setLtConfig(db: AssetCtx['db'], patch: Partial<LtConfig>) {
   const cur = getLtConfig(db);
@@ -101,8 +113,8 @@ export function crewOf(ctx: AssetCtx, teamId: string): LtSailor[] {
 }
 
 const fullName = (s: { firstName: string; lastName: string }) => [s.firstName.trim(), s.lastName.trim().toUpperCase()].filter(Boolean).join(' ');
-/** The lines Bottom text cycles through for a sailor: number and position first, then each best result. */
-export const sailorLines = (s: LtSailor) => [[s.number, s.position.toUpperCase()].filter(Boolean).join('  I  '), ...s.best].filter(Boolean);
+/** The lines Bottom text cycles through for a sailor: number and position first (9 | MIDBOW, as the best results are typed), then each best result. */
+export const sailorLines = (s: LtSailor) => [[s.number, s.position.toUpperCase()].filter(Boolean).join(' | '), ...s.best].filter(Boolean);
 
 export interface LtState { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
 const STATE_KEY = 'lt.state';
@@ -119,7 +131,9 @@ export function ltFields(ctx: AssetCtx, cfg: LtConfig, teamId: string, sailor: L
   const f = new Map<string, string>();
   f.set(`${cfg.fields.bar}.Source`, img(a[cfg.barSlot]));
   f.set(`${cfg.fields.flag}.Source`, img(a[cfg.flagSlot]));
-  f.set(`${cfg.fields.emblem}.Source`, img(a[cfg.emblemSlot]));
+  // a team on the light list (MEX): its team lower third and Qualified take the Emblem light PNG
+  const light = !sailor && cfg.emblemLightTeams.some((c) => c.trim().toUpperCase() === team.code.toUpperCase());
+  f.set(`${cfg.fields.emblem}.Source`, (light && img(a.emblem_light)) || img(a[cfg.emblemSlot]));
   if (sailor) {
     const lines = sailorLines(sailor);
     f.set(`${cfg.fields.top}.Text`, fullName(sailor));
@@ -141,7 +155,7 @@ const sent = new Map<string, Map<string, string>>();
 export class LowerThirds {
   private labels = new Map<string, string>();
   private timer: NodeJS.Timeout | null = null;
-  constructor(readonly ctx: AssetCtx, private fetcher: Fetch = fetch as unknown as Fetch, private log: (m: string) => void = () => {}) {}
+  constructor(readonly ctx: AssetCtx, private fetcher: Fetch = fetch as unknown as Fetch, private log: (m: string) => void = () => {}) { moveLtToLayer1(ctx.db); }
 
   get config() { return getLtConfig(this.ctx.db); }
   get state() { return getLtState(this.ctx.db); }
@@ -179,15 +193,17 @@ export class LowerThirds {
 
   private async show(inputName: string, fields: Map<string, string>, next: Omit<LtState, 'onAir' | 'input'>) {
     const cfg = this.config;
-    if (!inputName.trim()) throw badRequest('Set the vMix inputs of the lower thirds on the Lower thirds tab.');
+    if (!inputName.trim()) throw badRequest('Set the vMix inputs of the lower thirds in Show control → Lower thirds.');
     if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; await this.vmix(`?Function=OverlayInput${cfg.overlay}Out`); }
     const xml = await this.vmix('');
-    const input: VmixInput | undefined = findInput(parseVmixXml(xml), inputName);
-    if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name on the Lower thirds tab.`);
+    const all = parseVmixXml(xml);
+    const input: VmixInput | undefined = findInput(all, inputName);
+    if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
     const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
     fields = this.fitToTitle(input, fields, next.teamId);
     const has = new Set(input.fields);
     const id = input.key || input.number;
+    this.cancelClear(id); // its photo is still in: emptied below, before it comes in
     const last = sent.get(id) ?? new Map<string, string>();
     const held = (name: string) => input.values?.[name] ?? last.get(name) ?? '';
     // vMix leaves a Fly on the photo in Transition In out (the photo only fades in with the title), but plays the
@@ -210,7 +226,13 @@ export class LowerThirds {
       await new Promise((r) => setTimeout(r, Math.min(move!.out + move!.in, 3) * 1000 + 100));
     }
     sent.set(id, last);
-    if (!onAir) await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
+    if (!onAir) {
+      const before = LowerThirds.onOverlay(xml, cfg.overlay);
+      await this.vmix(`?Function=OverlayInput${cfg.overlay}In&Input=${encodeURIComponent(id)}`);
+      // the other lower third title it replaced (photo ⇄ no photo): its photo goes once it is off air
+      const prev = before ? all.find((i) => i.number === before) : undefined;
+      if (prev && prev !== input && [cfg.photoInput, cfg.noPhotoInput].some((x) => x && findInput([prev], x))) this.clearPhotoOffAir(prev);
+    }
     const photo = late ? fields.get(late) ?? '' : '';
     if (late && photo) { await this.set(id, late, photo); last.set(late, photo); changed++; }
     const state: LtState = { ...next, onAir: true, input: input.title };
@@ -223,6 +245,25 @@ export class LowerThirds {
    * The values (keyed by the field names on the Lower thirds tab) moved onto the fields this title really has
    * (Name, position/pb…), and the bar picture swapped for the team's PNG made like the title's own (ltTitle.ts).
    */
+  /**
+   * The team's bar of the lower thirds: the generator's <CODE>_lowerthird.png, else the bar the team's lower third
+   * title (photo / no photo) takes. Other titles with a bar (Team LT qualified) use it too, so every belt looks the same.
+   */
+  standardBar(teamId: string): string | null {
+    const cfg = this.config;
+    const teams = listTeams(this.ctx);
+    const team = teams.find((t) => t.id === teamId);
+    if (!team) return null;
+    const own = teamPictureFor(this.ctx, team, { w: 1, h: 1, key: keyOf('lowerthird', []), exact: true });
+    if (own) return own;
+    for (const title of [cfg.noPhotoInput, cfg.photoInput]) {
+      const info = title ? ltTitleInfo(this.ctx.assetsDir, title, teams.map((t) => t.code)) : null;
+      const pic = teamPictureFor(this.ctx, team, info?.images[cfg.fields.bar.toLowerCase()]);
+      if (pic) return pic;
+    }
+    return null;
+  }
+
   fitToTitle(input: VmixInput, fields: Map<string, string>, teamId: string | null) {
     const cfg = this.config;
     const roles = ltRoles(cfg.fields, input.fields);
@@ -300,6 +341,32 @@ export class LowerThirds {
     return this.show(input, ltFields(this.ctx, cfg, st.teamId, s, line), { kind: 'sailor', teamId: st.teamId, slot: s.slot, line });
   }
 
+  private clears = new Map<string, NodeJS.Timeout>();
+  private cancelClear(id: string) {
+    const t = this.clears.get(id);
+    if (t) { clearTimeout(t); this.clears.delete(id); }
+  }
+
+  /**
+   * A lower third title that left the screen (another graphic took OV1, OUT of the show, ALL OUT): its photo is
+   * emptied once the title is off air, so the next sailor on it comes in at once instead of waiting for that photo
+   * to fly away first.
+   */
+  clearPhotoOffAir(input: VmixInput, afterMs = 1500) {
+    const move = this.photoMove(input);
+    const id = input.key || input.number;
+    if (!move || !(input.values?.[move.field] ?? sent.get(id)?.get(move.field))) return;
+    this.cancelClear(id);
+    this.clears.set(id, setTimeout(() => {
+      this.clears.delete(id);
+      this.set(id, move.field, '').then(() => {
+        const last = sent.get(id) ?? new Map<string, string>();
+        last.set(move.field, '');
+        sent.set(id, last);
+      }).catch((e) => this.log(`Lower third photo not emptied: ${e?.message ?? e}`));
+    }, afterMs));
+  }
+
   async out() {
     const cfg = this.config;
     if (this.pendingOut) { clearTimeout(this.pendingOut); this.pendingOut = null; }
@@ -335,7 +402,7 @@ export class LowerThirds {
       teams.map((t) => ({ action: `team:${t.code}`, text: t.code, team: t.code, active: t.id === st.teamId, onAir: st.onAir && st.kind === 'team' && st.teamId === t.id })),
       LINEUP_SLOTS.map((d) => {
         const s = crew.find((x) => x.slot === d.key);
-        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName.toUpperCase() || '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
+        return { action: `place:${d.key}`, text: `${d.label.toUpperCase()}\\n${s?.lastName ? `${s.number ? `#${s.number} ` : ''}${s.lastName.toUpperCase()}` : '—'}`, team: team?.code, active: false, onAir: st.onAir && st.kind === 'sailor' && st.slot === d.key };
       }),
       [
         { action: 'showteam', text: team ? `TEAM\\n${team.code}` : 'TEAM', team: team?.code, active: false, onAir: !!team && st.onAir && st.kind === 'team' && st.teamId === team.id },
@@ -381,27 +448,8 @@ export class LowerThirds {
    * Writes the key texts and colours into Companion (HTTP remote control: POST /api/location/page/row/col/style),
    * only for keys that changed since the last time.
    */
-  async pushLabels(force = false) {
-    const cfg = this.config;
-    if (!cfg.companionUrl) return { sent: 0 };
-    // the Show control tab owns the Companion keys unless its labels are switched off
-    try { if (JSON.parse(getSetting(this.ctx.db, 'show.config') || '{}').labels !== false) return { sent: 0, show: true }; } catch { /* ignore */ }
-    if (force) this.labels.clear();
-    let n = 0;
-    try {
-      for (const k of this.layout().flat()) {
-        const st = k.bg ? { bg: k.bg, fg: k.fg!, label: k.label! } : ltKeyStyle(this.ctx.db, k);
-        const q = `text=${encodeURIComponent(st.label)}&bgcolor=${encodeURIComponent(st.bg)}&color=${encodeURIComponent(st.fg)}&size=auto`;
-        const id = `${k.page}/${k.row}/${k.col}`;
-        if (this.labels.get(id) === q) continue;
-        const res = await this.fetcher(`${cfg.companionUrl}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
-        if (res.ok) { this.labels.set(id, q); n++; }
-      }
-    } catch (e: any) {
-      this.log(`Companion labels: ${e?.message ?? e}`);
-    }
-    return { sent: n };
-  }
+  /** Keys show no on-air feedback: nothing is pushed to Companion. */
+  async pushLabels(_force = false) { return { sent: 0 }; }
 
   /** Keeps the labels in step with line-up changes made elsewhere. */
   start(ms = 15000) { this.timer = setInterval(() => { void this.pushLabels(); }, ms); this.timer.unref?.(); }

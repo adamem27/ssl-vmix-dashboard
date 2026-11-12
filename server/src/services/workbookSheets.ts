@@ -93,8 +93,8 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
   const ev = db.prepare('SELECT name FROM events WHERE id = ?').get(eventId) as { name: string } | undefined;
   const root = getSetting(db, 'paths.vmixAssetsRoot');
   const w = getWeather(db) as unknown as Record<string, string>;
-  const weather: [string, string][] = [['Forecast', 'forecast'], ['Air temperature', 'air_temp'], ['Water temperature', 'water_temp'],
-    ['Wind speed', 'wind_speed'], ['Wind direction', 'wind_direction'], ['Wind degrees', 'wind_degrees'], ['Wind unit', 'wind_unit']];
+  const weather: [string, string][] = [['Forecast', 'forecast'], ['Air temperature', 'air_temp'],
+    ['Wind speed', 'wind_speed'], ['Wind direction', 'wind_direction'], ['Wind degrees', 'wind_degrees']];
   const left = block(row, 0, 'EVENT', null, [['Name', ev?.name ?? ''], ['Stage', currentStage(db, eventId)?.name ?? ''], ['Date', today]]) + 1;
   const h = Math.max(
     left + block(row + left, 0, 'MATCHBOARD', null, [['Image', root ? joinVmixPath(root, MATCHBOARD_REL) : path.join(ctx.assetsDir, ...MATCHBOARD_REL.split('/'))]]),
@@ -142,7 +142,7 @@ export function announcementsSheet(ctx: AssetCtx, eventId: string): Record<strin
 }
 
 export function peopleSheet(ctx: AssetCtx, eventId: string): Record<string, string>[] {
-  return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Title: p.title, Photo: img(p.photo) }));
+  return listPeople(ctx, eventId).map((p) => ({ Role: p.role, Language: p.language, Name: p.name, Surname: p.surname, Title: p.title, Photo: img(p.photo) }));
 }
 
 // ---------- Line-up ----------
