@@ -1,8 +1,14 @@
 {
-  "version": "1.0.154",
-  "commit": "81b6222",
-  "date": "2026-11-12T11:20:25Z",
+  "version": "1.0.155",
+  "commit": "f6ae3ca",
+  "date": "2026-11-12T11:43:28Z",
   "changes": [
+    {
+      "version": "1.0.155",
+      "commit": "f6ae3ca",
+      "date": "2026-11-12T11:43:28Z",
+      "text": "Break scene: layers set with a plain comma and the input number (each input on its own layer); NEXT TICKER key with out/in animation"
+    },
     {
       "version": "1.0.154",
       "commit": "81b6222",
@@ -476,12 +482,6 @@
       "commit": "f8f22e5",
       "date": "2026-11-08T23:11:54Z",
       "text": "Commentator screen: event, clock and weather on top, today's races with live/next status, groups with flags, the group's standing and talking points, team cards in team colours with ranking, rank and points, crew in line-up order with photos on hover"
-    },
-    {
-      "version": "1.0.68",
-      "commit": "8629882",
-      "date": "2026-11-08T22:45:07Z",
-      "text": "GTZIP generator: upload a .zip with a whole set of titles as templates"
     }
   ]
 }
