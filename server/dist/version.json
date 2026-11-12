@@ -1,8 +1,14 @@
 {
-  "version": "1.0.156",
-  "commit": "9863081",
-  "date": "2026-11-12T12:01:04Z",
+  "version": "1.0.157",
+  "commit": "f093c85",
+  "date": "2026-11-12T12:23:29Z",
   "changes": [
+    {
+      "version": "1.0.157",
+      "commit": "f093c85",
+      "date": "2026-11-12T12:23:29Z",
+      "text": "Break scene: the results title of two groups switches cleanly (out, then the next group's data, then in; the data sync follows the group on the board); 1.5 s for the out animation"
+    },
     {
       "version": "1.0.156",
       "commit": "9863081",
@@ -476,12 +482,6 @@
       "commit": "9002079",
       "date": "2026-11-09T00:11:41Z",
       "text": "Commentator fits a 1920×1080 screen without scrolling: one-line header, groups and races in one row, standing and talking points in one line, compact team cards that fill the height"
-    },
-    {
-      "version": "1.0.71",
-      "commit": "607732d",
-      "date": "2026-11-08T23:31:56Z",
-      "text": "Commentator: the four teams of a group side by side in one row, standing and talking points above them"
     }
   ]
 }

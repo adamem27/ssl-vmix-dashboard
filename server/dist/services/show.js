@@ -72,9 +72,9 @@ export const showConfigSchema = z.object({
     breakAuto: z.boolean().default(true),
     rotateSeconds: z.number().int().min(4).max(120).default(30),
     /** ms the board's out animation takes before the next board goes in on the break scene */
-    breakOutMs: z.number().int().min(0).max(5000).default(1000),
+    breakOutMs: z.number().int().min(0).max(5000).default(1500),
     /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
-    cfgVersion: z.number().int().default(3),
+    cfgVersion: z.number().int().default(4),
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
     tickerNext: z.string().default(''),
     tickerEnd: z.string().default(''),
@@ -110,6 +110,9 @@ export function getShowConfig(db) {
         r.breakTickerLayer = 3;
         r.breakBoardLayer = 4;
     }
+    // 4: the results' out animation takes up to 1.2 s, so the next board waits 1.5 s (an old 1000 ms becomes 1500)
+    if (Number(r.cfgVersion ?? 0) < 4 && (r.breakOutMs === undefined || r.breakOutMs === 1000))
+        r.breakOutMs = 1500;
     return showConfigSchema.parse(r);
 }
 export function setShowConfig(db, patch) {
@@ -282,6 +285,8 @@ export class Show {
     log;
     timer = null;
     rotation = null;
+    /** a board of the break scene is switching (its data must not be overwritten meanwhile) */
+    switching = false;
     labels = new Map();
     /** vMix's inputs as last read (the COMPARE keys follow the Team comparison inputs there). */
     lastInputs = [];
@@ -1164,14 +1169,22 @@ export class Show {
         const n = this.config.breakBoardLayer;
         const input = this.slideInput(s, snap.inputs);
         const onAir = this.breakOnAir(snap);
-        if (onAir && snap.overlays[n]) {
-            await this.vmix(`?Function=OverlayInput${n}Out`);
-            await this.wait(this.config.breakOutMs);
+        // the same title for two groups (group H, then group I): out first, the new group's data only once it is off
+        // air, then in; meanwhile the data sync leaves the title alone
+        this.switching = true;
+        try {
+            if (onAir && snap.overlays[n]) {
+                await this.vmix(`?Function=OverlayInput${n}Out`);
+                await this.wait(this.config.breakOutMs);
+            }
+            this.patchState({ slide: i });
+            await this.fillSlide(s, input);
+            if (onAir)
+                await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
         }
-        await this.fillSlide(s, input);
-        if (onAir)
-            await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
-        this.patchState({ slide: i });
+        finally {
+            this.switching = false;
+        }
         return { slide: i, of: slides.length, showing: s };
     }
     /** A ticker version on the ticker on air (break channel or channel 1): out, the new text, in. */
@@ -1525,7 +1538,7 @@ export class Show {
         this.syncing = true;
         let sent = 0;
         try {
-            const { inputs } = await this.snapshot();
+            const { inputs, overlays } = await this.snapshot();
             const fleetId = this.config.fleetId;
             const jobs = [];
             // the Welcome bar follows the Welcome tab (and today's date) without a key
@@ -1542,9 +1555,13 @@ export class Show {
                 if (input)
                     jobs.push({ input, f: () => showDataFields(this.ctx, id, { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
             }
-            const res = fleetId ? this.resolve(this.graphic('results'), inputs) : undefined;
+            // the results title shows the group of the break scene's board while the scene is on air (one input, the
+            // groups in turn), else the group picked at the top; not touched while the board is switching
+            const slide = this.slides()[this.state.slide];
+            const resFleet = this.breakOnAir({ inputs, overlays }) && slide?.kind === 'results' && slide.fleetId ? slide.fleetId : fleetId;
+            const res = resFleet && !this.switching ? this.resolve(this.graphic('results'), inputs) : undefined;
             if (res)
-                jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, fleetId, res).fields });
+                jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, resFleet, res).fields });
             // Team comparison: every group's own input, and the shared one for the group picked at the top
             for (const t of this.compareTargets(inputs))
                 jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
