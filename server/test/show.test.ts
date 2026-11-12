@@ -487,6 +487,43 @@ describe('show control', () => {
     expect(v.calls.some((c) => c.includes(`Input=k${v.num(`ssl_compare_${k2}`)}&SelectedName=1 COUNTRY.Text`))).toBe(true);
   });
 
+  it('each group has its own results input and key; the day schedule can stay out of the break scene; flag 4 changes first', async () => {
+    const { s, ev, f1, f2 } = race();
+    const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
+    setCurrentStage(s.db, ev, stage.id);
+    seedGraphicSets(s.db, activeEvent(s.db).id);
+    const [k1, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+    const v = fakeVmix({ ...TITLES, 'L-bars.gtzip': ['TITLE.Text'], ssl_ticker: ['Ticker1.Text'],
+      [`ssl_results_${k1}`]: ['COUNTRY1.Text'], [`ssl_results_${k2}`]: ['COUNTRY1.Text'],
+      [`ssl_compare_${k1}`]: ['1 FLAG.Source', '2 FLAG.Source', '3 FLAG.Source', '4 FLAG.Source'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.snapshot();
+    // a RESULTS key per group on the AFTER / BREAK page, each with its own input
+    const page = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
+    expect(page.keys[0].slice(4, 6).map((x) => x?.action)).toEqual([`results:${k1}`, `results:${k2}`]);
+    expect(await show.run(`results:${k2}`)).toMatchObject({ in: 'results' });
+    expect(v.overlays[1]).toBe(v.num(`ssl_results_${k2}`));
+    await show.run(`results:${k2}`);
+    expect(v.overlays[1] ?? '').toBe('');
+    // the day schedule off: the break scene starts on the first group's own results input
+    setShowConfig(s.db, { breakSchedule: false, breakOutMs: 0 });
+    expect(show.slides().map((x) => x.kind)).toEqual(['results', 'results']);
+    await show.run('show:break');
+    expect(v.overlays[4]).toBe(v.num(`ssl_results_${k1}`));
+    await show.run('nextslide');
+    expect(v.overlays[4]).toBe(v.num(`ssl_results_${k2}`));
+    await show.run('breakout');
+    // flag / emblem: 4 FLAG (the one that starts the title's change animation) goes first
+    setShowConfig(s.db, { flagChangeMs: 0 });
+    v.calls.length = 0;
+    await show.run('comparemark');
+    const flags = v.calls.filter((c) => c.includes(`Input=k${v.num(`ssl_compare_${k1}`)}`) && /FLAG\.Source/.test(c));
+    expect(flags[0]).toContain('4 FLAG.Source');
+    expect(flags.at(-1)).not.toContain('4 FLAG.Source');
+    // no commentator lower third keys on the BEFORE page
+    expect(show.pages()[0].keys.flat().some((x) => x?.action.startsWith('comm:'))).toBe(false);
+  });
+
   it("fills the producer's own titles (overall_results, team_comparison, team_lineup) and keeps them in step without a key", async () => {
     const { s, teams } = race();
     saveLineup(s.ctx, activeEvent(s.db).id, teams[0], { rows: [

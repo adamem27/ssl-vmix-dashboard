@@ -73,6 +73,8 @@ export const showConfigSchema = z.object({
   race: z.number().int().min(1).max(12).default(1),
   /** fleets shown in turn in the break scene (empty: every fleet of the race's set) */
   breakFleets: z.array(z.string()).default([]),
+  /** the day schedule is one of the boards of the break scene (off: it starts with the first group's results) */
+  breakSchedule: z.boolean().default(true),
   /** the break scene's overlay channels: L-bar, ticker, and the board that switches (day schedule / group results) */
   breakLbarLayer: z.number().int().min(2).max(4).default(2),
   breakTickerLayer: z.number().int().min(2).max(4).default(3),
@@ -82,6 +84,8 @@ export const showConfigSchema = z.object({
   rotateSeconds: z.number().int().min(4).max(120).default(30),
   /** ms the board's out animation takes before the next board goes in on the break scene */
   breakOutMs: z.number().int().min(0).max(5000).default(1500),
+  /** ms the comparison's flag fade-out takes (FLAG ⇄ EMBLEM on air): the other flags change after it */
+  flagChangeMs: z.number().int().min(0).max(3000).default(500),
   /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
   cfgVersion: z.number().int().default(4),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
@@ -171,12 +175,14 @@ export interface PresetTeam { code: string; name: string; crew: { slot: string; 
 export interface PresetGroup { fleetId: string; key: string; label: string }
 export const compareKey = (name: string) => groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
 export const compareInput = (key: string) => `ssl_compare_${key}`;
+/** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
+export const resultsInput = (key: string) => `ssl_results_${key}`;
 
-export function deckPages(cfg: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = []): DeckPage[] {
-  return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups));
+export function deckPages(cfg: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = [], resultGroups: PresetGroup[] = groups): DeckPage[] {
+  return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups, resultGroups));
 }
 
-function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = []): DeckPage[] {
+function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = [], resultGroups: PresetGroup[] = groups): DeckPage[] {
   const comparePage = PRESET_PAGES.teams + teams.length;
   const cfg = { ...cfg0, deck1Page: PRESET_PAGES.deck1, deck2Page: PRESET_PAGES.deck2, fallbackPage: PRESET_PAGES.fallback };
   const p1 = cfg.deck1Page, p2 = cfg.deck2Page;
@@ -209,14 +215,16 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
       deck: 1, name: 'A BEFORE', page: p1, keys: [
         row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'),
           k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
-        row8(k('comm:host', 'HOST\\nLT', 'lt'), k('comm:guest', 'GUEST\\nLT', 'lt'), k('comm:water', 'ON-WATER\\nLT', 'lt'), k('comm:studio', 'STUDIO\\n+WATER LT', 'lt')),
+        row8(),
         row8(),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
       ],
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
+        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
+          // a key per group: its own results input (ssl_results_<KEY>)
+          ...resultGroups.slice(0, 4).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
         // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
         row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
@@ -399,7 +407,7 @@ export class Show {
   pages() {
     const teams = this.presetTeams(), groups = this.deckCompareGroups();
     this.keyEditsByName(teams, groups);
-    return deckPages(this.config, teams, groups);
+    return deckPages(this.config, teams, groups, this.compareGroups());
   }
 
   /**
@@ -599,7 +607,41 @@ export class Show {
   breakOnAir(snap: { inputs: VmixInput[]; overlays: Record<string, string> }) {
     const cfg = this.config;
     const on = (id: string, n: number) => { const i = this.resolve(this.graphic(id), snap.inputs); return !!i && snap.overlays[n] === i.number; };
-    return on('lbar', cfg.breakLbarLayer) || on('schedule', cfg.breakBoardLayer) || on('results', cfg.breakBoardLayer);
+    const board = snap.overlays[cfg.breakBoardLayer];
+    return on('lbar', cfg.breakLbarLayer) || on('schedule', cfg.breakBoardLayer) || (!!board && this.resultsTargets(snap.inputs).some((t) => t.input.number === board));
+  }
+  /** A group's own results input (ssl_results_H), if vMix has it. */
+  private ownResults(fleetId: string, inputs: VmixInput[]) {
+    const g = this.allCompareGroups().find((x) => x.fleetId === fleetId);
+    return g ? inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === resultsInput(g.key).toLowerCase()) : undefined;
+  }
+  /** The results input of a group: its own (ssl_results_H), else the shared one. */
+  private resultsFor(fleetId: string, inputs: VmixInput[]) {
+    return this.ownResults(fleetId, inputs) ?? this.need(this.graphic('results'), inputs);
+  }
+  /** Every group's own results input, and the shared one. */
+  private resultsTargets(inputs: VmixInput[]) {
+    const out: { input: VmixInput; fleetId: string | null }[] = [];
+    for (const g of this.allCompareGroups()) { const i = this.ownResults(g.fleetId, inputs); if (i) out.push({ input: i, fleetId: g.fleetId }); }
+    const shared = this.resolve(this.graphic('results'), inputs);
+    if (shared && !out.some((x) => x.input.number === shared.number)) out.push({ input: shared, fleetId: null });
+    return out;
+  }
+  /** GROUP RESULTS of one group (RESULTS H…): its data into its own input (else the shared one), then in; again = out. */
+  async resultsGroup(arg: string) {
+    const grp = [...this.compareGroups(), ...this.allCompareGroups()].find((x) => x.key === compareKey(arg) || x.fleetId === arg);
+    if (!grp) throw notFound(`Group ${arg} in this stage`);
+    const g = this.graphic('results');
+    const snap = await this.snapshot();
+    const input = this.resultsFor(grp.fleetId, snap.inputs);
+    if (snap.overlays[g.overlay] === input.number) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      return { out: 'results', group: grp.label };
+    }
+    await pushResults(this.ctx, grp.fleetId, input.key || input.number, this.fetcher);
+    await this.bringIn(g, input, snap);
+    return { in: 'results', group: grp.label, input: input.title };
   }
 
   /** The data of a graphic, set right before it comes in. */
@@ -699,8 +741,19 @@ export class Show {
   async compareMark() {
     const mark = this.state.compareMark === 'emblem' ? 'flag' : 'emblem';
     this.patchState({ compareMark: mark });
-    const { inputs } = await this.snapshot();
-    for (const t of this.compareTargets(inputs)) await this.set(t.input, new Map([...this.compareData(t.fleetId)].filter(([k]) => /flag\.source$/i.test(k))));
+    const { inputs, overlays } = await this.snapshot();
+    // the title's flag change animation (DataChangeOut / In) is started by the last flag (4 FLAG): that one goes first,
+    // the others once the flags have faded out, so every flag changes inside the animation instead of before it
+    const num = (k: string) => Number(k.match(/(\d+)/)?.[1] ?? 0);
+    for (const t of this.compareTargets(inputs)) {
+      const flags = [...this.compareData(t.fleetId)].filter(([k]) => /flag\.source$/i.test(k)).sort((a, b) => num(b[0]) - num(a[0]));
+      const onAir = Object.values(overlays).includes(t.input.number);
+      const top = num(flags[0]?.[0] ?? '');
+      const first = flags.filter(([k]) => num(k) === top), rest = flags.filter(([k]) => num(k) !== top);
+      const sent = await this.set(t.input, new Map(first));
+      if (onAir && sent) await this.wait(this.config.flagChangeMs);
+      await this.set(t.input, new Map(rest));
+    }
     return { compareMark: mark };
   }
 
@@ -808,6 +861,10 @@ export class Show {
   // ---------- actions ----------
   async toggle(id: string) {
     if (id === 'break') return this.toggleBreak();
+    if (id === 'results' && this.config.fleetId) {
+      const { inputs } = await this.snapshot();
+      if (this.ownResults(this.config.fleetId, inputs)) return this.resultsGroup(this.config.fleetId);
+    }
     const g = this.graphic(id);
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
@@ -1081,10 +1138,10 @@ export class Show {
   }
 
   // ---------- break scene ----------
-  slides() {
-    const out: { kind: 'schedule' | 'results'; fleetId?: string }[] = [{ kind: 'schedule' }];
+  slides(): { kind: 'schedule' | 'results'; fleetId?: string }[] {
+    const out: { kind: 'schedule' | 'results'; fleetId?: string }[] = this.config.breakSchedule ? [{ kind: 'schedule' }] : [];
     for (const f of this.breakFleets()) out.push({ kind: 'results', fleetId: f });
-    return out;
+    return out.length ? out : [{ kind: 'schedule' as const }];
   }
   private wait(ms: number) { return ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve(); }
   /**
@@ -1126,7 +1183,8 @@ export class Show {
     if (cfg.breakAuto) this.startRotation();
     return { in: 'break', lbar: lbar?.title ?? null, ticker: tk?.title ?? null, board: board.title };
   }
-  private slideInput(s: { kind: 'schedule' | 'results' }, inputs: VmixInput[]) {
+  private slideInput(s: { kind: 'schedule' | 'results'; fleetId?: string }, inputs: VmixInput[]) {
+    if (s.kind === 'results' && s.fleetId) return this.resultsFor(s.fleetId, inputs);
     return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);
   }
   private async fillSlide(s: { kind: 'schedule' | 'results'; fleetId?: string }, input: VmixInput) {
@@ -1246,6 +1304,7 @@ export class Show {
       case 'lultswap': return this.lineupLtSwap();
       case 'show': return arg === 'lineup5' ? this.lineupLt() : arg === 'compare' && this.config.fleetId && this.compareGroups().some((g) => g.fleetId === this.config.fleetId) ? this.compareGroup(this.config.fleetId) : this.toggle(arg);
       case 'compare': return this.compareGroup(arg);
+      case 'results': return this.resultsGroup(arg);
       case 'qualified': return this.qualified(arg);
       case 'comm': return this.commentator(arg);
       case 'person': return this.person(arg);
@@ -1337,6 +1396,7 @@ export class Show {
     else if (kind === 'rotate') { text = this.config.breakAuto ? 'AUTO SWITCH\\nON' : 'AUTO SWITCH\\nOFF'; active = this.config.breakAuto; }
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
+    if (kind === 'results' && ctxt) { const grp = this.allCompareGroups().find((x) => x.key === compareKey(arg)); const i = grp && this.ownResults(grp.fleetId, ctxt.inputs); onAir = !!i && ov[1] === i.number; }
     if (kind === 'compare' && ctxt) { const i = ctxt.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(compareKey(arg)).toLowerCase()); onAir = !!i && ov[1] === i.number; }
     if (kind === 'break') onAir = !!ctxt && this.breakOnAir({ inputs: ctxt.inputs, overlays: ov });
     if (neutral) { onAir = false; active = false; if (key.kind === 'mode') text = key.text; } // a fixed key: its name, not today's mode
@@ -1453,7 +1513,9 @@ export class Show {
       const slide = this.slides()[this.state.slide];
       const resFleet = this.breakOnAir({ inputs, overlays }) && slide?.kind === 'results' && slide.fleetId ? slide.fleetId : fleetId;
       const res = resFleet && !this.switching ? this.resolve(this.graphic('results'), inputs) : undefined;
-      if (res) jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, resFleet, res).fields });
+      if (res && !this.resultsTargets(inputs).some((t) => t.fleetId && t.input.number === res.number)) jobs.push({ input: res, f: () => resultFieldsFor(this.ctx, resFleet, res).fields });
+      // each group's own results input (ssl_results_H…) keeps its group's data
+      if (!this.switching) for (const t of this.resultsTargets(inputs)) if (t.fleetId) { const fid = t.fleetId; jobs.push({ input: t.input, f: () => resultFieldsFor(this.ctx, fid, t.input).fields }); }
       // Team comparison: every group's own input, and the shared one for the group picked at the top
       for (const t of this.compareTargets(inputs)) jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
       for (const { input, f: make } of jobs) {
