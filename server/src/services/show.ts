@@ -565,7 +565,13 @@ export class Show {
     // what must go first; a graphic on the same channel simply replaces what is there
     const off = new Set<number>(g.kind === 'board' ? [lt] : g.kind === 'scene' ? [1, lt] : []);
     off.delete(g.overlay);
-    for (const n of off) await this.overlayOut(n, snap.overlays);
+    // the break scene's own layers (L-bar, ticker, boards) leave another overlay at once: their out animation would
+    // leave the title out, so hidden inside the scene
+    const layers = g.id === 'break' ? new Set(this.breakLayerInputs(this.lastInputs).map((i) => i.number)) : new Set<string>();
+    for (const n of off) {
+      if (snap.overlays[n] && layers.has(snap.overlays[n])) await this.vmix(`?Function=OverlayInput${n}Off`);
+      else await this.overlayOut(n, snap.overlays);
+    }
     if (g.kind === 'board' && g.overlay !== 4 && snap.overlays[4]) await this.sceneOut(snap.overlays);
     if (g.kind === 'scene' && g.id !== 'break') this.stopRotation();
     await this.overlayIn(g.overlay, input, snap.overlays);
@@ -793,7 +799,13 @@ export class Show {
     else await this.fill(g, input);
     if (g.id === 'ticker') this.patchState({ tickerId: '' });
     await this.bringIn(g, input, snap);
-    if (g.id === 'break' && this.config.breakAuto) this.startRotation();
+    if (g.id === 'break') {
+      // every title on the scene plays its in animation, whatever state it was left in (an L-bar taken out before stays hidden otherwise)
+      const board = this.slides()[this.state.slide];
+      const ins = [this.resolve(this.graphic('lbar'), snap.inputs), this.resolve(this.graphic('ticker'), snap.inputs), board ? this.resolve(this.graphic(board.kind === 'schedule' ? 'schedule' : 'results'), snap.inputs) : undefined];
+      for (const t of ins) if (t) await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(t.key || t.number)}&Value=TransitionIn`);
+      if (this.config.breakAuto) this.startRotation();
+    }
     return { in: g.id, input: input.title };
   }
 
@@ -1085,6 +1097,10 @@ export class Show {
       await this.sceneLayer(scene, cfg.breakTickerLayer, tk);
     }
     await this.showSlide(0, inputs);
+  }
+  /** The inputs the break scene shows on its layers. */
+  private breakLayerInputs(inputs: VmixInput[]) {
+    return [this.graphic('lbar'), this.graphic('ticker'), this.graphic('schedule'), this.graphic('results')].map((g) => this.resolve(g, inputs)).filter((x): x is VmixInput => !!x);
   }
   private slideInput(s: { kind: 'schedule' | 'results' }, inputs: VmixInput[]) {
     return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);

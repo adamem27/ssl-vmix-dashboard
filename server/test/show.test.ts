@@ -325,7 +325,14 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const k = (n: string) => `k${v.num(n)}`;
     const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${k(inp)}`;
+    // the L-bar on air on its own first: it leaves at once (no out animation), then plays its in animation in the scene
+    await show.run('show:lbar');
+    expect(v.overlays[1]).toBe(String(v.num('L-bars.gtzip')));
     await show.run('show:break');
+    expect(v.calls).toContain('?Function=OverlayInput1Off');
+    expect(v.calls).not.toContain('?Function=OverlayInput1Out');
+    expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('L-bars.gtzip')}&Value=TransitionIn`);
+    expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionIn`);
     expect(v.calls).toContain(layer(1, 'L-bars.gtzip'));
     expect(v.calls).toContain(layer(3, 'ssl_ticker'));
     expect(v.calls).toContain(layer(4, 'ssl_schedule'));
