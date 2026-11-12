@@ -113,6 +113,26 @@ describe('line-ups', () => {
     expect(rows.find((x) => x.slot === 'Bow')!.lastName).toBe('Bow');
   });
 
+  it('two grinders sit side by side (Grinder, Main); the main trimmer moves to Tactician, the floater to Trimmer 2', () => {
+    const { db, ctx, eventId } = setup();
+    const names = ['A Helm', 'B Main', 'C Trim', 'D Gri', 'E Gri', 'F Pit', 'G Mid', 'H Bow', 'I Flo'];
+    const { teamId, sailorIds } = seedTeam(db, 'ESA', names);
+    const date = '2026-11-19';
+    const d = createManualDeclaration(ctx, eventId, teamId, date, 'empty');
+    const pos = ['Helm', 'Main trimmer', 'Trimmer', 'Grinder', 'Grinder', 'Pit', 'Midbow', 'Bow', 'Floater'];
+    sailorIds.forEach((id, i) => addMember(ctx, d.id, { sailorId: id, position: pos[i], number: String(i + 1) }));
+    lu.syncLineupFromDeclaration(ctx, eventId, teamId, date);
+    const rows = lu.getLineup(ctx, eventId, teamId).data.rows;
+    const at = (k: string) => rows.find((x) => x.slot === k)!;
+    expect([at('Grinder').lastName, at('Main').lastName]).toEqual(['Gri', 'Gri']);
+    expect(at('Main').position).toBe('GRINDER');
+    expect(at('Tactician')).toMatchObject({ firstName: 'B', position: 'MAIN TRIMMER' });
+    expect(at('Trimmer1')).toMatchObject({ lastName: 'Flo', position: 'FLOATER' });
+    // the 9-place board, bow to stern: … trimmer and floater, the two grinders, then helm and main trimmer
+    const order = lu.BOARD_BOW_TO_STERN.map((k) => rows.find((x) => x.slot === k)).filter((x) => x?.lastName).map((x) => x!.firstName);
+    expect(order).toEqual(['H', 'G', 'F', 'C', 'I', 'D', 'E', 'A', 'B']);
+  });
+
   it('maps declared positions to boat places', () => {
     expect(['Helm', 'Mainsail trimmer', 'Main Trimmer', 'Trimmer', 'Mid-Bow', 'Bow', 'Pit', 'Grinder', 'Floater', 'Spare', ''].map(lu.slotForPosition))
       .toEqual(['Helm', 'Main', 'Main', 'Trimmer', 'Midbow', 'Bow', 'Pit', 'Grinder', 'Floater', null, null]);
