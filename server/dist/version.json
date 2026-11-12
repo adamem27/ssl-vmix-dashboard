@@ -1,8 +1,14 @@
 {
-  "version": "1.0.150",
-  "commit": "60218ed",
-  "date": "2026-11-12T00:41:04Z",
+  "version": "1.0.151",
+  "commit": "f1cf35f",
+  "date": "2026-11-12T01:12:53Z",
   "changes": [
+    {
+      "version": "1.0.151",
+      "commit": "f1cf35f",
+      "date": "2026-11-12T01:12:53Z",
+      "text": "People: Other role lets you type the role"
+    },
     {
       "version": "1.0.150",
       "commit": "60218ed",
@@ -476,12 +482,6 @@
       "commit": "7b6d080",
       "date": "2026-11-08T22:36:56Z",
       "text": "Line-up sheet in Excel: one row per team with flag, emblem, line-up background and sponsors, then the places in the order set in the Line-up panel with number, names, position, captain and photo"
-    },
-    {
-      "version": "1.0.63",
-      "commit": "c2a237c",
-      "date": "2026-11-08T22:30:04Z",
-      "text": "GTZIP generator: add a data field the template lacks, fitted into the graphic"
     }
   ]
 }
