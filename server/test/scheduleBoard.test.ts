@@ -54,3 +54,13 @@ describe('day schedule board', () => {
     expect(fields().get('HIGHLIGHT 2.Source')).toBe('');
   });
 });
+
+import { weight2 } from '../src/services/showData.js';
+describe('team weight in Team comparison', () => {
+  it('always has two decimals', () => {
+    expect(weight2('702.5')).toBe('702.50');
+    expect(weight2('698')).toBe('698.00');
+    expect(weight2('701,25 kg')).toBe('701.25 kg');
+    expect(weight2('')).toBe('');
+  });
+});

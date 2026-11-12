@@ -216,6 +216,11 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
 
 /** Team comparison overrides (General graphics → Team comparison): per group, the group's own fields and each team's. */
 export const COMPARE_KEY = 'compare.overrides';
+/** A team weight always with two decimals ("702.5" → "702.50", "698 kg" → "698.00 kg"); other text as it is. */
+export function weight2(w: string): string {
+  const m = String(w ?? '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(kg)?$/i);
+  return m ? `${Number(m[1].replace(',', '.')).toFixed(2)}${m[2] ? ` ${m[2]}` : ''}` : String(w ?? '');
+}
 export const COMPARE_TEAM_FIELDS = ['name', 'nick', 'rank', 'weight', 'cptName', 'cptSurname', 'flag', 'emblem', 'photo', 'panel'] as const;
 export const COMPARE_GROUP_FIELDS = ['title', 'group'] as const;
 export type CompareTeamField = (typeof COMPARE_TEAM_FIELDS)[number];
@@ -295,7 +300,7 @@ export function compareFields(ctx: AssetCtx, eventId: string, fleetId: string, t
     const ov = over.teams?.[String(n)] ?? {};
     const pic = (k: CompareTeamField) => (ov[k] ? imagePath(ctx.db, ctx.assetsDir, ov[k]) : r.values[k]);
     const val = (k: CompareTeamField) => ov[k] ?? r.values[k];
-    const name = val('name'), nick = val('nick'), rank = val('rank'), w = val('weight');
+    const name = val('name'), nick = val('nick'), rank = val('rank'), w = weight2(val('weight'));
     const cptName = val('cptName'), cptSurname = val('cptSurname');
     const flag = o.mark === 'emblem' ? pic('emblem') : pic('flag');
     const photo = pic('photo');
