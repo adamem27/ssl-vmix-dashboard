@@ -1,8 +1,14 @@
 {
-  "version": "1.0.155",
-  "commit": "f6ae3ca",
-  "date": "2026-11-12T11:43:28Z",
+  "version": "1.0.156",
+  "commit": "9863081",
+  "date": "2026-11-12T12:01:04Z",
   "changes": [
+    {
+      "version": "1.0.156",
+      "commit": "9863081",
+      "date": "2026-11-12T12:01:04Z",
+      "text": "Break scene without a scene input: L-bar, ticker and schedule/results each on their own overlay channel (2, 3, 4) with their own animations; boards and tickers switch out and in on their channel"
+    },
     {
       "version": "1.0.155",
       "commit": "f6ae3ca",
@@ -476,12 +482,6 @@
       "commit": "607732d",
       "date": "2026-11-08T23:31:56Z",
       "text": "Commentator: the four teams of a group side by side in one row, standing and talking points above them"
-    },
-    {
-      "version": "1.0.70",
-      "commit": "f8f22e5",
-      "date": "2026-11-08T23:11:54Z",
-      "text": "Commentator screen: event, clock and weather on top, today's races with live/next status, groups with flags, the group's standing and talking points, team cards in team colours with ranking, rank and points, crew in line-up order with photos on hover"
     }
   ]
 }
