@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
 import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
@@ -148,7 +149,24 @@ export const compareInput = (key) => `ssl_compare_${key}`;
 /** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
 export const resultsInput = (key) => `ssl_results_${key}`;
 export function deckPages(cfg, teams = [], groups = [], resultGroups = groups) {
-    return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups, resultGroups));
+    return applyKeyEdits(cfg, defaultDeckPages(cfg, teams, groups, resultGroups).map((p) => (p.name === 'PEOPLE' ? keptPeople(p) : p)));
+}
+/**
+ * The PEOPLE page as the producer set it up in Companion: its own keys win (dashboard keys show here as they are,
+ * vMix / ATEM keys only in Companion), the person keys it took away stay away; new keys only in its free places.
+ */
+function keptPeople(p) {
+    return { ...p, keys: p.keys.map((row, r) => row.map((key, c) => {
+            if (KEPT_PEOPLE_PLACES.has(`${r}/${c}`)) {
+                const a = keptPeopleAction(r, c);
+                if (key?.action.startsWith('nav:'))
+                    return key;
+                if (!a)
+                    return null;
+                return key?.action === a ? key : (a.startsWith('person:') ? k(a, '—', 'bug') : { action: a, text: a.toUpperCase(), kind: 'mode' });
+            }
+            return key && /^person:/.test(key.action) ? null : key;
+        })) };
 }
 function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) {
     const comparePage = PRESET_PAGES.teams + teams.length;
@@ -1739,68 +1757,97 @@ export class Show {
         return { added, image: vmixPath };
     }
 }
-/** Companion's full export (format 4, which every later Companion upgrades on import): all pages, one HTTP connection. */
+/** Companion 5.1's export format (12): what Companion 5.1 exports itself, imported as it is. */
+const FILE_VERSION = 12;
+const BUILD = '5.1.2';
+/** The keys of a deck page as Companion buttons; on the PEOPLE page the producer's own keys stay as they are. */
+function pageControls(cfg, p, keys, b) {
+    const controls = {};
+    keys.forEach((row, r) => row.forEach((x, c) => {
+        if (!x)
+            return;
+        const id = `p${p.page}r${r}c${c}`;
+        const act = x.key.action.startsWith('nav:') ? setPage(id, Number(x.key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(x.key.action)}`);
+        (controls[r] ??= {})[c] = control(x.text, hex(x.bg), [act], hex(x.fg));
+    }));
+    if (p.name !== 'PEOPLE')
+        return controls;
+    // the producer's PEOPLE page: each of its keys as it is (its dashboard calls to this dashboard's address)
+    for (const [r, row] of Object.entries(keptControls(b)))
+        for (const [c, ctl] of Object.entries(row))
+            (controls[Number(r)] ??= {})[Number(c)] = ctl;
+    return controls;
+}
+function keptControls(b) {
+    const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
+    return JSON.parse(json);
+}
+/** The places of the producer's PEOPLE page that have a key ("row/col"). */
+export const KEPT_PEOPLE_PLACES = new Set(Object.entries(KEPT_PEOPLE_PAGE.controls).flatMap(([r, row]) => Object.keys(row).map((c) => `${r}/${c}`)));
+/** The dashboard action of a key of the producer's PEOPLE page, if it calls this dashboard. */
+export function keptPeopleAction(r, c) {
+    const url = KEPT_PEOPLE_PAGE.controls[r]?.[c]?.steps?.[0]?.action_sets?.down?.find((a) => a.definitionId === 'get')?.options?.url?.value ?? '';
+    const m = url.match(/\/api\/show\/do\?a=([^&]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+}
+/** The producer's own connection to the dashboard on that page: the preset's one instead. */
+const KEPT_HTTP = Object.entries(KEPT_PEOPLE_PAGE.connections).find(([, x]) => x.moduleId === 'generic-http')?.[0] ?? '';
+const connections = () => ({ ...Object.fromEntries(Object.entries(KEPT_PEOPLE_PAGE.connections).filter(([id]) => id !== KEPT_HTTP)), [CONN]: CONN_DEF });
+/** Companion's full export: all pages, the dashboard's HTTP connection (and the producer's vMix / ATEM ones, matched by name). */
 export function companionPresetFile(cfg, pages, base, vmixBase, graphics) {
     const b = base.replace(/\/+$/, '');
     const out = {};
     for (const p of pages) {
-        const controls = {};
-        p.keys.forEach((row, r) => row.forEach((x, c) => {
-            if (!x || (x.look.empty && x.key.kind !== 'nav'))
-                return;
-            const { key, look } = x;
-            const id = `p${p.page}r${r}c${c}`;
-            const act = key.action.startsWith('nav:') ? setPage(id, Number(key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(key.action)}`);
-            (controls[r] ??= {})[c] = control(look.text, hex(look.bg), [act], hex(look.fg));
-        }));
-        out[p.page] = { name: `SSL ${p.name}`, controls, gridSize: GRID };
+        const keys = p.keys.map((row) => row.map((x) => (!x || (x.look.empty && x.key.kind !== 'nav') ? null : { key: x.key, text: x.look.text, bg: x.look.bg, fg: x.look.fg })));
+        out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b), gridSize: GRID };
     }
-    const fb = fallbackControls(cfg, vmixBase, graphics);
-    out[PRESET_PAGES.fallback] = { name: 'SSL FALLBACK', controls: fb, gridSize: GRID };
+    out[PRESET_PAGES.fallback] = { name: 'SSL FALLBACK', controls: fallbackControls(cfg, vmixBase, graphics), gridSize: GRID };
     return {
-        version: 4, type: 'full',
+        version: FILE_VERSION, type: 'full', companionBuild: BUILD,
         pages: out,
         triggers: {},
         custom_variables: {},
-        instances: { [CONN]: CONN_DEF },
+        instances: connections(),
+        connectionCollections: [],
     };
 }
 const GRID = { minColumn: 0, maxColumn: 7, minRow: 0, maxRow: 3 };
 const COLOURS = (kind) => ({ board: 0x1e3a8a, lt: 0x166534, bug: 0xa16207, scene: 0x0f766e, team: 0x1e3a5f, sailor: 0x27303f, nav: 0x3f3f46, safety: 0x7c2d12, mode: 0x4c1d95 }[kind] ?? 0x3f3f46);
 const hex = (c) => parseInt(c.replace('#', ''), 16) || 0;
+const v = (value) => ({ value, isExpression: false });
+/** A button as Companion 5.1 has it: a background box and a text layer. */
 const control = (text, bg, down, fg = 0xffffff) => ({
-    type: 'button',
-    style: { text, size: 'auto', png64: null, alignment: 'center:center', pngalignment: 'center:center', color: fg, bgcolor: bg, show_topbar: 'default' },
-    options: { relativeDelay: false, rotaryActions: false, stepAutoProgress: true },
+    type: 'button-layered',
+    style: { layers: [
+            { id: 'canvas', name: 'Canvas', usage: 'auto', type: 'canvas', decoration: v('default'), showStatusIcons: v('default') },
+            { id: 'box0', name: 'Background', usage: 'auto', type: 'box', pinnedProperties: ['color'], enabled: v(true), opacity: v(100), x: v(0), y: v(0), width: v(100), height: v(100), rotation: v(0), color: v(bg), cornerRadius: v(0), borderWidth: v(0), borderColor: v(0), borderPosition: v('inside') },
+            { id: 'text0', name: 'Text', usage: 'auto', type: 'text', pinnedProperties: ['text', 'fontsize', 'fontsizeAllowShrink', 'color', 'halign', 'valign'], enabled: v(true), opacity: v(100), x: v(0), y: v(0), width: v(100), height: v(100), rotation: v(0), text: v(text), color: v(fg), halign: v('center'), valign: v('center'), fontsize: v(100), fontsizeAllowShrink: v(true), font: v('companion-sans'), weight: v('normal'), styles: v([]), outlineColor: v(4278190080) },
+        ] },
+    options: { stepProgression: 'auto', stepExpression: '', rotaryActions: false, canModifyStyleInApis: true, notes: '' },
     feedbacks: [],
     steps: { 0: { action_sets: { down, up: [] }, options: { runWhileHeld: [] } } },
+    localVariables: [],
 });
 const CONN = 'ssl_dashboard_show';
-const http = (id, url) => ({ id, action: 'get', instance: CONN, options: { url, header: '' }, delay: 0 });
-const setPage = (id, page) => ({ id, action: 'set_page', instance: 'internal', options: { controller: 'self', controller_from_variable: false, controller_variable: '', page, page_from_variable: false, page_variable: '' }, delay: 0 });
-const CONN_DEF = { instance_type: 'generic-http', label: 'ssl_dashboard_show', enabled: true, isFirstInit: false, lastUpgradeIndex: -1, sortOrder: 0, config: { prefix: '', proxyAddress: '', rejectUnauthorized: true } };
+const http = (id, url) => ({ type: 'action', id, definitionId: 'get', connectionId: CONN, options: { url: v(url), header: v('') }, upgradeIndex: 3 });
+const setPage = (id, page) => ({ type: 'action', id, definitionId: 'set_page', connectionId: 'internal', options: { page: v(page), surfaceId: v('self') }, children: {} });
+const CONN_DEF = { moduleInstanceType: 'connection', moduleId: 'generic-http', moduleVersionId: '3.2.0', sortOrder: 0, label: 'ssl_dashboard_show', isFirstInit: false, config: { prefix: '', proxyAddress: '', rejectUnauthorized: true, insecureHTTPParser: false, authType: 'none' }, secrets: {}, lastUpgradeIndex: 3, enabled: true };
 function pageFile(name, page, controls) {
     return {
-        version: 4, type: 'page',
-        page: { name, controls, gridSize: { minColumn: 0, maxColumn: 7, minRow: 0, maxRow: 3 } },
-        instances: { [CONN]: CONN_DEF },
+        version: FILE_VERSION, type: 'page', companionBuild: BUILD,
+        page: { name, controls, gridSize: GRID },
+        instances: connections(),
+        connectionCollections: [],
         oldPageNumber: page,
     };
 }
-/** One Companion page export (format 4, upgraded by every later Companion on import) per deck page, plus the fallback page. */
+/** One Companion page export per deck page, plus the fallback page. */
 export function companionFiles(cfg, base, vmixBase, graphics) {
     const b = base.replace(/\/+$/, '');
     const files = [];
     for (const p of deckPages(cfg)) {
-        const controls = {};
-        p.keys.forEach((row, r) => row.forEach((key, c) => {
-            if (!key)
-                return;
-            const id = `p${p.page}r${r}c${c}`;
-            const act = key.action.startsWith('nav:') ? setPage(id, Number(key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(key.action)}`);
-            (controls[r] ??= {})[c] = control(key.custom ? key.custom.replace(/\{auto\}/g, key.text) : key.text, hex(keyBg(cfg, key)), [act], key.fg ? hex(key.fg) : 0xffffff);
-        }));
-        files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, controls) });
+        const keys = p.keys.map((row) => row.map((key) => (key ? { key, text: key.custom ? key.custom.replace(/\{auto\}/g, key.text) : key.text, bg: keyBg(cfg, key), fg: key.fg || '#ffffff' } : null)));
+        files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, pageControls(cfg, p, keys, b)) });
     }
     const fb = fallbackControls(cfg, vmixBase, graphics);
     files.push({ name: 'fallback', page: PRESET_PAGES.fallback, file: pageFile('SSL FALLBACK', cfg.fallbackPage, fb) });
