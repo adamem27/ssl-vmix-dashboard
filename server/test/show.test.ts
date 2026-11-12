@@ -304,9 +304,37 @@ describe('show control', () => {
     show.stopRotation();
     v.calls.length = 0;
     await show.run('nextslide');
-    expect(v.calls.at(-1)).toBe('?Function=SetMultiViewOverlay&Input=k5&Value=3,k3');
+    expect(v.calls.at(-1)).toBe('?Function=SetMultiViewOverlay&Input=k5&Value=4,k3');
     await show.run('tickermode');
     expect(show.state.tickerMode).toBe('end');
+  });
+
+  it('break scene: L-bar on layer 1, the ticker on layer 3, schedule / results on layer 4; tickers change in place; auto switch on and off', async () => {
+    const { s } = race();
+    seedGraphicSets(s.db, activeEvent(s.db).id);
+    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text', 'Ticker1.Text'], ssl_ticker: ['Ticker1.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const k = (n: string) => `k${v.num(n)}`;
+    const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${k(inp)}`;
+    await show.run('show:break');
+    expect(v.calls).toContain(layer(1, 'ssl_lbar'));
+    expect(v.calls).toContain(layer(3, 'ssl_ticker'));
+    expect(v.calls).toContain(layer(4, 'ssl_schedule'));
+    expect(v.overlays[4]).toBe(String(v.num('ssl_break')));
+    expect(show.state.rotating).toBe(true);
+    // a ticker key while the scene is on air: only the text of the ticker layer changes
+    v.calls.length = 0;
+    const r = await show.run('ticker:1');
+    expect(r).toMatchObject({ in: 'ticker', scene: true });
+    expect(v.overlays[1] ?? '').toBe('');
+    expect(v.calls.some((c) => c.startsWith(`?Function=SetText&Input=${k('ssl_ticker')}`))).toBe(true);
+    // AUTO SWITCH off: stops now and stays off for the next break
+    expect(await show.run('rotate')).toMatchObject({ auto: false, rotating: false });
+    await show.run('breakout');
+    await show.run('show:break');
+    expect(show.state.rotating).toBe(false);
+    expect(await show.run('rotate')).toMatchObject({ auto: true, rotating: true });
+    show.stopRotation();
   });
 
   it('builds one Companion preset: every page, a page per team with its sailors, the fallback straight to vMix', async () => {

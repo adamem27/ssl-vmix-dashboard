@@ -6,7 +6,7 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLayer: number; rotateSeconds: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; breakAuto: boolean; rotateSeconds: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -252,9 +252,15 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           <p className="text-xs text-ink-500">Ticker texts are edited under General graphics → Tickers. Now: {data.state.tickerMode === 'end' ? 'end of day (E)' : 'next race (D)'}.</p>
         </div>
         <div className="space-y-2">
-          <label className="block text-xs text-ink-400">Break scene: board layer<input type="number" min={1} max={10} className="input mt-1 w-20 py-1 text-sm" value={c.breakLayer} onChange={(e) => setC({ ...c, breakLayer: Number(e.target.value) || 3 })} /></label>
-          <label className="block text-xs text-ink-400">Rotation every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 12 })} /></label>
-          <p className="text-xs text-ink-500">The break scene rotates the day schedule and the results of every group of the stage.</p>
+          <div className="text-xs font-semibold text-ink-300">Break scene (ssl_break) layers</div>
+          <div className="flex gap-2">
+            {([['L-bar', 'breakLbarLayer', 1], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
+              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={1} max={10} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakAuto} onChange={(e) => setC({ ...c, breakAuto: e.target.checked })} /> Switch day schedule / group results by itself</label>
+          <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 12 })} /></label>
+          <p className="text-xs text-ink-500">The board layer shows the day schedule, then the results of every group of the stage. The ticker layer shows the ticker picked last on the TICKERS page (else the automatic one). AUTO SWITCH on the deck turns switching on or off at once.</p>
         </div>
       </div>
       {data.sailors.length > 0 && (
