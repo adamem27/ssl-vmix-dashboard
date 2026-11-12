@@ -21,7 +21,7 @@ interface ShowData {
   vmix: { ok: boolean; overlays: Record<string, string> };
   graphics: Graphic[]; boats: { id: string; code: string; name: string }[];
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
-  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string;
+  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; breakGroups: { id: string; name: string }[]; breakShown: string[];
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
@@ -258,6 +258,22 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
               <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={2} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
             ))}
           </div>
+          {data.breakGroups.length > 0 && (
+            <div className="text-xs text-ink-400">Group results shown
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                {data.breakGroups.map((g) => {
+                  const shown = c.breakFleets.length ? c.breakFleets.filter((id) => data.breakGroups.some((x) => x.id === id)) : data.breakShown;
+                  const on = shown.includes(g.id);
+                  return (
+                    <label key={g.id} className="flex items-center gap-1 text-ink-200">
+                      <input type="checkbox" checked={on} onChange={() => setC({ ...c, breakFleets: data.breakGroups.map((x) => x.id).filter((id) => (id === g.id ? !on : shown.includes(id))) })} /> {groupLabel(g.name)}
+                    </label>
+                  );
+                })}
+              </div>
+              <span className="text-ink-500">None ticked: every group but the Last Chance Race.</span>
+            </div>
+          )}
           <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakAuto} onChange={(e) => setC({ ...c, breakAuto: e.target.checked })} /> Switch day schedule / group results by itself</label>
           <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>

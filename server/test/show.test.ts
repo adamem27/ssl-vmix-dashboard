@@ -6,7 +6,7 @@ import { comparisonFlag } from '../src/services/compareImages.js';
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
-import { createSet, getSetDetail, placeTeam } from '../src/services/fleets.js';
+import { createSet, getSetDetail, placeTeam, renameFleet } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
 import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
@@ -377,6 +377,19 @@ describe('show control', () => {
     // BREAK SCENE again: all three go out
     expect(await show.run('show:break')).toMatchObject({ out: 'break' });
     expect(show.state.rotating).toBe(false);
+  });
+
+  it('the break scene shows the groups picked on Show control, else every group but the Last Chance Race', () => {
+    const { s, f1, f2 } = race();
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    expect(show.breakFleets()).toEqual([f1.id, f2.id]);
+    renameFleet(s.db, f2.id, 'Last Chance Race');
+    expect(show.breakFleets()).toEqual([f1.id]);
+    expect(show.slides().map((x) => x.kind)).toEqual(['schedule', 'results']);
+    // groups picked on Show control: only those (the Last Chance Race too, when picked)
+    setShowConfig(s.db, { breakFleets: [f2.id] });
+    expect(show.breakFleets()).toEqual([f2.id]);
+    expect(show.breakStageFleets().map((f) => f.id)).toEqual([f1.id, f2.id]);
   });
 
   it('builds one Companion preset: every page, a page per team with its sailors, the fallback straight to vMix', async () => {

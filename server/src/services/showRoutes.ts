@@ -22,7 +22,7 @@ export function registerShowRoutes(app: FastifyInstance, ctx: AssetCtx, show: Sh
   app.get('/api/show', async () => {
     const ev = activeEvent(db).id;
     const fleets = (listSets(db, ev) as { id: string; name: string }[]).flatMap((s) => getSetDetail(db, s.id).fleets.map((f) => ({ id: f.id, name: `${s.name} · ${f.name}`, size: f.filled })));
-    return { ...(await show.view()), fleets, tickers: listGraphicSets(db, ev, 'ticker').map((t) => ({ id: t.id, name: t.name })), companionUrl: JSON.parse(getSetting(db, 'lt.config') || '{}').companionUrl ?? '' };
+    return { ...(await show.view()), fleets, tickers: listGraphicSets(db, ev, 'ticker').map((t) => ({ id: t.id, name: t.name })), breakGroups: show.breakStageFleets(), breakShown: show.breakFleets(), companionUrl: JSON.parse(getSetting(db, 'lt.config') || '{}').companionUrl ?? '' };
   });
   app.put('/api/show/config', async (req) => {
     const c = setShowConfig(db, showConfigSchema.partial().parse(req.body));
