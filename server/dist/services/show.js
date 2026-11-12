@@ -432,18 +432,26 @@ export class Show {
         return crewOf(this.ctx, b.id).filter((s) => s.firstName || s.lastName).sort((a, c) => num(a) - num(c));
     }
     announcements() { return this.cached('announcements', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'announcement')); }
+    /** The groups of the stage of the group racing now (the ones the break scene can show). */
+    breakStageFleets() {
+        const cfg = this.config;
+        const ev = activeEvent(this.ctx.db).id;
+        for (const st of listSets(this.ctx.db, ev)) {
+            const fleets = getSetDetail(this.ctx.db, st.id).fleets;
+            if (fleets.some((f) => f.id === cfg.fleetId))
+                return fleets.map((f) => ({ id: f.id, name: f.name }));
+        }
+        return [];
+    }
     /** Fleets that rotate in the break scene. */
     breakFleets() {
         const cfg = this.config;
-        if (cfg.breakFleets.length)
-            return cfg.breakFleets;
-        const ev = activeEvent(this.ctx.db).id;
-        for (const s of listSets(this.ctx.db, ev)) {
-            const d = getSetDetail(this.ctx.db, s.id);
-            if (d.fleets.some((f) => f.id === cfg.fleetId))
-                return d.fleets.map((f) => f.id);
-        }
-        return cfg.fleetId ? [cfg.fleetId] : [];
+        const stage = this.breakStageFleets();
+        // picked on Show control (in the stage's order); none picked: every group but the Last Chance Race
+        const picked = stage.filter((f) => cfg.breakFleets.includes(f.id));
+        if (picked.length)
+            return picked.map((f) => f.id);
+        return stage.filter((f) => !/last\s*chance|\blcr\b/i.test(f.name)).map((f) => f.id);
     }
     // ---------- vMix state ----------
     /** vMix's state; the tab and the Companion refresh share one read for half a second. */
