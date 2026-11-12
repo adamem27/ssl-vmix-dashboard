@@ -12,7 +12,9 @@ import { setShowConfig } from './show.js';
 import { badRequest } from './errors.js';
 import * as wb from './workbookSheets.js';
 import { DAY_SETTING, dayOverrideNow, realTodayIn, setDayOverride, todayIn } from './dates.js';
-import { getWeather, listSchedule } from './general.js';
+import { getScheduleOptions, getWeather, listPeople, listSchedule } from './general.js';
+import { listSets } from './fleets.js';
+import { listTeams } from './teams.js';
 import { listGradients } from './generator/generator.js';
 import * as vx from './vmixResults.js';
 
@@ -142,12 +144,37 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
         position: r.position, captain: r.captain, sailorId: r.sailorId,
       }));
     }
+    const first = (kind: string): Record<string, string> => gs.listGraphicSets(db, e.id, kind)[0]?.data ?? {};
+    // the officials as typed on Race officials: each role with its names
+    const officials = () => {
+      const x = first('officials');
+      return gs.OFFICIAL_ROLES.map((r, i) => ({ role: (x[`role_${i + 1}`] ?? r.role).trim(), names: r.names.map((n) => (x[`name_${n.i}`] ?? n.name).trim()).filter(Boolean) }))
+        .filter((r) => r.role && r.names.length);
+    };
+    // each team's places in the other stages (rank in its group, points)
+    const history: Record<string, { stage: string; group: string; rank: number; of: number; total: string }[]> = {};
+    for (const st of listSets(db, e.id) as { id: string; name: string }[]) {
+      if (st.id === setId) continue;
+      for (const g of rs.listResults(db, st.id)) {
+        if (!g.rows.some((r) => r.total !== '')) continue;
+        g.rows.forEach((r, i) => { if (teamIds.has(r.teamId)) (history[r.teamId] ??= []).push({ stage: st.name, group: g.title || g.fleetName, rank: i + 1, of: g.rows.length, total: r.total }); });
+      }
+    }
     return {
       event: { name: (db.prepare('SELECT name FROM events WHERE id = ?').get(e.id) as { name: string } | undefined)?.name ?? '', timezone: e.timezone },
       stage: wb.currentStage(db, e.id), setId, date,
       weather: getWeather(db), schedule: listSchedule(db, e.id, date),
       results: results.map((g) => ({ fleetId: g.fleetId, fleetName: g.fleetName, title: g.title, subtitle: g.subtitle, races: g.races, rows: g.rows.map((r) => ({ teamId: r.teamId, races: r.races, total: r.total })) })),
       colours, lineups,
+      // what else the dashboard knows and a commentator can use
+      welcome: { stage: (first('welcome').stage ?? '').trim(), day: (first('welcome').day ?? '').trim() },
+      nextRace: getScheduleOptions(db).next[date] ?? null,
+      // the team's notes, without the line an import leaves (From the … matchboard / workbook)
+      notes: Object.fromEntries(listTeams(ctx).filter((t) => teamIds.has(t.id)).map((t) => [t.id, (t.notes ?? '').split(/\r?\n/).filter((l: string) => !/^\s*(imported )?from the .*(matchboard|workbook|import|sheet)\.?\s*$/i.test(l)).join('\n').trim()]).filter(([, n]) => n)),
+      history,
+      officials: officials(),
+      people: listPeople(ctx, e.id).map((p) => ({ name: [p.name, p.surname].filter(Boolean).join(' '), role: p.role })).filter((p) => p.name),
+      socials: (() => { const x = first('socials'); return { website: x.website ?? '', hashtag: x.hashtag ?? '', handles: [x.instagram, x.facebook, x.youtube, x.tiktok, x.x].map((v) => (v ?? '').trim()).filter((v, i, a) => v && a.indexOf(v) === i) }; })(),
     };
   });
 

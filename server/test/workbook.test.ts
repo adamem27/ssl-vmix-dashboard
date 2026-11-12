@@ -137,6 +137,16 @@ describe('current stage in the API', () => {
     expect(c.setId).toBe(setId);
     expect(c.results.map((g: { fleetName: string }) => g.fleetName)).toEqual(['Group A']);
     expect(c.lineups[a.teamId].map((p: { label: string; lastName: string }) => [p.label, p.lastName])).toEqual([['Helm', 'Hassan']]);
+    // and what else a commentator can use: officials, team notes (without the import's line), the next race
+    expect(c.officials[0]).toMatchObject({ role: 'REGATTA DIRECTOR' });
+    expect(c.notes).toEqual({});
+    await app.inject({ method: 'PATCH', url: `/api/teams/${a.teamId}`, payload: { notes: 'From the SSL Gold Cup 2026 matchboard.\nOlympic medallist on helm' } });
+    const day = c.date;
+    const item = (await app.inject({ method: 'POST', url: '/api/schedule', payload: { date: day, time: '10:00', race: '1', fleet: 'Group A' } })).json().id;
+    await app.inject({ method: 'PUT', url: '/api/schedule/options', payload: { date: day, next: item } });
+    const c2 = (await app.inject({ url: '/api/commentator' })).json();
+    expect(c2.notes[a.teamId]).toBe('Olympic medallist on helm');
+    expect(c2.nextRace).toBe(item);
     await app.close();
   });
 });
