@@ -1,8 +1,14 @@
 {
-  "version": "1.0.148",
-  "commit": "fbab737",
-  "date": "2026-11-11T22:47:38Z",
+  "version": "1.0.149",
+  "commit": "5b7a9f1",
+  "date": "2026-11-12T00:27:47Z",
   "changes": [
+    {
+      "version": "1.0.149",
+      "commit": "5b7a9f1",
+      "date": "2026-11-12T00:27:47Z",
+      "text": "Line-up from declaration: a second grinder sits beside the grinder (Main place), the main trimmer moves to Tactician"
+    },
     {
       "version": "1.0.148",
       "commit": "fbab737",
@@ -476,12 +482,6 @@
       "commit": "a0e2974",
       "date": "2026-11-08T22:23:21Z",
       "text": "Announcements and People in their own Excel sheets (one row each), so adding one moves nothing in General"
-    },
-    {
-      "version": "1.0.61",
-      "commit": "f6e0043",
-      "date": "2026-11-08T22:11:29Z",
-      "text": "No heading in Welcome, Follow us and Announcements; line-up places bow to helm by default and reorderable by dragging (names still drag to swap sailors); General graphics in the order welcome, schedule, weather, announcements, tickers, race officials, follow us, people"
     }
   ]
 }
