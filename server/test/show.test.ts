@@ -398,30 +398,32 @@ describe('show control', () => {
     const { s } = race();
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
     const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
-    expect(f).toMatchObject({ version: 4, type: 'full' });
+    expect(f).toMatchObject({ version: 12, type: 'full' });
     // deck 1: 1–2, deck 2: 3–6, fallback 8, teams (by code) 9–12
     expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14]);
-    const url = (c: any) => c.steps[0].action_sets.down[0].options.url;
+    const url = (c: any) => c.steps[0].action_sets.down[0].options.url.value;
+    const text = (c: any) => c.style.layers.find((l: any) => l.type === 'text').text.value;
+    const page = (c: any) => c.steps[0].action_sets.down[0].options.page.value;
     expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
-    expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', instance: 'internal', options: { controller: 'self', page: 2 } });
+    expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ definitionId: 'set_page', connectionId: 'internal', options: { surfaceId: { value: 'self' }, page: { value: 2 } } });
     // TEAMS: a key per team opens its page; ESP is the second by code
     expect(f.pages[3].name).toBe('SSL TEAMS');
-    expect(f.pages[3].controls[0][1].style.text).toBe('ESP\\nTEAM ESP');
-    expect(f.pages[3].controls[0][1].steps[0].action_sets.down[0]).toMatchObject({ action: 'set_page', options: { page: 10 } });
+    expect(text(f.pages[3].controls[0][1])).toBe('ESP\\nTEAM ESP');
+    expect(page(f.pages[3].controls[0][1])).toBe(10);
     // ESP's page: its places with the names fixed on the keys, each calling that place of that team
     const esp = f.pages[10];
     expect(esp.name).toBe('SSL ESP');
-    expect(esp.controls[1][0].style.text).toBe('BOW\\nPONS');
-    expect(esp.controls[1][2].style.text).toBe('PIT\\n#12 RUIZ');
+    expect(text(esp.controls[1][0])).toBe('BOW\\nPONS');
+    expect(text(esp.controls[1][2])).toBe('PIT\\n#12 RUIZ');
     expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
     expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=qualified%3AESP');
     // the team lower thirds sit on TEAMS, a row below each team's page key (not on the team's own page)
     expect(f.pages[3].controls[1] ?? {}).toEqual({});
     expect(url(f.pages[3].controls[2][1])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
-    expect(Object.values(esp.controls).flatMap((r: any) => Object.values(r)).some((c: any) => /teamlt/.test(c?.steps?.[0]?.action_sets?.down?.[0]?.options?.url ?? ''))).toBe(false);
-    expect(esp.controls[3][1].steps[0].action_sets.down[0].options.page).toBe(9); // ◀ BRA
-    expect(esp.controls[3][2].steps[0].action_sets.down[0].options.page).toBe(11); // ▶ GBR
-    expect(f.pages[12].controls[3][2].steps[0].action_sets.down[0].options.page).toBe(9); // after the last team: the first
+    expect(Object.values(esp.controls).flatMap((r: any) => Object.values(r)).some((c: any) => /teamlt/.test(c?.steps?.[0]?.action_sets?.down?.[0]?.options?.url?.value ?? ''))).toBe(false);
+    expect(page(esp.controls[3][1])).toBe(9); // ◀ BRA
+    expect(page(esp.controls[3][2])).toBe(11); // ▶ GBR
+    expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
     for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
@@ -434,6 +436,28 @@ describe('show control', () => {
     const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next' && k.action !== 'lultswap' && k.action !== 'show:socials').map((k) => k!.action);
     expect(acts.filter((a, i) => acts.indexOf(a) !== i)).toEqual([]);
     expect(acts.some((a) => a.startsWith('anthem'))).toBe(false);
+  });
+
+  it("keeps the producer's PEOPLE page from Companion as it is in every preset", async () => {
+    const { s } = race();
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const people = show.pages().find((p) => p.name === 'PEOPLE')!;
+    // the dashboard keys of that page show on Show control; the person keys it took away stay away
+    expect(people.keys[0].slice(0, 3).map((x) => x?.action)).toEqual(['person:1', 'person:2', 'person:3']);
+    expect(people.keys[0][3]).toBeNull();
+    expect(people.keys[1].every((x) => x === null)).toBe(true);
+    const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
+    const pg = f.pages[people.page];
+    expect(pg.name).toBe('SSL PEOPLE');
+    const act = (r: number, c: number) => pg.controls[r][c].steps[0].action_sets.down[0];
+    expect(act(0, 0)).toMatchObject({ definitionId: 'get', connectionId: 'ssl_dashboard_show', options: { url: { value: 'http://10.0.0.5:4310/api/show/do?a=person%3A1' } } });
+    // the vMix and ATEM keys exactly as they were, with their connections in the file (matched by name on import)
+    expect(act(1, 0)).toMatchObject({ definitionId: 'overlayFunctions', options: { input: { value: '15' } } });
+    expect(act(2, 7)).toMatchObject({ definitionId: 'dskAuto' });
+    expect(f.instances[act(1, 0).connectionId]).toMatchObject({ moduleId: 'studiocoast-vmix', label: 'vmix_stream1' });
+    expect(f.instances[act(2, 7).connectionId]).toMatchObject({ moduleId: 'bmd-atem', label: 'atem' });
+    expect(Object.values(f.instances).filter((x: any) => x.moduleId === 'generic-http')).toHaveLength(1);
+    expect(pg.controls[0][3]).toBeUndefined();
   });
 
   it('the preset has pages only for the teams of the stage picked at the top, in group order', () => {
@@ -678,7 +702,9 @@ describe('show control', () => {
     expect(look).toMatchObject({ text: 'HELLO\\nWELCOME', bg: '#16a34a', fg: '#000000' });
     expect((await show.keyLook(p.keys[0][3]!)).bg).toBe('#7c3aed');
     const f: any = companionFiles(show.config, 'http://x', 'http://v', show.graphics())[0].file;
-    expect(f.page.controls[0][0].style).toMatchObject({ text: 'HELLO\\nWELCOME', bgcolor: 0x16a34a, color: 0 });
+    const ls = f.page.controls[0][0].style.layers;
+    expect(ls.find((l: any) => l.type === 'text')).toMatchObject({ text: { value: 'HELLO\\nWELCOME' }, color: { value: 0 } });
+    expect(ls.find((l: any) => l.type === 'box').color.value).toBe(0x16a34a);
     expect(f.page.controls[0][2]).toBeUndefined();
   });
 
