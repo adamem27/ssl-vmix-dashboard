@@ -1,8 +1,14 @@
 {
-  "version": "1.0.158",
-  "commit": "d0c969e",
-  "date": "2026-11-12T13:02:07Z",
+  "version": "1.0.159",
+  "commit": "69247b1",
+  "date": "2026-11-12T13:23:27Z",
   "changes": [
+    {
+      "version": "1.0.159",
+      "commit": "69247b1",
+      "date": "2026-11-12T13:23:27Z",
+      "text": "AFTER / BREAK page: a key per ticker for the break scene (new tickers get the next key) instead of NEXT TICKER"
+    },
     {
       "version": "1.0.158",
       "commit": "d0c969e",
@@ -476,12 +482,6 @@
       "commit": "8e9901c",
       "date": "2026-11-09T00:32:50Z",
       "text": "Number every build (1.0.N) and show the version with a list of changes"
-    },
-    {
-      "version": "1.0.73",
-      "commit": "bcfef90",
-      "date": "2026-11-09T00:27:21Z",
-      "text": "Results: Send to vMix fills the overall results title through the vMix Web API"
     }
   ]
 }
