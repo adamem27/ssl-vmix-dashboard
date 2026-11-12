@@ -120,7 +120,8 @@ export function repeatGroups(root: GtNode): RepeatGroup[] {
         byPattern.get(pat)!.set(Number(m[0]), i);
       }
     }
-    const tagsOf = (i: number) => { const inner = innerComposition(comp.children[i]); return inner ? inner.children.filter(isElement).map((x) => x.tag).join(',') : ''; };
+    // alike = the same elements inside, in any order (a row whose flags sit above its race text is still a row)
+    const tagsOf = (i: number) => { const inner = innerComposition(comp.children[i]); return inner ? inner.children.filter(isElement).map((x) => x.tag).sort().join(',') : ''; };
     // a pattern counts when its layers are alike inside (Layer1, Layer2… of unrelated content are not parts)
     const pats = [...byPattern.entries()].filter(([, m]) => m.size >= 2 && new Set([...m.values()].map(tagsOf)).size === 1);
     const bySet = new Map<string, string[]>();
@@ -165,7 +166,7 @@ export function repeatGroups(root: GtNode): RepeatGroup[] {
     const sig = (c: GtNode) => {
       const inner = innerComposition(c);
       if (!inner) return null;
-      const tags = inner.children.filter(isElement).map((x) => x.tag);
+      const tags = inner.children.filter(isElement).map((x) => x.tag).sort();
       return tags.length >= 3 ? tags.join(',') : null;
     };
     const bySig = new Map<string, { c: GtNode; i: number }[]>();
