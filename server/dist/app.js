@@ -35,7 +35,8 @@ import { versionInfo } from './version.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
-import { siteSettings, saveSiteSettings, siteTarget } from './services/siteTargets.js';
+import { siteSettings, saveSiteSettings, siteTarget, uploadKey } from './services/siteTargets.js';
+import { uploadPhp } from './services/httpsTarget.js';
 import { StaticSitePublisher } from './services/staticSite.js';
 import { FEED_TYPE, feedKey, INTERNAL_KEY, LiveFeedPusher, LiveFeedStore, viewerMayRead } from './services/liveFeed.js';
 const str = (max = 500) => z.string().max(max);
@@ -189,7 +190,7 @@ export async function buildApp(deps) {
     app.get('/api/static-site', async () => siteInfo());
     app.put('/api/static-site', async (req) => {
         const b = z.object({
-            enabled: z.boolean(), mode: z.enum(['folder', 'ftp']), localDir: str(500), publicUrl: str(300),
+            enabled: z.boolean(), mode: z.enum(['folder', 'ftp', 'https']), localDir: str(500), publicUrl: str(300),
             ftpHost: str(200), ftpPort: z.number().int().min(1).max(65535), ftpUser: str(200), ftpPassword: str(200), ftpDir: str(300), ftpSecure: z.boolean(),
         }).partial().parse(req.body);
         saveSiteSettings(db, b);
@@ -198,6 +199,7 @@ export async function buildApp(deps) {
         site.reset();
         return siteInfo();
     });
+    app.get('/api/static-site/upload.php', async (_req, reply) => reply.header('Content-Type', 'application/octet-stream').header('Content-Disposition', 'attachment; filename="upload.php"').send(uploadPhp(uploadKey(db))));
     app.post('/api/static-site/publish', async () => { await site.publishNow(); return siteInfo(); });
     app.post('/api/static-site/new-address', async () => { site.newFolder(); return siteInfo(); });
     const ev = () => activeEvent(db);
