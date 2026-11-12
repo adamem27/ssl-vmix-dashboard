@@ -1,8 +1,14 @@
 {
-  "version": "1.0.162",
-  "commit": "c69e458",
-  "date": "2026-11-12T21:17:21Z",
+  "version": "1.0.163",
+  "commit": "b369c1a",
+  "date": "2026-11-12T22:03:13Z",
   "changes": [
+    {
+      "version": "1.0.163",
+      "commit": "b369c1a",
+      "date": "2026-11-12T22:03:13Z",
+      "text": "L-BAR RANKING key (ssl_bar_2), no GROUP RESULTS or UNDO keys, the ATEM downstream key on every page, team keys in shirt colours"
+    },
     {
       "version": "1.0.162",
       "commit": "c69e458",
@@ -476,12 +482,6 @@
       "commit": "03fc7db",
       "date": "2026-11-09T01:17:20Z",
       "text": "Version list and other dialogs stay on screen, long content scrolls inside"
-    },
-    {
-      "version": "1.0.79",
-      "commit": "da9be5d",
-      "date": "2026-11-09T01:03:30Z",
-      "text": "Flags always have rounded corners, as in the designs"
     }
   ]
 }
