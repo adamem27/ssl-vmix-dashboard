@@ -36,6 +36,7 @@ export function SettingsPage() {
         ))}
       </nav>
       <EventSection event={q.data!.event} />
+      <StaticPageSection />
       <CommentatorOnlineSection />
       <PresetSection />
       <SyncSection />
@@ -383,8 +384,8 @@ function CommentatorOnlineSection() {
   const link = v ? window.location.origin + v.path : '';
   const ago = (iso: string | null | undefined) => iso ? fmtDateTime(iso) : '—';
   return (
-    <Section id="commentator-online" title="Commentator online"
-      desc={<>The commentator screen on a web address, read-only. The PC at the venue sends the data every 5 s to the online dashboard (for example <code>https://sslgfx.em27code.com</code>); commentators open a link that shows only the commentator screen and cannot change anything. The venue PC is not reachable from the internet.</>}>
+    <Section id="commentator-push" title="Commentator via the online dashboard (alternative)"
+      desc={<>Instead of the static page above: the PC at the venue sends the data every 5 s to the online dashboard (for example <code>https://sslgfx.em27code.com</code>); commentators open a link that shows only the commentator screen and cannot change anything. The venue PC is not reachable from the internet.</>}>
       <h3 className="text-sm font-semibold text-ink-200">1. On the PC at the venue: send the data</h3>
       {push.isLoading ? <Loading /> : push.error ? <ErrorBox error={push.error} /> : p && (
         <>
@@ -442,6 +443,90 @@ function CommentatorOnlineSection() {
           </>}
         </div>
       )}
+      {dialog}
+    </Section>
+  );
+}
+
+// ---------- commentator screen as a static page ----------
+interface StaticSiteInfo {
+  mode: 'folder' | 'ftp'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
+  enabled: boolean; url: string; folderName: string;
+  status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
+}
+type SiteForm = Omit<StaticSiteInfo, 'enabled' | 'url' | 'folderName' | 'status' | 'hasFtpPassword'> & { ftpPassword: string };
+
+/** The PC at the venue writes the commentator screen as a static web page and uploads it (FTP) or saves it to a folder. */
+function StaticPageSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { ask, dialog } = useConfirm();
+  const q = useQuery({ queryKey: ['static-site'], queryFn: () => api.get<StaticSiteInfo>('/api/static-site'), refetchInterval: 5000 });
+  const [f, setF] = useState<SiteForm | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const d = q.data;
+  useEffect(() => { if (d && !f) setF({ mode: d.mode, localDir: d.localDir, publicUrl: d.publicUrl, ftpHost: d.ftpHost, ftpPort: d.ftpPort, ftpUser: d.ftpUser, ftpDir: d.ftpDir, ftpSecure: d.ftpSecure, ftpPassword: '' }); }, [d, f]);
+  if (q.isLoading || !f) return <Section id="commentator-online" title="Commentator online"><Loading /></Section>;
+  if (q.error || !d) return <Section id="commentator-online" title="Commentator online"><ErrorBox error={q.error} /></Section>;
+  const set = <K extends keyof SiteForm>(k: K, v: SiteForm[K]) => setF({ ...f, [k]: v });
+  const run = async (key: string, call: () => Promise<StaticSiteInfo>, msg?: string) => {
+    setBusy(key);
+    try { const r = await call(); qc.setQueryData(['static-site'], r); qc.invalidateQueries({ queryKey: ['commentator-link'] }); if (r.status.error && key !== 'save') toast.error(r.status.error); else if (msg) toast.ok(msg); }
+    catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
+  const save = (e: FormEvent) => {
+    e.preventDefault();
+    const { ftpPassword, ...rest } = f;
+    void run('save', async () => { await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}) }); setF({ ...f, ftpPassword: '' }); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'Saved');
+  };
+  const st = d.status;
+  const when = (iso: string | null) => (iso ? fmtDateTime(iso) : '—');
+  return (
+    <Section id="commentator-online" title="Commentator online"
+      desc={<>The commentator screen as a <b>static web page</b>: every 5 s this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
+      <form onSubmit={save} className="space-y-3">
+        <div className="flex flex-wrap gap-4 text-sm">
+          {(['ftp', 'folder'] as const).map((m) => (
+            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{m === 'ftp' ? 'Upload by FTP to the web host' : 'Only save to a folder on this PC'}</label>
+          ))}
+        </div>
+        {f.mode === 'ftp' ? (
+          <div className="grid gap-3 md:grid-cols-[2fr_100px_1fr_1fr]">
+            <Field label="FTP server"><input className="input font-mono text-xs" value={f.ftpHost} onChange={(e) => set('ftpHost', e.target.value)} placeholder="h55.seohost.pl" /></Field>
+            <Field label="Port"><input className="input font-mono text-xs" inputMode="numeric" value={f.ftpPort} onChange={(e) => set('ftpPort', Number(e.target.value.replace(/\D/g, '')) || 0)} /></Field>
+            <Field label="FTP user"><input className="input font-mono text-xs" value={f.ftpUser} onChange={(e) => set('ftpUser', e.target.value)} autoComplete="off" /></Field>
+            <Field label={d.hasFtpPassword ? 'Password (saved; type to change)' : 'Password'}><input className="input" type="password" value={f.ftpPassword} onChange={(e) => set('ftpPassword', e.target.value)} placeholder={d.hasFtpPassword ? '••••••••' : ''} autoComplete="new-password" /></Field>
+            <Field label="Folder on the server (empty = the FTP account's own folder)" className="md:col-span-2"><input className="input font-mono text-xs" value={f.ftpDir} onChange={(e) => set('ftpDir', e.target.value)} placeholder="" /></Field>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm md:col-span-2"><input type="checkbox" className="h-4 w-4 accent-sky-500" checked={f.ftpSecure} onChange={(e) => set('ftpSecure', e.target.checked)} />Encrypted (FTPS); switch off only if the host does not offer it</label>
+          </div>
+        ) : (
+          <Field label="Folder on this PC"><input className="input font-mono text-xs" value={f.localDir} onChange={(e) => set('localDir', e.target.value)} /></Field>
+        )}
+        <Field label="Web address of that folder (what commentators open, without the random part)">
+          <input className="input font-mono text-xs" value={f.publicUrl} onChange={(e) => set('publicUrl', e.target.value)} placeholder="https://komentator.em27code.com" />
+        </Field>
+        <Button type="submit" variant="primary" busy={busy === 'save'}>Save</Button>
+      </form>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={d.enabled} disabled={busy !== null}
+            onChange={(e) => run('toggle', async () => { await api.put('/api/static-site', { enabled: e.target.checked }); return e.target.checked ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
+          Publish every 5 seconds
+        </label>
+        <Button size="sm" busy={busy === 'now'} onClick={() => run('now', () => api.post<StaticSiteInfo>('/api/static-site/publish'), 'Published')}>Publish now</Button>
+        {st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Published {when(st.lastOkAt)}</Badge> : <Badge>{d.enabled ? 'Waiting' : 'Off'}</Badge>}
+      </div>
+      {st.error && <p className="mt-2 text-sm text-red-300">{st.error}</p>}
+      {st.lastOkAt && <p className="mt-2 text-xs text-ink-400">Data last changed {when(st.lastChangeAt)} · data.json {Math.round(st.dataBytes / 1024)} KB · {st.pictures} pictures · last round sent {st.uploadedFiles} file{st.uploadedFiles === 1 ? '' : 's'} · {st.target}</p>}
+      <div className="mt-3">
+        <p className="mb-1 text-xs text-ink-400">Link for commentators (any network, any browser; read-only):</p>
+        {d.url ? <CopyLink url={d.url} /> : <p className="text-sm text-ink-400">Fill in the web address above. Folder name: <code>{d.folderName}</code></p>}
+      </div>
+      <Button className="mt-3" size="sm" variant="danger" busy={busy === 'addr'} onClick={async () => {
+        if (!(await ask('Move the page to a new address?', 'The page is published under a new random folder name, so the old link stops getting new data. Delete the old folder on the host by hand (FTP) so it disappears completely.', 'New address'))) return;
+        void run('addr', async () => { await api.post('/api/static-site/new-address'); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'New address ready');
+      }}>New address (old link stops updating)</Button>
       {dialog}
     </Section>
   );
