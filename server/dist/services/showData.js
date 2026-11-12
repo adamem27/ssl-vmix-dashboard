@@ -55,7 +55,8 @@ function scheduleFleets(ctx, eventId) {
 export const EVENT_CITY = 'RIO DE JANEIRO';
 export const EVENT_COUNTRY = 'BRAZIL';
 export const EVENT_LOCATION = `${EVENT_CITY}, ${EVENT_COUNTRY}`;
-const SCHEDULE_GROUP_LAYERS = ['GROUP A', 'GROUP B', 'GROUP A1', 'GROUP B1'];
+// rows added by the GTZIP generator's quick form copy the last row and count its number on (GROUP B2, B3, …)
+const SCHEDULE_GROUP_LAYERS = ['GROUP A', 'GROUP B', 'GROUP A1', 'GROUP B1', ...Array.from({ length: 8 }, (_, i) => `GROUP B${i + 2}`)];
 const groupKey = (s) => groupLabel(s).replace(/\s+/g, ' ').trim();
 /** The band behind the next race on the schedule board (its HIGHLIGHT n layers): soft white, a brighter line at the left. */
 export const SCHEDULE_HIGHLIGHT = 'icons/schedule_highlight.png';
@@ -116,7 +117,7 @@ export function showDataFields(ctx, graphicId, o) {
         const time = !board || opt.showTime;
         const next = board ? rows.findIndex((r) => r.id === opt.next[today]) : -1;
         const hl = next >= 0 ? scheduleHighlightPath(ctx) : '';
-        for (let i = 0; i < Math.max(rows.length, 6); i++) {
+        for (let i = 0; i < Math.max(rows.length, 6); i++) { // rows the title lacks are simply not there
             const r = rows[i];
             const on = (v) => (time ? v : ''), off = (v) => (time ? '' : v);
             f.set(`POSITION ${i + 1}.Text`, on(r ? String(i + 1) : ''));
