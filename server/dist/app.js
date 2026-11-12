@@ -35,6 +35,8 @@ import { versionInfo } from './version.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
+import { siteSettings, saveSiteSettings, siteTarget } from './services/siteTargets.js';
+import { StaticSitePublisher } from './services/staticSite.js';
 import { FEED_TYPE, feedKey, INTERNAL_KEY, LiveFeedPusher, LiveFeedStore, viewerMayRead } from './services/liveFeed.js';
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
@@ -45,7 +47,9 @@ export async function buildApp(deps) {
     seedRaceFlags(deps.assetsDir);
     const generator = deps.generator ?? new pngGen.GeneratorExporter({ db, assetsDir: deps.assetsDir });
     const matchboard = deps.matchboard ?? new mb.MatchboardExporter({ db, assetsDir: deps.assetsDir });
-    const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 5 * 1024 * 1024 });
+    const app = Fastify({ logger: process.env.NODE_ENV === 'test' ? false : { level: process.env.LOG_LEVEL ?? 'info' }, bodyLimit: 5 * 1024 * 1024,
+        // the commentator snapshot reads its own routes every 5 s: keep those out of the log
+        disableRequestLogging: (req) => req.headers['x-ssl-internal'] !== undefined });
     await app.register(multipart, { limits: { fileSize: deps.maxUploadBytes ?? 40 * 1024 * 1024, files: 1 } });
     app.setErrorHandler((err, _req, reply) => {
         if (err instanceof HttpError)
@@ -176,6 +180,26 @@ export async function buildApp(deps) {
     app.get('/api/live/push', async () => ({ ...pusher.settings(), status: pusher.status }));
     app.put('/api/live/push', async (req) => { pusher.save(pushBody.parse(req.body)); return { ...pusher.settings(), status: pusher.status }; });
     app.post('/api/live/push/now', async () => ({ ...pusher.settings(), status: await pusher.pushNow() }));
+    // ---------- commentator screen as a static page (folder or web host; nothing runs on the host) ----------
+    const siteDir = deps.siteDir ?? path.join(path.dirname(deps.assetsDir), 'commentator-site');
+    const site = new StaticSitePublisher(db, () => pusher.build(), deps.webDist, (d, folder) => siteTarget(d, folder, siteDir));
+    app.decorate('staticSite', site);
+    app.addHook('onClose', async () => site.stop());
+    const siteInfo = () => ({ ...siteSettings(db, siteDir), enabled: site.enabled(), url: site.url(), folderName: site.folderName(), status: site.status });
+    app.get('/api/static-site', async () => siteInfo());
+    app.put('/api/static-site', async (req) => {
+        const b = z.object({
+            enabled: z.boolean(), mode: z.enum(['folder', 'ftp']), localDir: str(500), publicUrl: str(300),
+            ftpHost: str(200), ftpPort: z.number().int().min(1).max(65535), ftpUser: str(200), ftpPassword: str(200), ftpDir: str(300), ftpSecure: z.boolean(),
+        }).partial().parse(req.body);
+        saveSiteSettings(db, b);
+        if (b.enabled !== undefined)
+            site.setEnabled(b.enabled);
+        site.reset();
+        return siteInfo();
+    });
+    app.post('/api/static-site/publish', async () => { await site.publishNow(); return siteInfo(); });
+    app.post('/api/static-site/new-address', async () => { site.newFolder(); return siteInfo(); });
     const ev = () => activeEvent(db);
     // ---------- meta ----------
     app.get('/api/health', async () => ({ ok: true, time: nowIso(), version: versionInfo().version }));
