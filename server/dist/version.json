@@ -1,8 +1,14 @@
 {
-  "version": "1.0.159",
-  "commit": "69247b1",
-  "date": "2026-11-12T13:23:27Z",
+  "version": "1.0.160",
+  "commit": "06d49df",
+  "date": "2026-11-12T20:59:16Z",
   "changes": [
+    {
+      "version": "1.0.160",
+      "commit": "06d49df",
+      "date": "2026-11-12T20:59:16Z",
+      "text": "Own results input per group, day schedule toggle in the break scene, flag 4 first in Team comparison, no commentator LT keys"
+    },
     {
       "version": "1.0.159",
       "commit": "69247b1",
@@ -476,12 +482,6 @@
       "commit": "745c9f1",
       "date": "2026-11-09T00:45:45Z",
       "text": "Send to vMix fills race columns from the right, next to Points"
-    },
-    {
-      "version": "1.0.75",
-      "commit": "8e9901c",
-      "date": "2026-11-09T00:32:50Z",
-      "text": "Number every build (1.0.N) and show the version with a list of changes"
     }
   ]
 }
