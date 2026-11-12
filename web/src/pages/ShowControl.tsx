@@ -252,16 +252,16 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           <p className="text-xs text-ink-500">Ticker texts are edited under General graphics → Tickers. Now: {data.state.tickerMode === 'end' ? 'end of day (E)' : 'next race (D)'}.</p>
         </div>
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-ink-300">Break scene (ssl_break) layers</div>
+          <div className="text-xs font-semibold text-ink-300">Break scene: overlay channels</div>
           <div className="flex gap-2">
-            {([['L-bar', 'breakLbarLayer', 1], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
-              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={1} max={10} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
+            {([['L-bar', 'breakLbarLayer', 2], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
+              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={2} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
             ))}
           </div>
           <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakAuto} onChange={(e) => setC({ ...c, breakAuto: e.target.checked })} /> Switch day schedule / group results by itself</label>
           <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
-          <p className="text-xs text-ink-500">The board layer shows the day schedule, then the results of every group of the stage. The ticker layer shows the ticker picked last on the TICKERS page (else the automatic one). AUTO SWITCH on the deck turns switching on or off at once.</p>
+          <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule, which then switches with the results of every group of the stage. NEXT SLIDE and NEXT TICKER switch by hand; AUTO SWITCH turns the timed switching on or off.</p>
         </div>
       </div>
       {data.sailors.length > 0 && (

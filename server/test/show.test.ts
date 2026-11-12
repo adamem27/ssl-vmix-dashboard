@@ -302,68 +302,70 @@ describe('show control', () => {
     expect(v.overlays[1]).toBe('');
 
     await show.run('show:break');
-    expect(v.overlays[4]).toBe('5');
+    // the day schedule on channel 4 (no input of the scene's own)
+    expect(v.overlays[4]).toBe('2');
     show.stopRotation();
     v.calls.length = 0;
     setShowConfig(s.db, { breakOutMs: 0 });
     // an old saved 12 s switch time becomes 30 s
     expect(getShowConfig(s.db).rotateSeconds).toBe(30);
     await show.run('nextslide');
-    // on air: the schedule plays its out animation, the results take the layer and play their in animation
-    const i = v.calls.indexOf('?Function=TitleBeginAnimation&Input=k2&Value=TransitionOut');
-    const j = v.calls.indexOf('?Function=SetMultiViewOverlay&Input=k5&Value=4,3');
-    expect(i).toBeGreaterThanOrEqual(0);
-    expect(j).toBeGreaterThan(i);
-    expect(v.calls.at(-1)).toBe('?Function=TitleBeginAnimation&Input=k3&Value=TransitionIn');
+    // on air: the schedule goes out on channel 4 (its out animation), the results get their data and come in
+    expect(v.calls[0]).toBe('?Function=OverlayInput4Out');
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput4In&Input=k3');
+    expect(v.overlays[4]).toBe('3');
     await show.run('tickermode');
     expect(show.state.tickerMode).toBe('end');
   });
 
-  it('break scene: L-bar on layer 1, the ticker on layer 3, schedule / results on layer 4; tickers change in place; auto switch on and off', async () => {
+  it('break scene: L-bar on channel 2, the ticker on 3, schedule / results on 4; tickers and boards switch with their animations; auto switch on and off', async () => {
     const { s } = race();
     seedGraphicSets(s.db, activeEvent(s.db).id);
     // the L-bar loaded under its file name (L-bars.gtzip) is found too
     const v = fakeVmix({ ...TITLES, 'L-bars.gtzip': ['TITLE.Text', 'Ticker1.Text'], ssl_ticker: ['Ticker1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const k = (n: string) => `k${v.num(n)}`;
-    const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${v.num(inp)}`;
-    // the L-bar on air on its own first: it leaves at once (no out animation), then plays its in animation in the scene
+    // an old saved layer 1 for the L-bar becomes channel 2
+    setSetting(s.db, 'show.config', JSON.stringify({ ...JSON.parse(JSON.stringify(getShowConfig(s.db))), breakLbarLayer: 1, cfgVersion: 2 }));
+    expect(getShowConfig(s.db).breakLbarLayer).toBe(2);
+    // the L-bar on air on its own first: it leaves channel 1 at once, then comes in on channel 2 with its in animation
     await show.run('show:lbar');
-    expect(v.overlays[1]).toBe(String(v.num('L-bars.gtzip')));
+    expect(v.overlays[1]).toBe(v.num('L-bars.gtzip'));
     await show.run('show:break');
     expect(v.calls).toContain('?Function=OverlayInput1Off');
-    expect(v.calls).not.toContain('?Function=OverlayInput1Out');
-    expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('L-bars.gtzip')}&Value=TransitionIn`);
-    expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionIn`);
-    expect(v.calls).toContain(layer(1, 'L-bars.gtzip'));
-    // vMix gets a plain comma between the layer and the input (an encoded one put every input on one layer)
-    expect(v.raw.filter((c) => c.includes('SetMultiViewOverlay')).every((c) => /&Value=\d+,\d+$/.test(c))).toBe(true);
-    expect(v.calls).toContain(layer(3, 'ssl_ticker'));
-    expect(v.calls).toContain(layer(4, 'ssl_schedule'));
-    expect(v.overlays[4]).toBe(String(v.num('ssl_break')));
+    expect(v.overlays[1] ?? '').toBe('');
+    expect(v.overlays[2]).toBe(v.num('L-bars.gtzip'));
+    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
+    expect(v.overlays[4]).toBe(v.num('ssl_schedule'));
+    expect(v.calls.some((c) => c.includes('SetMultiViewOverlay'))).toBe(false);
     expect(show.state.rotating).toBe(true);
-    // a ticker key while the scene is on air: only the text of the ticker layer changes
+    // a ticker key while the scene is on air: the ticker goes out on channel 3, takes the text and comes back
+    setShowConfig(s.db, { breakOutMs: 0 });
     v.calls.length = 0;
     const r = await show.run('ticker:1');
     expect(r).toMatchObject({ in: 'ticker', scene: true });
-    expect(v.overlays[1] ?? '').toBe('');
+    expect(v.calls[0]).toBe('?Function=OverlayInput3Out');
     expect(v.calls.some((c) => c.startsWith(`?Function=SetText&Input=${k('ssl_ticker')}`))).toBe(true);
-    // AUTO SWITCH off: stops now and stays off for the next break
-    // NEXT TICKER: the next version, with its out and in animation on the scene
-    setShowConfig(s.db, { breakOutMs: 0 });
+    expect(v.calls.at(-1)).toBe(`?Function=OverlayInput3In&Input=${k('ssl_ticker')}`);
+    expect(v.overlays[1] ?? '').toBe('');
+    // NEXT TICKER: the next version, the same way
     v.calls.length = 0;
     const first = show.state.tickerId;
     const nt = await show.run('nextticker');
     expect(show.state.tickerId).not.toBe(first);
     expect(nt).toMatchObject({ ticker: expect.any(String) });
-    expect(v.calls[0]).toBe(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionOut`);
-    expect(v.calls.at(-1)).toBe(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionIn`);
+    expect(v.calls[0]).toBe('?Function=OverlayInput3Out');
+    expect(v.calls.at(-1)).toBe(`?Function=OverlayInput3In&Input=${k('ssl_ticker')}`);
+    // AUTO SWITCH off: stops now and stays off for the next break
     expect(await show.run('rotate')).toMatchObject({ auto: false, rotating: false });
     await show.run('breakout');
+    expect([v.overlays[2], v.overlays[3], v.overlays[4]].map((x) => x ?? '')).toEqual(['', '', '']);
     await show.run('show:break');
     expect(show.state.rotating).toBe(false);
     expect(await show.run('rotate')).toMatchObject({ auto: true, rotating: true });
-    show.stopRotation();
+    // BREAK SCENE again: all three go out
+    expect(await show.run('show:break')).toMatchObject({ out: 'break' });
+    expect(show.state.rotating).toBe(false);
   });
 
   it('builds one Companion preset: every page, a page per team with its sailors, the fallback straight to vMix', async () => {

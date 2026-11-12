@@ -59,7 +59,8 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
   { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
   { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 1, inputs: ['ssl_sponsors'] },
-  { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: ['ssl_break'] },
+  // no input of its own: the L-bar, the ticker and the boards each on an overlay channel of their own (2, 3, 4)
+  { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: [] },
   { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
 ];
 
@@ -72,17 +73,17 @@ export const showConfigSchema = z.object({
   race: z.number().int().min(1).max(12).default(1),
   /** fleets shown in turn in the break scene (empty: every fleet of the race's set) */
   breakFleets: z.array(z.string()).default([]),
-  /** the break scene's layers (ssl_break): L-bar, ticker, and the board that switches (day schedule / group results) */
-  breakLbarLayer: z.number().int().min(1).max(10).default(1),
-  breakTickerLayer: z.number().int().min(1).max(10).default(3),
-  breakBoardLayer: z.number().int().min(1).max(10).default(4),
+  /** the break scene's overlay channels: L-bar, ticker, and the board that switches (day schedule / group results) */
+  breakLbarLayer: z.number().int().min(2).max(4).default(2),
+  breakTickerLayer: z.number().int().min(2).max(4).default(3),
+  breakBoardLayer: z.number().int().min(2).max(4).default(4),
   /** the board in the break scene switches by itself (day schedule, then each group's results) */
   breakAuto: z.boolean().default(true),
   rotateSeconds: z.number().int().min(4).max(120).default(30),
   /** ms the board's out animation takes before the next board goes in on the break scene */
   breakOutMs: z.number().int().min(0).max(5000).default(1000),
   /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
-  cfgVersion: z.number().int().default(2),
+  cfgVersion: z.number().int().default(3),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
   tickerNext: z.string().default(''),
   tickerEnd: z.string().default(''),
@@ -110,6 +111,8 @@ export function getShowConfig(db: AssetCtx['db']): ShowConfig {
   try { raw = JSON.parse(getSetting(db, CFG) || '{}'); } catch { /* defaults */ }
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   if (!r.cfgVersion && r.rotateSeconds === 12) r.rotateSeconds = 30;
+  // 3: the break scene uses overlay channels 2, 3, 4 (no ssl_break input): layer numbers saved before become those
+  if (Number(r.cfgVersion ?? 0) < 3) { r.breakLbarLayer = 2; r.breakTickerLayer = 3; r.breakBoardLayer = 4; }
   return showConfigSchema.parse(r);
 }
 export function setShowConfig(db: AssetCtx['db'], patch: Partial<ShowConfig>) {
@@ -567,19 +570,23 @@ export class Show {
     off.delete(g.overlay);
     // the break scene's own layers (L-bar, ticker, boards) leave another overlay at once: their out animation would
     // leave the title out, so hidden inside the scene
-    const layers = g.id === 'break' ? new Set(this.breakLayerInputs(this.lastInputs).map((i) => i.number)) : new Set<string>();
-    for (const n of off) {
-      if (snap.overlays[n] && layers.has(snap.overlays[n])) await this.vmix(`?Function=OverlayInput${n}Off`);
-      else await this.overlayOut(n, snap.overlays);
-    }
-    if (g.kind === 'board' && g.overlay !== 4 && snap.overlays[4]) await this.sceneOut(snap.overlays);
+    for (const n of off) await this.overlayOut(n, snap.overlays);
+    if (g.kind === 'board' && this.breakOnAir({ inputs: this.lastInputs, overlays: snap.overlays })) await this.sceneOut(snap.overlays);
     if (g.kind === 'scene' && g.id !== 'break') this.stopRotation();
     await this.overlayIn(g.overlay, input, snap.overlays);
   }
 
+  /** The break scene off: its overlay channels (L-bar, ticker, board) go out with their animations. */
   private async sceneOut(overlays: Record<string, string>) {
     this.stopRotation();
-    await this.overlayOut(4, overlays);
+    const cfg = this.config;
+    for (const n of [cfg.breakBoardLayer, cfg.breakTickerLayer, cfg.breakLbarLayer]) await this.overlayOut(n, overlays);
+  }
+  /** On air: the L-bar on its channel, or a board (day schedule / group results) on the board channel. */
+  breakOnAir(snap: { inputs: VmixInput[]; overlays: Record<string, string> }) {
+    const cfg = this.config;
+    const on = (id: string, n: number) => { const i = this.resolve(this.graphic(id), snap.inputs); return !!i && snap.overlays[n] === i.number; };
+    return on('lbar', cfg.breakLbarLayer) || on('schedule', cfg.breakBoardLayer) || on('results', cfg.breakBoardLayer);
   }
 
   /** The data of a graphic, set right before it comes in. */
@@ -787,25 +794,18 @@ export class Show {
 
   // ---------- actions ----------
   async toggle(id: string) {
+    if (id === 'break') return this.toggleBreak();
     const g = this.graphic(id);
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     if (snap.overlays[g.overlay] === input.number) {
       this.pushUndo(snap.overlays);
-      if (g.id === 'break') await this.sceneOut(snap.overlays); else await this.overlayOut(g.overlay, snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
       return { out: g.id };
     }
-    if (g.id === 'break') await this.prepareBreak(input, snap.inputs);
-    else await this.fill(g, input);
+    await this.fill(g, input);
     if (g.id === 'ticker') this.patchState({ tickerId: '' });
     await this.bringIn(g, input, snap);
-    if (g.id === 'break') {
-      // every title on the scene plays its in animation, whatever state it was left in (an L-bar taken out before stays hidden otherwise)
-      const board = this.slides()[this.state.slide];
-      const ins = [this.resolve(this.graphic('lbar'), snap.inputs), this.resolve(this.graphic('ticker'), snap.inputs), board ? this.resolve(this.graphic(board.kind === 'schedule' ? 'schedule' : 'results'), snap.inputs) : undefined];
-      for (const t of ins) if (t) await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(t.key || t.number)}&Value=TransitionIn`);
-      if (this.config.breakAuto) this.startRotation();
-    }
     return { in: g.id, input: input.title };
   }
 
@@ -959,12 +959,9 @@ export class Show {
     const snap = await this.snapshot();
     const input = this.need(g, snap.inputs);
     const on = snap.overlays[g.overlay] === input.number;
-    // the break scene on air: the ticker is its layer, so only its text changes
-    const scene = this.resolve(this.graphic('break'), snap.inputs);
-    if (scene && snap.overlays[this.graphic('break').overlay] === scene.number) {
-      const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
-      await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
-      this.patchState({ tickerId: t.id });
+    // the break scene on air: the ticker on its channel goes out, takes the text and comes back in
+    if (this.breakOnAir(snap)) {
+      const text = await this.swapTicker(t, input, snap.overlays);
       return { in: 'ticker', text, scene: true };
     }
     if (on && this.state.tickerId === t.id) {
@@ -1076,65 +1073,88 @@ export class Show {
     for (const f of this.breakFleets()) out.push({ kind: 'results', fleetId: f });
     return out;
   }
-  /** A layer of the break scene (SetMultiViewOverlay: layer, input). */
-  private async sceneLayer(scene: VmixInput, layer: number, input: VmixInput) {
-    // Value as vMix reads it: the layer, a plain comma, the input's number (an encoded comma left every input on one layer)
-    await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${layer},${input.number}`);
-  }
+  private wait(ms: number) { return ms ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve(); }
   /**
-   * The break scene before it comes in: the L-bar (its data) on its layer, the ticker on air last (a TICKERS key) or
-   * the automatic one on its layer, and the first board (day schedule) on the board layer.
+   * BREAK SCENE: three inputs on three overlay channels, each with its own in and out animation: the L-bar (channel 2),
+   * the ticker (3: the ticker picked last, else the automatic one) and the day schedule (4), which then switches with
+   * the group results. Again: all three go out.
    */
-  private async prepareBreak(scene: VmixInput, inputs: VmixInput[]) {
+  private async toggleBreak() {
+    const snap = await this.snapshot();
     const cfg = this.config;
-    const lbar = this.resolve(this.graphic('lbar'), inputs);
-    if (lbar) { await this.fill(this.graphic('lbar'), lbar); await this.sceneLayer(scene, cfg.breakLbarLayer, lbar); }
-    else this.log('Break scene: no L-bar input in vMix (ssl_lbar or L-bars); its layer stays as it is.');
-    const tk = this.resolve(this.graphic('ticker'), inputs);
+    if (this.breakOnAir(snap)) {
+      this.pushUndo(snap.overlays);
+      await this.sceneOut(snap.overlays);
+      return { out: 'break' };
+    }
+    this.pushUndo(snap.overlays);
+    const lbar = this.resolve(this.graphic('lbar'), snap.inputs);
+    const tk = this.resolve(this.graphic('ticker'), snap.inputs);
+    const board = this.slideInput(this.slides()[0], snap.inputs);
+    // what sits on channel 1 or on the lower third channel goes; an input of the scene leaves at once (no out animation),
+    // so it comes in on its own channel with its in animation
+    const mine = new Set([lbar, tk, board].filter(Boolean).map((i) => i!.number));
+    for (const n of new Set([1, getLtConfig(this.ctx.db).overlay])) {
+      if (!snap.overlays[n] || [cfg.breakLbarLayer, cfg.breakTickerLayer, cfg.breakBoardLayer].includes(n)) continue;
+      if (mine.has(snap.overlays[n])) await this.vmix(`?Function=OverlayInput${n}Off`);
+      else await this.overlayOut(n, snap.overlays);
+    }
+    if (lbar) { await this.fill(this.graphic('lbar'), lbar); await this.overlayIn(cfg.breakLbarLayer, lbar, snap.overlays); }
+    else this.log('Break scene: no L-bar input in vMix (ssl_lbar).');
     if (tk) {
       const t = this.state.tickerId ? this.tickerVersion(this.state.tickerId) : undefined;
       const text = t ? tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : this.tickerText();
       await this.set(tk, new Map([[this.textField(tk, /ticker|text/i) ?? '', text]]));
-      await this.sceneLayer(scene, cfg.breakTickerLayer, tk);
+      await this.overlayIn(cfg.breakTickerLayer, tk, snap.overlays);
     }
-    await this.showSlide(0, inputs);
-  }
-  /** The inputs the break scene shows on its layers. */
-  private breakLayerInputs(inputs: VmixInput[]) {
-    return [this.graphic('lbar'), this.graphic('ticker'), this.graphic('schedule'), this.graphic('results')].map((g) => this.resolve(g, inputs)).filter((x): x is VmixInput => !!x);
+    await this.fillSlide(this.slides()[0], board);
+    await this.overlayIn(cfg.breakBoardLayer, board, snap.overlays);
+    this.patchState({ slide: 0 });
+    if (cfg.breakAuto) this.startRotation();
+    return { in: 'break', lbar: lbar?.title ?? null, ticker: tk?.title ?? null, board: board.title };
   }
   private slideInput(s: { kind: 'schedule' | 'results' }, inputs: VmixInput[]) {
     return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);
   }
-  /**
-   * A board on the break scene's board layer. On air the board on it plays its out animation first (TransitionOut),
-   * then the next one gets its data, takes the layer and plays its in animation (TransitionIn).
-   */
-  private async showSlide(i: number, inputs?: VmixInput[], animate = false) {
-    const slides = this.slides();
-    const s = slides[i];
-    let overlays: Record<string, string> = {};
-    if (!inputs) ({ inputs, overlays } = await this.snapshot());
-    const scene = this.need(this.graphic('break'), inputs);
-    const onAir = animate || overlays[this.graphic('break').overlay] === scene.number;
-    const input = this.slideInput(s, inputs);
-    const before = slides[this.state.slide];
-    if (onAir && before) {
-      const old = this.slideInput(before, inputs);
-      await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(old.key || old.number)}&Value=TransitionOut`);
-      if (this.config.breakOutMs) await new Promise((r) => setTimeout(r, this.config.breakOutMs));
-    }
+  private async fillSlide(s: { kind: 'schedule' | 'results'; fleetId?: string }, input: VmixInput) {
     if (s.kind === 'results' && s.fleetId) await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
     else await this.fill(this.graphic('schedule'), input);
-    await this.sceneLayer(scene, this.config.breakBoardLayer, input);
-    if (onAir) await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(input.key || input.number)}&Value=TransitionIn`);
+  }
+  /**
+   * The next board on the board channel. On air the board there goes out (its out animation), the next one gets its
+   * data and comes in (its in animation); off air only the data and the place in the order change.
+   */
+  private async showSlide(i: number) {
+    const slides = this.slides();
+    const s = slides[i];
+    const snap = await this.snapshot();
+    const n = this.config.breakBoardLayer;
+    const input = this.slideInput(s, snap.inputs);
+    const onAir = this.breakOnAir(snap);
+    if (onAir && snap.overlays[n]) {
+      await this.vmix(`?Function=OverlayInput${n}Out`);
+      await this.wait(this.config.breakOutMs);
+    }
+    await this.fillSlide(s, input);
+    if (onAir) await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
     this.patchState({ slide: i });
     return { slide: i, of: slides.length, showing: s };
   }
-  /**
-   * NEXT TICKER: the next version of Tickers (General graphics) on the ticker. On the break scene on air it plays its out
-   * animation, takes the new text and plays its in animation, like the boards on the board layer.
-   */
+  /** A ticker version on the ticker on air (break channel or channel 1): out, the new text, in. */
+  private async swapTicker(t: { id: string; data: Record<string, string> }, input: VmixInput, overlays: Record<string, string>) {
+    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+    const field = this.textField(input, /ticker|text/i) ?? '';
+    const n = [this.config.breakTickerLayer, this.graphic('ticker').overlay].find((x) => overlays[x] === input.number);
+    if (n) {
+      await this.vmix(`?Function=OverlayInput${n}Out`);
+      await this.wait(this.config.breakOutMs);
+      await this.set(input, new Map([[field, text]]));
+      await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+    } else await this.set(input, new Map([[field, text]]));
+    this.patchState({ tickerId: t.id });
+    return text;
+  }
+  /** NEXT TICKER: the next version of Tickers (General graphics); on air it goes out and comes back in with the new text. */
   async nextTicker() {
     const list = this.tickers();
     if (!list.length) throw badRequest('No tickers. Add them under General graphics → Tickers.');
@@ -1142,17 +1162,7 @@ export class Show {
     const t = list[(at + 1) % list.length];
     const snap = await this.snapshot();
     const input = this.need(this.graphic('ticker'), snap.inputs);
-    const scene = this.resolve(this.graphic('break'), snap.inputs);
-    const onAir = (!!scene && snap.overlays[this.graphic('break').overlay] === scene.number) || snap.overlays[this.graphic('ticker').overlay] === input.number;
-    const id = encodeURIComponent(input.key || input.number);
-    if (onAir) {
-      await this.vmix(`?Function=TitleBeginAnimation&Input=${id}&Value=TransitionOut`);
-      if (this.config.breakOutMs) await new Promise((r) => setTimeout(r, this.config.breakOutMs));
-    }
-    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
-    await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
-    if (onAir) await this.vmix(`?Function=TitleBeginAnimation&Input=${id}&Value=TransitionIn`);
-    this.patchState({ tickerId: t.id });
+    const text = await this.swapTicker(t, input, snap.overlays);
     return { ticker: t.name, text };
   }
   async nextSlide() {
@@ -1174,8 +1184,7 @@ export class Show {
     const on = !this.config.breakAuto;
     setShowConfig(this.ctx.db, { breakAuto: on });
     const snap = await this.snapshot().catch(() => null);
-    const scene = snap && this.resolve(this.graphic('break'), snap.inputs);
-    if (on && scene && snap!.overlays[this.graphic('break').overlay] === scene.number) this.startRotation();
+    if (on && snap && this.breakOnAir(snap)) this.startRotation();
     if (!on) this.stopRotation();
     return { rotating: !!this.rotation, auto: on };
   }
@@ -1296,7 +1305,7 @@ export class Show {
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
     if (kind === 'show') onAir = isOn(arg);
     if (kind === 'compare' && ctxt) { const i = ctxt.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(compareKey(arg)).toLowerCase()); onAir = !!i && ov[1] === i.number; }
-    if (kind === 'break') onAir = isOn('break');
+    if (kind === 'break') onAir = !!ctxt && this.breakOnAir({ inputs: ctxt.inputs, overlays: ov });
     if (neutral) { onAir = false; active = false; if (key.kind === 'mode') text = key.text; } // a fixed key: its name, not today's mode
     if (key.custom) text = key.custom.replace(/\{auto\}/g, text);
     // team and sailor keys in the team's national colours, the feedback (selected / on air) in its colours too;
@@ -1541,7 +1550,7 @@ function fallbackControls(cfg: ShowConfig, vmixBase: string, graphics: Graphic[]
   const v = vmixBase.replace(/\/+$/, '');
   const fb: Record<number, Record<number, unknown>> = {};
   const first = (g: Graphic) => g.inputs.map((x) => x.replace('{n}', '4').replace('{crew}', '9')).find((x) => !x.includes('{'))!;
-  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'socials', 'sponsors', 'break', 'lbar'];
+  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'socials', 'sponsors', 'lbar'];
   const fbKeys = pick.map((id) => graphics.find((g) => g.id === id)).filter((g): g is Graphic => !!g);
   fbKeys.slice(0, 16).forEach((g, i) => {
     const r = Math.floor(i / 8), c = i % 8;
