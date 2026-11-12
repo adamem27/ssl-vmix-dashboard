@@ -21,6 +21,7 @@ import { groupLabel, groupLetter } from '../src/services/groupNames.js';
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
   const calls: string[] = [];
+  const raw: string[] = [];
   const names = Object.keys(titles);
   const overlays: Record<number, string> = {};
   const num = (k: string) => String(names.indexOf(k) + 1);
@@ -32,13 +33,14 @@ function fakeVmix(titles: Record<string, string[]>) {
       return { ok: true, status: 200, text: async () => `<vmix><inputs>${inputs}</inputs><overlays>${ov}</overlays></vmix>` };
     }
     calls.push(q);
+    raw.push(url.split('/api/')[1] ?? '');
     const m = q.match(/Function=OverlayInput(\d)In&Input=k?(\d+)/);
     if (m) overlays[Number(m[1])] = m[2];
     const o = q.match(/Function=OverlayInput(\d)(Out|Off)$/);
     if (o) overlays[Number(o[1])] = '';
     return { ok: true, status: 200, text: async () => '' };
   };
-  return { calls, fetcher, overlays, num };
+  return { calls, raw, fetcher, overlays, num };
 }
 
 const TITLES = {
@@ -309,7 +311,7 @@ describe('show control', () => {
     await show.run('nextslide');
     // on air: the schedule plays its out animation, the results take the layer and play their in animation
     const i = v.calls.indexOf('?Function=TitleBeginAnimation&Input=k2&Value=TransitionOut');
-    const j = v.calls.indexOf('?Function=SetMultiViewOverlay&Input=k5&Value=4,k3');
+    const j = v.calls.indexOf('?Function=SetMultiViewOverlay&Input=k5&Value=4,3');
     expect(i).toBeGreaterThanOrEqual(0);
     expect(j).toBeGreaterThan(i);
     expect(v.calls.at(-1)).toBe('?Function=TitleBeginAnimation&Input=k3&Value=TransitionIn');
@@ -324,7 +326,7 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, 'L-bars.gtzip': ['TITLE.Text', 'Ticker1.Text'], ssl_ticker: ['Ticker1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const k = (n: string) => `k${v.num(n)}`;
-    const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${k(inp)}`;
+    const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${v.num(inp)}`;
     // the L-bar on air on its own first: it leaves at once (no out animation), then plays its in animation in the scene
     await show.run('show:lbar');
     expect(v.overlays[1]).toBe(String(v.num('L-bars.gtzip')));
@@ -334,6 +336,8 @@ describe('show control', () => {
     expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('L-bars.gtzip')}&Value=TransitionIn`);
     expect(v.calls).toContain(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionIn`);
     expect(v.calls).toContain(layer(1, 'L-bars.gtzip'));
+    // vMix gets a plain comma between the layer and the input (an encoded one put every input on one layer)
+    expect(v.raw.filter((c) => c.includes('SetMultiViewOverlay')).every((c) => /&Value=\d+,\d+$/.test(c))).toBe(true);
     expect(v.calls).toContain(layer(3, 'ssl_ticker'));
     expect(v.calls).toContain(layer(4, 'ssl_schedule'));
     expect(v.overlays[4]).toBe(String(v.num('ssl_break')));
@@ -345,6 +349,15 @@ describe('show control', () => {
     expect(v.overlays[1] ?? '').toBe('');
     expect(v.calls.some((c) => c.startsWith(`?Function=SetText&Input=${k('ssl_ticker')}`))).toBe(true);
     // AUTO SWITCH off: stops now and stays off for the next break
+    // NEXT TICKER: the next version, with its out and in animation on the scene
+    setShowConfig(s.db, { breakOutMs: 0 });
+    v.calls.length = 0;
+    const first = show.state.tickerId;
+    const nt = await show.run('nextticker');
+    expect(show.state.tickerId).not.toBe(first);
+    expect(nt).toMatchObject({ ticker: expect.any(String) });
+    expect(v.calls[0]).toBe(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionOut`);
+    expect(v.calls.at(-1)).toBe(`?Function=TitleBeginAnimation&Input=${k('ssl_ticker')}&Value=TransitionIn`);
     expect(await show.run('rotate')).toMatchObject({ auto: false, rotating: false });
     await show.run('breakout');
     await show.run('show:break');

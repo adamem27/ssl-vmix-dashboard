@@ -212,7 +212,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
         row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug')),
-        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
+        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('nextticker', 'NEXT\\nTICKER', 'scene')),
         row8(k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug')),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
       ],
@@ -1078,7 +1078,8 @@ export class Show {
   }
   /** A layer of the break scene (SetMultiViewOverlay: layer, input). */
   private async sceneLayer(scene: VmixInput, layer: number, input: VmixInput) {
-    await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${encodeURIComponent(`${layer},${input.key || input.number}`)}`);
+    // Value as vMix reads it: the layer, a plain comma, the input's number (an encoded comma left every input on one layer)
+    await this.vmix(`?Function=SetMultiViewOverlay&Input=${encodeURIComponent(scene.key || scene.number)}&Value=${layer},${input.number}`);
   }
   /**
    * The break scene before it comes in: the L-bar (its data) on its layer, the ticker on air last (a TICKERS key) or
@@ -1129,6 +1130,30 @@ export class Show {
     if (onAir) await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(input.key || input.number)}&Value=TransitionIn`);
     this.patchState({ slide: i });
     return { slide: i, of: slides.length, showing: s };
+  }
+  /**
+   * NEXT TICKER: the next version of Tickers (General graphics) on the ticker. On the break scene on air it plays its out
+   * animation, takes the new text and plays its in animation, like the boards on the board layer.
+   */
+  async nextTicker() {
+    const list = this.tickers();
+    if (!list.length) throw badRequest('No tickers. Add them under General graphics → Tickers.');
+    const at = list.findIndex((x) => x.id === this.state.tickerId);
+    const t = list[(at + 1) % list.length];
+    const snap = await this.snapshot();
+    const input = this.need(this.graphic('ticker'), snap.inputs);
+    const scene = this.resolve(this.graphic('break'), snap.inputs);
+    const onAir = (!!scene && snap.overlays[this.graphic('break').overlay] === scene.number) || snap.overlays[this.graphic('ticker').overlay] === input.number;
+    const id = encodeURIComponent(input.key || input.number);
+    if (onAir) {
+      await this.vmix(`?Function=TitleBeginAnimation&Input=${id}&Value=TransitionOut`);
+      if (this.config.breakOutMs) await new Promise((r) => setTimeout(r, this.config.breakOutMs));
+    }
+    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+    await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
+    if (onAir) await this.vmix(`?Function=TitleBeginAnimation&Input=${id}&Value=TransitionIn`);
+    this.patchState({ tickerId: t.id });
+    return { ticker: t.name, text };
   }
   async nextSlide() {
     return this.showSlide((this.state.slide + 1) % this.slides().length);
@@ -1204,6 +1229,7 @@ export class Show {
       case 'breakout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
       case 'rotate': return this.toggleRotation();
       case 'nextslide': return this.nextSlide();
+      case 'nextticker': return this.nextTicker();
       case 'tickermode': return this.tickerMode();
       case 'comparemark': return this.compareMark();
       case 'undo': return this.undo();
@@ -1264,6 +1290,7 @@ export class Show {
       empty = !p;
     } else if (kind === 'photo') text = `PHOTO\\n${st.photo.toUpperCase()}`;
     else if (kind === 'comparemark') text = `COMPARE:\\n${st.compareMark === 'emblem' ? 'EMBLEM' : 'FLAG'}`;
+    else if (kind === 'nextticker') { const t = st.tickerId ? this.tickers().find((x) => x.id === st.tickerId) : undefined; text = `NEXT TICKER\\n${(t?.name ?? 'AUTO').toUpperCase().slice(0, 14)}`; }
     else if (kind === 'tickermode') text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
     else if (kind === 'rotate') { text = this.config.breakAuto ? 'AUTO SWITCH\\nON' : 'AUTO SWITCH\\nOFF'; active = this.config.breakAuto; }
     else if (kind === 'panic' && Date.now() - st.armedPanic < 3000) { text = 'PANIC?\\nPRESS AGAIN'; onAir = true; }
