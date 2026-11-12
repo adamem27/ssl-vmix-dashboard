@@ -314,6 +314,17 @@ describe('show control', () => {
     expect(v.calls[0]).toBe('?Function=OverlayInput4Out');
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput4In&Input=k3');
     expect(v.overlays[4]).toBe('3');
+    // the next group's results on the same title: the data sync follows the group on the board, not the one picked at the top
+    v.calls.length = 0;
+    await show.syncData();
+    const groupA = v.calls.filter((c) => c.includes('SelectedName=TEAM 1.Text')).join();
+    await show.run('nextslide');
+    expect(show.state.slide).toBe(2);
+    v.calls.length = 0;
+    await show.syncData();
+    const groupB = v.calls.filter((c) => c.includes('SelectedName=TEAM 1.Text')).join();
+    expect(groupA).toContain('ESP');
+    expect(groupB).not.toContain('ESP');
     await show.run('tickermode');
     expect(show.state.tickerMode).toBe('end');
   });
