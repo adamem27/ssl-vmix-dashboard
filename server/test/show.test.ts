@@ -426,7 +426,13 @@ describe('show control', () => {
     expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action)).toEqual(['undo', 'allout', 'panic']);
+    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action ?? null)).toEqual([null, 'allout', 'panic']);
+    // no UNDO key anywhere; the ATEM downstream key (from the PEOPLE page) on every page, in a free place
+    const all = Object.values(f.pages).map((pg: any) => Object.values(pg.controls).flatMap((r: any) => Object.values(r)));
+    expect(all.flat().some((c: any) => /a=undo/.test(JSON.stringify(c)))).toBe(false);
+    for (const cs of all) expect(cs.filter((c: any) => c.steps?.[0]?.action_sets?.down?.[0]?.definitionId === 'dskAuto')).toHaveLength(1);
+    expect(f.pages[1].controls[2][7].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
+    expect(f.pages[8].controls[3][5].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
     // no OUT key; PHOTO mode on every team page and on PEOPLE, SOCIALS on BEFORE and AFTER
     expect(show.pages().some((p) => p.keys.flat().some((k) => k?.action === 'out'))).toBe(false);
     expect(show.pages().filter((p) => p.keys[3][4]?.action === 'photo').map((p) => p.name)).toEqual(['BRA', 'ESP', 'GBR', 'ITA', 'PEOPLE']);
@@ -436,6 +442,28 @@ describe('show control', () => {
     const acts = show.pages().flatMap((p) => p.keys.slice(0, 3).flat()).filter((k) => k && !k.action.startsWith('nav:') && k.action !== 'next' && k.action !== 'lultswap' && k.action !== 'show:socials').map((k) => k!.action);
     expect(acts.filter((a, i) => acts.indexOf(a) !== i)).toEqual([]);
     expect(acts.some((a) => a.startsWith('anthem'))).toBe(false);
+  });
+
+  it('L-BAR RANKING: its own key for ssl_bar_2, never in the break scene; team keys in the shirt colours', async () => {
+    const { s } = race();
+    seedGraphicSets(s.db, activeEvent(s.db).id);
+    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text'], ssl_bar_2: ['TITLE.Text'], ssl_ticker: ['Ticker1.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const page = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
+    expect(page.keys[0].slice(0, 4).map((x) => x?.action)).toEqual(['show:socials', 'show:lbar', 'show:lbar2', 'show:sponsors']);
+    expect(page.keys.flat().some((x) => x?.action === 'show:results')).toBe(false);
+    await show.run('show:lbar2');
+    expect(v.overlays[1]).toBe(v.num('ssl_bar_2'));
+    await show.run('show:lbar2');
+    setShowConfig(s.db, { breakOutMs: 0 });
+    await show.run('show:break');
+    expect(Object.values(v.overlays)).not.toContain(v.num('ssl_bar_2'));
+    expect(v.overlays[2]).toBe(v.num('ssl_lbar'));
+    await show.run('show:break');
+    expect(teamKeyColours(null, 'URU')!.normal).toEqual({ bg: '#4aa8e0', fg: '#ffffff' });
+    expect(teamKeyColours(null, 'PUR')!.normal).toEqual({ bg: '#ffffff', fg: '#1d4fa3' });
+    expect(teamKeyColours(null, 'ANT')!.normal).toEqual({ bg: '#000000', fg: '#ffe95c' });
+    expect(teamKeyColours(null, 'CUB')!.normal).toEqual({ bg: '#e03a3e', fg: '#0a2a8c' });
   });
 
   it("keeps the producer's PEOPLE page from Companion as it is in every preset", async () => {

@@ -63,6 +63,8 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   // no input of its own: the L-bar, the ticker and the boards each on an overlay channel of their own (2, 3, 4)
   { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: [] },
   { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
+  // the second L-bar (ranking): a key of its own, never part of the break scene
+  { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
 ];
 
 export const showConfigSchema = z.object({
@@ -191,7 +193,7 @@ function keptPeople(p: DeckPage): DeckPage {
     if (KEPT_PEOPLE_PLACES.has(`${r}/${c}`)) {
       const a = keptPeopleAction(r, c);
       if (key?.action.startsWith('nav:')) return key;
-      if (!a) return null;
+      if (!a || a === 'undo') return null;
       return key?.action === a ? key : (a.startsWith('person:') ? k(a, '—', 'bug') : { action: a, text: a.toUpperCase(), kind: 'mode' as const });
     }
     return key && /^person:/.test(key.action) ? null : key;
@@ -238,7 +240,7 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     },
     {
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-        row8(k('show:results', 'GROUP\\nRESULTS', 'board'), k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
+        row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
           // a key per group: its own results input (ssl_results_<KEY>)
           ...resultGroups.slice(0, 4).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
@@ -274,7 +276,8 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
 
 const TEAMS_PER_PAGE = 8;
 /** The bottom row of every page: its way around, then OUT (OV1), UNDO, ALL OUT and PANIC. */
-const navRow = (...keys: DeckKey[]) => row8(...keys.slice(0, 4), keys[4] ?? null, k('undo', 'UNDO', 'safety'), k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+// no UNDO key (the producer's ask); its place takes the ATEM downstream key in Companion where 2/7 is taken
+const navRow = (...keys: DeckKey[]) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
 /** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
 const withPhoto = (row: (DeckKey | null)[]) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
 
@@ -1597,7 +1600,7 @@ const BUILD = '5.1.2';
 type Controls = Record<number, Record<number, unknown>>;
 
 /** The keys of a deck page as Companion buttons; on the PEOPLE page the producer's own keys stay as they are. */
-function pageControls(cfg: ShowConfig, p: Pick<DeckPage, 'page' | 'name'>, keys: ({ key: DeckKey; text: string; bg: string; fg: string } | null)[][], b: string): Controls {
+function pageControls(cfg: ShowConfig, p: Pick<DeckPage, 'page' | 'name'>, keys: ({ key: DeckKey; text: string; bg: string; fg: string } | null)[][], b: string, taken = new Set<string>()): Controls {
   const controls: Controls = {};
   keys.forEach((row, r) => row.forEach((x, c) => {
     if (!x) return;
@@ -1605,14 +1608,33 @@ function pageControls(cfg: ShowConfig, p: Pick<DeckPage, 'page' | 'name'>, keys:
     const act = x.key.action.startsWith('nav:') ? setPage(id, Number(x.key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(x.key.action)}`);
     (controls[r] ??= {})[c] = control(x.text, hex(x.bg), [act], hex(x.fg));
   }));
-  if (p.name !== 'PEOPLE') return controls;
   // the producer's PEOPLE page: each of its keys as it is (its dashboard calls to this dashboard's address)
-  for (const [r, row] of Object.entries(keptControls(b))) for (const [c, ctl] of Object.entries(row)) (controls[Number(r)] ??= {})[Number(c)] = ctl;
+  if (p.name === 'PEOPLE') for (const [r, row] of Object.entries(keptControls(b))) for (const [c, ctl] of Object.entries(row)) (controls[Number(r)] ??= {})[Number(c)] = ctl;
+  else addDsk(controls, p.page, (r, c) => !!keys[r]?.[c] || taken.has(`${r}/${c}`));
   return controls;
 }
+/**
+ * The ATEM key of the PEOPLE page (DOWNSTREAM KEY: run auto transmission) on every page: in its place there (row 3,
+ * last key) or, where a key is there, in the first free place of the bottom rows (UNDO's old place first).
+ */
+function addDsk(controls: Controls, page: number, used: (r: number, c: number) => boolean) {
+  const dsk = KEPT_PEOPLE_PAGE.controls[DSK_AT[0]]?.[DSK_AT[1]];
+  if (!dsk) return;
+  const free = (r: number, c: number) => !used(r, c) && !controls[r]?.[c];
+  const order: [number, number][] = [DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c] as [number, number]))];
+  const at = order.find(([r, c]) => free(r, c));
+  if (!at) return;
+  const ctl = JSON.parse(JSON.stringify(dsk).replace(/"id":"([A-Za-z0-9_-]{21})"/g, `"id":"$1p${page}"`));
+  (controls[at[0]] ??= {})[at[1]] = ctl;
+}
+/** Where the downstream key is on the producer's PEOPLE page (row 2, last column). */
+const DSK_AT: [number, number] = [2, 7];
+/** The kept page's keys without UNDO (no UNDO key on any page). */
 function keptControls(b: string): Controls {
   const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
-  return JSON.parse(json);
+  const out: Controls = JSON.parse(json);
+  for (const row of Object.values(out)) for (const [c, ctl] of Object.entries(row)) if (/api\/show\/do\?a=undo"/.test(JSON.stringify(ctl))) delete row[Number(c)];
+  return out;
 }
 /** The places of the producer's PEOPLE page that have a key ("row/col"). */
 export const KEPT_PEOPLE_PLACES = new Set(Object.entries(KEPT_PEOPLE_PAGE.controls).flatMap(([r, row]) => Object.keys(row).map((c) => `${r}/${c}`)));
@@ -1633,9 +1655,13 @@ export function companionPresetFile(cfg: ShowConfig, pages: (Omit<DeckPage, 'key
   const out: Record<number, { name: string; controls: Controls; gridSize: unknown }> = {};
   for (const p of pages) {
     const keys = p.keys.map((row) => row.map((x) => (!x || (x.look.empty && x.key.kind !== 'nav') ? null : { key: x.key, text: x.look.text, bg: x.look.bg, fg: x.look.fg })));
-    out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b), gridSize: GRID };
+    // a key with no text now (a free version place) keeps its place: its name comes when the version is added
+    const taken = new Set(p.keys.flatMap((row, r) => row.flatMap((x, c) => (x ? [`${r}/${c}`] : []))));
+    out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b, taken), gridSize: GRID };
   }
-  out[PRESET_PAGES.fallback] = { name: 'SSL FALLBACK', controls: fallbackControls(cfg, vmixBase, graphics), gridSize: GRID };
+  const fb = fallbackControls(cfg, vmixBase, graphics);
+  addDsk(fb, PRESET_PAGES.fallback, () => false);
+  out[PRESET_PAGES.fallback] = { name: 'SSL FALLBACK', controls: fb, gridSize: GRID };
   return {
     version: FILE_VERSION, type: 'full', companionBuild: BUILD,
     pages: out,
@@ -1687,6 +1713,7 @@ export function companionFiles(cfg: ShowConfig, base: string, vmixBase: string, 
     files.push({ name: `deck${p.deck}-${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`, page: p.page, file: pageFile(`SSL ${p.name}`, p.page, pageControls(cfg, p, keys, b)) });
   }
   const fb = fallbackControls(cfg, vmixBase, graphics);
+  addDsk(fb, PRESET_PAGES.fallback, () => false);
   files.push({ name: 'fallback', page: PRESET_PAGES.fallback, file: pageFile('SSL FALLBACK', cfg.fallbackPage, fb) });
   return files;
 }
