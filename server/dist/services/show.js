@@ -52,7 +52,7 @@ export const DEFAULT_GRAPHICS = [
     { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
     { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 1, inputs: ['ssl_sponsors'] },
     { id: 'break', label: 'Break scene (L-bar + ticker + boards)', kind: 'scene', overlay: 4, inputs: ['ssl_break'] },
-    { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'] },
+    { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
 ];
 export const showConfigSchema = z.object({
     /** input names per graphic id (comma separated alternatives), overriding the defaults */
@@ -69,7 +69,11 @@ export const showConfigSchema = z.object({
     breakBoardLayer: z.number().int().min(1).max(10).default(4),
     /** the board in the break scene switches by itself (day schedule, then each group's results) */
     breakAuto: z.boolean().default(true),
-    rotateSeconds: z.number().int().min(4).max(120).default(12),
+    rotateSeconds: z.number().int().min(4).max(120).default(30),
+    /** ms the board's out animation takes before the next board goes in on the break scene */
+    breakOutMs: z.number().int().min(0).max(5000).default(1000),
+    /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
+    cfgVersion: z.number().int().default(2),
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
     tickerNext: z.string().default(''),
     tickerEnd: z.string().default(''),
@@ -96,7 +100,10 @@ export function getShowConfig(db) {
         raw = JSON.parse(getSetting(db, CFG) || '{}');
     }
     catch { /* defaults */ }
-    return showConfigSchema.parse(raw);
+    const r = (raw && typeof raw === 'object' ? raw : {});
+    if (!r.cfgVersion && r.rotateSeconds === 12)
+        r.rotateSeconds = 30;
+    return showConfigSchema.parse(r);
 }
 export function setShowConfig(db, patch) {
     const next = showConfigSchema.parse({ ...getShowConfig(db), ...patch });
@@ -1095,6 +1102,8 @@ export class Show {
             await this.fill(this.graphic('lbar'), lbar);
             await this.sceneLayer(scene, cfg.breakLbarLayer, lbar);
         }
+        else
+            this.log('Break scene: no L-bar input in vMix (ssl_lbar or L-bars); its layer stays as it is.');
         const tk = this.resolve(this.graphic('ticker'), inputs);
         if (tk) {
             const t = this.state.tickerId ? this.tickerVersion(this.state.tickerId) : undefined;
@@ -1104,17 +1113,36 @@ export class Show {
         }
         await this.showSlide(0, inputs);
     }
-    async showSlide(i, inputs) {
+    slideInput(s, inputs) {
+        return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);
+    }
+    /**
+     * A board on the break scene's board layer. On air the board on it plays its out animation first (TransitionOut),
+     * then the next one gets its data, takes the layer and plays its in animation (TransitionIn).
+     */
+    async showSlide(i, inputs, animate = false) {
         const slides = this.slides();
         const s = slides[i];
-        inputs ??= (await this.snapshot()).inputs;
-        const g = this.graphic(s.kind === 'schedule' ? 'schedule' : 'results');
-        const input = this.need(g, inputs);
+        let overlays = {};
+        if (!inputs)
+            ({ inputs, overlays } = await this.snapshot());
+        const scene = this.need(this.graphic('break'), inputs);
+        const onAir = animate || overlays[this.graphic('break').overlay] === scene.number;
+        const input = this.slideInput(s, inputs);
+        const before = slides[this.state.slide];
+        if (onAir && before) {
+            const old = this.slideInput(before, inputs);
+            await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(old.key || old.number)}&Value=TransitionOut`);
+            if (this.config.breakOutMs)
+                await new Promise((r) => setTimeout(r, this.config.breakOutMs));
+        }
         if (s.kind === 'results' && s.fleetId)
             await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
         else
-            await this.fill(g, input);
-        await this.sceneLayer(this.need(this.graphic('break'), inputs), this.config.breakBoardLayer, input);
+            await this.fill(this.graphic('schedule'), input);
+        await this.sceneLayer(scene, this.config.breakBoardLayer, input);
+        if (onAir)
+            await this.vmix(`?Function=TitleBeginAnimation&Input=${encodeURIComponent(input.key || input.number)}&Value=TransitionIn`);
         this.patchState({ slide: i });
         return { slide: i, of: slides.length, showing: s };
     }

@@ -1,8 +1,14 @@
 {
-  "version": "1.0.152",
-  "commit": "26978f1",
-  "date": "2026-11-12T02:54:22Z",
+  "version": "1.0.153",
+  "commit": "d430942",
+  "date": "2026-11-12T03:32:00Z",
   "changes": [
+    {
+      "version": "1.0.153",
+      "commit": "d430942",
+      "date": "2026-11-12T03:32:00Z",
+      "text": "Break scene: L-bar found as L-bars.gtzip too; boards switch with their out and in animations; switch every 30 s"
+    },
     {
       "version": "1.0.152",
       "commit": "26978f1",
@@ -476,12 +482,6 @@
       "commit": "98cfc89",
       "date": "2026-11-08T22:42:12Z",
       "text": "Panam colours: URU"
-    },
-    {
-      "version": "1.0.66",
-      "commit": "b7d9226",
-      "date": "2026-11-08T22:40:18Z",
-      "text": "README: Line-up sheet"
     }
   ]
 }
