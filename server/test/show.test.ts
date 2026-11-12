@@ -303,8 +303,16 @@ describe('show control', () => {
     expect(v.overlays[4]).toBe('5');
     show.stopRotation();
     v.calls.length = 0;
+    setShowConfig(s.db, { breakOutMs: 0 });
+    // an old saved 12 s switch time becomes 30 s
+    expect(getShowConfig(s.db).rotateSeconds).toBe(30);
     await show.run('nextslide');
-    expect(v.calls.at(-1)).toBe('?Function=SetMultiViewOverlay&Input=k5&Value=4,k3');
+    // on air: the schedule plays its out animation, the results take the layer and play their in animation
+    const i = v.calls.indexOf('?Function=TitleBeginAnimation&Input=k2&Value=TransitionOut');
+    const j = v.calls.indexOf('?Function=SetMultiViewOverlay&Input=k5&Value=4,k3');
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(j).toBeGreaterThan(i);
+    expect(v.calls.at(-1)).toBe('?Function=TitleBeginAnimation&Input=k3&Value=TransitionIn');
     await show.run('tickermode');
     expect(show.state.tickerMode).toBe('end');
   });
@@ -312,12 +320,13 @@ describe('show control', () => {
   it('break scene: L-bar on layer 1, the ticker on layer 3, schedule / results on layer 4; tickers change in place; auto switch on and off', async () => {
     const { s } = race();
     seedGraphicSets(s.db, activeEvent(s.db).id);
-    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text', 'Ticker1.Text'], ssl_ticker: ['Ticker1.Text'] });
+    // the L-bar loaded under its file name (L-bars.gtzip) is found too
+    const v = fakeVmix({ ...TITLES, 'L-bars.gtzip': ['TITLE.Text', 'Ticker1.Text'], ssl_ticker: ['Ticker1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const k = (n: string) => `k${v.num(n)}`;
     const layer = (n: number, inp: string) => `?Function=SetMultiViewOverlay&Input=${k('ssl_break')}&Value=${n},${k(inp)}`;
     await show.run('show:break');
-    expect(v.calls).toContain(layer(1, 'ssl_lbar'));
+    expect(v.calls).toContain(layer(1, 'L-bars.gtzip'));
     expect(v.calls).toContain(layer(3, 'ssl_ticker'));
     expect(v.calls).toContain(layer(4, 'ssl_schedule'));
     expect(v.overlays[4]).toBe(String(v.num('ssl_break')));

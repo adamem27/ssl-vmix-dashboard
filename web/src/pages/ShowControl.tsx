@@ -6,7 +6,7 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; breakAuto: boolean; rotateSeconds: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; breakAuto: boolean; rotateSeconds: number; breakOutMs: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -259,7 +259,8 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
             ))}
           </div>
           <label className="flex items-center gap-2 text-xs text-ink-300"><input type="checkbox" checked={c.breakAuto} onChange={(e) => setC({ ...c, breakAuto: e.target.checked })} /> Switch day schedule / group results by itself</label>
-          <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 12 })} /></label>
+          <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
+          <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <p className="text-xs text-ink-500">The board layer shows the day schedule, then the results of every group of the stage. The ticker layer shows the ticker picked last on the TICKERS page (else the automatic one). AUTO SWITCH on the deck turns switching on or off at once.</p>
         </div>
       </div>
