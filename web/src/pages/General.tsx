@@ -187,6 +187,23 @@ function SchedulePanel() {
 }
 
 // ---------- people ----------
+/** A role from the list, or Other with the role typed in (what is typed is the role on the graphics). */
+function RoleCell({ value, roles, onSave }: { value: string; roles: string[]; onSave: (v: string) => Promise<void> }) {
+  const listed = roles.filter((r) => r !== 'Other');
+  const other = !!value && !listed.includes(value);
+  return (
+    <div className="flex items-center gap-1">
+      <select aria-label="Role" value={other ? 'Other' : value} onChange={(e) => void onSave(e.target.value)}
+        className={cx('rounded border border-transparent bg-transparent px-1 py-1 text-sm text-ink-100 hover:border-ink-700 focus:border-accent-400 focus:outline-none', other ? 'w-24 shrink-0' : 'w-full')}>
+        <option value="">—</option>
+        {listed.map((o) => <option key={o} value={o}>{o}</option>)}
+        <option value="Other">Other</option>
+      </select>
+      {other && <div className="min-w-0 flex-1"><Cell value={value === 'Other' ? '' : value} onSave={(v) => onSave(v.trim() || 'Other')} label="Role text" placeholder="Type the role" className="text-ink-50" /></div>}
+    </div>
+  );
+}
+
 interface Person { id: string; name: string; surname: string; role: string; language: string; title: string; photo: Asset | null }
 
 function PeoplePanel() {
@@ -205,10 +222,11 @@ function PeoplePanel() {
     try { await api.post('/api/people/commentator-set', {}); refresh(); } catch (e) { toast.error(e); }
   };
   const empty = { name: '', surname: '', role: '', language: '', title: '' };
+  const [roleText, setRoleText] = useState('');
   const [f, setF] = useState(empty);
   const add = async () => {
     if (!f.name.trim() && !f.surname.trim() && !f.role) return;
-    try { await api.post('/api/people', f); setF(empty); refresh(); } catch (e) { toast.error(e); }
+    try { await api.post('/api/people', { ...f, role: f.role === 'Other' ? roleText.trim() || 'Other' : f.role }); setF(empty); setRoleText(''); refresh(); } catch (e) { toast.error(e); }
   };
 
   const people = q.data?.people ?? [];
@@ -228,8 +246,7 @@ function PeoplePanel() {
                 <td className="py-0.5"><ImgCell kind="people" ownerId={p.id} slot="photo" label={`${[p.name, p.surname].filter(Boolean).join(' ') || p.role} · Photo`} asset={p.photo} onChanged={refresh} accept="png+jpg" /></td>
                 <td><Cell value={p.name} onSave={(v) => save(p.id, { name: v })} label="Name" className="font-medium text-ink-50" /></td>
                 <td><Cell value={p.surname} onSave={(v) => save(p.id, { surname: v })} label="Surname" className="font-medium uppercase text-ink-50" /></td>
-                <td><SelectCell value={p.role} options={roles} onSave={(v) => save(p.id, { role: v })} label="Role" /></td>
-                <td />
+                <td colSpan={2}><RoleCell value={p.role} roles={roles} onSave={(v) => save(p.id, { role: v })} /></td>
                 <td className="text-center"><button onClick={() => remove(p)} className="invisible px-1 text-ink-500 hover:text-red-300 group-hover:visible" aria-label={`Delete ${p.name || p.role}`}>✕</button></td>
               </tr>
             ))}
@@ -241,6 +258,7 @@ function PeoplePanel() {
                 <select className="input py-1 text-sm" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} aria-label="New person role">
                   <option value="">Role</option>{roles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
+                {f.role === 'Other' && <input className="input mt-1 py-1 text-sm" placeholder="Type the role" value={roleText} onChange={(e) => setRoleText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void add()} aria-label="New person role text" autoFocus />}
               </td>
               <td className="py-1"><Button size="sm" variant="primary" onClick={add} disabled={!f.name.trim() && !f.surname.trim() && !f.role}>Add</Button></td>
               <td />
