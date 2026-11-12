@@ -1,8 +1,14 @@
 {
-  "version": "1.0.149",
-  "commit": "5b7a9f1",
-  "date": "2026-11-12T00:27:47Z",
+  "version": "1.0.150",
+  "commit": "60218ed",
+  "date": "2026-11-12T00:41:04Z",
   "changes": [
+    {
+      "version": "1.0.150",
+      "commit": "60218ed",
+      "date": "2026-11-12T00:41:04Z",
+      "text": "Commentator screen: next race with countdown, races done, Details (photos, best results, team notes), other stages' places, Info (all groups, officials, commentators, socials), larger crew text"
+    },
     {
       "version": "1.0.149",
       "commit": "5b7a9f1",
@@ -476,12 +482,6 @@
       "commit": "c2a237c",
       "date": "2026-11-08T22:30:04Z",
       "text": "GTZIP generator: add a data field the template lacks, fitted into the graphic"
-    },
-    {
-      "version": "1.0.62",
-      "commit": "a0e2974",
-      "date": "2026-11-08T22:23:21Z",
-      "text": "Announcements and People in their own Excel sheets (one row each), so adding one moves nothing in General"
     }
   ]
 }
