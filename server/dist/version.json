@@ -1,8 +1,14 @@
 {
-  "version": "1.0.153",
-  "commit": "d430942",
-  "date": "2026-11-12T03:32:00Z",
+  "version": "1.0.154",
+  "commit": "81b6222",
+  "date": "2026-11-12T11:20:25Z",
   "changes": [
+    {
+      "version": "1.0.154",
+      "commit": "81b6222",
+      "date": "2026-11-12T11:20:25Z",
+      "text": "Break scene: its titles play their in animation when it comes in; one of them on another overlay leaves it at once, so it is not left hidden"
+    },
     {
       "version": "1.0.153",
       "commit": "d430942",
@@ -476,12 +482,6 @@
       "commit": "8629882",
       "date": "2026-11-08T22:45:07Z",
       "text": "GTZIP generator: upload a .zip with a whole set of titles as templates"
-    },
-    {
-      "version": "1.0.67",
-      "commit": "98cfc89",
-      "date": "2026-11-08T22:42:12Z",
-      "text": "Panam colours: URU"
     }
   ]
 }
