@@ -1,8 +1,14 @@
 {
-  "version": "1.0.168",
-  "commit": "ce1314e",
-  "date": "2026-11-13T13:30:09Z",
+  "version": "1.0.169",
+  "commit": "0cf20ca",
+  "date": "2026-11-13T13:33:14Z",
   "changes": [
+    {
+      "version": "1.0.169",
+      "commit": "0cf20ca",
+      "date": "2026-11-13T13:33:14Z",
+      "text": "Static commentator page: Cloudflare R2 / S3 upload + back off after failures (#20)"
+    },
     {
       "version": "1.0.168",
       "commit": "ce1314e",
@@ -476,12 +482,6 @@
       "commit": "fd7d955",
       "date": "2026-11-09T15:55:47Z",
       "text": "PNG generator: cut corners of any length and slope with rounded vertices, one or both ends, up to a point"
-    },
-    {
-      "version": "1.0.89",
-      "commit": "c40bc4a",
-      "date": "2026-11-09T15:36:47Z",
-      "text": "PNG generator: corners can be cut straight across instead of rounded"
     }
   ]
 }
