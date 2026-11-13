@@ -107,7 +107,7 @@ export class StaticSitePublisher {
   newFolder() { setSetting(this.db, 'static.folder', ''); this.sent.clear(); return this.folderName(); }
   url() {
     const base = getSetting(this.db, 'static.publicUrl').trim().replace(/\/+$/, '');
-    return base ? `${base}/${this.folderName()}/` : '';
+    return base ? `${base}/${this.folderName()}/index.html` : ''; // index.html: object stores have no folder index
   }
   enabled() { return getSetting(this.db, 'static.enabled') === '1'; }
   setEnabled(on: boolean) { setSetting(this.db, 'static.enabled', on ? '1' : ''); if (!on) this.status.error = ''; }

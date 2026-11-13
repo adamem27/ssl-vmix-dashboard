@@ -450,11 +450,12 @@ function CommentatorOnlineSection() {
 
 // ---------- commentator screen as a static page ----------
 interface StaticSiteInfo {
-  mode: 'folder' | 'ftp' | 'https'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
+  mode: 'folder' | 'ftp' | 'https' | 's3'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
+  s3Endpoint: string; s3Bucket: string; s3AccessKey: string; s3Region: string; hasS3Secret: boolean;
   enabled: boolean; url: string; folderName: string;
   status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
 }
-type SiteForm = Omit<StaticSiteInfo, 'enabled' | 'url' | 'folderName' | 'status' | 'hasFtpPassword'> & { ftpPassword: string };
+type SiteForm = Omit<StaticSiteInfo, 'enabled' | 'url' | 'folderName' | 'status' | 'hasFtpPassword' | 'hasS3Secret'> & { ftpPassword: string; s3Secret: string };
 
 /** The PC at the venue writes the commentator screen as a static web page and uploads it (FTP) or saves it to a folder. */
 function StaticPageSection() {
@@ -465,7 +466,7 @@ function StaticPageSection() {
   const [f, setF] = useState<SiteForm | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const d = q.data;
-  useEffect(() => { if (d && !f) setF({ mode: d.mode, localDir: d.localDir, publicUrl: d.publicUrl, ftpHost: d.ftpHost, ftpPort: d.ftpPort, ftpUser: d.ftpUser, ftpDir: d.ftpDir, ftpSecure: d.ftpSecure, ftpPassword: '' }); }, [d, f]);
+  useEffect(() => { if (d && !f) setF({ mode: d.mode, localDir: d.localDir, publicUrl: d.publicUrl, ftpHost: d.ftpHost, ftpPort: d.ftpPort, ftpUser: d.ftpUser, ftpDir: d.ftpDir, ftpSecure: d.ftpSecure, ftpPassword: '', s3Endpoint: d.s3Endpoint, s3Bucket: d.s3Bucket, s3AccessKey: d.s3AccessKey, s3Region: d.s3Region, s3Secret: '' }); }, [d, f]);
   if (q.isLoading || !f) return <Section id="commentator-online" title="Commentator online"><Loading /></Section>;
   if (q.error || !d) return <Section id="commentator-online" title="Commentator online"><ErrorBox error={q.error} /></Section>;
   const set = <K extends keyof SiteForm>(k: K, v: SiteForm[K]) => setF({ ...f, [k]: v });
@@ -476,8 +477,8 @@ function StaticPageSection() {
   };
   const save = (e: FormEvent) => {
     e.preventDefault();
-    const { ftpPassword, ...rest } = f;
-    void run('save', async () => { await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}) }); setF({ ...f, ftpPassword: '' }); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'Saved');
+    const { ftpPassword, s3Secret, ...rest } = f;
+    void run('save', async () => { await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}), ...(s3Secret ? { s3Secret } : {}) }); setF({ ...f, ftpPassword: '', s3Secret: '' }); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'Saved');
   };
   const st = d.status;
   const when = (iso: string | null) => (iso ? fmtDateTime(iso) : '—');
@@ -486,11 +487,22 @@ function StaticPageSection() {
       desc={<>The commentator screen as a <b>static web page</b>: every 5 s this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
       <form onSubmit={save} className="space-y-3">
         <div className="flex flex-wrap gap-4 text-sm">
-          {(['https', 'ftp', 'folder'] as const).map((m) => (
-            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{m === 'https' ? 'Upload by HTTPS (upload.php)' : m === 'ftp' ? 'Upload by FTP' : 'Only save to a folder on this PC'}</label>
+          {(['s3', 'https', 'ftp', 'folder'] as const).map((m) => (
+            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{{ s3: 'Cloudflare R2 / S3 (recommended)', https: 'HTTPS to upload.php', ftp: 'FTP', folder: 'Only a folder on this PC' }[m]}</label>
           ))}
         </div>
-        {f.mode === 'https' ? (
+        {f.mode === 's3' ? (
+          <div className="space-y-3">
+            <p className="text-sm text-ink-400">Cloudflare R2: R2 → Create bucket → Settings → Public access (r2.dev) on; R2 → Manage API tokens → Object Read &amp; Write for this bucket. Paste the S3 endpoint, the bucket name and the token's Access Key ID and Secret here; the web address below is the bucket's public <code>https://pub-….r2.dev</code>.</p>
+            <div className="grid gap-3 md:grid-cols-[2fr_1fr_100px]">
+              <Field label="S3 endpoint"><input className="input font-mono text-xs" value={f.s3Endpoint} onChange={(e) => set('s3Endpoint', e.target.value)} placeholder="https://<account-id>.r2.cloudflarestorage.com" /></Field>
+              <Field label="Bucket"><input className="input font-mono text-xs" value={f.s3Bucket} onChange={(e) => set('s3Bucket', e.target.value)} placeholder="ssl-commentary" /></Field>
+              <Field label="Region"><input className="input font-mono text-xs" value={f.s3Region} onChange={(e) => set('s3Region', e.target.value)} placeholder="auto" /></Field>
+              <Field label="Access Key ID"><input className="input font-mono text-xs" value={f.s3AccessKey} onChange={(e) => set('s3AccessKey', e.target.value)} autoComplete="off" /></Field>
+              <Field label={d.hasS3Secret ? 'Secret Access Key (saved; type to change)' : 'Secret Access Key'} className="md:col-span-2"><input className="input" type="password" value={f.s3Secret} onChange={(e) => set('s3Secret', e.target.value)} placeholder={d.hasS3Secret ? '••••••••' : ''} autoComplete="new-password" /></Field>
+            </div>
+          </div>
+        ) : f.mode === 'https' ? (
           <div className="rounded-md border border-ink-800 bg-ink-950/40 p-3 text-sm text-ink-300">
             Works on any network (port 443, like a web page). Once: download <b>upload.php</b> and put it in the web folder of the address below
             (e.g. <code>public_html/commentary</code>) with the hosting's file manager. It holds only a fingerprint of this PC's key and accepts nothing but the commentator page files.
@@ -509,7 +521,7 @@ function StaticPageSection() {
           <Field label="Folder on this PC"><input className="input font-mono text-xs" value={f.localDir} onChange={(e) => set('localDir', e.target.value)} /></Field>
         )}
         <Field label="Web address of that folder (what commentators open, without the random part)">
-          <input className="input font-mono text-xs" value={f.publicUrl} onChange={(e) => set('publicUrl', e.target.value)} placeholder="https://komentator.em27code.com" />
+          <input className="input font-mono text-xs" value={f.publicUrl} onChange={(e) => set('publicUrl', e.target.value)} placeholder={f.mode === 's3' ? 'https://pub-xxxxxxxx.r2.dev' : 'https://commentary.em27code.com'} />
         </Field>
         <Button type="submit" variant="primary" busy={busy === 'save'}>Save</Button>
       </form>

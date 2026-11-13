@@ -175,8 +175,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get('/api/static-site', async () => siteInfo());
   app.put('/api/static-site', async (req) => {
     const b = z.object({
-      enabled: z.boolean(), mode: z.enum(['folder', 'ftp', 'https']), localDir: str(500), publicUrl: str(300),
+      enabled: z.boolean(), mode: z.enum(['folder', 'ftp', 'https', 's3']), localDir: str(500), publicUrl: str(300),
       ftpHost: str(200), ftpPort: z.number().int().min(1).max(65535), ftpUser: str(200), ftpPassword: str(200), ftpDir: str(300), ftpSecure: z.boolean(),
+      s3Endpoint: str(300), s3Bucket: str(100), s3AccessKey: str(200), s3Secret: str(300), s3Region: str(40),
     }).partial().parse(req.body);
     saveSiteSettings(db, b);
     if (b.enabled !== undefined) site.setEnabled(b.enabled);

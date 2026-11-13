@@ -38,7 +38,7 @@ describe('static commentator page', () => {
     expect(s.error).toBe('');
     const folder = path.join(out, site.folderName());
     expect(site.folderName()).toMatch(/^komentator-[a-z0-9]{8,}$/);
-    expect(s.url).toBe(`https://komentator.example.com/${site.folderName()}/`);
+    expect(s.url).toBe(`https://komentator.example.com/${site.folderName()}/index.html`);
     expect(fs.readFileSync(path.join(folder, 'index.html'), 'utf8')).toContain('src="assets/commentator-A.js"');
     expect(fs.readdirSync(path.join(folder, 'assets')).sort()).toEqual(['commentator-A.js', 'src-B.js', 'src-C.css']);
     const data = JSON.parse(fs.readFileSync(path.join(folder, 'data.json'), 'utf8'));
