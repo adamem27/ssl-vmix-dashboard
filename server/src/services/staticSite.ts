@@ -92,7 +92,9 @@ export class StaticSitePublisher {
   private sentTo = '';
   private running = false;
   private timer: NodeJS.Timeout | null = null;
-  private target: SiteTarget | null = null; // kept between rounds: one FTP connection, not one every 5 s
+  private target: SiteTarget | null = null;
+  private failures = 0;
+  private retryAt = 0; // kept between rounds: one FTP connection, not one every 5 s
 
   constructor(private db: DB, private build: Build, private webDist: string | undefined, private makeTarget: MakeTarget, private everyMs = 5000) {}
 
@@ -110,11 +112,16 @@ export class StaticSitePublisher {
   enabled() { return getSetting(this.db, 'static.enabled') === '1'; }
   setEnabled(on: boolean) { setSetting(this.db, 'static.enabled', on ? '1' : ''); if (!on) this.status.error = ''; }
   /** Settings changed: send everything again on the next round. */
-  reset() { this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
+  reset() { this.failures = 0; this.retryAt = 0; this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
 
   start() {
     if (this.timer) return;
-    this.timer = setInterval(() => { if (this.enabled()) void this.publishNow(); }, this.everyMs);
+    // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min): a host's firewall bans an
+    // address that keeps failing to connect, and a ban blocks the page for everyone on that network.
+    this.timer = setInterval(() => {
+      if (!this.enabled() || Date.now() < this.retryAt) return;
+      void this.publishNow();
+    }, this.everyMs);
     this.timer.unref?.();
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; void this.target?.close?.(); this.target = null; }
@@ -153,8 +160,13 @@ export class StaticSitePublisher {
       this.status.pictures = images.length;
       this.status.lastOkAt = nowIso();
       this.status.error = '';
+      this.failures = 0;
+      this.retryAt = 0;
     } catch (e: any) {
-      this.status.error = String(e?.message ?? e).slice(0, 300);
+      this.failures++;
+      const wait = Math.min(300_000, this.everyMs * 2 ** Math.min(this.failures - 1, 10));
+      this.retryAt = Date.now() + wait;
+      this.status.error = `${String(e?.message ?? e).slice(0, 300)} (next try in ${Math.round(wait / 1000)} s)`;
       // a broken connection: start a new one next round
       try { await this.target?.close?.(); } catch { /* closing */ }
       this.target = null;

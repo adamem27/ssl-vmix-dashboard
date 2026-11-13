@@ -64,6 +64,11 @@ describe('static commentator page', () => {
     expect(after).not.toBe(before);
     const r = (await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'ftp', ftpHost: 'h55.example.pl', ftpUser: 'kom', ftpPassword: 'secret' } })).json();
     expect(r.hasFtpPassword).toBe(true);
+    // failures back off instead of hammering the host (its firewall would ban this address)
+    await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'https', publicUrl: '' } });
+    const site = (app as any).staticSite as StaticSitePublisher;
+    expect((await site.publishNow()).error).toMatch(/next try in 5 s/);
+    expect((await site.publishNow()).error).toMatch(/next try in 10 s/);
     expect(JSON.stringify(r)).not.toContain('secret');
   });
 });
