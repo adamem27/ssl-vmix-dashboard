@@ -178,7 +178,8 @@ export interface PresetTeam { code: string; name: string; crew: { slot: string; 
 
 /** A group of the stage with a Team comparison of its own: key A, B… (FINAL…), its input ssl_compare_<key>. */
 export interface PresetGroup { fleetId: string; key: string; label: string }
-export const compareKey = (name: string) => groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase();
+/** A group's key for its own inputs and keys: H, I…; the Last Chance Race is LCR (ssl_results_LCR, ssl_compare_LCR). */
+export const compareKey = (name: string) => (/last\s*chance|\blcr\b/i.test(name) ? 'LCR' : groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
 export const compareInput = (key: string) => `ssl_compare_${key}`;
 /** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
 export const resultsInput = (key: string) => `ssl_results_${key}`;
@@ -724,7 +725,7 @@ export class Show {
   /** Groups of these stages, a key each (the first stage wins a key two stages share). */
   private groupsOf(sets: string[]): PresetGroup[] {
     const seen = new Set<string>();
-    return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: groupLabel(f.name) }))
+    return sets.flatMap((id) => getSetDetail(this.ctx.db, id).fleets).map((f) => ({ fleetId: f.id, key: compareKey(f.name), label: compareKey(f.name) === 'LCR' ? 'Last Chance' : groupLabel(f.name) }))
       .filter((g) => g.key && !seen.has(g.key) && !!seen.add(g.key));
   }
   /** Every group of the event, the stage picked at the top first. */
@@ -736,11 +737,14 @@ export class Show {
       return this.groupsOf(stage ? [stage.id, ...all.filter((x) => x !== stage.id)] : all);
     });
   }
-  /** The COMPARE keys: one per Team comparison input vMix has (ssl_compare_A…), else one per group of the stage. */
+  /** The COMPARE keys: one per Team comparison input vMix has (ssl_compare_A…), else one per group of the stage; the stage's Last Chance Race always. */
   deckCompareGroups(): PresetGroup[] {
     const has = (g: PresetGroup) => this.lastInputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
     const inVmix = this.allCompareGroups().filter(has);
-    return inVmix.length ? inVmix : this.compareGroups();
+    if (!inVmix.length) return this.compareGroups();
+    // the stage's Last Chance Race has its key from the start (its input ssl_compare_LCR)
+    const lcr = this.compareGroups().filter((g) => g.key === 'LCR' && !inVmix.some((x) => x.key === 'LCR'));
+    return [...inVmix, ...lcr];
   }
 
   /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */

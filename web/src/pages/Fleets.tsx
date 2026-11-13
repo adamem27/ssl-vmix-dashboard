@@ -37,9 +37,11 @@ export function FleetsPage() {
   // with a stage picked only its teams are offered, unless “all teams” is ticked (needed to build a stage)
   const offered = (teams.data ?? []).filter((t) => allTeams || stage.inStage(t.id) || assigned.has(t.id));
   const pool = offered.filter((t) => !assigned.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
+  // a team also in the Last Chance Race: its own group first
+  const isLcr = (name: string) => /last\s*chance|\blcr\b/i.test(name);
   const locate = (teamId: string) => {
-    for (const f of d?.fleets ?? []) { const i = f.positions.indexOf(teamId); if (i >= 0) return { fleetId: f.id, position: i + 1, fleetName: f.name }; }
-    return null;
+    const found = (d?.fleets ?? []).flatMap((f) => { const i = f.positions.indexOf(teamId); return i >= 0 ? [{ fleetId: f.id, position: i + 1, fleetName: f.name }] : []; });
+    return found.find((x) => !isLcr(x.fleetName)) ?? found[0] ?? null;
   };
   const fleetName = (id: string) => d?.fleets.find((f) => f.id === id)?.name ?? '';
   const tName = (id: string) => teamById.get(id)?.name ?? '?';
@@ -71,9 +73,9 @@ export function FleetsPage() {
     }
   };
 
-  const unassign = async (teamId: string) => {
+  const unassign = async (teamId: string, fleetId?: string) => {
     if (!setId) return;
-    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId })); toast.ok(`${tName(teamId)} removed from the group (still in the team database)`); }
+    try { refresh(await api.post<FleetSetDetail>(`/api/fleet-sets/${setId}/unassign`, { teamId, fleetId })); toast.ok(`${tName(teamId)} removed from the group (still in the team database)`); }
     catch (e) { toast.error(e); }
   };
 
@@ -221,7 +223,7 @@ export function FleetsPage() {
                                   <option value="">⇄</option>
                                   {d.fleets.filter((o) => o.id !== f.id).map((o) => <option key={o.id} value={o.id} disabled={o.complete}>{o.name}{o.complete ? ' (full)' : ''}</option>)}
                                 </select>
-                                <IconBtn label={`Remove ${tName(tid)} from the group`} onClick={() => unassign(tid)}>✕</IconBtn>
+                                <IconBtn label={`Remove ${tName(tid)} from the group`} onClick={() => unassign(tid, f.id)}>✕</IconBtn>
                               </>
                             ) : (
                               <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Choose a team for place ${i + 1} in ${f.name}`}
@@ -230,7 +232,7 @@ export function FleetsPage() {
                                 <optgroup label="Available">
                                   {offered.filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>
-                                <optgroup label="Move from another group">
+                                <optgroup label={isLcr(f.name) ? 'Also from another group (stays there too)' : 'Move from another group'}>
                                   {(teams.data ?? []).filter((t) => assigned.has(t.id) && !f.positions.includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name} ({locate(t.id)?.fleetName})</option>)}
                                 </optgroup>
                               </select>

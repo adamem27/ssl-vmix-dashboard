@@ -6,7 +6,7 @@ import { comparisonFlag } from '../src/services/compareImages.js';
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
-import { createSet, getSetDetail, placeTeam, renameFleet } from '../src/services/fleets.js';
+import { createFleet, createSet, getSetDetail, placeTeam, renameFleet } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
 import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
@@ -552,6 +552,30 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.run('show:schedule');
     expect(v.calls).toEqual([`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`]);
+  });
+
+  it('the Last Chance Race: teams of other groups, its own results and comparison inputs (ssl_results_LCR, ssl_compare_LCR) and keys', async () => {
+    const { s, ev, teams } = race();
+    const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
+    setCurrentStage(s.db, ev, stage.id);
+    const lcr = createFleet(s.db, stage.id, 'Last Chance Race');
+    placeTeam(s.db, stage.id, { teamId: teams[1], fleetId: lcr, position: 1 });
+    placeTeam(s.db, stage.id, { teamId: teams[0], fleetId: lcr, position: 2 });
+    const v = fakeVmix({ ...TITLES, ssl_results_LCR: ['COUNTRY1.Text', 'COUNTRY2.Text'], ssl_compare_LCR: ['1 COUNTRY.Text', '2 COUNTRY.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.snapshot();
+    const after = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
+    expect(after.keys[0].map((x) => x?.action)).toContain('results:LCR');
+    expect(show.pages().find((p) => p.name === 'COMPARE')!.keys[0].map((x) => x?.action)).toContain('compare:LCR');
+    await show.run('results:LCR');
+    expect(v.overlays[1]).toBe(v.num('ssl_results_LCR'));
+    expect(v.vals.get(`${v.num('ssl_results_LCR')}|COUNTRY1.Text`)).toBe('TEAM BRA');
+    await show.run('results:LCR');
+    await show.run('compare:LCR');
+    expect(v.overlays[1]).toBe(v.num('ssl_compare_LCR'));
+    expect(v.vals.get(`${v.num('ssl_compare_LCR')}|2 COUNTRY.Text`)).toBe('TEAM ESP');
+    // ESP stays in its own group
+    expect(getSetDetail(s.db, stage.id).fleets[0].positions[0]).toBe(teams[0]);
   });
 
   it('REFRESH PNG: every picture from the dashboard goes into vMix again (results H and I alike); the data sync does not', async () => {

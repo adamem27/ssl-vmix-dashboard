@@ -26,6 +26,32 @@ describe('fleets', () => {
     expect(() => db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, 17, ?)').run(f1, setId, teams[4])).toThrow();
   });
 
+  it('the Last Chance Race takes teams of the stage\'s other groups, which stay in their own group', () => {
+    const { db, teams, setId, f1, f2 } = world();
+    const lcr = fleets.createFleet(db, setId, 'Last Chance Race');
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: f1, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[1], fleetId: f2, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: lcr, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[1], fleetId: lcr, position: 2 });
+    let d = fleets.getSetDetail(db, setId);
+    expect(d.fleets.map((f) => f.positions[0])).toEqual([teams[0], teams[1], teams[0]]);
+    expect(d.fleets[2].positions.slice(0, 2)).toEqual([teams[0], teams[1]]);
+    // moving inside the LCR, or between the other groups, still moves
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: lcr, position: 3 });
+    fleets.placeTeam(db, setId, { teamId: teams[1], fleetId: f1, position: 2 });
+    d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[2].positions.slice(0, 3)).toEqual([null, teams[1], teams[0]]);
+    expect(d.fleets[0].positions.slice(0, 2)).toEqual([teams[0], teams[1]]);
+    expect(d.fleets[1].filled).toBe(0);
+    // out of the LCR only
+    fleets.unassignTeam(db, setId, teams[0], lcr);
+    d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[0].positions[0]).toBe(teams[0]);
+    expect(d.fleets[2].positions.includes(teams[0])).toBe(false);
+    // a team still once per group
+    expect(() => db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, 4, ?)').run(f1, setId, teams[0])).toThrow();
+  });
+
   it('fleet size can be changed per fleet; shrinking needs the extra places empty', () => {
     const { db, teams, setId, f1, f2 } = world();
     fleets.setFleetSize(db, f1, 6);

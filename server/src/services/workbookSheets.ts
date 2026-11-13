@@ -1,3 +1,4 @@
+import { isLastChance } from './fleets.js';
 import path from 'node:path';
 import { DB, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx, listAssets } from './assets.js';
@@ -43,7 +44,8 @@ export function stageTeamIds(db: DB, eventId: string): string[] | null {
   const stage = currentStage(db, eventId);
   if (!stage) return null;
   return (db.prepare(`SELECT x.team_id AS teamId FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id
-    WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id) as { teamId: string }[]).map((r) => r.teamId);
+    WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id) as { teamId: string }[]).map((r) => r.teamId)
+    .filter((t, i, all) => all.indexOf(t) === i); // a team also in the Last Chance Race once
 }
 
 type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: string | null } | undefined | null;
@@ -58,7 +60,10 @@ function stageTeams(ctx: AssetCtx, eventId: string) {
   const slots = ctx.db.prepare(`SELECT x.team_id AS teamId, x.position, f.name AS fleet FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id
     WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id) as { teamId: string; position: number; fleet: string }[];
   const byId = new Map(teams.map((t) => [t.id, t]));
-  return { stage, teams: slots.filter((s) => byId.has(s.teamId)).map((s) => ({ t: byId.get(s.teamId)!, group: groupLabel(s.fleet), place: String(s.position) })) };
+  // a team also in the Last Chance Race: once, with its own group
+  const own = new Map<string, typeof slots[number]>();
+  for (const x of slots) if (!own.has(x.teamId) || isLastChance(own.get(x.teamId)!.fleet)) own.set(x.teamId, x);
+  return { stage, teams: slots.filter((s) => byId.has(s.teamId) && own.get(s.teamId) === s).map((s) => ({ t: byId.get(s.teamId)!, group: groupLabel(s.fleet), place: String(s.position) })) };
 }
 
 // ---------- General ----------

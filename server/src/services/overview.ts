@@ -1,3 +1,4 @@
+import { isLastChance } from './fleets.js';
 import { AssetCtx } from './assets.js';
 import { assertDate, sumWeights } from './declarations.js';
 import { listSailors } from './sailors.js';
@@ -14,7 +15,8 @@ export function overview(ctx: AssetCtx, eventId: string, date: string, fleetSetI
   const places = new Map<string, { fleetName: string; position: number }>();
   if (fleetSetId) {
     const rows = db.prepare(`SELECT x.team_id AS teamId, x.position, f.name AS fleetName FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id WHERE x.fleet_set_id = ?`).all(fleetSetId) as any[];
-    for (const r of rows) places.set(r.teamId, { fleetName: r.fleetName, position: r.position });
+    // a team also in the Last Chance Race shows its own group
+    for (const r of rows) if (!places.has(r.teamId) || isLastChance(places.get(r.teamId)!.fleetName)) places.set(r.teamId, { fleetName: r.fleetName, position: r.position });
   }
   const members = db.prepare(`
     SELECT d.team_id AS teamId, d.origin AS declOrigin, m.sailor_id AS sailorId, m.source_name AS sourceName, m.sort, m.in_source AS inSource,
