@@ -1,8 +1,14 @@
 {
-  "version": "1.0.166",
-  "commit": "59ab026",
-  "date": "2026-11-12T23:46:42Z",
+  "version": "1.0.167",
+  "commit": "5a533d6",
+  "date": "2026-11-13T13:10:28Z",
   "changes": [
+    {
+      "version": "1.0.167",
+      "commit": "5a533d6",
+      "date": "2026-11-13T13:10:28Z",
+      "text": "vMix data: a picture whose file changed (PNG remade in the generator) goes again into every input that shows it"
+    },
     {
       "version": "1.0.166",
       "commit": "59ab026",
@@ -476,12 +482,6 @@
       "commit": "05a4848",
       "date": "2026-11-09T15:27:03Z",
       "text": "PNG generator: one tab for elements and team colours, element table on top with an expandable preview per row"
-    },
-    {
-      "version": "1.0.86",
-      "commit": "3d96e97",
-      "date": "2026-11-09T12:22:17Z",
-      "text": "GTZIP generator: layer PNGs are cropped to what is drawn (full frame stays as an option)"
     }
   ]
 }

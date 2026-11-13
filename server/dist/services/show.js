@@ -14,7 +14,7 @@ import { ltRoles, teamPictureFor } from './ltTitle.js';
 import { teamKeyColours, teamKeyLook } from './nationColours.js';
 import { listTeams } from './teams.js';
 import { encodePng } from './png.js';
-import { joinVmixPath } from './paths.js';
+import { joinVmixPath, localCandidate } from './paths.js';
 import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
 import { groupLabel, groupLetter } from './groupNames.js';
@@ -1701,10 +1701,22 @@ export class Show {
                 const match = titleFieldMatcher(input.fields);
                 // the first name for a field wins, as in set()
                 const seen = new Set();
-                const changed = new Map([...f].filter(([k, v]) => { const r = match(k); if (r === undefined || seen.has(r))
-                    return false; seen.add(r); return (input.values?.[r] ?? '') !== v; }));
+                // a picture also goes again when its file changed (a PNG remade in the PNG generator keeps its path, so vMix
+                // would keep showing the old one): every input that shows that picture gets it, not only the one last pressed
+                const changed = new Map([...f].filter(([k, v]) => {
+                    const r = match(k);
+                    if (r === undefined || seen.has(r))
+                        return false;
+                    seen.add(r);
+                    return (input.values?.[r] ?? '') !== v || (r.endsWith('.Source') && this.pictureChanged(input, r, v));
+                }));
                 if (changed.size)
                     sent += await this.set(input, changed);
+                for (const [k, v] of changed) {
+                    const r = match(k);
+                    if (r?.endsWith('.Source'))
+                        this.pictureSent(input, r, v);
+                }
             }
             this.syncSig = sig;
             this.syncError = '';
@@ -1719,6 +1731,32 @@ export class Show {
             this.syncing = false;
         }
         return { sent };
+    }
+    /** When each picture went into each input (by the file's time): input key + field → path and mtime. */
+    pictures = new Map();
+    pictureMtime(value) {
+        if (!value)
+            return 0;
+        const local = localCandidate(value, getSetting(this.ctx.db, 'paths.vmixAssetsRoot') ?? '', this.ctx.assetsDir);
+        try {
+            return local ? fs.statSync(local).mtimeMs : 0;
+        }
+        catch {
+            return 0;
+        }
+    }
+    /** The picture's file is newer than when it went into this field (the first look only notes it). */
+    pictureChanged(input, field, value) {
+        const id = `${input.key || input.number}|${field}`;
+        const was = this.pictures.get(id), now = this.pictureMtime(value);
+        if (!was || was.path !== value) {
+            this.pictures.set(id, { path: value, mtime: now });
+            return false;
+        }
+        return now > was.mtime;
+    }
+    pictureSent(input, field, value) {
+        this.pictures.set(`${input.key || input.number}|${field}`, { path: value, mtime: this.pictureMtime(value) });
     }
     stop() { if (this.timer)
         clearInterval(this.timer); this.stopRotation(); }
