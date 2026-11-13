@@ -112,7 +112,7 @@ export class StaticSitePublisher {
   enabled() { return getSetting(this.db, 'static.enabled') === '1'; }
   setEnabled(on: boolean) { setSetting(this.db, 'static.enabled', on ? '1' : ''); if (!on) this.status.error = ''; }
   /** Settings changed: send everything again on the next round. */
-  reset() { this.failures = 0; this.retryAt = 0; this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
+  reset() { this.status.error = ''; this.failures = 0; this.retryAt = 0; this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
 
   start() {
     if (this.timer) return;
