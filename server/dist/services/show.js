@@ -203,8 +203,9 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
             // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
             deck: 1, name: 'A BEFORE', page: p1, keys: [
                 row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
+                // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
                 row8(),
-                row8(),
+                row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
                 nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
             ],
         },
@@ -540,7 +541,7 @@ export class Show {
     /**
      * The fields into the title. Only what differs from what vMix shows now goes (the data sync keeps the titles
      * current, so a key press mostly sends nothing and the graphic comes in at once); a picture also goes when its file
-     * changed. The calls go a few at a time. Returns how many fields were set.
+     * changed only with the REFRESH PNG key (refreshPictures). The calls go a few at a time. Returns how many fields were set.
      */
     async set(input, fields) {
         const match = titleFieldMatcher(input.fields);
@@ -552,7 +553,7 @@ export class Show {
                 continue;
             done.add(real);
             const same = input.values !== undefined && (input.values[real] ?? '') === value;
-            if (same && !(real.endsWith('.Source') && this.pictureChanged(input, real, value)))
+            if (same)
                 continue;
             todo.push([real, value]);
         }
@@ -564,8 +565,6 @@ export class Show {
         for (const [real, value] of todo) {
             if (input.values)
                 input.values[real] = value;
-            if (real.endsWith('.Source'))
-                this.pictureSent(input, real, value);
         }
         return todo.length;
     }
@@ -1405,6 +1404,7 @@ export class Show {
             case 'results': return this.resultsGroup(arg);
             case 'qualified': return this.qualified(arg);
             case 'comm': return this.commentator(arg);
+            case 'refreshpng': return this.refreshPictures();
             case 'person': return this.person(arg);
             case 'anthem': return this.lt.showTeam(this.teamRef(arg).code);
             case 'lineup': return this.lineup(arg);
@@ -1735,31 +1735,26 @@ export class Show {
         }
         return { sent };
     }
-    /** When each picture went into each input (by the file's time): input key + field → path and mtime. */
-    pictures = new Map();
-    pictureMtime(value) {
-        if (!value)
-            return 0;
-        const local = localCandidate(value, getSetting(this.ctx.db, 'paths.vmixAssetsRoot') ?? '', this.ctx.assetsDir);
-        try {
-            return local ? fs.statSync(local).mtimeMs : 0;
+    /**
+     * REFRESH PNG key: every picture of every vMix input that comes from the dashboard's files goes in again (same path),
+     * so vMix reads the file again: a PNG remade in the PNG generator shows everywhere. Only on this key.
+     */
+    async refreshPictures() {
+        this.invalidate();
+        const { inputs } = await this.snapshot();
+        const root = getSetting(this.ctx.db, 'paths.vmixAssetsRoot') ?? '';
+        const assets = path.resolve(this.ctx.assetsDir).toLowerCase();
+        let n = 0;
+        for (const input of inputs) {
+            const mine = (v) => { const l = localCandidate(v, root, this.ctx.assetsDir); return !!l && path.resolve(l).toLowerCase().startsWith(assets); };
+            const todo = Object.entries(input.values ?? {}).filter(([f, v]) => f.endsWith('.Source') && v && mine(v));
+            const id = encodeURIComponent(input.key || input.number);
+            for (let i = 0; i < todo.length; i += SET_BATCH) {
+                await Promise.all(todo.slice(i, i + SET_BATCH).map(([f, v]) => this.vmix(`?Function=SetImage&Input=${id}&SelectedName=${encodeURIComponent(f)}&Value=${encodeURIComponent(v)}`)));
+            }
+            n += todo.length;
         }
-        catch {
-            return 0;
-        }
-    }
-    /** The picture's file is newer than when it went into this field (the first look only notes it). */
-    pictureChanged(input, field, value) {
-        const id = `${input.key || input.number}|${field}`;
-        const was = this.pictures.get(id), now = this.pictureMtime(value);
-        if (!was || was.path !== value) {
-            this.pictures.set(id, { path: value, mtime: now });
-            return false;
-        }
-        return now > was.mtime;
-    }
-    pictureSent(input, field, value) {
-        this.pictures.set(`${input.key || input.number}|${field}`, { path: value, mtime: this.pictureMtime(value) });
+        return { refreshed: n };
     }
     stop() { if (this.timer)
         clearInterval(this.timer); this.stopRotation(); }

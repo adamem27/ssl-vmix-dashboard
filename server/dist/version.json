@@ -1,8 +1,14 @@
 {
-  "version": "1.0.169",
-  "commit": "0cf20ca",
-  "date": "2026-11-13T13:33:14Z",
+  "version": "1.0.170",
+  "commit": "630bb3d",
+  "date": "2026-11-13T13:40:26Z",
   "changes": [
+    {
+      "version": "1.0.170",
+      "commit": "630bb3d",
+      "date": "2026-11-13T13:40:26Z",
+      "text": "PNG refresh only on the REFRESH PNG key (A BEFORE page): no file checks in the data sync or on key presses"
+    },
     {
       "version": "1.0.169",
       "commit": "0cf20ca",
@@ -476,12 +482,6 @@
       "commit": "c99e735",
       "date": "2026-11-09T19:14:07Z",
       "text": "Weather: forecast instead of conditions, wind direction in degrees, no location/gusts/note. PNG generator: elements are for teams or neutral (never both), gradient from any side, neutral versions V1-V3, table scrollbar above the open preview"
-    },
-    {
-      "version": "1.0.90",
-      "commit": "fd7d955",
-      "date": "2026-11-09T15:55:47Z",
-      "text": "PNG generator: cut corners of any length and slope with rounded vertices, one or both ends, up to a point"
     }
   ]
 }
