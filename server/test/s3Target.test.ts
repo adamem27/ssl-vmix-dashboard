@@ -21,3 +21,20 @@ describe('S3 / Cloudflare R2 upload', () => {
     await expect(new S3Target({ endpoint: 'https://x', bucket: 'b', accessKey: 'k', secret: 's', region: 'auto', folder: 'f' }, denied).put([{ rel: 'data.json', data: '{}' }], () => undefined)).rejects.toThrow(/refused the keys/);
   });
 });
+
+describe('R2 settings as pasted', () => {
+  it('accepts the endpoint with or without https:// and with the bucket at the end', async () => {
+    const { s3Origin } = await import('../src/services/siteTargets.js');
+    expect(s3Origin('https://abc.r2.cloudflarestorage.com/ssl-commentary')).toBe('https://abc.r2.cloudflarestorage.com');
+    expect(s3Origin('abc.r2.cloudflarestorage.com')).toBe('https://abc.r2.cloudflarestorage.com');
+    expect(s3Origin(' https://abc.r2.cloudflarestorage.com/ ')).toBe('https://abc.r2.cloudflarestorage.com');
+  });
+
+  it('names the missing fields', async () => {
+    const { setup } = await import('./helpers.js');
+    const { saveSiteSettings, siteTarget } = await import('../src/services/siteTargets.js');
+    const { db } = setup();
+    saveSiteSettings(db, { mode: 's3', s3Endpoint: 'abc.r2.cloudflarestorage.com', s3Bucket: 'ssl-commentary' });
+    expect(() => siteTarget(db, 'komentator-abc123', '/tmp')).toThrow(/Missing .*Access Key ID, Secret Access Key/);
+  });
+});

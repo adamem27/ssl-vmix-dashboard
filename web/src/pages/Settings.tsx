@@ -529,7 +529,7 @@ function StaticPageSection() {
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={d.enabled} disabled={busy !== null}
-            onChange={(e) => run('toggle', async () => { await api.put('/api/static-site', { enabled: e.target.checked }); return e.target.checked ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
+            onChange={(e) => run('toggle', async () => { const { ftpPassword, s3Secret, ...rest } = f; await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}), ...(s3Secret ? { s3Secret } : {}), enabled: e.target.checked }); setF({ ...f, ftpPassword: '', s3Secret: '' }); return e.target.checked ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
           Publish every 5 seconds
         </label>
         <Button size="sm" busy={busy === 'now'} onClick={() => run('now', () => api.post<StaticSiteInfo>('/api/static-site/publish'), 'Published')}>Publish now</Button>
