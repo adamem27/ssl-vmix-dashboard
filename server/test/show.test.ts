@@ -554,7 +554,7 @@ describe('show control', () => {
     expect(v.calls).toEqual([`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`]);
   });
 
-  it('a PNG remade in the generator goes again into every input that shows it (results H and I alike)', async () => {
+  it('REFRESH PNG: every picture from the dashboard goes into vMix again (results H and I alike); the data sync does not', async () => {
     const { s, ev, f1, f2 } = race();
     const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
     setCurrentStage(s.db, ev, stage.id);
@@ -565,29 +565,25 @@ describe('show control', () => {
     fs.mkdirSync(dir, { recursive: true });
     const png = path.join(dir, 'ESP_bar_results.png');
     fs.writeFileSync(png, encodePng(1129, 76, () => [0, 0, 0, 255]));
+    // a picture from elsewhere stays alone
+    v.vals.set(`${v.num(`ssl_results_${k2}`)}|bar2.Source`, 'C:/elsewhere/x.png');
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.syncData();
-    const bars = () => v.calls.filter((c) => c.startsWith('?Function=SetImage') && /SelectedName=bar\d\.Source/.test(c) && /ESP_bar_results/.test(c));
-    expect(bars().length).toBeGreaterThan(0);
-    // nothing changed: nothing again
+    const bars = () => v.calls.filter((c) => c.startsWith('?Function=SetImage') && /SelectedName=bar\d\.Source/.test(c));
+    // the PNG remade (same path): the data sync leaves it (the title already has that path)
+    fs.writeFileSync(png, encodePng(1129, 76, () => [255, 0, 0, 255]));
     v.calls.length = 0;
     setSetting(s.db, 'touch', '1');
     (show as any).memo.clear();
     await show.syncData();
     expect(bars()).toEqual([]);
-    // the PNG remade (same path, newer file): both groups' inputs get it again
-    fs.writeFileSync(png, encodePng(1129, 76, () => [255, 0, 0, 255]));
-    fs.utimesSync(png, new Date(), new Date(Date.now() + 5000));
-    setSetting(s.db, 'touch', '2');
-    (show as any).memo.clear();
-    await show.syncData();
-    expect(bars().map((c) => c.match(/Input=([^&]+)/)![1])).toContain(`k${v.num(`ssl_results_${k1}`)}`);
-    // and only once
+    // the key: every dashboard picture again, in every input that shows one
+    expect(show.pages()[0].keys[2][0]?.action).toBe('refreshpng');
     v.calls.length = 0;
-    setSetting(s.db, 'touch', '3');
-    (show as any).memo.clear();
-    await show.syncData();
-    expect(bars()).toEqual([]);
+    const r: any = await show.run('refreshpng');
+    expect(r.refreshed).toBeGreaterThan(0);
+    expect(bars().some((c) => c.includes(`Input=k${v.num(`ssl_results_${k1}`)}`) && /ESP_bar_results/.test(c))).toBe(true);
+    expect(bars().some((c) => c.includes('elsewhere'))).toBe(false);
   });
 
   it('each group has its own results input and key; the day schedule can stay out of the break scene; flag 4 changes first', async () => {
