@@ -25,22 +25,27 @@ function fakeVmix(titles: Record<string, string[]>) {
   const names = Object.keys(titles);
   const overlays: Record<number, string> = {};
   const num = (k: string) => String(names.indexOf(k) + 1);
+  const vals = new Map<string, string>();
+  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const fetcher = async (url: string) => {
     const q = decodeURIComponent(url.split('/api/')[1] ?? '');
     if (q === '') {
-      const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="${titles[n][0] === '#Image' ? 'Image' : 'GT'}" title="${n}">${titles[n].filter((f) => !f.startsWith('#')).map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}"></image>` : `<text index="0" name="${f}">x</text>`)).join('')}</input>`).join('');
+      const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="${titles[n][0] === '#Image' ? 'Image' : 'GT'}" title="${n}">${titles[n].filter((f) => !f.startsWith('#')).map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}">${esc(vals.get(`${i + 1}|${f}`) ?? '')}</image>` : `<text index="0" name="${f}">${esc(vals.get(`${i + 1}|${f}`) ?? 'x')}</text>`)).join('')}</input>`).join('');
       const ov = [1, 2, 3, 4].map((n) => `<overlay number="${n}">${overlays[n] ?? ''}</overlay>`).join('');
       return { ok: true, status: 200, text: async () => `<vmix><inputs>${inputs}</inputs><overlays>${ov}</overlays></vmix>` };
     }
     calls.push(q);
     raw.push(url.split('/api/')[1] ?? '');
+    // vMix keeps what was set: the next XML shows it
+    const sv = q.match(/^\?Function=Set(?:Text|Image)&Input=k?(\d+)&SelectedName=(.+?)&Value=(.*)$/s);
+    if (sv) vals.set(`${sv[1]}|${sv[2]}`, sv[3]);
     const m = q.match(/Function=OverlayInput(\d)In&Input=k?(\d+)/);
     if (m) overlays[Number(m[1])] = m[2];
     const o = q.match(/Function=OverlayInput(\d)(Out|Off)$/);
     if (o) overlays[Number(o[1])] = '';
     return { ok: true, status: 200, text: async () => '' };
   };
-  return { calls, raw, fetcher, overlays, num };
+  return { calls, raw, fetcher, overlays, num, vals };
 }
 
 const TITLES = {
@@ -315,14 +320,12 @@ describe('show control', () => {
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput4In&Input=k3');
     expect(v.overlays[4]).toBe('3');
     // the next group's results on the same title: the data sync follows the group on the board, not the one picked at the top
-    v.calls.length = 0;
     await show.syncData();
-    const groupA = v.calls.filter((c) => c.includes('SelectedName=TEAM 1.Text')).join();
+    const groupA = v.vals.get('3|TEAM 1.Text') ?? '';
     await show.run('nextslide');
     expect(show.state.slide).toBe(2);
-    v.calls.length = 0;
     await show.syncData();
-    const groupB = v.calls.filter((c) => c.includes('SelectedName=TEAM 1.Text')).join();
+    const groupB = v.vals.get('3|TEAM 1.Text') ?? '';
     expect(groupA).toContain('ESP');
     expect(groupB).not.toContain('ESP');
     await show.run('tickermode');
@@ -537,6 +540,42 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.syncData();
     expect(v.calls.some((c) => c.includes(`Input=k${v.num(`ssl_compare_${k2}`)}&SelectedName=1 COUNTRY.Text`))).toBe(true);
+  });
+
+  it('a PNG remade in the generator goes again into every input that shows it (results H and I alike)', async () => {
+    const { s, ev, f1, f2 } = race();
+    const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
+    setCurrentStage(s.db, ev, stage.id);
+    const [k1, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+    const fields = ['COUNTRY1.Text', 'COUNTRY2.Text', 'bar1.Source', 'bar2.Source'];
+    const v = fakeVmix({ ...TITLES, [`ssl_results_${k1}`]: fields, [`ssl_results_${k2}`]: fields });
+    const dir = path.join(s.ctx.assetsDir, 'PNG generator', 'ESP');
+    fs.mkdirSync(dir, { recursive: true });
+    const png = path.join(dir, 'ESP_bar_results.png');
+    fs.writeFileSync(png, encodePng(1129, 76, () => [0, 0, 0, 255]));
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.syncData();
+    const bars = () => v.calls.filter((c) => c.startsWith('?Function=SetImage') && /SelectedName=bar\d\.Source/.test(c) && /ESP_bar_results/.test(c));
+    expect(bars().length).toBeGreaterThan(0);
+    // nothing changed: nothing again
+    v.calls.length = 0;
+    setSetting(s.db, 'touch', '1');
+    (show as any).memo.clear();
+    await show.syncData();
+    expect(bars()).toEqual([]);
+    // the PNG remade (same path, newer file): both groups' inputs get it again
+    fs.writeFileSync(png, encodePng(1129, 76, () => [255, 0, 0, 255]));
+    fs.utimesSync(png, new Date(), new Date(Date.now() + 5000));
+    setSetting(s.db, 'touch', '2');
+    (show as any).memo.clear();
+    await show.syncData();
+    expect(bars().map((c) => c.match(/Input=([^&]+)/)![1])).toContain(`k${v.num(`ssl_results_${k1}`)}`);
+    // and only once
+    v.calls.length = 0;
+    setSetting(s.db, 'touch', '3');
+    (show as any).memo.clear();
+    await show.syncData();
+    expect(bars()).toEqual([]);
   });
 
   it('each group has its own results input and key; the day schedule can stay out of the break scene; flag 4 changes first', async () => {
