@@ -330,7 +330,8 @@ export async function buildApp(deps) {
         return { ...fleets.getSetDetail(db, req.params.id), result };
     });
     app.post('/api/fleet-sets/:id/unassign', async (req) => {
-        fleets.unassignTeam(db, req.params.id, z.object({ teamId: id }).parse(req.body).teamId);
+        const b = z.object({ teamId: id, fleetId: id.optional() }).parse(req.body);
+        fleets.unassignTeam(db, req.params.id, b.teamId, b.fleetId);
         return fleets.getSetDetail(db, req.params.id);
     });
     // ---------- declarations ----------

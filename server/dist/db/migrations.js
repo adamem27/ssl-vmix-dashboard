@@ -361,4 +361,22 @@ ALTER TABLE people ADD COLUMN surname TEXT NOT NULL DEFAULT '';
 UPDATE people SET surname = trim(substr(name, instr(name, ' ') + 1)), name = substr(name, 1, instr(name, ' ') - 1) WHERE instr(name, ' ') > 0;
 `,
     },
+    {
+        version: 10,
+        name: 'a team in its group and in the last chance race',
+        sql: `
+-- A team once per group (was once per stage): the Last Chance Race of a stage takes teams of its other groups.
+CREATE TABLE fleet_slots_v10 (
+  fleet_id TEXT NOT NULL REFERENCES fleets(id) ON DELETE CASCADE,
+  fleet_set_id TEXT NOT NULL REFERENCES fleet_sets(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL CHECK (position BETWEEN 1 AND 16),
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  PRIMARY KEY (fleet_id, position),
+  UNIQUE (fleet_id, team_id)
+);
+INSERT INTO fleet_slots_v10 (fleet_id, fleet_set_id, position, team_id) SELECT fleet_id, fleet_set_id, position, team_id FROM fleet_slots;
+DROP TABLE fleet_slots;
+ALTER TABLE fleet_slots_v10 RENAME TO fleet_slots;
+`,
+    },
 ];

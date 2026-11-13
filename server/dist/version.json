@@ -1,8 +1,14 @@
 {
-  "version": "1.0.171",
-  "commit": "bcd6858",
-  "date": "2026-11-13T13:45:28Z",
+  "version": "1.0.172",
+  "commit": "8df23a3",
+  "date": "2026-11-13T19:38:49Z",
   "changes": [
+    {
+      "version": "1.0.172",
+      "commit": "8df23a3",
+      "date": "2026-11-13T19:38:49Z",
+      "text": "Last Chance Race takes teams of the stage's other groups (they stay in their own); its own results and comparison inputs ssl_results_LCR / ssl_compare_LCR with keys"
+    },
     {
       "version": "1.0.171",
       "commit": "bcd6858",
@@ -476,12 +482,6 @@
       "commit": "03a1734",
       "date": "2026-11-09T20:37:05Z",
       "text": "PNG generator: the stroke swatch shows the orange-yellow gradient when Gradient is ticked; new elements get the gradient stroke"
-    },
-    {
-      "version": "1.0.92",
-      "commit": "7b25d3f",
-      "date": "2026-11-09T19:24:55Z",
-      "text": "PNG generator: an element can be made for both the teams and the neutral set"
     }
   ]
 }
