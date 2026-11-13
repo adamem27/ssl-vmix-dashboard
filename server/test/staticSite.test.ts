@@ -38,7 +38,7 @@ describe('static commentator page', () => {
     expect(s.error).toBe('');
     const folder = path.join(out, site.folderName());
     expect(site.folderName()).toMatch(/^komentator-[a-z0-9]{8,}$/);
-    expect(s.url).toBe(`https://komentator.example.com/${site.folderName()}/`);
+    expect(s.url).toBe(`https://komentator.example.com/${site.folderName()}/index.html`);
     expect(fs.readFileSync(path.join(folder, 'index.html'), 'utf8')).toContain('src="assets/commentator-A.js"');
     expect(fs.readdirSync(path.join(folder, 'assets')).sort()).toEqual(['commentator-A.js', 'src-B.js', 'src-C.css']);
     const data = JSON.parse(fs.readFileSync(path.join(folder, 'data.json'), 'utf8'));
@@ -64,6 +64,11 @@ describe('static commentator page', () => {
     expect(after).not.toBe(before);
     const r = (await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'ftp', ftpHost: 'h55.example.pl', ftpUser: 'kom', ftpPassword: 'secret' } })).json();
     expect(r.hasFtpPassword).toBe(true);
+    // failures back off instead of hammering the host (its firewall would ban this address)
+    await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'https', publicUrl: '' } });
+    const site = (app as any).staticSite as StaticSitePublisher;
+    expect((await site.publishNow()).error).toMatch(/next try in 5 s/);
+    expect((await site.publishNow()).error).toMatch(/next try in 10 s/);
     expect(JSON.stringify(r)).not.toContain('secret');
   });
 });
