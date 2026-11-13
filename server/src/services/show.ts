@@ -169,6 +169,8 @@ const row8 = (...keys: (DeckKey | null)[]) => Array.from({ length: 8 }, (_, i) =
  * Page numbers of the Companion preset (one file with every page): deck 1 starts on page 1, deck 2 on page 3, the
  * fallback page is 8 and every team has a page of its own from 9 on, its places with the sailors' names on the keys.
  */
+/** vMix calls sent at once when a title takes many fields. */
+const SET_BATCH = 8;
 export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 } as const;
 
 /** A team page: the team and its places (slot, place label, the name on the key). */
@@ -542,18 +544,34 @@ export class Show {
   }
 
   /** Fields into the title, by its own field names (any case, GT's names cut at 15 characters too); one call each. */
+  /**
+   * The fields into the title. Only what differs from what vMix shows now goes (the data sync keeps the titles
+   * current, so a key press mostly sends nothing and the graphic comes in at once); a picture also goes when its file
+   * changed. The calls go a few at a time. Returns how many fields were set.
+   */
   private async set(input: VmixInput, fields: Map<string, string>) {
     const match = titleFieldMatcher(input.fields);
     const done = new Set<string>();
-    let n = 0;
+    const todo: [string, string][] = [];
     for (const [name, value] of fields) {
       const real = match(name);
       if (!real || done.has(real)) continue;
       done.add(real);
-      await this.vmix(`?Function=${real.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${encodeURIComponent(input.key || input.number)}&SelectedName=${encodeURIComponent(real)}&Value=${encodeURIComponent(value)}`);
-      n++;
+      const same = input.values !== undefined && (input.values[real] ?? '') === value;
+      if (same && !(real.endsWith('.Source') && this.pictureChanged(input, real, value))) continue;
+      todo.push([real, value]);
     }
-    return n;
+    const id = encodeURIComponent(input.key || input.number);
+    for (let i = 0; i < todo.length; i += SET_BATCH) {
+      await Promise.all(todo.slice(i, i + SET_BATCH).map(([real, value]) =>
+        this.vmix(`?Function=${real.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=${id}&SelectedName=${encodeURIComponent(real)}&Value=${encodeURIComponent(value)}`)));
+    }
+    // what vMix holds now, for the next set() before the next read of vMix
+    for (const [real, value] of todo) {
+      if (input.values) input.values[real] = value;
+      if (real.endsWith('.Source')) this.pictureSent(input, real, value);
+    }
+    return todo.length;
   }
   /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
   private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>, blind?: () => Map<string, string>) {
@@ -658,7 +676,7 @@ export class Show {
       await this.overlayOut(g.overlay, snap.overlays);
       return { out: 'results', group: grp.label };
     }
-    await pushResults(this.ctx, grp.fleetId, input.key || input.number, this.fetcher);
+    await this.set(input, resultFieldsFor(this.ctx, grp.fleetId, input).fields);
     await this.bringIn(g, input, snap);
     return { in: 'results', group: grp.label, input: input.title };
   }
@@ -668,7 +686,7 @@ export class Show {
     const ev = activeEvent(this.ctx.db).id;
     if (g.id === 'results') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
-      await pushResults(this.ctx, this.config.fleetId, input.key || input.number, this.fetcher);
+      await this.set(input, resultFieldsFor(this.ctx, this.config.fleetId, input).fields);
     } else if (g.id === 'compare') {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
       await this.set(input, this.compareData());
@@ -1207,7 +1225,7 @@ export class Show {
     return this.need(this.graphic(s.kind === 'schedule' ? 'schedule' : 'results'), inputs);
   }
   private async fillSlide(s: { kind: 'schedule' | 'results'; fleetId?: string }, input: VmixInput) {
-    if (s.kind === 'results' && s.fleetId) await pushResults(this.ctx, s.fleetId, input.key || input.number, this.fetcher);
+    if (s.kind === 'results' && s.fleetId) await this.set(input, resultFieldsFor(this.ctx, s.fleetId, input).fields);
     else await this.fill(this.graphic('schedule'), input);
   }
   /**
@@ -1540,17 +1558,8 @@ export class Show {
       for (const { input, f: make } of jobs) {
         const f = make();
         if (!f) continue;
-        const match = titleFieldMatcher(input.fields);
-        // the first name for a field wins, as in set()
-        const seen = new Set<string>();
-        // a picture also goes again when its file changed (a PNG remade in the PNG generator keeps its path, so vMix
-        // would keep showing the old one): every input that shows that picture gets it, not only the one last pressed
-        const changed = new Map([...f].filter(([k, v]) => {
-          const r = match(k); if (r === undefined || seen.has(r)) return false; seen.add(r);
-          return (input.values?.[r] ?? '') !== v || (r.endsWith('.Source') && this.pictureChanged(input, r, v));
-        }));
-        if (changed.size) sent += await this.set(input, changed);
-        for (const [k, v] of changed) { const r = match(k); if (r?.endsWith('.Source')) this.pictureSent(input, r, v); }
+        // only what differs from the title goes; a picture also when its file changed (set())
+        sent += await this.set(input, f);
       }
       this.syncSig = sig;
       this.syncError = '';

@@ -542,6 +542,18 @@ describe('show control', () => {
     expect(v.calls.some((c) => c.includes(`Input=k${v.num(`ssl_compare_${k2}`)}&SelectedName=1 COUNTRY.Text`))).toBe(true);
   });
 
+  it('a key press sends only what the title does not show yet, so the graphic comes in at once', async () => {
+    const { s } = race();
+    const v = fakeVmix({ ...TITLES, ssl_schedule: ['DateText.Text', 'Day.Text', 'RACE 1.Text', 'RACE 2.Text', 'POSITION 1.Text'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:schedule');
+    expect(v.calls.filter((c) => c.startsWith('?Function=SetText')).length).toBeGreaterThan(0);
+    await show.run('show:schedule');
+    v.calls.length = 0;
+    await show.run('show:schedule');
+    expect(v.calls).toEqual([`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`]);
+  });
+
   it('a PNG remade in the generator goes again into every input that shows it (results H and I alike)', async () => {
     const { s, ev, f1, f2 } = race();
     const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
@@ -606,6 +618,9 @@ describe('show control', () => {
     await show.run('breakout');
     // flag / emblem: 4 FLAG (the one that starts the title's change animation) goes first
     setShowConfig(s.db, { flagChangeMs: 0 });
+    // the title shows other pictures now (the flags), so the marks go in
+    for (const n of [1, 2, 3, 4]) v.vals.set(`${v.num(`ssl_compare_${k1}`)}|${n} FLAG.Source`, 'old.png');
+    (show as any).memo.clear();
     v.calls.length = 0;
     await show.run('comparemark');
     const flags = v.calls.filter((c) => c.includes(`Input=k${v.num(`ssl_compare_${k1}`)}`) && /FLAG\.Source/.test(c));
@@ -651,6 +666,8 @@ describe('show control', () => {
     expect((await show.syncData()).sent).toBe(0);
     // COMPARE key: the emblem instead of the flag, straight into the title
     v.calls.length = 0;
+    v.vals.set('2|1 FLAG.Source', 'old.png');
+    (show as any).memo.clear();
     expect(await show.run('comparemark')).toEqual({ compareMark: 'emblem' });
     expect(v.calls.map((c) => c.split('&Value')[0])).toEqual(['?Function=SetImage&Input=k2&SelectedName=1 FLAG.Source']);
     v.calls.length = 0;
