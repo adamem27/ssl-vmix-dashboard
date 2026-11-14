@@ -4,6 +4,10 @@ import { setup } from './helpers.js';
 import { activeEvent } from '../src/db/db.js';
 import { createScheduleItem, getScheduleOptions, setScheduleOptions } from '../src/services/general.js';
 import { scheduleHighlightPath, showDataFields } from '../src/services/showData.js';
+import { createFleet, createSet, placeTeam } from '../src/services/fleets.js';
+import { createTeam } from '../src/services/teams.js';
+import { saveUpload } from '../src/services/assets.js';
+import { encodePng } from '../src/services/png.js';
 
 const day = '2026-11-11';
 function board() {
@@ -19,7 +23,7 @@ describe('day schedule board', () => {
     const { fields } = board();
     const f = fields();
     expect(f.get('TIME 1.Text')).toBe('10:00');
-    expect(f.get('RACE 2.Text')).toBe('RACE 2');
+    expect(f.get('RACE 2.Text')).toBe('Race 2');
     expect(f.get('POSITION 3.Text')).toBe('3');
     expect(f.get('RACE 2 C.Text')).toBe('');
     expect(f.get('POSITION 1 C.Text')).toBe('');
@@ -35,9 +39,33 @@ describe('day schedule board', () => {
     expect(f.get('TIME 1.Text')).toBe('');
     expect(f.get('RACE 1.Text')).toBe('');
     expect(f.get('GROUP A.Text')).toBe('');
-    expect(f.get('RACE 1 C.Text')).toBe('RACE 1');
+    expect(f.get('RACE 1 C.Text')).toBe('Race 1');
     expect(f.get('POSITION 2 C.Text')).toBe('2');
     expect(f.get('GROUP 1 C.Text')).not.toBe('');
+  });
+
+  it('a group with only some teams known: only their flags are set, the other places stay as in the title; the name as typed', () => {
+    const { s, fields } = board();
+    const ev = activeEvent(s.db).id;
+    const set = createSet(s.db, ev, 'Final day');
+    const qr = createFleet(s.db, set, 'Qualification Race', 4);
+    const png = encodePng(4, 4, () => [0, 0, 255, 255]);
+    for (const [code, position] of [['BRA', 1], ['CHI', 3]] as const) {
+      const teamId = createTeam(s.db, { name: code, code });
+      saveUpload(s.ctx, 'team', teamId, 'flag_small', png, `${code}.png`);
+      placeTeam(s.db, set, { teamId, fleetId: qr, position });
+    }
+    createScheduleItem(s.db, ev, { date: day, time: '12:00', race: 'Qualification', fleet: 'Qualification Race' });
+    setScheduleOptions(s.db, { showTime: false });
+    const f = fields();
+    expect(f.get('GROUP 4 C.Text')).toBe('Qualification Race');
+    expect(f.get('RACE 4 C.Text')).toBe('Qualification');
+    expect(f.get('FLAG 13 C.Source')).toMatch(/BRA/);
+    expect(f.has('FLAG 14 C.Source')).toBe(false); // unknown yet: the “?” flag in the title stays
+    expect(f.get('FLAG 15 C.Source')).toMatch(/CHI/);
+    expect(f.has('FLAG 16 C.Source')).toBe(false);
+    // rows that are not in the schedule are still emptied
+    expect(f.get('FLAG 17 C.Source')).toBe('');
   });
 
   it('highlights the row picked as the next race, only on its day', () => {

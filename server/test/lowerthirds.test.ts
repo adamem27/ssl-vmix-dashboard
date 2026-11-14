@@ -56,7 +56,7 @@ describe('lower thirds', () => {
     // no photo → the no-photo title, filled and brought in
     const r = await lt.showSailor(null, 'pit');
     expect(r).toMatchObject({ kind: 'sailor', slot: 'Pit', cameIn: true, input: 'lowerthird_no_photo' });
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Martine GRAEL');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Martine Grael');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=9 | PIT');
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k2');
 
@@ -77,8 +77,8 @@ describe('lower thirds', () => {
     // the team: country and nickname
     v.calls.length = 0;
     await lt.showTeam('BRA');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=TEAM BRA');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=THE CANARIES');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=Team BRA');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Bottom text.Text&Value=The Canaries');
 
     await lt.out();
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput1Out');
@@ -121,8 +121,8 @@ describe('lower thirds', () => {
     setLtConfig(s.db, { photoInput: 'lowerthird_photo 2 1.gtzip', noPhotoInput: 'lowerthird_photo 2 1.gtzip' });
     const lt = new LowerThirds(s.ctx, fetcher);
     await lt.showTeam('BRA');
-    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=Name.Text&Value=TEAM BRA');
-    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=THE CANARIES');
+    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=Name.Text&Value=Team BRA');
+    expect(calls).toContain('?Function=SetText&Input=k1&SelectedName=position/pb.Text&Value=The Canaries');
     const barCall = calls.find((c) => c.includes('SelectedName=Bar.Source'));
     expect(barCall).toMatch(/BRA_lowerthird\.png$/);
     expect(calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k1');
@@ -156,7 +156,7 @@ describe('lower thirds', () => {
     for (const d of LINEUP_SLOTS) {
       const r = await lt.run(`place:${d.key}`);
       expect(r).toMatchObject({ slot: d.key });
-      expect(v.calls).toContain(`?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=X ${d.key.toUpperCase()}`);
+      expect(v.calls).toContain(`?Function=SetText&Input=k2&SelectedName=Top text.Text&Value=X ${d.key}`);
     }
     // by label and by number too
     expect(await lt.showSailor(null, 'Trimmer 2')).toMatchObject({ slot: 'Trimmer1' });

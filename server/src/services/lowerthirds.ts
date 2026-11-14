@@ -112,9 +112,9 @@ export function crewOf(ctx: AssetCtx, teamId: string): LtSailor[] {
   });
 }
 
-const fullName = (s: { firstName: string; lastName: string }) => [s.firstName.trim(), s.lastName.trim().toUpperCase()].filter(Boolean).join(' ');
+const fullName = (s: { firstName: string; lastName: string }) => [s.firstName.trim(), s.lastName.trim()].filter(Boolean).join(' ');
 /** The lines Bottom text cycles through for a sailor: number and position first (9 | MIDBOW, as the best results are typed), then each best result. */
-export const sailorLines = (s: LtSailor) => [[s.number, s.position.toUpperCase()].filter(Boolean).join(' | '), ...s.best].filter(Boolean);
+export const sailorLines = (s: LtSailor) => [[s.number, s.position].filter(Boolean).join(' | '), ...s.best].filter(Boolean);
 
 export interface LtState { kind: 'team' | 'sailor' | null; teamId: string | null; slot: string | null; line: number; onAir: boolean; input: string }
 const STATE_KEY = 'lt.state';
@@ -140,8 +140,8 @@ export function ltFields(ctx: AssetCtx, cfg: LtConfig, teamId: string, sailor: L
     f.set(`${cfg.fields.bottom}.Text`, lines.length ? lines[line % lines.length] : '');
     f.set(`${cfg.fields.photo}.Source`, sailor.photo);
   } else {
-    f.set(`${cfg.fields.top}.Text`, team.name.toUpperCase());
-    f.set(`${cfg.fields.bottom}.Text`, (team.nickname || '').toUpperCase());
+    f.set(`${cfg.fields.top}.Text`, team.name);
+    f.set(`${cfg.fields.bottom}.Text`, team.nickname || '');
   }
   return f;
 }

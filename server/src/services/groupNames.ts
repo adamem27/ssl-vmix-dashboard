@@ -4,12 +4,12 @@
  */
 const SHORT = /^(?:QS|Q|R\d+|EF|QF|SF|GR|GROUP|FLEET|G)\s*[-_.]?\s*([A-Z]{1,2}\d?)$/i;
 
-/** “QS H” → “Group H”; names that are not a lettered group (Final, Petit Final) stay as they are, in capitals. */
+/** “QS H” → “Group H”; names that are not a lettered group (Final, Qualification Race) stay exactly as typed. */
 export function groupLabel(name: string | null | undefined): string {
   const n = (name ?? '').trim();
   if (!n) return '';
   const m = SHORT.exec(n);
-  return m ? `Group ${m[1].toUpperCase()}` : n.toUpperCase();
+  return m ? `Group ${m[1].toUpperCase()}` : n;
 }
 
 /** The letter of a group (“QS H” → “H”), or its label when it has none. */

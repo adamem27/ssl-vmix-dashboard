@@ -138,9 +138,9 @@ export function LineupPanel({ teamId, date, tz }: { teamId: string; date: string
               <div className="grid grid-cols-[3.5rem_1fr_1fr] gap-1">
                 <SaveInput value={r.number} onSave={(number) => setRow(r.slot, { number })} label="Number" placeholder="No." maxLength={10} className="text-center tabular-nums" />
                 <SaveInput value={r.firstName} onSave={(firstName) => setRow(r.slot, { firstName })} label="Name" placeholder="Name" maxLength={80} />
-                <SaveInput value={r.lastName} onSave={(lastName) => setRow(r.slot, { lastName })} label="Surname" placeholder="SURNAME" maxLength={80} className="uppercase" />
+                <SaveInput value={r.lastName} onSave={(lastName) => setRow(r.slot, { lastName })} label="Surname" placeholder="Surname" maxLength={80} />
               </div>
-              <SaveInput value={r.position} onSave={(position) => setRow(r.slot, { position })} label="Position shown" placeholder={def?.position || 'POSITION'} maxLength={40} className="mt-1 text-xs uppercase text-ink-300" />
+              <SaveInput value={r.position} onSave={(position) => setRow(r.slot, { position })} label="Position shown" placeholder={def?.position || 'POSITION'} maxLength={40} className="mt-1 text-xs text-ink-300" />
             </div>
           );
         })}

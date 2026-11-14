@@ -82,7 +82,7 @@ describe('workbook sheets', () => {
 
     const sailors = sailorsSheet(ctx, eventId, today);
     expect(sailors.map((r) => [r['Team code'], r['Last name'], r['Line-up place'], r.Captain])).toEqual([
-      ['BRN', 'HASSAN', 'Helm', ''], ['BRN', 'SAID', '', 'Yes'], ['IND', 'KUMAR', '', ''],
+      ['BRN', 'Hassan', 'Helm', ''], ['BRN', 'Said', '', 'Yes'], ['IND', 'Kumar', '', ''],
     ]);
     expect(sailors[0].Number).toBe('7');
 
@@ -111,7 +111,7 @@ describe('workbook sheets', () => {
     expect(lu.map((r) => r.Code)).toEqual(['BRN', 'IND']);
     expect(Object.keys(lu[0]).slice(0, 4)).toEqual(['Group', 'Code', 'Team', 'Title']);
     // places in the panel's order: bow first by default, the helm last
-    expect([lu[0]['1 Place'], lu[0]['9 Place'], lu[0]['9 Surname'], lu[0]['9 Number']]).toEqual(['Bow', 'Helm', 'HASSAN', '7']);
+    expect([lu[0]['1 Place'], lu[0]['9 Place'], lu[0]['9 Surname'], lu[0]['9 Number']]).toEqual(['Bow', 'Helm', 'Hassan', '7']);
     expect(lu[0]).toHaveProperty('Line-up background');
   });
 });

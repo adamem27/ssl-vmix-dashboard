@@ -178,7 +178,7 @@ export function syncLineupFromDeclaration(ctx: AssetCtx, eventId: string, teamId
   for (const c of rest) {
     const d = free.shift() ?? (extra < MAX_EXTRA ? extraSlot(10 + extra++) : null);
     if (!d) break;
-    placed.set(d.key, { slot: d.key, ...c, position: (c.position || d.position).toUpperCase() });
+    placed.set(d.key, { slot: d.key, ...c, position: c.position || d.position });
   }
   const data = normalize({ title: cur.title, teamName: cur.teamName, photoSide: cur.photoSide, extra: Math.max(extra, 0), rows: [...placed.values()], order: cur.order });
   store(ctx.db, eventId, teamId, data, date);
@@ -209,14 +209,14 @@ export function lineupSheetRows(ctx: AssetCtx, eventId: string): Record<string, 
     if (!saved.has(t.id)) continue;
     const { data } = loadLineup(ctx.db, eventId, t.id);
     const row: Record<string, string> = {
-      code: t.code, TeamName: (data.teamName || t.name).toUpperCase(), LineupText: data.title,
+      code: t.code, TeamName: data.teamName || t.name, LineupText: data.title,
       Flag: img(t.assets.flag_big), Emblem: img(t.assets.emblem_light), CaptainSlot: data.rows.find((r) => r.captain)?.slot ?? '',
     };
     for (const d of slotDefs(data.extra)) {
       const r = data.rows.find((x) => x.slot === d.key)!;
       const photo = r.sailorId ? img(listAssets(ctx, 'sailor', r.sailorId).photo) : '';
       row[d.fields.name] = r.firstName;
-      row[d.fields.surname] = r.lastName.toUpperCase();
+      row[d.fields.surname] = r.lastName;
       row[d.fields.number] = r.number;
       row[d.fields.position] = r.position;
       row[d.fields.photo] = photo;

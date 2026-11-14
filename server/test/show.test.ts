@@ -131,7 +131,7 @@ describe('show control', () => {
     const v = fakeVmix(TITLES);
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('show:results');
-    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TEAM 1.Text&Value=TEAM ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TEAM 1.Text&Value=Team ESP');
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput1In&Input=k3');
     await show.run('show:welcome');
     expect(v.overlays[1]).toBe('1');
@@ -152,13 +152,13 @@ describe('show control', () => {
     expect(show.sailors().map((x) => x.number)).toEqual(['3', '12', '']);
     v.calls.length = 0;
     await show.run('sailor:2');
-    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Ana RUIZ');
+    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Ana Ruiz');
     await show.run('shirt:3');
-    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Jordi XAMMAR');
+    expect(v.calls).toContain('?Function=SetText&Input=k8&SelectedName=Top text.Text&Value=Jordi Xammar');
 
     v.calls.length = 0;
     await show.run('lineup:1');
-    expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitSURNAME.Text&Value=RUIZ');
+    expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitSURNAME.Text&Value=Ruiz');
     expect(v.calls).toContain('?Function=SetText&Input=k6&SelectedName=PitNUMBER.Text&Value=12');
   });
 
@@ -222,7 +222,7 @@ describe('show control', () => {
     expect(v.calls).toContain(`?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=${repeatLoop('BOAT CAPSIZED - ALL CREW SAFE I ')}`);
     // THANKS FOR WATCHING is the fixed ticker
     await show.run('ticker:thanks');
-    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=THANKS FOR WATCHING'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=Thanks for watching'))).toBe(true);
 
     // a board gets General graphics at the press
     const w = listGraphicSets(s.db, ev, 'welcome')[0];
@@ -263,23 +263,23 @@ describe('show control', () => {
     await show.run('show:lineup5');
     // eight sailors: 4 + 4, bow first, each four on the centred places 6-9 (1-5 empty)
     const name = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
-    expect(v.calls).toContain(name(6, 'G. BOW'));
-    expect(v.calls).toContain(name(8, 'F. GRI'));
-    expect(v.calls).toContain(name(9, 'E. TR1'));
+    expect(v.calls).toContain(name(6, 'G. Bow'));
+    expect(v.calls).toContain(name(8, 'F. Gri'));
+    expect(v.calls).toContain(name(9, 'E. Tr1'));
     expect(v.calls).toContain(name(1, ''));
     expect(v.calls).toContain('?Function=SetText&Input=k9&SelectedName=POSITION 6.Text&Value=7 | BOW');
     expect(v.overlays[1]).toBe('9');
     v.calls.length = 0;
     await show.run('lultswap');
     // the four toward the stern on 6-9, no overlay change
-    expect(v.calls).toContain(name(6, 'D. TR2'));
-    expect(v.calls).toContain(name(7, 'C. MAI'));
-    expect(v.calls).toContain(name(8, 'B. HEL'));
-    expect(v.calls).toContain(name(9, 'A. TAC'));
+    expect(v.calls).toContain(name(6, 'D. Tr2'));
+    expect(v.calls).toContain(name(7, 'C. Mai'));
+    expect(v.calls).toContain(name(8, 'B. Hel'));
+    expect(v.calls).toContain(name(9, 'A. Tac'));
     expect(v.calls.some((c) => c.includes('Overlay'))).toBe(false);
     v.calls.length = 0;
     await show.run('lultswap');
-    expect(v.calls).toContain(name(6, 'G. BOW'));
+    expect(v.calls).toContain(name(6, 'G. Bow'));
     await show.run(`lult:${show.boat(show.state.boat).code}`);
     expect(v.overlays[1]).toBe('');
     await expect(show.run('lultswap')).rejects.toThrow(/LINEUP LT/);
@@ -525,7 +525,7 @@ describe('show control', () => {
     const people = (await show.view()).pages.find((p) => p.name === 'PEOPLE')!;
     expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA', 'BEN\\nLEE', '']);
     await show.run('person:2');
-    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=Ben LEE`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=BEN lee`);
     // only the group whose input is in vMix gets a COMPARE key
     const compare = show.pages().find((p) => p.name === 'COMPARE')!;
     expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k2}`]);
@@ -544,7 +544,7 @@ describe('show control', () => {
     // the group's data into its own input, then in; the same key again takes it out
     const n1 = v.num(`ssl_compare_${k1}`);
     expect(await show.run(`compare:${k1}`)).toMatchObject({ in: 'compare' });
-    expect(v.calls).toContain(`?Function=SetText&Input=k${n1}&SelectedName=1 COUNTRY.Text&Value=TEAM ESP`);
+    expect(v.calls).toContain(`?Function=SetText&Input=k${n1}&SelectedName=1 COUNTRY.Text&Value=Team ESP`);
     expect(v.overlays[1]).toBe(n1);
     await show.run(`compare:${k1}`);
     expect(v.overlays[1]).toBe('');
@@ -581,11 +581,11 @@ describe('show control', () => {
     expect(show.pages().find((p) => p.name === 'COMPARE')!.keys[0].map((x) => x?.action)).toContain('compare:LCR');
     await show.run('results:LCR');
     expect(v.overlays[1]).toBe(v.num('ssl_results_LCR'));
-    expect(v.vals.get(`${v.num('ssl_results_LCR')}|COUNTRY1.Text`)).toBe('TEAM BRA');
+    expect(v.vals.get(`${v.num('ssl_results_LCR')}|COUNTRY1.Text`)).toBe('Team BRA');
     await show.run('results:LCR');
     await show.run('compare:LCR');
     expect(v.overlays[1]).toBe(v.num('ssl_compare_LCR'));
-    expect(v.vals.get(`${v.num('ssl_compare_LCR')}|2 COUNTRY.Text`)).toBe('TEAM ESP');
+    expect(v.vals.get(`${v.num('ssl_compare_LCR')}|2 COUNTRY.Text`)).toBe('Team ESP');
     // ESP stays in its own group
     expect(getSetDetail(s.db, stage.id).fleets[0].positions[0]).toBe(teams[0]);
   });
@@ -685,11 +685,11 @@ describe('show control', () => {
     // picking the group (top of the dashboard) is enough: results and comparison follow it
     const r = await show.syncData();
     expect(r.sent).toBeGreaterThan(5);
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=COUNTRY1.Text&Value=TEAM ESP');
-    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Group A.Text&Value=FLEET 1');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=COUNTRY1.Text&Value=Team ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=Group A.Text&Value=Fleet 1');
     expect(v.calls).toContain('?Function=SetText&Input=k1&SelectedName=LOCALIZATION.Text&Value=RIO DE JANEIRO, BRAZIL');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=TEAM ESP');
-    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=TRITTEL');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 COUNTRY.Text&Value=Team ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 CPT SURNAME.Text&Value=Trittel');
     expect(v.calls.some((c) => c.includes('SelectedName=DateText.Text'))).toBe(true);
     expect(v.calls.find((c) => c.includes('SelectedName=bar1.Source'))).toMatch(/ESP_bar_results\.png$/);
     expect(v.calls.find((c) => c.includes('SelectedName=1 BG.Source'))).toMatch(/ESP_panel_left\.png$/);
@@ -705,10 +705,10 @@ describe('show control', () => {
     v.calls.length = 0;
     // the lineup: GT's cut names and the trimmers numbered 1 and 2
     await show.run('lineup:ESP');
-    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer1NAME.Text&Value=JOAN');
-    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer2SURNAME.Text&Value=MARTINEZ');
-    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TacticianSURNAM.Text&Value=TRITTEL');
-    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TeamName.Text&Value=TEAM ESP');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer1NAME.Text&Value=Joan');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=Trimmer2SURNAME.Text&Value=Martinez');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TacticianSURNAM.Text&Value=Trittel');
+    expect(v.calls).toContain('?Function=SetText&Input=k3&SelectedName=TeamName.Text&Value=Team ESP');
     // the box behind each photo in the team's square; the big background stays
     expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_lineup_photo_left\.png$/);
     expect(v.calls.find((c) => c.includes('SelectedName=Trimmer1BG.Source'))).toMatch(/ESP_lineup_photo_left\.png$/);
@@ -736,14 +736,14 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.run('boat:2');
     await show.run('sailorof:ESP/Pit');
-    expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('Value=Ana Ruiz'))).toBe(true);
     await show.run('teamlt:ESP');
-    expect(v.calls.some((c) => c.includes('Value=TEAM ESP') || c.includes('Value=ESP'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('Value=Team ESP') || c.includes('Value=ESP'))).toBe(true);
     // a lower third on air: the next sailor is a data change, it is not taken out first (that made the next one wait)
     v.calls.length = 0;
     await show.run('sailorof:ESP/Pit');
     expect(v.calls.some((c) => c.includes('OverlayInput1Out'))).toBe(false);
-    expect(v.calls.some((c) => c.includes('Value=Ana RUIZ'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('Value=Ana Ruiz'))).toBe(true);
   });
 
   it('fills the Weather layers named as the fields of the Weather tab, also when the data changes', async () => {
@@ -758,7 +758,7 @@ describe('show control', () => {
     setWeather(s.db, { wind_speed: '15' });
     await show.syncData();
     expect(v.calls).toContain(w('Wind.Text', '15'));
-    expect(personName({ name: 'jAN-erik', surname: 'van Dijk' })).toBe('Jan-Erik VAN DIJK');
+    expect(personName({ name: 'jAN-erik', surname: 'van Dijk' })).toBe('jAN-erik van Dijk'); // as typed
   });
 
   it('a crew of ten with a floater: Lineup LT 5 + 5 from the bow, the numbered board for ten', async () => {
@@ -773,25 +773,25 @@ describe('show control', () => {
     const code = show.boat(show.state.boat).code;
     await show.run(`lult:${code}`);
     const lt = (n: number, val: string) => `?Function=SetText&Input=k9&SelectedName=NAME ${n}.Text&Value=${val}`;
-    expect(v.calls).toContain(lt(1, 'F. BOW'));
-    expect(v.calls).toContain(lt(4, 'F. FLOATER'));
-    expect(v.calls).toContain(lt(5, 'F. GRINDER'));
+    expect(v.calls).toContain(lt(1, 'F. Bow'));
+    expect(v.calls).toContain(lt(4, 'F. Floater'));
+    expect(v.calls).toContain(lt(5, 'F. Grinder'));
     v.calls.length = 0;
     await show.run('lultswap');
-    expect(v.calls).toContain(lt(1, 'F. TRIMMER'));
-    expect(v.calls).toContain(lt(5, 'F. TACTICIAN'));
+    expect(v.calls).toContain(lt(1, 'F. Trimmer'));
+    expect(v.calls).toContain(lt(5, 'F. Tactician'));
     v.calls.length = 0;
     await show.run(`lineup:${code}`);
     const k = v.num('ssl_lineup_10');
     const set = (input: string, f: string, val: string) => `?Function=${f.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=k${input}&SelectedName=${f}&Value=${val}`;
-    for (const [f, val] of [['BowSURNAME.Text', 'BOW'], ['BowPosition.Text', 'BOW'], ['FloaterSURNAME.Text', 'FLOATER'], ['FloaterPOSITION.Text', 'FLOATER'], ['TrimmerSURNAME.Text', 'TRIMMER'],
-      ['Trimmer1SURNAME.Text', 'TRIMMER1'], ['Trimmer1POSITIO.Text', 'TRIMMER'], ['TacticianSURNAM.Text', 'TACTICIAN'], ['TacticianNAME.Text', 'FTACTICIAN'], ['HelmNUMBER.Text', '2']]) expect(v.calls).toContain(set(k, f, val));
+    for (const [f, val] of [['BowSURNAME.Text', 'Bow'], ['BowPosition.Text', 'BOW'], ['FloaterSURNAME.Text', 'Floater'], ['FloaterPOSITION.Text', 'FLOATER'], ['TrimmerSURNAME.Text', 'Trimmer'],
+      ['Trimmer1SURNAME.Text', 'Trimmer1'], ['Trimmer1POSITIO.Text', 'TRIMMER'], ['TacticianSURNAM.Text', 'Tactician'], ['TacticianNAME.Text', 'FTactician'], ['HelmNUMBER.Text', '2']]) expect(v.calls).toContain(set(k, f, val));
     // eight (no Midbow, no Floater) on the numbered board: the two trimmers side by side, the grinder behind them
     saveLineup(s.ctx, ev, teams[0], { rows: [{ slot: 'Midbow', firstName: '', lastName: '', number: '' }, { slot: 'Floater', firstName: '', lastName: '', number: '' }] });
     v.calls.length = 0;
     await show.run(`lineup:${code}`);
     const k8 = v.num('ssl_lineup_8');
-    for (const [n, val] of [[1, 'BOW'], [2, 'PIT'], [3, 'TRIMMER'], [4, 'TRIMMER1'], [5, 'GRINDER'], [6, 'MAIN'], [7, 'HELM'], [8, 'TACTICIAN']] as const) expect(v.calls).toContain(set(k8, `S${n}SURNAME.Text`, val));
+    for (const [n, val] of [[1, 'Bow'], [2, 'Pit'], [3, 'Trimmer'], [4, 'Trimmer1'], [5, 'Grinder'], [6, 'Main'], [7, 'Helm'], [8, 'Tactician']] as const) expect(v.calls).toContain(set(k8, `S${n}SURNAME.Text`, val));
   });
 
   it('keeps key edits by page name; old ones by position move once, never onto the LINEUP LT keys', async () => {

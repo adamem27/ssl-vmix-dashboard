@@ -701,7 +701,7 @@ export class Show {
     } else if (g.id === 'bug') {
       // BUG key without a version: the announcement shown last, else the first one
       const a = (this.state.bugId && this.announcement(this.state.bugId)) || this.announcements()[0];
-      if (a) { await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data)); this.patchState({ bug: (a.data.text || a.name).toUpperCase(), bugId: a.id }); }
+      if (a) { await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data)); this.patchState({ bug: (a.data.text || a.name), bugId: a.id }); }
     } else {
       // General graphics straight into the title, so a change made a moment ago is on air without waiting for Excel
       const e = activeEvent(this.ctx.db);
@@ -825,8 +825,8 @@ export class Show {
     for (let i = 1; i <= 9; i++) {
       const s = five ? (i <= 5 ? crew[i - 1] : undefined) : (i > 5 ? crew[i - 6] : undefined);
       // I. SLADDER and 5 | MIDBOW
-      f.set(`NAME ${i}.Text`, s ? [s.firstName.trim() ? `${s.firstName.trim()[0].toUpperCase()}.` : '', s.lastName.toUpperCase()].filter(Boolean).join(' ') : '');
-      f.set(`POSITION ${i}.Text`, s ? [s.number, s.position.toUpperCase()].filter(Boolean).join(' | ') : '');
+      f.set(`NAME ${i}.Text`, s ? [s.firstName.trim() ? `${s.firstName.trim()[0].toUpperCase()}.` : '', s.lastName].filter(Boolean).join(' ') : '');
+      f.set(`POSITION ${i}.Text`, s ? [s.number, s.position].filter(Boolean).join(' | ') : '');
       f.set(`PHOTO ${i}.Source`, s?.photo ?? '');
     }
     const t = listTeams(this.ctx).find((x) => x.id === teamId);
@@ -948,7 +948,7 @@ export class Show {
     const withPhoto = photo ? this.resolve({ ...g, inputs: g.inputs.slice(0, 1) }, snap.inputs) : undefined;
     const input = withPhoto ?? this.resolve({ ...g, inputs: g.inputs.slice(1) }, snap.inputs) ?? this.need(g, snap.inputs);
     const lf = getLtConfig(this.ctx.db).fields;
-    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, (p.role || '').toUpperCase()], [`${lf.photo}.Source`, photo]]), null);
+    const f = this.lt.fitToTitle(input, new Map<string, string>([[`${lf.top}.Text`, personName(p)], [`${lf.bottom}.Text`, p.role || ''], [`${lf.photo}.Source`, photo]]), null);
     // on-air swap of the same title animates; a different title comes in on the overlay
     await this.set(input, f);
     await this.bringIn({ ...g }, input, snap);
@@ -965,7 +965,7 @@ export class Show {
     const a = team.assets as Record<string, Asset>;
     const crew = new Map(crewOf(this.ctx, b.id).map((s) => [s.slot, s]));
     const f = new Map<string, string>([['Flag.Source', img(a.flag_big)], ['Emblem.Source', img(a.emblem_light)],
-      ['TeamName.Text', (lu.teamName || team.name).toUpperCase()], ['LineupText.Text', lu.title]]);
+      ['TeamName.Text', lu.teamName || team.name], ['LineupText.Text', lu.title]]);
     // titles that number the trimmers 1 and 2 (Trimmer1NAME = Trimmer 1, Trimmer2NAME = Trimmer 2, TrimmerPHOTO1/2)
     const twoTrimmers = input.fields.some((x) => /^Trimmer2/i.test(x));
     const names = (d: ReturnType<typeof slotDefs>[number]) => {
@@ -977,10 +977,10 @@ export class Show {
       const r = lu.rows.find((x) => x.slot === d.key);
       const s = crew.get(d.key);
       const fl = names(d);
-      f.set(`${fl.name}.Text`, (r?.firstName ?? '').toUpperCase());
-      f.set(`${fl.surname}.Text`, (r?.lastName ?? '').toUpperCase());
+      f.set(`${fl.name}.Text`, r?.firstName ?? '');
+      f.set(`${fl.surname}.Text`, r?.lastName ?? '');
       f.set(`${fl.number}.Text`, r?.number ?? '');
-      f.set(`${fl.position}.Text`, (r?.position ?? '').toUpperCase());
+      f.set(`${fl.position}.Text`, r?.position ?? '');
       f.set(`${fl.photo}.Source`, s?.photo ?? '');
     }
     // boards with numbered places (Team_lineup_8/9/10: S1 = bow … S10 = stern): the crew from the bow, whoever sails
@@ -990,10 +990,10 @@ export class Show {
       for (let n = 1; n <= 12; n++) {
         const s = crewList[n - 1];
         const r = s ? rows.get(s.slot) : undefined;
-        f.set(`S${n}NAME.Text`, (s?.firstName ?? '').toUpperCase());
-        f.set(`S${n}SURNAME.Text`, (s?.lastName ?? '').toUpperCase());
+        f.set(`S${n}NAME.Text`, s?.firstName ?? '');
+        f.set(`S${n}SURNAME.Text`, s?.lastName ?? '');
         f.set(`S${n}NUMBER.Text`, s?.number ?? '');
-        f.set(`S${n}POSITION.Text`, ((r?.position || s?.position) ?? '').toUpperCase());
+        f.set(`S${n}POSITION.Text`, (r?.position || s?.position) ?? '');
         f.set(`S${n}PHOTO.Source`, s?.photo ?? '');
       }
     }
@@ -1023,7 +1023,7 @@ export class Show {
   private bugFields(input: VmixInput, data: Record<string, string>) {
     const f = new Map<string, string>();
     const text = this.textField(input, /text/i);
-    if (text) f.set(text, (data.text ?? '').toUpperCase());
+    if (text) f.set(text, data.text ?? '');
     const pics = input.fields.filter((x) => x.endsWith('.Source') && !/background|\bbg\b|_bg|bar/i.test(x));
     const icon = [/race ?flag/i, /^icon\./i, /flag/i, /icon/i, /star/i, /logo/i].map((re) => pics.find((x) => re.test(x))).find(Boolean);
     if (icon) f.set(icon, imagePath(this.ctx.db, this.ctx.assetsDir, data.icon));
@@ -1033,7 +1033,7 @@ export class Show {
   /** The bug's data by the Announcement bug GTZIP's own field names (TEXT; the flag as Race flag or icon). */
   private bugBlind(data: Record<string, string>) {
     const icon = imagePath(this.ctx.db, this.ctx.assetsDir, data.icon);
-    return new Map([['TEXT.Text', (data.text ?? '').toUpperCase()], ['Race flag.Source', icon], ['icon.Source', icon]]);
+    return new Map([['TEXT.Text', data.text ?? ''], ['Race flag.Source', icon], ['icon.Source', icon]]);
   }
 
   /** Announcement bug: its text and icon go into the title, then it comes in; the same key again takes it out. */
@@ -1052,7 +1052,7 @@ export class Show {
       return { out: 'bug' };
     }
     const used = (await this.setOrExplain(input, g, this.bugFields(input, a.data), () => this.bugBlind(a.data))) ?? input;
-    const text = (a.data.text || a.name).toUpperCase();
+    const text = a.data.text || a.name;
     this.patchState({ bug: text, bugId: a.id });
     await this.bringIn(g, used, snap);
     return { in: 'bug', text };

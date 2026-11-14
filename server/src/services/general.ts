@@ -84,7 +84,7 @@ export function deleteScheduleItem(db: DB, id: string) {
 /** Jan-erik → Jan-Erik: a capital at the start of each part of the name, the rest small. */
 export const titleCase = (v: string) => v.trim().toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
 /** How a person's name is shown: Name in title case, SURNAME in capitals (lt_comm_photo). */
-export const personName = (p: { name: string; surname?: string }) => [titleCase(p.name), (p.surname ?? '').trim().toUpperCase()].filter(Boolean).join(' ');
+export const personName = (p: { name: string; surname?: string }) => [p.name.trim(), (p.surname ?? '').trim()].filter(Boolean).join(' ');
 export const PERSON_ROLES = ['Host commentator', 'Guest commentator', 'On-water commentator', 'Guest', 'Other'];
 const PERSON_FIELDS = ['name', 'surname', 'role', 'language', 'title'] as const;
 type PersonInput = Partial<Record<(typeof PERSON_FIELDS)[number], string>>;

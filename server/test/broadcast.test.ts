@@ -35,12 +35,12 @@ describe('general graphics versions', () => {
     gs.seedGraphicSets(db, eventId);
     const t = (p: string) => gs.listGraphicSets(db, eventId, 'ticker').find((x) => x.data.preset === p)!;
     gs.updateGraphicSet(db, t('warning').id, { data: { race: '1', group: 'h', time: '10:00' } });
-    expect(gs.tickerText(t('warning').data)).toBe(gs.repeatLoop('RACE 1 OF GROUP H WARNING SIGNAL AT 10:00 (GMT-3) I '));
+    expect(gs.tickerText(t('warning').data)).toBe(gs.repeatLoop('Race 1 of Group h warning signal at 10:00 (GMT-3) I '));
     // repeated so the ticker runs on: 3× and 600 characters at least
     expect(gs.repeatLoop('A I ')).toBe('A I '.repeat(150));
     expect(gs.repeatLoop('x'.repeat(400))).toBe('x'.repeat(1200));
-    expect(gs.tickerMessages(t('thanks').data)).toEqual(['THANKS FOR WATCHING - JOIN US TOMORROW FOR THE 2ND DAY OF THE SSL GOLD CUP PAN-AMERICAN QUALIFIERS']);
-    expect(gs.tickerMessages(t('delay').data, { group: 'I', race: '2' })).toEqual(['WE ARE BACK SOON - RACE 2 OF GROUP I IS DELAYED DUE TO WEATHER CONDITIONS']);
+    expect(gs.tickerMessages(t('thanks').data)).toEqual(['Thanks for watching - join us TOMORROW for the 2ND DAY of the SSL GOLD CUP PAN-AMERICAN QUALIFIERS']);
+    expect(gs.tickerMessages(t('delay').data, { group: 'I', race: '2' })).toEqual(['We are back soon - Race 2 of Group I is delayed due to WEATHER CONDITIONS']);
     expect(() => gs.deleteGraphicSet(db, t('custom').id)).toThrow(/fixed/);
     gs.seedGraphicSets(db, eventId);
     expect(gs.listGraphicSets(db, eventId, 'ticker').filter((x) => x.data.preset)).toHaveLength(4); // not doubled
@@ -52,7 +52,7 @@ describe('general graphics versions', () => {
   });
 
   it('names groups as the broadcast does', () => {
-    expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['Group H', 'Group A', 'Group B', 'Group C', 'FINAL', 'PETIT FINAL']);
+    expect(['QS H', 'R1 A', 'EF b', 'Group C', 'Final', 'Petit Final'].map(groupLabel)).toEqual(['Group H', 'Group A', 'Group B', 'Group C', 'Final', 'Petit Final']);
     // a results title saved as the short name shows as the group; other titles stay as typed
     expect(['QS H', 'qs i', 'Final day'].map(groupTitle)).toEqual(['Group H', 'Group I', 'Final day']);
   });
@@ -95,7 +95,7 @@ describe('line-ups', () => {
     lu.saveLineup(ctx, eventId, teamId, { rows: [{ slot: 'Pit', captain: true }] });
     lu.saveLineup(ctx, eventId, teamId, { rows: [{ slot: 'Helm', captain: true }] });
     const row = lu.lineupSheetRows(ctx, eventId)[0];
-    expect(row).toMatchObject({ TeamName: 'SPAIN', HelmSURNAME: 'BERMUDEZ', HelmNUMBER: '1', TacticianSURNAM: 'GONZALEZ', Trimmer1POSITIO: 'TRIMMER', CaptainSlot: 'Helm', PitCAPTAIN: '' });
+    expect(row).toMatchObject({ TeamName: 'Spain', HelmSURNAME: 'Bermudez', HelmNUMBER: '1', TacticianSURNAM: 'Gonzalez', Trimmer1POSITIO: 'TRIMMER', CaptainSlot: 'Helm', PitCAPTAIN: '' });
     expect(lu.syncLineupFromDeclaration(ctx, eventId, teamId, '2026-11-20')).toMatchObject({ synced: false });
   });
 

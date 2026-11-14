@@ -34,7 +34,7 @@ describe('results to vMix', () => {
     const set = new Map(calls.slice(1).map((u) => { const q = new URL(u).searchParams; expect(q.get('Input')).toBe('k-res'); return [q.get('SelectedName')!, q.get('Value')!]; }));
     expect(set.get('SUBTITLE.Text')).toBe('Group A');
     expect(set.has('TITLE.Text')).toBe(false); // the event name stays as designed
-    expect([set.get('TEAM 1.Text'), set.get('POINTS 1.Text'), set.get('TEAM 2.Text'), set.get('R1 2.Text')]).toEqual(['TEAM IND', '8', 'TEAM BRN', '3']);
+    expect([set.get('TEAM 1.Text'), set.get('POINTS 1.Text'), set.get('TEAM 2.Text'), set.get('R1 2.Text')]).toEqual(['Team IND', '8', 'Team BRN', '3']);
     expect([set.get('POS 3.Text'), set.get('TEAM 3.Text'), set.get('POINTS 3.Text')]).toEqual(['', '', '']);
     expect(set.has('FLAG 1.Source')).toBe(true);
     expect(set.get('H2.Text')).toBe('R2');

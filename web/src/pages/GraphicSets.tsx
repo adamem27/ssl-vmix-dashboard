@@ -11,13 +11,13 @@ interface TickerAuto { group?: string; race?: string }
 export const useGraphicSets = () => useQuery({ queryKey: ['graphic-sets'], queryFn: () => api.get<{ kinds: GKind[]; sets: GSet[]; auto?: TickerAuto }>('/api/graphic-sets') });
 
 // the same sentences as the server builds (graphicSets.tickerMessages), for the preview
-const up = (s: string | undefined) => (s ?? '').trim().toUpperCase();
+const up = (s: string | undefined) => (s ?? '').trim(); // as typed, like the server
 const tickerMessages = (d: Record<string, string>, auto: TickerAuto = {}): string[] => {
   const group = up(d.group) || up(auto.group) || '?', race = up(d.race) || up(auto.race) || '?';
   switch (d.preset) {
-    case 'warning': return [`RACE ${race} OF GROUP ${group} WARNING SIGNAL AT ${up(d.time) || '?'}${d.timezone?.trim() ? ` (${up(d.timezone)})` : ''}`];
-    case 'thanks': return [`THANKS FOR WATCHING - JOIN US ${up(d.when) || 'TOMORROW'} FOR THE ${up(d.day) || '2ND DAY'} OF THE ${up(d.event)}`];
-    case 'delay': return [`WE ARE BACK SOON - RACE ${race} OF GROUP ${group} IS DELAYED DUE TO ${up(d.reason) || 'WEATHER CONDITIONS'}`];
+    case 'warning': return [`Race ${race} of Group ${group} warning signal at ${up(d.time) || '?'}${d.timezone?.trim() ? ` (${up(d.timezone)})` : ''}`];
+    case 'thanks': return [`Thanks for watching - join us ${up(d.when) || 'tomorrow'} for the ${up(d.day) || '2nd day'} of the ${up(d.event)}`];
+    case 'delay': return [`We are back soon - Race ${race} of Group ${group} is delayed due to ${up(d.reason) || 'weather conditions'}`];
     case 'custom': return d.text?.trim() ? [d.text.trim()] : [];
     default: return (d.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   }
