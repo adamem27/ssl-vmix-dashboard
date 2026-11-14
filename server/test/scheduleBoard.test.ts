@@ -8,6 +8,7 @@ import { createFleet, createSet, placeTeam } from '../src/services/fleets.js';
 import { createTeam } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
 import { encodePng } from '../src/services/png.js';
+import { setDayOverride, todayIn } from '../src/services/dates.js';
 
 const day = '2026-11-11';
 function board() {
@@ -74,6 +75,24 @@ describe('day schedule board', () => {
     setScheduleOptions(s.db, { showTime: false });
     // rows that are not in the schedule are still emptied
     expect(f.get('FLAG 17 C.Source')).toBe('');
+  });
+
+  it('a schedule row typed QR takes the Qualification Race group; the rows follow the day picked at the top', () => {
+    const s = setup();
+    const ev = activeEvent(s.db).id;
+    const set = createSet(s.db, ev, 'Final day');
+    const qr = createFleet(s.db, set, 'Qualification Race', 4);
+    const teamId = createTeam(s.db, { name: 'BRA', code: 'BRA' });
+    saveUpload(s.ctx, 'team', teamId, 'flag_small', encodePng(4, 4, () => [0, 0, 255, 255]), 'BRA.png');
+    placeTeam(s.db, set, { teamId, fleetId: qr, position: 2 });
+    createScheduleItem(s.db, ev, { date: '2026-11-15', time: '13:00', race: '3', fleet: 'QR' });
+    setScheduleOptions(s.db, { showTime: false });
+    setDayOverride('2026-11-15');
+    try {
+      const f = showDataFields(s.ctx, 'schedule', { eventId: ev, today: todayIn('America/Sao_Paulo'), auto: { enabled: false } as never })!;
+      expect(f.get('FLAG 2 C.Source')).toMatch(/BRA/);
+      expect(f.get('FLAG 1 C.Source')).toBe(unknownFlagPath(s.ctx));
+    } finally { setDayOverride(''); }
   });
 
   it('highlights the row picked as the next race, only on its day', () => {

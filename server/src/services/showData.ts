@@ -6,7 +6,7 @@
  * Only fields the title has are set (Show.set), so one map serves every variant of a title.
  */
 import { AssetCtx, listAssets } from './assets.js';
-import { getSetDetail, listSets } from './fleets.js';
+import { getSetDetail, isLastChance, isQualificationRace, listSets } from './fleets.js';
 import { getScheduleOptions, getWeather, listSchedule } from './general.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -108,7 +108,10 @@ export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
     const label = groupLabel(s.fleet);
     const key = groupKey(s.fleet);
     // same name first, then the same label; a group with teams placed before an empty one of the same name
-    const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key)];
+    // (the Qualification Race / Last Chance Race also by their short names: QR, LCR)
+    const kind = (n: string | null | undefined) => (isQualificationRace(n) ? 'qr' : isLastChance(n) ? 'lcr' : '');
+    const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key),
+      ...(kind(s.fleet) ? fleets.filter((x) => kind(x.name) === kind(s.fleet)) : [])];
     const f = same.find((x) => x.filled > 0) ?? same[0];
     const race = (s.race ?? '').trim();
     // no group of that name yet: four places with no team
