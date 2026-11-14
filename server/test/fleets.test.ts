@@ -52,6 +52,32 @@ describe('fleets', () => {
     expect(() => db.prepare('INSERT INTO fleet_slots (fleet_id, fleet_set_id, position, team_id) VALUES (?, ?, 4, ?)').run(f1, setId, teams[0])).toThrow();
   });
 
+  it('the Qualification Race takes teams of the stage\'s groups, which stay in their own group (also with a Last Chance Race)', () => {
+    const { db, teams, setId, f1, f2 } = world();
+    const qr = fleets.createFleet(db, setId, 'Qualification Race');
+    const lcr = fleets.createFleet(db, setId, 'Last Chance Race');
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: f1, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[1], fleetId: f2, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: qr, position: 1 });
+    fleets.placeTeam(db, setId, { teamId: teams[1], fleetId: qr, position: 2 });
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: lcr, position: 1 });
+    let d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[0].positions[0]).toBe(teams[0]);
+    expect(d.fleets[1].positions[0]).toBe(teams[1]);
+    expect(d.fleets[2].positions.slice(0, 2)).toEqual([teams[0], teams[1]]);
+    expect(d.fleets[3].positions[0]).toBe(teams[0]);
+    // moving inside the Qualification Race still moves
+    fleets.placeTeam(db, setId, { teamId: teams[0], fleetId: qr, position: 3 });
+    d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[2].positions.slice(0, 3)).toEqual([null, teams[1], teams[0]]);
+    expect(d.fleets[0].positions[0]).toBe(teams[0]);
+    // out of the Qualification Race only
+    fleets.unassignTeam(db, setId, teams[1], qr);
+    d = fleets.getSetDetail(db, setId);
+    expect(d.fleets[1].positions[0]).toBe(teams[1]);
+    expect(d.fleets[2].positions.includes(teams[1])).toBe(false);
+  });
+
   it('fleet size can be changed per fleet; shrinking needs the extra places empty', () => {
     const { db, teams, setId, f1, f2 } = world();
     fleets.setFleetSize(db, f1, 6);

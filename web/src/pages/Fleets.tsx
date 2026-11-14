@@ -37,8 +37,8 @@ export function FleetsPage() {
   // with a stage picked only its teams are offered, unless “all teams” is ticked (needed to build a stage)
   const offered = (teams.data ?? []).filter((t) => allTeams || stage.inStage(t.id) || assigned.has(t.id));
   const pool = offered.filter((t) => !assigned.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
-  // a team also in the Last Chance Race: its own group first
-  const isLcr = (name: string) => /last\s*chance|\blcr\b/i.test(name);
+  // a team also in the Last Chance / Qualification Race: its own group first
+  const isLcr = (name: string) => /last\s*chance|\blcr\b|qualification\s*race|\bqr\b/i.test(name);
   const locate = (teamId: string) => {
     const found = (d?.fleets ?? []).flatMap((f) => { const i = f.positions.indexOf(teamId); return i >= 0 ? [{ fleetId: f.id, position: i + 1, fleetName: f.name }] : []; });
     return found.find((x) => !isLcr(x.fleetName)) ?? found[0] ?? null;
