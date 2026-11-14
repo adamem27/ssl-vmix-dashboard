@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ink-50: 244 246 249;
+  --ink-100: 230 234 240;
+  --ink-200: 201 209 220;
+  --ink-300: 163 175 191;
+  --ink-400: 122 136 156;
+  --ink-500: 91 104 123;
+  --ink-600: 67 78 95;
+  --ink-700: 50 59 73;
+  --ink-800: 35 42 53;
+  --ink-850: 27 33 42;
+  --ink-900: 21 26 33;
+  --ink-950: 14 18 23;
+}
+/* light theme (commentator screen): the ink scale mirrored, and the bright accents made darker to read on white */
+html.theme-light {
+  --ink-50: 14 18 23;
+  --ink-100: 21 26 33;
+  --ink-200: 35 42 53;
+  --ink-300: 59 69 84;
+  --ink-400: 79 91 109;
+  --ink-500: 107 119 136;
+  --ink-600: 138 150 167;
+  --ink-700: 179 189 202;
+  --ink-800: 211 217 225;
+  --ink-850: 227 231 236;
+  --ink-900: 255 255 255;
+  --ink-950: 238 241 245;
+  color-scheme: light;
+}
+html.theme-light .text-sky-300 { color: #0369a1; }
+html.theme-light .text-amber-200, html.theme-light .text-amber-300 { color: #b45309; }
+html.theme-light .text-amber-400 { color: #d97706; }
+html.theme-light .text-emerald-300 { color: #047857; }
+html.theme-light .text-red-300 { color: #b91c1c; }
+html.theme-light .text-accent-200 { color: #0369a1; }
+html.theme-light .bg-sky-950\/40 { background-color: rgb(224 242 254); }
+html.theme-light .bg-red-950\/50, html.theme-light .bg-red-950\/70 { background-color: rgb(254 226 226); }
+html.theme-light .bg-emerald-950\/60, html.theme-light .bg-emerald-950\/70 { background-color: rgb(209 250 229); }
+html.theme-light .bg-amber-500\/10 { background-color: rgb(254 243 199); }
+
 @layer base {
   html { color-scheme: dark; }
   /* Windows draws native dropdown lists white unless the options get their own colours. */

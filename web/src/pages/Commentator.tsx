@@ -1,12 +1,15 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import React, { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
 import { cx, Empty, ErrorBox, fmtDate, Loading, todayIn } from '../components/ui';
 import { useStage } from '../components/StagePicker';
 import { groupTitle } from '../../../server/src/services/groupNames';
+import { COUNTRY_FACTS } from '../countryFacts';
 
 const LS_KEY = 'commentator.v1';
+const readLs = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const writeLs = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } };
 function loadPrefs(): { setId?: string; fleetId?: string } {
   try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '{}'); } catch { return {}; }
 }
@@ -45,6 +48,12 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const [setId, setSetId] = useState(''); // picked on this page; otherwise the current stage, then the last one used
   const [fleetId, setFleetId] = useState(prefs.fleetId ?? '');
   const [info, setInfo] = useState(false);
+  const [focus, setFocus] = useState<string | null>(null); // a team opened on its own, in very large type
+  const [light, setLight] = useState(() => readLs('commentator.light') === '1');
+  const [scale, setScale] = useState(() => { const v = Number(readLs('commentator.scale')); return v >= 0.6 && v <= 2 ? v : 1; });
+  useEffect(() => { writeLs('commentator.light', light ? '1' : '0'); document.documentElement.classList.toggle('theme-light', light); return () => document.documentElement.classList.remove('theme-light'); }, [light]);
+  useEffect(() => writeLs('commentator.scale', String(scale)), [scale]);
+  const zoom = (d: number) => setScale((v) => Math.round(Math.min(2, Math.max(0.6, v + d)) * 10) / 10);
 
   const sets = useQuery({ queryKey: ['fleet-sets'], queryFn: () => api.get<FleetSetSummary[]>('/api/fleet-sets') });
   const stage = useStage();
@@ -62,13 +71,23 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'i' || e.key === 'I') { setInfo((v) => !v); return; }
-      if (e.key === 'Escape') { setInfo(false); return; }
+      if (e.key === 'l' || e.key === 'L') { setLight((v) => !v); return; }
+      if (e.key === '+' || e.key === '=') { zoom(0.1); return; }
+      if (e.key === '-' || e.key === '_') { zoom(-0.1); return; }
+      if (e.key === '0') { setScale(1); return; }
+      if (e.key === 'Escape') { if (info) setInfo(false); else setFocus(null); return; }
+      if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && focus) {
+        const ids = (fleets.find((f) => f.id === fleetId) ?? fleets[0])?.positions.filter((t): t is string => !!t) ?? [];
+        const at = ids.indexOf(focus);
+        if (at >= 0 && ids.length) setFocus(ids[(at + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length]);
+        return;
+      }
       const n = Number(e.key);
-      if (n >= 1 && n <= fleets.length) setFleetId(fleets[n - 1].id);
+      if (n >= 1 && n <= fleets.length) { setFleetId(fleets[n - 1].id); setFocus(null); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [fleets]);
+  }, [fleets, fleetId, focus, info]);
 
   const teamById = new Map((data.data?.teams ?? []).map((t) => [t.id, t]));
   const x = extra.data;
@@ -78,14 +97,16 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const pickFleetByName = (name: string) => { const f = fleets.find((ff) => norm(ff.name) === norm(name) || norm(name).endsWith(norm(ff.name))); if (f) setFleetId(f.id); };
 
   const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
+  const focused = focus ? groupTeams.find((t) => t.id === focus) : undefined;
   // Sized for a 1920×1080 screen with the browser bars: everything fits the window; a long crew list scrolls inside its card.
   return (
-    <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')}>
+    <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')} style={{ ['--cs' as string]: scale }}>
+      <div className="flex shrink-0 flex-col gap-2" style={{ zoom: scale }}>
       <TopStrip x={x} tz={tz} teamById={teamById} schedule={x && x.schedule.length > 0 ? <ScheduleStrip items={x.schedule} next={x.nextRace ?? null} current={fleet?.name ?? ''} onPick={pickFleetByName} /> : null} sets={sets.data ?? []} activeSet={activeSet} onSet={(id) => { setSetId(id); setFleetId(''); }} badge={live ? <FreshnessBadge /> : undefined} />
       <div className="flex min-w-0 items-center gap-2">
         <nav className="flex shrink-0 gap-1" aria-label="Groups">
           {fleets.map((f, i) => (
-            <button key={f.id} onClick={() => setFleetId(f.id)} title={`Key ${i + 1}`}
+            <button key={f.id} onClick={() => { setFleetId(f.id); setFocus(null); }} title={`Key ${i + 1}`}
               className={cx('flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors', f.id === fleet?.id ? 'border-accent-500 bg-accent-500/15' : 'border-ink-800 bg-ink-900 hover:border-ink-600')}>
               <span className={cx('text-base font-black tracking-wide', f.id === fleet?.id ? 'text-accent-200' : 'text-ink-200')}>{groupTitle(f.name)}</span>
               <span className="flex -space-x-1">
@@ -95,33 +116,45 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
           ))}
         </nav>
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          <button onClick={() => zoom(-0.1)} title="Key −: smaller text" aria-label="Smaller text" className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-sm font-bold text-ink-200 hover:border-ink-600">A−</button>
+          <button onClick={() => setScale(1)} title="Key 0: normal size" className="w-12 rounded-md border border-ink-800 bg-ink-900 px-1 py-1 text-xs tabular-nums text-ink-300 hover:border-ink-600">{Math.round(scale * 100)}%</button>
+          <button onClick={() => zoom(0.1)} title="Key +: larger text" aria-label="Larger text" className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-base font-bold text-ink-200 hover:border-ink-600">A+</button>
+          <button onClick={() => setLight((v) => !v)} title="Key L: light or dark screen" aria-pressed={light}
+            className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-sm font-semibold text-ink-200 hover:border-ink-600">{light ? '☾ Dark' : '☀ Light'}</button>
           <button onClick={() => setInfo((v) => !v)} title="Key I: race officials, commentators, socials, all groups" aria-pressed={info}
             className={cx('rounded-md border px-2 py-1 text-sm font-semibold', info ? 'border-accent-500 bg-accent-500/15 text-accent-200' : 'border-ink-800 bg-ink-900 text-ink-300 hover:border-ink-600')}>Info</button>
         </div>
+      </div>
       </div>
 
       {sets.isLoading || detail.isLoading || data.isLoading ? <Loading /> : sets.error || detail.error || data.error ? <ErrorBox error={sets.error ?? detail.error ?? data.error} /> : !fleet ? (
         <Empty title="No groups in this stage" />
       ) : (
         <>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
-            <StandingLine standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={groupTitle(fleet.name)} />
+          <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-4 gap-y-1" style={{ zoom: scale }}>
+            <StandingLine standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={groupTitle(fleet.name)} onPick={setFocus} />
             <FactsLine teams={groupTeams} />
           </div>
+          {focused ? (
+            <TeamFocus team={focused} colour={x?.colours[focused.id]} lineup={x?.lineups[focused.id]} points={hasScores ? pointsOf.get(focused.id) : undefined}
+              races={hasScores ? standing?.rows.find((r) => r.teamId === focused.id)?.races.filter((v) => v !== '') : undefined}
+              history={x?.history?.[focused.id]} note={x?.notes?.[focused.id]} group={groupTeams} groupName={groupTitle(fleet.name)} onClose={() => setFocus(null)} />
+          ) : (
           <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
             {fleet.positions.map((tid, i) => {
               const team = tid ? teamById.get(tid) : undefined;
               const st = standing?.rows.find((r) => r.teamId === tid);
               return team
                 ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} points={hasScores ? pointsOf.get(team.id) : undefined} races={hasScores ? st?.races.filter((v) => v !== '') : undefined}
-                    history={x?.history?.[team.id]} />
+                    history={x?.history?.[team.id]} onOpen={() => setFocus(team.id)} />
                 : <EmptyCard key={i} place={i + 1} label={fleet.placeholders?.[i] ?? null} />;
             })}
           </div>
+          )}
         </>
       )}
       {info && x && <InfoPanel x={x} teamById={teamById} onClose={() => setInfo(false)} onGroup={(id) => { setFleetId(id); setInfo(false); }} fleets={fleets} />}
-      <p className="shrink-0 text-center text-[10px] text-ink-600">Keys: 1–{Math.max(1, fleets.length)} group · I info</p>
+      <p className="shrink-0 text-center text-[10px] text-ink-600">Keys: 1–{Math.max(1, fleets.length)} group · click a team to open it (← → next team, Esc back) · + − text size · L light/dark · I info</p>
     </div>
   );
 }
@@ -222,7 +255,7 @@ function ScheduleStrip({ items, next, current, onPick }: { items: CommentatorDat
 }
 
 // ---------- standing and talking points, one line each ----------
-function StandingLine({ standing, teamById, colours, hasScores, fleetName }: { standing?: Standing; teamById: Map<string, OverviewTeam>; colours: Record<string, Gradient | null>; hasScores: boolean; fleetName: string }) {
+function StandingLine({ standing, teamById, colours, hasScores, fleetName, onPick }: { standing?: Standing; teamById: Map<string, OverviewTeam>; colours: Record<string, Gradient | null>; hasScores: boolean; fleetName: string; onPick: (teamId: string) => void }) {
   if (!standing || !hasScores) return <span className="text-sm text-ink-500">{groupTitle(standing?.title || fleetName)}: no scores yet</span>;
   const raced = Array.from({ length: standing.races }, (_, i) => i).filter((i) => standing.rows.some((r) => (r.races[i] ?? '') !== '')).length;
   return (
@@ -232,12 +265,12 @@ function StandingLine({ standing, teamById, colours, hasScores, fleetName }: { s
         const t = teamById.get(r.teamId);
         const fl = t && flagOf(t);
         return (
-          <span key={r.teamId} className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-0.5 text-base">
+          <button key={r.teamId} onClick={() => onPick(r.teamId)} className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-0.5 text-base hover:border-ink-600">
             <span className="h-3.5 w-1 rounded-full" style={{ background: css(colours[r.teamId], 180) ?? '#334155' }} />
             {fl && <img src={fl} alt="" className="h-4 w-6 rounded-[2px] object-cover" />}
             <b className="font-mono text-ink-50">{t?.code ?? '?'}</b>
             <b className="tabular-nums text-accent-200">{r.total}</b>
-          </span>
+          </button>
         );
       })}
     </div>
@@ -262,34 +295,41 @@ function FactsLine({ teams }: { teams: OverviewTeam[] }) {
 }
 
 // ---------- team ----------
-function TeamCard({ team, colour, lineup, points, races, history }: {
-  team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; races?: string[];
-  history?: { stage: string; group: string; rank: number; of: number; total: string }[];
-}) {
-  const flag = flagOf(team);
+type Line = { key: string; number: string; first: string; last: string; position: string; weight: string; captain: boolean; sailor?: OverviewSailor };
+type History = { stage: string; group: string; rank: number; of: number; total: string }[];
+
+/** The crew as the commentators read it: the position on the boat is always the one from today's declaration, never the line-up's place. */
+function crewOf(team: OverviewTeam, lineup?: LineupPlace[]): { lines: Line[]; source: 'Line-up' | 'Declared today' | 'Roster' } {
   const declared = !!team.declaration;
   const byId = new Map(team.sailors.map((s) => [s.id, s]));
-  const captain = team.sailors.find((s) => s.isCaptain);
-  type Line = { key: string; number: string; first: string; last: string; position: string; captain: boolean; sailor?: OverviewSailor };
   const source: 'Line-up' | 'Declared today' | 'Roster' = lineup?.length ? 'Line-up' : declared ? 'Declared today' : 'Roster';
-  // the position on the boat is always the one from today's declaration, never the line-up's place
   const lines: Line[] = source === 'Line-up'
-    ? lineup!.map((p, i) => { const s = p.sailorId ? byId.get(p.sailorId) : undefined; return { key: `l${i}`, number: p.number, first: p.firstName, last: p.lastName, position: s?.declared?.position ?? '', captain: p.captain, sailor: s }; })
+    ? lineup!.map((p, i) => { const s = p.sailorId ? byId.get(p.sailorId) : undefined; return { key: `l${i}`, number: p.number, first: p.firstName, last: p.lastName, position: s?.declared?.position ?? '', weight: s?.declared?.weight ?? '', captain: p.captain, sailor: s }; })
     : [
       ...(declared ? team.sailors.filter((s) => s.declared).sort((a, b) => a.declared!.sort - b.declared!.sort) : [...team.sailors].sort((a, b) => Number(b.isCaptain) - Number(a.isCaptain)))
-        .map((s) => ({ key: s.id, number: s.declared?.number || s.defaultNumber, first: s.firstName, last: s.lastName, position: s.declared?.position ?? '', captain: s.isCaptain, sailor: s })),
-      ...(team.declaration?.unmatched ?? []).map((m, i) => ({ key: `u${i}`, number: m.number, first: m.name, last: '', position: m.position, captain: false })),
+        .map((s) => ({ key: s.id, number: s.declared?.number || s.defaultNumber, first: s.firstName, last: s.lastName, position: s.declared?.position ?? '', weight: s.declared?.weight ?? '', captain: s.isCaptain, sailor: s })),
+      ...(team.declaration?.unmatched ?? []).map((m, i) => ({ key: `u${i}`, number: m.number, first: m.name, last: '', position: m.position, weight: m.weight, captain: false })),
     ];
+  return { lines, source };
+}
+
+function TeamCard({ team, colour, lineup, points, races, history, onOpen }: {
+  team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; races?: string[];
+  history?: History; onOpen: () => void;
+}) {
+  const flag = flagOf(team);
+  const captain = team.sailors.find((s) => s.isCaptain);
+  const { lines, source } = crewOf(team, lineup);
   const bg = css(colour);
   // the crew fills the card: the font grows with the screen height and shrinks for a long crew
   const rows = Math.max(5, lines.length);
-  const font = `clamp(15px, calc((100vh - 300px) / ${rows} * 0.3), 30px)`;
+  const font = `calc(clamp(15px, calc((100vh - 300px) / ${rows} * 0.3), 30px) * var(--cs, 1))`;
   return (
     <section className="card flex min-h-0 flex-col overflow-hidden">
-      <header className="relative shrink-0 px-3 py-2" style={bg ? { background: bg } : undefined}>
-        <div className="absolute inset-0 bg-gradient-to-r from-ink-950/80 via-ink-950/55 to-ink-950/20" aria-hidden />
+      <header className="relative shrink-0 cursor-pointer px-3 py-2" style={{ background: bg ?? '#1b212a' }} onClick={onOpen} title="Open this team in large type">
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/80 via-[#0e1217]/55 to-[#0e1217]/20" aria-hidden />
         <div className="relative flex items-center gap-3">
-          <div className="flex h-12 w-[72px] shrink-0 items-center justify-center overflow-hidden rounded bg-ink-950/60 shadow">
+          <div className="flex h-12 w-[72px] shrink-0 items-center justify-center overflow-hidden rounded bg-[#0e1217]/60 shadow">
             {flag ? <img src={flag} alt="" className="max-h-full max-w-full object-contain" /> : null}
           </div>
           <div className="min-w-0 flex-1">
@@ -299,13 +339,13 @@ function TeamCard({ team, colour, lineup, points, races, history }: {
             </div>
             <div className="truncate text-sm">
               {team.nickname && <span className="font-bold uppercase tracking-wide text-white/80">“{team.nickname}” </span>}
-              {captain && <span className="text-amber-200">★ {captain.firstName} {captain.lastName}</span>}
+              {captain && <span className="text-[#fde68a]">★ {captain.firstName} {captain.lastName}</span>}
             </div>
           </div>
           {points && (
-            <div className="shrink-0 rounded-md bg-ink-950/70 px-2.5 py-1 text-center" title="Points in the group">
+            <div className="shrink-0 rounded-md bg-[#0e1217]/70 px-2.5 py-1 text-center" title="Points in the group">
               <div className="text-2xl font-black leading-tight tabular-nums text-white">{points}</div>
-              <div className="text-[11px] uppercase leading-tight text-ink-300">pts</div>
+              <div className="text-[11px] uppercase leading-tight text-[#a3afbf]">pts</div>
             </div>
           )}
         </div>
@@ -318,7 +358,7 @@ function TeamCard({ team, colour, lineup, points, races, history }: {
         {(history ?? []).map((h, i) => <Chip key={i} label={h.stage} value={`${ordinal(h.rank)} of ${h.of}${h.total ? ` · ${h.total} pts` : ''}`} title={`${h.stage}, ${h.group}`} />)}
         <span className={cx('ml-auto rounded px-1.5 py-0.5 text-xs font-semibold uppercase', source === 'Roster' ? 'bg-ink-800 text-ink-400' : 'bg-emerald-950/70 text-emerald-300')}>{source}</span>
       </div>
-      <ol className="flex min-h-0 flex-1 flex-col overflow-y-auto" style={{ fontSize: font }}>
+      <ol className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-y-auto" style={{ fontSize: font }} onClick={onOpen}>
         {lines.map((l) => {
           const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
           return (
@@ -352,6 +392,129 @@ function EmptyCard({ place, label }: { place: number; label: string | null }) {
     <section className="card flex flex-col items-center justify-center border-dashed text-ink-500">
       <span className="text-sm font-bold tabular-nums">Place {place}</span>
       <span className="mt-1 font-mono text-2xl font-bold text-ink-400">{label ?? 'To be decided'}</span>
+    </section>
+  );
+}
+
+// ---------- one team on its own (click a card): the crew in very large type and everything about the team ----------
+const kg = (v: string | undefined | null) => { const n = Number(String(v ?? '').replace(',', '.')); return n > 0 ? n : 0; };
+
+function TeamFocus({ team, colour, lineup, points, races, history, note, group, groupName, onClose }: {
+  team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; races?: string[]; history?: History; note?: string;
+  group: OverviewTeam[]; groupName: string; onClose: () => void;
+}) {
+  const flag = team.assets.flag_big?.previewUrl ?? flagOf(team);
+  const captain = team.sailors.find((s) => s.isCaptain);
+  const { lines, source } = crewOf(team, lineup);
+  const country = COUNTRY_FACTS[team.code.toUpperCase()];
+  const rows = Math.max(6, lines.length);
+  const font = `calc(clamp(24px, calc((100vh - 330px) / ${rows} * 0.36), 60px) * var(--cs, 1))`;
+
+  // talking points worked out from the data
+  const facts: string[] = [];
+  const ranked = group.filter((t) => Number(t.ranking) > 0).sort((a, b) => Number(a.ranking) - Number(b.ranking));
+  const rr = ranked.findIndex((t) => t.id === team.id);
+  if (rr >= 0 && ranked.length > 1) facts.push(rr === 0 ? `Best ranked team in ${groupName}` : rr === ranked.length - 1 ? `Lowest ranked team in ${groupName}` : `${ordinal(rr + 1)} of ${ranked.length} in ${groupName} by world ranking`);
+  const weights = group.map((t) => ({ t, w: kg(t.declaration?.totalWeight) })).filter((x) => x.w > 0);
+  const mine = kg(team.declaration?.totalWeight);
+  if (mine && weights.length > 1) {
+    const avg = weights.reduce((a, x) => a + x.w, 0) / weights.length;
+    const sorted = [...weights].sort((a, b) => b.w - a.w);
+    const d = Math.round((mine - avg) * 10) / 10;
+    facts.push(`${sorted[0].t.id === team.id ? 'Heaviest crew in the group' : sorted[sorted.length - 1].t.id === team.id ? 'Lightest crew in the group' : 'Crew weight'}: ${mine} kg (${d >= 0 ? '+' : ''}${d} kg vs the group average)`);
+  }
+  const sw = lines.map((l) => ({ l, w: kg(l.weight) })).filter((x) => x.w > 0).sort((a, b) => b.w - a.w);
+  if (sw.length > 1) {
+    facts.push(`Average sailor: ${Math.round((sw.reduce((a, x) => a + x.w, 0) / sw.length) * 10) / 10} kg`);
+    facts.push(`Heaviest: ${sw[0].l.first} ${sw[0].l.last} (${sw[0].w} kg) · lightest: ${sw[sw.length - 1].l.first} ${sw[sw.length - 1].l.last} (${sw[sw.length - 1].w} kg)`);
+  }
+  const decorated = lines.filter((l) => l.sailor?.bestResult1).length;
+  if (decorated) facts.push(`${decorated} of ${lines.length} sailors with notable results`);
+  if (races?.length) facts.push(`Results here: ${races.join(' · ')}`);
+  for (const h of history ?? []) facts.push(`${h.stage}: ${ordinal(h.rank)} of ${h.of} in ${groupTitle(h.group)}${h.total ? ` (${h.total} pts)` : ''}`);
+
+  const stats: [string, string][] = ([
+    ['Points', points ?? ''], ['World rank', team.ranking ? `#${team.ranking}` : ''], ['Ranking pts', team.rankingPoints],
+    ['Crew', team.declaration?.totalWeight ? `${team.declaration.totalWeight} kg` : ''], ['Sailors', lines.length ? String(lines.length) : ''],
+  ] as [string, string][]).filter(([, v]) => v);
+  return (
+    <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="relative shrink-0 px-4 py-3" style={{ background: css(colour) ?? '#1b212a', zoom: 'var(--cs, 1)' } as React.CSSProperties}>
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/85 via-[#0e1217]/55 to-[#0e1217]/25" aria-hidden />
+        <div className="relative flex items-center gap-5">
+          <div className="flex h-24 w-36 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#0e1217]/60 shadow-lg">
+            {flag ? <img src={flag} alt="" className="max-h-full max-w-full object-contain" /> : null}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-6xl font-black leading-none text-white drop-shadow">{team.code}</span>
+              <span className="truncate text-3xl font-bold text-white/90">{team.name}</span>
+            </div>
+            <div className="mt-1 truncate text-xl">
+              {team.nickname && <span className="font-bold uppercase tracking-wide text-white/85">“{team.nickname}” </span>}
+              {captain && <span className="text-[#fde68a]">★ {captain.firstName} {captain.lastName}</span>}
+            </div>
+          </div>
+          <dl className="flex shrink-0 gap-2">
+            {stats.map(([k, v]) => (
+              <div key={k} className="min-w-[96px] rounded-lg bg-[#0e1217]/70 px-3 py-1.5 text-center">
+                <dd className="text-3xl font-black tabular-nums leading-tight text-white">{v}</dd>
+                <dt className="text-xs uppercase tracking-wide text-[#a3afbf]">{k}</dt>
+              </div>
+            ))}
+          </dl>
+          <button onClick={onClose} title="Esc: back to the group" className="shrink-0 self-start rounded-md bg-[#0e1217]/70 px-3 py-1.5 text-lg font-bold text-white hover:bg-[#0e1217]">✕</button>
+        </div>
+      </header>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(320px,26%)]">
+        <ol className="flex min-h-0 flex-col overflow-y-auto" style={{ fontSize: font }} aria-label="Crew">
+          {lines.map((l) => {
+            const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
+            return (
+              <li key={l.key} className={cx('flex min-h-0 flex-1 items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0', l.captain && 'bg-amber-500/10')}>
+                <span className="w-[5em] shrink-0 text-[0.55em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>
+                <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold leading-tight text-ink-50">
+                    {l.captain && <span className="mr-[0.2em] text-amber-400">★</span>}
+                    {l.first} <span className="font-black uppercase">{l.last}</span>
+                  </span>
+                  {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
+                </span>
+                {l.weight && <span className="shrink-0 text-[0.45em] tabular-nums text-ink-400">{l.weight} kg</span>}
+              </li>
+            );
+          })}
+          {!lines.length && <li className="px-3 py-6 text-center text-2xl text-ink-600">No crew yet</li>}
+        </ol>
+        <aside className="min-h-0 space-y-4 overflow-y-auto border-l border-ink-800 bg-ink-950/40 p-4" style={{ fontSize: 'calc(17px * var(--cs, 1))' }}>
+          <span className={cx('inline-block rounded px-2 py-0.5 text-[0.75em] font-semibold uppercase', source === 'Roster' ? 'bg-ink-800 text-ink-400' : 'bg-emerald-950/70 text-emerald-300')}>Crew from: {source}</span>
+          {facts.length > 0 && (
+            <div>
+              <h3 className="mb-1 text-[0.75em] font-bold uppercase tracking-wide text-ink-400">Talking points</h3>
+              <ul className="space-y-1.5 text-ink-100">{facts.map((f, i) => <li key={i}>• {f}</li>)}</ul>
+            </div>
+          )}
+          {note && (
+            <div>
+              <h3 className="mb-1 text-[0.75em] font-bold uppercase tracking-wide text-ink-400">Notes</h3>
+              <p className="whitespace-pre-line text-ink-100">{note}</p>
+            </div>
+          )}
+          {country && (
+            <div>
+              <h3 className="mb-1 text-[0.75em] font-bold uppercase tracking-wide text-ink-400">{team.name}</h3>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt className="text-ink-500">Capital</dt><dd className="text-ink-100">{country.capital}</dd>
+                <dt className="text-ink-500">Region</dt><dd className="text-ink-100">{country.region}</dd>
+                <dt className="text-ink-500">Population</dt><dd className="text-ink-100">{country.population}</dd>
+                <dt className="text-ink-500">Languages</dt><dd className="text-ink-100">{country.languages}</dd>
+              </dl>
+            </div>
+          )}
+          {!note && <p className="text-[0.75em] text-ink-500">Your own facts about the team go in Teams → the team's notes; they show here.</p>}
+        </aside>
+      </div>
     </section>
   );
 }
