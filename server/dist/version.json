@@ -1,8 +1,14 @@
 {
-  "version": "1.0.178",
-  "commit": "ae49004",
-  "date": "2026-11-14T19:25:30Z",
+  "version": "1.0.179",
+  "commit": "e77df03",
+  "date": "2026-11-14T20:02:50Z",
   "changes": [
+    {
+      "version": "1.0.179",
+      "commit": "e77df03",
+      "date": "2026-11-14T20:02:50Z",
+      "text": "Team comparison for the Qualification Race: texts fit themselves (ssl_compare_QR)"
+    },
     {
       "version": "1.0.178",
       "commit": "ae49004",
@@ -476,12 +482,6 @@
       "commit": "9ff241c",
       "date": "2026-11-09T23:09:20Z",
       "text": "Left menu: tabs in coloured groups (On air, Data, Graphics, Output & setup) with icons"
-    },
-    {
-      "version": "1.0.99",
-      "commit": "95ed05a",
-      "date": "2026-11-09T23:00:56Z",
-      "text": "Race results with times at marks: one race per group typed on the Results tab, sorted by finish, gap to the winner, points into the overall table, filled into the race results title by the RACE RESULTS key"
     }
   ]
 }

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { resetTextFit } from '../textFit.js';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -261,6 +262,7 @@ export class MatchboardExporter {
             fs.writeFileSync(path.join(dir, `GeneralSans-${f.weight}.${f.ext}`), f.data);
         }
         this.fontsLoaded = ''; // re-register
+        resetTextFit(); // the Team comparison measures its texts with them
         const info = await this.fonts();
         this.schedule(0);
         return info;

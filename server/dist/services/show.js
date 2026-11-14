@@ -150,8 +150,8 @@ const row8 = (...keys) => Array.from({ length: 8 }, (_, i) => keys[i] ?? null);
 /** vMix calls sent at once when a title takes many fields. */
 const SET_BATCH = 8;
 export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 };
-/** A group's key for its own inputs and keys: H, I…; the Last Chance Race is LCR (ssl_results_LCR, ssl_compare_LCR). */
-export const compareKey = (name) => (/last\s*chance|\blcr\b/i.test(name) ? 'LCR' : groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+/** A group's key for its own inputs and keys: H, I…; the Last Chance Race is LCR (ssl_results_LCR, ssl_compare_LCR), the Qualification Race QR (ssl_compare_QR). */
+export const compareKey = (name) => (/last\s*chance|\blcr\b/i.test(name) ? 'LCR' : /qualification\s*race|\bqr\b/i.test(name) ? 'QR' : groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
 export const compareInput = (key) => `ssl_compare_${key}`;
 /** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
 export const resultsInput = (key) => `ssl_results_${key}`;

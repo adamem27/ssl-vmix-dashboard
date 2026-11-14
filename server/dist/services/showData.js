@@ -21,6 +21,7 @@ import { teamPictureFor } from './ltTitle.js';
 import { comparisonFlag } from './compareImages.js';
 import { currentStage } from './workbookSheets.js';
 import { getSetting, setSetting } from '../db/db.js';
+import { pad, textWidth } from './textFit.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 /** As typed (only trimmed): vMix gets the text exactly as it was written in the dashboard. */
 const up = (s) => (s ?? '').trim();
@@ -341,6 +342,63 @@ export function compareFields(ctx, eventId, fleetId, today, o = {}) {
             [`${n} PHOTO.Source`, photo], [`PHOTO ${n}.Source`, photo], [`T${n}Photo.Source`, photo],
         ])
             f.set(k, v);
+        for (const [k, v] of Object.entries(fitCompareTeam(n, name, nick, cptSurname, cptName, ctx.assetsDir)))
+            f.set(k, v);
     }
+    for (const [k, v] of Object.entries(fitCompareHeader(over.title || auto.title, group, ctx.assetsDir)))
+        f.set(k, v);
     return f;
+}
+/**
+ * The text boxes of the Team comparison whose texts fit themselves (team_comparison_qualification.gtzip): every box
+ * of a card spans the whole free width (cards 1 and 3: x 330–921, the country and the captain's surname right-aligned;
+ * cards 2 and 4: x 1000–1610, all left-aligned), and the nickname and the captain's first name are moved next to
+ * their partner with no-break spaces, so no text is cut whatever its length. A nickname that does not fit beside the
+ * country goes on two lines (n NICKNAME FIT, n NICKNAME FIT 2). The header (TITLE FIT, Group FIT: x 110–1810) is
+ * centred on the graphic as one line.
+ */
+export const COMPARE_FIT = { size: 40, gap: 16, left: { l: 330, r: 921 }, right: { l: 1000, r: 1610 }, header: { l: 110, r: 1810, centre: 960, size: 45, gap: 17 } };
+export function fitCompareTeam(n, country, nick, cptSurname, cptName, assetsDir) {
+    const { size, gap } = COMPARE_FIT;
+    const side = n % 2 ? COMPARE_FIT.left : COMPARE_FIT.right;
+    const leftSide = n % 2 === 1;
+    const w = (t, b = false) => textWidth(t, size, b ? 'bold' : 'regular', assetsDir);
+    // the soft text beside the bold one: its padding from the box's left edge
+    const beside = (strong, soft) => {
+        const sw = w(strong, true), g = strong ? gap : 0, room = side.r - side.l - sw - g;
+        // a text longer than its room keeps inside the box: from the box's left edge (cards 1, 3) or up to its right edge (2, 4)
+        const at = (t) => (t ? pad(leftSide ? Math.max(0, room - w(t)) : Math.max(0, Math.min(sw + g, side.r - side.l - w(t))), size, 'regular', assetsDir) + t : '');
+        return { room, at };
+    };
+    const nk = beside(country, nick);
+    let line1 = nick, line2 = '';
+    if (w(nick) > nk.room) {
+        const words = nick.split(/\s+/).filter(Boolean);
+        // the split with the most even lines whose first line fits
+        let k = 1, best = Infinity;
+        for (let j = 1; j < words.length; j++) {
+            const a = w(words.slice(0, j).join(' ')), b = w(words.slice(j).join(' '));
+            if (a <= nk.room && Math.max(a, b) < best) {
+                best = Math.max(a, b);
+                k = j;
+            }
+        }
+        line1 = words.slice(0, k).join(' ');
+        line2 = words.slice(k).join(' ');
+    }
+    return {
+        [`${n} NICKNAME FIT.Text`]: nk.at(line1),
+        [`${n} NICKNAME FIT 2.Text`]: nk.at(line2),
+        [`${n} CPT NAME FIT.Text`]: beside(cptSurname, cptName).at(cptName),
+    };
+}
+export function fitCompareHeader(title, group, assetsDir) {
+    const { l, centre, size, gap } = COMPARE_FIT.header;
+    const tw = textWidth(title, size, 'bold', assetsDir), gw = textWidth(group, size, 'regular', assetsDir);
+    const g = title && group ? gap : 0;
+    const start = Math.max(l, centre - (tw + g + gw) / 2);
+    return {
+        'TITLE FIT.Text': title ? pad(start - l, size, 'bold', assetsDir) + title : '',
+        'Group FIT.Text': group ? pad(start + tw + g - l, size, 'regular', assetsDir) + group : '',
+    };
 }
