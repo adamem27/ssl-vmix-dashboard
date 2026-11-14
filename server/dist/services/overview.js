@@ -1,4 +1,4 @@
-import { isLastChance } from './fleets.js';
+import { isExtraGroup } from './fleets.js';
 import { assertDate, sumWeights } from './declarations.js';
 import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
@@ -13,9 +13,9 @@ export function overview(ctx, eventId, date, fleetSetId) {
     const places = new Map();
     if (fleetSetId) {
         const rows = db.prepare(`SELECT x.team_id AS teamId, x.position, f.name AS fleetName FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id WHERE x.fleet_set_id = ?`).all(fleetSetId);
-        // a team also in the Last Chance Race shows its own group
+        // a team also in the Last Chance / Qualification Race shows its own group
         for (const r of rows)
-            if (!places.has(r.teamId) || isLastChance(places.get(r.teamId).fleetName))
+            if (!places.has(r.teamId) || isExtraGroup(places.get(r.teamId).fleetName))
                 places.set(r.teamId, { fleetName: r.fleetName, position: r.position });
     }
     const members = db.prepare(`

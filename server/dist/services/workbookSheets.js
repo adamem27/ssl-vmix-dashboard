@@ -1,4 +1,4 @@
-import { isLastChance } from './fleets.js';
+import { isExtraGroup } from './fleets.js';
 import path from 'node:path';
 import { getSetting, setSetting } from '../db/db.js';
 import { listAssets } from './assets.js';
@@ -56,10 +56,10 @@ function stageTeams(ctx, eventId) {
     const slots = ctx.db.prepare(`SELECT x.team_id AS teamId, x.position, f.name AS fleet FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id
     WHERE x.fleet_set_id = ? ORDER BY f.sort, f.created_at, x.position`).all(stage.id);
     const byId = new Map(teams.map((t) => [t.id, t]));
-    // a team also in the Last Chance Race: once, with its own group
+    // a team also in the Last Chance / Qualification Race: once, with its own group
     const own = new Map();
     for (const x of slots)
-        if (!own.has(x.teamId) || isLastChance(own.get(x.teamId).fleet))
+        if (!own.has(x.teamId) || isExtraGroup(own.get(x.teamId).fleet))
             own.set(x.teamId, x);
     return { stage, teams: slots.filter((s) => byId.has(s.teamId) && own.get(s.teamId) === s).map((s) => ({ t: byId.get(s.teamId), group: groupLabel(s.fleet), place: String(s.position) })) };
 }

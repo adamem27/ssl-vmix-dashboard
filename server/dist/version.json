@@ -1,8 +1,14 @@
 {
-  "version": "1.0.179",
-  "commit": "e77df03",
-  "date": "2026-11-14T20:02:50Z",
+  "version": "1.0.180",
+  "commit": "ccedd5e",
+  "date": "2026-11-14T20:19:27Z",
   "changes": [
+    {
+      "version": "1.0.180",
+      "commit": "ccedd5e",
+      "date": "2026-11-14T20:19:27Z",
+      "text": "Groups: the Qualification Race takes teams of the stage's groups, which stay in their own group too"
+    },
     {
       "version": "1.0.179",
       "commit": "e77df03",
@@ -476,12 +482,6 @@
       "commit": "edceb16",
       "date": "2026-11-09T23:24:53Z",
       "text": "GTZIP generator as a design workspace: big zoomable artboard with a 10 px grid, rulers, handles, marquee, smart guides and snapping; toolbar to add text, shapes, pictures (dashboard or computer, drag and drop), layers, align, distribute, arrange, group; layers panel with drag and drop, lock and rename; Ctrl+C/V/X/D/G shortcuts"
-    },
-    {
-      "version": "1.0.100",
-      "commit": "9ff241c",
-      "date": "2026-11-09T23:09:20Z",
-      "text": "Left menu: tabs in coloured groups (On air, Data, Graphics, Output & setup) with icons"
     }
   ]
 }

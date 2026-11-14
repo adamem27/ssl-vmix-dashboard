@@ -133,11 +133,11 @@ export function placeTeam(db, setId, input) {
     if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId))
         throw notFound('Team');
     return db.transaction(() => {
-        // a team has one place among the stage's groups and, besides, can have one in its Last Chance Race: moving it
-        // moves it among groups of the same kind (into the Last Chance Race it keeps its own group)
-        const lcr = isLastChance(fleet.name);
+        // a team has one place among the stage's groups and, besides, can have one in its Last Chance Race and one in its
+        // Qualification Race: moving it moves it among groups of the same kind (into those it keeps its own group)
+        const kind = groupKind(fleet.name);
         const current = db.prepare('SELECT x.*, f.name AS fleet_name FROM fleet_slots x JOIN fleets f ON f.id = x.fleet_id WHERE x.fleet_set_id = ? AND x.team_id = ?').all(setId, teamId)
-            .find((x) => isLastChance(x.fleet_name) === lcr);
+            .find((x) => groupKind(x.fleet_name) === kind);
         const occupant = db.prepare('SELECT * FROM fleet_slots WHERE fleet_id = ? AND position = ?').get(fleetId, position);
         if (occupant?.team_id === teamId)
             return { changed: false, displaced: null };
@@ -176,6 +176,12 @@ export function firstFreePosition(db, fleetId) {
 }
 /** The Last Chance Race of a stage: its teams also race in the stage's other groups. */
 export const isLastChance = (name) => /last\s*chance|\blcr\b/i.test(name ?? '');
+/** The Qualification Race: its teams come from the stage's groups and stay in them too. */
+export const isQualificationRace = (name) => /qualification\s*race|\bqr\b/i.test(name ?? '');
+/** A group whose teams keep their own group besides (Last Chance Race, Qualification Race). */
+export const isExtraGroup = (name) => isLastChance(name) || isQualificationRace(name);
+/** What kind of group: a team has one place in each kind. */
+const groupKind = (name) => (isLastChance(name) ? 'lcr' : isQualificationRace(name) ? 'qr' : 'group');
 /** A team out of the stage, or only out of one group (fleetId: its place in the Last Chance Race, say). */
 export function unassignTeam(db, setId, teamId, fleetId) {
     if (fleetId)
