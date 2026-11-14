@@ -1,8 +1,14 @@
 {
-  "version": "1.0.176",
-  "commit": "285a04d",
-  "date": "2026-11-14T12:55:38Z",
+  "version": "1.0.177",
+  "commit": "9a9d0e0",
+  "date": "2026-11-14T13:48:20Z",
   "changes": [
+    {
+      "version": "1.0.177",
+      "commit": "9a9d0e0",
+      "date": "2026-11-14T13:48:20Z",
+      "text": "Show control: LAST CHANCE EXPLAINED key on the BEFORE page (input ssl_lcr_info)"
+    },
     {
       "version": "1.0.176",
       "commit": "285a04d",
@@ -476,12 +482,6 @@
       "commit": "f3bb699",
       "date": "2026-11-09T22:51:03Z",
       "text": "Show control: lineup lower third in two parts, qualified team keys, placeholders as Image inputs, README"
-    },
-    {
-      "version": "1.0.97",
-      "commit": "6e7901a",
-      "date": "2026-11-09T22:45:54Z",
-      "text": "Show control: both Stream Decks from one registry of graphics, overlays read from vMix, undo/all out/panic, break scene rotation, Companion page files with a fallback page"
     }
   ]
 }

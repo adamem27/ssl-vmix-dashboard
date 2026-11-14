@@ -57,6 +57,8 @@ export const DEFAULT_GRAPHICS = [
     { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
     // the second L-bar (ranking): a key of its own, never part of the break scene
     { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
+    // a ready graphic in vMix (Image or Title input) explaining how the Last Chance group works; nothing is filled in
+    { id: 'lcrinfo', label: 'Last Chance explained', kind: 'board', overlay: 1, inputs: ['ssl_lcr_info'] },
 ];
 export const showConfigSchema = z.object({
     /** input names per graphic id (comma separated alternatives), overriding the defaults */
@@ -205,7 +207,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
             deck: 1, name: 'A BEFORE', page: p1, keys: [
                 row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
                 // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
-                row8(),
+                row8(k('show:lcrinfo', 'LAST\\nCHANCE\\nEXPLAINED', 'board')),
                 row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
                 nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
             ],
