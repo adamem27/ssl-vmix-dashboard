@@ -51,12 +51,18 @@ export function pageFiles(webDist: string): SiteFile[] {
 export function dataFiles(feed: Feed, files: Map<string, string>): { data: string; images: { rel: string; file: string }[]; version: string } {
   let json = JSON.stringify({ pushedAt: feed.pushedAt, day: feed.day, routes: feed.routes });
   const images: { rel: string; file: string }[] = [];
-  // longest first, so an address never matches inside a longer one
-  for (const [url, b] of Object.entries(feed.blobs).sort((a, b2) => b2[0].length - a[0].length)) {
+  const seen = new Set<string>();
+  const relOf = new Map<string, string>(); // the address as it is written inside the JSON → img/…
+  for (const [url, b] of Object.entries(feed.blobs)) {
     const rel = `img/${b.hash}.${EXT[b.mime] ?? 'bin'}`;
-    json = json.split(JSON.stringify(url).slice(1, -1)).join(rel);
+    relOf.set(JSON.stringify(url).slice(1, -1), rel);
     const file = files.get(b.hash);
-    if (file && !images.some((i) => i.rel === rel)) images.push({ rel, file });
+    if (file && !seen.has(rel)) { seen.add(rel); images.push({ rel, file }); }
+  }
+  // one pass over the (megabytes of) JSON instead of one per picture; longest first, so an address never matches inside a longer one
+  if (relOf.size) {
+    const re = new RegExp([...relOf.keys()].sort((a, b) => b.length - a.length).map((k) => k.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|'), 'g');
+    json = json.replace(re, (m) => relOf.get(m) ?? m);
   }
   const version = sha1(JSON.stringify({ day: feed.day, routes: feed.routes, blobs: feed.blobs }));
   return { data: json.replace(`"pushedAt":${JSON.stringify(feed.pushedAt)}`, `"pushedAt":${JSON.stringify(feed.pushedAt)},"version":"${version}"`), images, version };
@@ -90,7 +96,8 @@ export class StaticSitePublisher {
   status: SiteStatus = { lastAttemptAt: null, lastOkAt: null, lastChangeAt: null, error: '', url: '', uploadedFiles: 0, dataBytes: 0, pictures: 0, target: '' };
   private sent = new Map<string, string>(); // rel → sha1 already on the target
   private sentTo = '';
-  private running = false;
+  private current: Promise<SiteStatus> | null = null;
+  private queued: Promise<SiteStatus> | null = null;
   private timer: NodeJS.Timeout | null = null;
   private target: SiteTarget | null = null;
   private failures = 0;
@@ -119,16 +126,24 @@ export class StaticSitePublisher {
     // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min): a host's firewall bans an
     // address that keeps failing to connect, and a ban blocks the page for everyone on that network.
     this.timer = setInterval(() => {
-      if (!this.enabled() || Date.now() < this.retryAt) return;
+      if (!this.enabled() || Date.now() < this.retryAt || this.current) return;
       void this.publishNow();
     }, this.everyMs);
     this.timer.unref?.();
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; void this.target?.close?.(); this.target = null; }
 
-  async publishNow(): Promise<SiteStatus> {
-    if (this.running) return this.status;
-    this.running = true;
+  /** Publish now. A round already under way is finished first and then one more starts, so the newest data always goes out. */
+  publishNow(): Promise<SiteStatus> {
+    if (this.current) {
+      this.queued ??= this.current.then(() => { this.queued = null; return this.publishNow(); });
+      return this.queued;
+    }
+    this.current = this.round().finally(() => { this.current = null; });
+    return this.current;
+  }
+
+  private async round(): Promise<SiteStatus> {
     this.status.lastAttemptAt = nowIso();
     let target: SiteTarget | null = null;
     try {
@@ -152,7 +167,8 @@ export class StaticSitePublisher {
       }
       const dataChanged = this.sent.get('data.json') !== version;
       if (dataChanged) { pending.push({ rel: 'data.json', data }); hashes.set('data.json', version); }
-      const status = JSON.stringify({ pushedAt: feed.pushedAt, version });
+      // auto: the page knows whether to expect a new status every few seconds or only when someone publishes
+      const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled() });
       pending.push({ rel: 'status.json', data: status });
       await target.put(pending, (rel) => { const h = hashes.get(rel); if (h) this.sent.set(rel, h); });
       if (dataChanged) { this.status.lastChangeAt = feed.pushedAt; this.status.dataBytes = Buffer.byteLength(data); }
@@ -173,7 +189,6 @@ export class StaticSitePublisher {
     } finally {
       this.status.target = target?.label ?? '';
       this.status.url = this.url();
-      this.running = false;
     }
     return this.status;
   }

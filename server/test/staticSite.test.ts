@@ -54,6 +54,16 @@ describe('static commentator page', () => {
     expect((await site.publishNow()).uploadedFiles).toBe(1); // status.json only
     createTeam(db, { name: 'Chile', code: 'CHI' });
     expect((await site.publishNow()).uploadedFiles).toBe(2); // data.json + status.json
+
+    // Publish now while a round is under way: that round finishes, then one more sends the newest data
+    expect(status.auto).toBe(false); // published by hand: the page does not expect a heartbeat
+    const first = site.publishNow();
+    createTeam(db, { name: 'Peru', code: 'PER' });
+    const second = site.publishNow();
+    expect(second).not.toBe(first);
+    await first;
+    await second;
+    expect(fs.readFileSync(path.join(folder, 'data.json'), 'utf8')).toContain('"PER"');
   });
 
   it('a new address moves the page; settings never return the FTP password', async () => {

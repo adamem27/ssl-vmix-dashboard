@@ -16,8 +16,24 @@ export function openDb(file: string): DB {
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
   migrate(db);
+  cachePrepared(db);
   ensureDefaults(db);
   return db;
+}
+
+/**
+ * Reuse prepared statements: the code calls db.prepare(sql) on every request, and compiling the SQL each time was the
+ * biggest cost of a commentator page round (and of every key press reading the settings). Nothing here changes a
+ * statement's mode (pluck/raw/expand) or iterates one, so a statement can be shared.
+ */
+function cachePrepared(db: DB) {
+  const prepare = db.prepare.bind(db);
+  const cache = new Map<string, Database.Statement>();
+  (db as { prepare: (sql: string) => Database.Statement }).prepare = (sql: string) => {
+    let st = cache.get(sql);
+    if (!st) { st = prepare(sql); if (cache.size < 5000) cache.set(sql, st); }
+    return st;
+  };
 }
 
 function migrate(db: DB) {

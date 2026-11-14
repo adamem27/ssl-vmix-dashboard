@@ -165,7 +165,7 @@ function Clock({ tz }: { tz: string }) {
   return <span className="font-mono text-2xl font-black tabular-nums text-ink-50">{s}</span>;
 }
 
-interface LiveStatus { feed: { pushedAt: string; receivedAt: string | null } | null; now: string }
+interface LiveStatus { feed: { pushedAt: string; receivedAt: string | null; auto?: boolean } | null; now: string }
 
 /** Online: how fresh the data from the venue PC is. Green while it keeps coming, red once it stops. */
 function FreshnessBadge() {
@@ -175,6 +175,8 @@ function FreshnessBadge() {
   const ago = Math.max(0, Math.round((Date.parse(q.data.now) - Date.parse(at)) / 1000));
   const ok = ago < 30;
   const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  // published by hand (Publish now): no new data is expected every few seconds, so the age is not an alarm
+  if (q.data.feed.auto === false) return <span className="shrink-0 rounded px-2 py-1 text-sm font-semibold text-ink-300" title="The operator publishes the data by hand">Updated {time.slice(0, 5)}</span>;
   return (
     <span title={ok ? 'Data from the venue arrives every few seconds' : 'The venue PC stopped sending: these are the last data it sent'}
       className={cx('flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold', ok ? 'bg-emerald-950/60 text-emerald-300' : 'bg-red-950/70 text-red-300')}>

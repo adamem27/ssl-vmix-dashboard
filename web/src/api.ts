@@ -4,7 +4,7 @@ export class ApiError extends Error {
 
 // ---------- static commentator page: answers come from one data.json written by the venue PC ----------
 interface StaticFeed { pushedAt: string; version: string; routes: Record<string, unknown> }
-interface StaticStatus { pushedAt: string; version: string }
+interface StaticStatus { pushedAt: string; version: string; auto?: boolean }
 let staticBase: string | null = null;
 let statusLoad: { at: number; p: Promise<StaticStatus> } | null = null;
 let feedCache: Promise<StaticFeed> | null = null;
@@ -40,7 +40,7 @@ async function loadFeed(): Promise<StaticFeed> {
 
 async function staticGet<T>(url: string): Promise<T> {
   const [path, qs = ''] = url.split('?');
-  if (path === '/api/live/status') { const st = await loadStatus(); return { feed: { pushedAt: st.pushedAt, receivedAt: st.pushedAt }, now: new Date().toISOString() } as T; }
+  if (path === '/api/live/status') { const st = await loadStatus(); return { feed: { pushedAt: st.pushedAt, receivedAt: st.pushedAt, auto: st.auto }, now: new Date().toISOString() } as T; }
   const feed = await loadFeed();
   const set = new URLSearchParams(qs).get('set');
   const key = set && (path === '/api/overview' || path === '/api/commentator') ? `${path}?set=${set}` : path;
