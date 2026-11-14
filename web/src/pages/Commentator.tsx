@@ -94,7 +94,6 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const standing = x?.results.find((g) => g.fleetId === fleet?.id);
   const pointsOf = new Map((standing?.rows ?? []).map((r) => [r.teamId, r.total]));
   const hasScores = !!standing?.rows.some((r) => r.total !== '');
-  const pickFleetByName = (name: string) => { const f = fleets.find((ff) => norm(ff.name) === norm(name) || norm(name).endsWith(norm(ff.name))); if (f) setFleetId(f.id); };
 
   const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
   const focused = focus ? groupTeams.find((t) => t.id === focus) : undefined;
@@ -102,51 +101,50 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   return (
     <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')} style={{ ['--cs' as string]: scale }}>
       <div className="flex shrink-0 flex-col gap-2" style={{ zoom: scale }}>
-      <TopStrip x={x} tz={tz} teamById={teamById} schedule={x && x.schedule.length > 0 ? <ScheduleStrip items={x.schedule} next={x.nextRace ?? null} current={fleet?.name ?? ''} onPick={pickFleetByName} /> : null} sets={sets.data ?? []} activeSet={activeSet} onSet={(id) => { setSetId(id); setFleetId(''); }} badge={live ? <FreshnessBadge /> : undefined} />
-      <div className="flex min-w-0 items-center gap-2">
-        <nav className="flex shrink-0 gap-1" aria-label="Groups">
-          {fleets.map((f, i) => (
-            <button key={f.id} onClick={() => { setFleetId(f.id); setFocus(null); }} title={`Key ${i + 1}`}
-              className={cx('flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors', f.id === fleet?.id ? 'border-accent-500 bg-accent-500/15' : 'border-ink-800 bg-ink-900 hover:border-ink-600')}>
-              <span className={cx('text-base font-black tracking-wide', f.id === fleet?.id ? 'text-accent-200' : 'text-ink-200')}>{groupTitle(f.name)}</span>
-              <span className="flex -space-x-1">
-                {f.positions.map((tid, j) => { const t = tid ? teamById.get(tid) : undefined; const fl = t && flagOf(t); return fl ? <img key={j} src={fl} alt={t!.code} title={t!.code} className="h-3 w-[18px] rounded-[2px] object-cover ring-1 ring-ink-950" /> : null; })}
-              </span>
-            </button>
-          ))}
-        </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          <button onClick={() => zoom(-0.1)} title="Key −: smaller text" aria-label="Smaller text" className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-sm font-bold text-ink-200 hover:border-ink-600">A−</button>
-          <button onClick={() => setScale(1)} title="Key 0: normal size" className="w-12 rounded-md border border-ink-800 bg-ink-900 px-1 py-1 text-xs tabular-nums text-ink-300 hover:border-ink-600">{Math.round(scale * 100)}%</button>
-          <button onClick={() => zoom(0.1)} title="Key +: larger text" aria-label="Larger text" className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-base font-bold text-ink-200 hover:border-ink-600">A+</button>
-          <button onClick={() => setLight((v) => !v)} title="Key L: light or dark screen" aria-pressed={light}
-            className="rounded-md border border-ink-800 bg-ink-900 px-2 py-1 text-sm font-semibold text-ink-200 hover:border-ink-600">{light ? '☾ Dark' : '☀ Light'}</button>
-          <button onClick={() => setInfo((v) => !v)} title="Key I: race officials, commentators, socials, all groups" aria-pressed={info}
-            className={cx('rounded-md border px-2 py-1 text-sm font-semibold', info ? 'border-accent-500 bg-accent-500/15 text-accent-200' : 'border-ink-800 bg-ink-900 text-ink-300 hover:border-ink-600')}>Info</button>
+        <TopStrip x={x} tz={tz} teamById={teamById} current={fleet?.name ?? ''} badge={live ? <FreshnessBadge /> : undefined} />
+        <div className="flex min-w-0 items-end gap-3 border-b border-ink-800">
+          <nav className="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Groups">
+            {fleets.map((f, i) => {
+              const on = f.id === fleet?.id;
+              return (
+                <button key={f.id} onClick={() => { setFleetId(f.id); setFocus(null); }} title={`Key ${i + 1}`} aria-current={on ? 'page' : undefined}
+                  className={cx('-mb-px shrink-0 rounded-t-lg border border-b-0 px-4 py-2 text-lg font-black tracking-wide transition-colors',
+                    on ? 'border-ink-700 bg-ink-900 text-ink-50 shadow-[inset_0_3px_0_0_rgb(14_165_233)]' : 'border-transparent text-ink-400 hover:text-ink-100')}>
+                  {groupTitle(f.name)}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="mb-1.5 ml-auto flex shrink-0 items-center gap-2 text-sm">
+            <select className="input w-auto py-1 text-sm" value={activeSet} onChange={(e) => { setSetId(e.target.value); setFleetId(''); setFocus(null); }} aria-label="Stage" title="Stage">
+              {(sets.data ?? []).map((st) => <option key={st.id} value={st.id}>{st.name}{x?.stage?.id === st.id ? ' (current)' : ''}</option>)}
+            </select>
+            <div className="flex items-center overflow-hidden rounded-md border border-ink-700" role="group" aria-label="Text size">
+              <button onClick={() => zoom(-0.1)} title="Smaller text (key −)" className="px-2.5 py-1 font-bold text-ink-200 hover:bg-ink-800">A−</button>
+              <button onClick={() => setScale(1)} title="Normal size (key 0)" className="border-x border-ink-700 px-2 py-1 tabular-nums text-ink-400 hover:bg-ink-800">{Math.round(scale * 100)}%</button>
+              <button onClick={() => zoom(0.1)} title="Larger text (key +)" className="px-2.5 py-1 text-base font-bold text-ink-200 hover:bg-ink-800">A+</button>
+            </div>
+            <button onClick={() => setLight((v) => !v)} title="Light or dark screen (key L)" className="rounded-md border border-ink-700 px-2.5 py-1 text-ink-200 hover:bg-ink-800">{light ? '☾ Dark' : '☀ Light'}</button>
+            <button onClick={() => setInfo((v) => !v)} title="Officials, commentators, socials, all groups (key I)" className="rounded-md border border-ink-700 px-2.5 py-1 font-semibold text-ink-200 hover:bg-ink-800">Info</button>
+          </div>
         </div>
-      </div>
       </div>
 
       {sets.isLoading || detail.isLoading || data.isLoading ? <Loading /> : sets.error || detail.error || data.error ? <ErrorBox error={sets.error ?? detail.error ?? data.error} /> : !fleet ? (
         <Empty title="No groups in this stage" />
       ) : (
         <>
-          <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-x-4 gap-y-1" style={{ zoom: scale }}>
-            <StandingLine standing={standing} teamById={teamById} colours={x?.colours ?? {}} hasScores={hasScores} fleetName={groupTitle(fleet.name)} onPick={setFocus} />
-            <FactsLine teams={groupTeams} />
-          </div>
           {focused ? (
             <TeamFocus team={focused} colour={x?.colours[focused.id]} lineup={x?.lineups[focused.id]} points={hasScores ? pointsOf.get(focused.id) : undefined}
               races={hasScores ? standing?.rows.find((r) => r.teamId === focused.id)?.races.filter((v) => v !== '') : undefined}
-              history={x?.history?.[focused.id]} note={x?.notes?.[focused.id]} group={groupTeams} groupName={groupTitle(fleet.name)} onClose={() => setFocus(null)} />
+              history={x?.history?.[focused.id]} note={x?.notes?.[focused.id]} group={groupTeams} groupName={groupTitle(fleet.name)} onClose={() => setFocus(null)}
+              onStep={(d) => { const at = groupTeams.findIndex((t) => t.id === focused.id); setFocus(groupTeams[(at + d + groupTeams.length) % groupTeams.length].id); }} />
           ) : (
           <div className="grid min-h-0 flex-1 grid-cols-4 gap-2">
             {fleet.positions.map((tid, i) => {
               const team = tid ? teamById.get(tid) : undefined;
-              const st = standing?.rows.find((r) => r.teamId === tid);
               return team
-                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} points={hasScores ? pointsOf.get(team.id) : undefined} races={hasScores ? st?.races.filter((v) => v !== '') : undefined}
-                    history={x?.history?.[team.id]} onOpen={() => setFocus(team.id)} />
+                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} points={hasScores ? pointsOf.get(team.id) : undefined} onOpen={() => setFocus(team.id)} />
                 : <EmptyCard key={i} place={i + 1} label={fleet.placeholders?.[i] ?? null} />;
             })}
           </div>
@@ -154,7 +152,6 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
         </>
       )}
       {info && x && <InfoPanel x={x} teamById={teamById} onClose={() => setInfo(false)} onGroup={(id) => { setFleetId(id); setInfo(false); }} fleets={fleets} />}
-      <p className="shrink-0 text-center text-[10px] text-ink-600">Keys: 1–{Math.max(1, fleets.length)} group · click a team to open it (← → next team, Esc back) · + − text size · L light/dark · I info</p>
     </div>
   );
 }
@@ -187,110 +184,49 @@ function FreshnessBadge() {
   );
 }
 
-function TopStrip({ x, tz, teamById, schedule, sets, activeSet, onSet, badge }: { x?: CommentatorData; tz: string; teamById: Map<string, OverviewTeam>; schedule: ReactNode; sets: FleetSetSummary[]; activeSet: string; onSet: (id: string) => void; badge?: ReactNode }) {
+function TopStrip({ x, tz, teamById, current, badge }: { x?: CommentatorData; tz: string; teamById: Map<string, OverviewTeam>; current: string; badge?: ReactNode }) {
   const w = x?.weather;
-  const unit = 'kn';
   // units typed in the field (24°C) are not added twice
   const num = (v: string) => /^\s*-?\d+([.,]\d+)?\s*$/.test(v);
-  const chips: [string, string, string][] = w ? ([
-    ['Wind', w.wind_speed ? `${w.wind_speed}${num(w.wind_speed) ? ` ${unit}` : ''}` : '', '💨'],
-    ['Direction', [w.wind_degrees && `${w.wind_degrees}${num(w.wind_degrees) ? '°' : ''}`, w.wind_direction].filter(Boolean).join(' '), '🧭'],
-    ['Air', w.air_temp ? `${w.air_temp}${num(w.air_temp) ? '°C' : ''}` : '', '🌡'],
-    ['Forecast', w.forecast, '⛅'],
-  ] as [string, string, string][]).filter(([, v]) => v) : [];
+  const weather = w ? [
+    w.wind_speed && `💨 ${w.wind_speed}${num(w.wind_speed) ? ' kn' : ''}`,
+    [w.wind_degrees && `${w.wind_degrees}${num(w.wind_degrees) ? '°' : ''}`, w.wind_direction].filter(Boolean).join(' '),
+    w.air_temp && `🌡 ${w.air_temp}${num(w.air_temp) ? '°C' : ''}`,
+    w.forecast,
+  ].filter(Boolean) : [];
   return (
-    <header className="card flex items-center gap-x-5 px-3 py-1.5">
-      <div className="min-w-0">
-        <div className="truncate text-lg font-black uppercase leading-tight tracking-wide text-ink-50">{x?.welcome?.stage || x?.event.name || 'Event'}</div>
-        <div className="flex items-center gap-2 text-xs text-ink-400">
-          {x?.welcome?.day && <b className="uppercase text-ink-200">{x.welcome.day}</b>}
-          <span>{x ? fmtDate(x.date) : ''}</span>
-          <select className="input w-auto py-0.5 text-xs" value={activeSet} onChange={(e) => onSet(e.target.value)} aria-label="Stage">
-            {sets.map((s) => <option key={s.id} value={s.id}>{s.name}{x?.stage?.id === s.id ? ' (current)' : ''}</option>)}
-          </select>
-        </div>
+    <header className="flex items-center gap-x-6 px-1">
+      <div className="min-w-0 shrink-0">
+        <div className="truncate text-xl font-black uppercase leading-tight tracking-wide text-ink-50">{x?.welcome?.stage || x?.event.name || 'Event'}</div>
+        <div className="text-sm text-ink-400">{[x?.welcome?.day, x ? fmtDate(x.date) : ''].filter(Boolean).join(' · ')}</div>
       </div>
       <Clock tz={tz} />
       {badge}
       {x && <NextRace x={x} tz={tz} teamById={teamById} />}
-      {schedule}
-      <ul className="ml-auto flex shrink-0 items-center gap-1.5" aria-label="Weather">
-        {chips.map(([label, value, icon]) => (
-          <li key={label} className="shrink-0 rounded-md border border-ink-800 bg-ink-950/50 px-2 py-1 text-base" title={label}>
-            <span className="mr-1 text-xs">{icon}</span><b className="text-ink-100">{value}</b>
-          </li>
-        ))}
-      </ul>
+      {x && <Later items={x.schedule} next={x.nextRace ?? null} current={current} />}
+      {weather.length > 0 && <div className="ml-auto shrink-0 text-base font-semibold text-ink-200" aria-label="Weather">{weather.join('   ·   ')}</div>}
     </header>
   );
 }
 
-// ---------- today's races ----------
-function ScheduleStrip({ items, next, current, onPick }: { items: CommentatorData['schedule']; next: string | null; current: string; onPick: (fleet: string) => void }) {
-  // the race marked as next on General → Schedule: the races before it are done
+// ---------- the races after the next one (the next one is in Next, so it is not repeated) ----------
+function Later({ items, next, current }: { items: CommentatorData['schedule']; next: string | null; current: string }) {
   const at = next ? items.findIndex((it) => it.id === next) : -1;
+  if (at < 0) return null;
+  const later = items.slice(at + 1, at + 4);
+  if (!later.length) return null;
   return (
-    <ol className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto" aria-label="Today's races">
-      {at >= 0 && <li className="shrink-0 text-xs font-bold text-ink-400" title="Races done today">{at}/{items.length} done</li>}
-      {items.map((it, i) => {
-        if (at >= 0 && i <= at) return null; // the next race is shown in Next; the ones before it are done
-        const tone = statusTone(it.status);
-        const mine = !!current && norm(it.fleet).endsWith(norm(current));
+    <div className="flex min-w-0 items-baseline gap-3 overflow-hidden whitespace-nowrap" aria-label="Later races">
+      <span className="text-xs font-bold uppercase tracking-wide text-ink-500">Then</span>
+      {later.map((it) => {
+        const mine = !!current && !!it.fleet && norm(it.fleet).endsWith(norm(current));
         return (
-          <li key={it.id} className="shrink-0">
-            <button onClick={() => it.fleet && onPick(it.fleet)} title={it.note || undefined}
-              className={cx('flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-1 text-left text-base',
-                tone === 'live' ? 'border-red-600 bg-red-950/50' : tone === 'next' ? 'border-sky-600 bg-sky-950/40' : tone === 'done' ? 'border-ink-800 bg-ink-950/30 opacity-60' : 'border-ink-800 bg-ink-900',
-                mine && 'ring-2 ring-accent-500/60')}>
-              <span className="font-mono font-bold tabular-nums text-ink-100">{it.time || '—'}</span>
-              {it.status && <span className={cx('rounded px-1 text-xs font-bold uppercase', tone === 'live' ? 'animate-pulse bg-red-600 text-white' : tone === 'next' ? 'bg-sky-600 text-white' : 'bg-ink-800 text-ink-300')}>{it.status}</span>}
-              <span className="font-semibold text-ink-50">{it.race}</span>
-              {it.fleet && <span className="text-sm text-ink-400">{groupTitle(it.fleet)}</span>}
-            </button>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-// ---------- standing and talking points, one line each ----------
-function StandingLine({ standing, teamById, colours, hasScores, fleetName, onPick }: { standing?: Standing; teamById: Map<string, OverviewTeam>; colours: Record<string, Gradient | null>; hasScores: boolean; fleetName: string; onPick: (teamId: string) => void }) {
-  if (!standing || !hasScores) return <span className="text-sm text-ink-500">{groupTitle(standing?.title || fleetName)}: no scores yet</span>;
-  const raced = Array.from({ length: standing.races }, (_, i) => i).filter((i) => standing.rows.some((r) => (r.races[i] ?? '') !== '')).length;
-  return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      <span className="shrink-0 text-sm font-bold uppercase text-ink-400">{groupTitle(standing.title || fleetName)} · after {raced} race{raced === 1 ? '' : 's'}</span>
-      {standing.rows.filter((r) => r.total !== '').map((r) => {
-        const t = teamById.get(r.teamId);
-        const fl = t && flagOf(t);
-        return (
-          <button key={r.teamId} onClick={() => onPick(r.teamId)} className="flex shrink-0 items-center gap-1.5 rounded-md border border-ink-800 bg-ink-900 px-2 py-0.5 text-base hover:border-ink-600">
-            <span className="h-3.5 w-1 rounded-full" style={{ background: css(colours[r.teamId], 180) ?? '#334155' }} />
-            {fl && <img src={fl} alt="" className="h-4 w-6 rounded-[2px] object-cover" />}
-            <b className="font-mono text-ink-50">{t?.code ?? '?'}</b>
-            <b className="tabular-nums text-accent-200">{r.total}</b>
-          </button>
+          <span key={it.id} className={cx('text-base', mine ? 'text-ink-50' : 'text-ink-400')} title={it.note || undefined}>
+            <span className="font-mono tabular-nums">{it.time || '—'}</span> {/^\d+$/.test(it.race.trim()) ? `Race ${it.race.trim()}` : it.race}{it.fleet ? ` · ${groupTitle(it.fleet)}` : ''}
+          </span>
         );
       })}
     </div>
-  );
-}
-
-function FactsLine({ teams }: { teams: OverviewTeam[] }) {
-  if (!teams.length) return null;
-  const ranked = teams.filter((t) => Number(t.ranking) > 0).sort((a, b) => Number(a.ranking) - Number(b.ranking));
-  const weighed = teams.filter((t) => Number(String(t.declaration?.totalWeight ?? '').replace(',', '.')) > 0)
-    .map((t) => ({ t, w: Number(String(t.declaration!.totalWeight).replace(',', '.')) })).sort((a, b) => a.w - b.w);
-  const facts: [string, string][] = [];
-  if (ranked.length) facts.push(['Best ranked', `${ranked[0].code} #${ranked[0].ranking}`]);
-  if (ranked.length > 1) facts.push(['Lowest ranked', `${ranked[ranked.length - 1].code} #${ranked[ranked.length - 1].ranking}`]);
-  if (weighed.length > 1) { facts.push(['Heaviest', `${weighed[weighed.length - 1].t.code} ${weighed[weighed.length - 1].w} kg`]); facts.push(['Lightest', `${weighed[0].t.code} ${weighed[0].w} kg`]); }
-  facts.push(['Declared today', `${teams.filter((t) => t.declaration).length}/${teams.length}`]);
-  return (
-    <ul className="ml-auto flex flex-wrap items-center gap-1.5 text-sm" aria-label="Talking points">
-      {facts.map(([k, v]) => <li key={k} className="rounded-md bg-ink-900 px-1.5 py-0.5"><span className="text-ink-500">{k} </span><b className="text-ink-100">{v}</b></li>)}
-    </ul>
   );
 }
 
@@ -313,34 +249,26 @@ function crewOf(team: OverviewTeam, lineup?: LineupPlace[]): { lines: Line[]; so
   return { lines, source };
 }
 
-function TeamCard({ team, colour, lineup, points, races, history, onOpen }: {
-  team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; races?: string[];
-  history?: History; onOpen: () => void;
-}) {
+function TeamCard({ team, colour, lineup, points, onOpen }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; onOpen: () => void }) {
   const flag = flagOf(team);
-  const captain = team.sailors.find((s) => s.isCaptain);
-  const { lines, source } = crewOf(team, lineup);
+  const { lines } = crewOf(team, lineup);
+  const hasPos = lines.some((l) => l.position); // no declaration yet: no empty position column
   const bg = css(colour);
   // the crew fills the card: the font grows with the screen height and shrinks for a long crew
   const rows = Math.max(5, lines.length);
-  const font = `calc(clamp(15px, calc((100vh - 300px) / ${rows} * 0.3), 30px) * var(--cs, 1))`;
+  const font = `calc(clamp(15px, calc((100vh - 250px) / ${rows} * 0.32), 32px) * var(--cs, 1))`;
   return (
-    <section className="card flex min-h-0 flex-col overflow-hidden">
-      <header className="relative shrink-0 cursor-pointer px-3 py-2" style={{ background: bg ?? '#1b212a' }} onClick={onOpen} title="Open this team in large type">
+    <button type="button" onClick={onOpen} title="Open this team"
+      className="card group flex min-h-0 flex-col overflow-hidden text-left transition-shadow hover:ring-2 hover:ring-accent-500">
+      <header className="relative w-full shrink-0 px-3 py-2" style={{ background: bg ?? '#1b212a' }}>
         <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/80 via-[#0e1217]/55 to-[#0e1217]/20" aria-hidden />
         <div className="relative flex items-center gap-3">
           <div className="flex h-12 w-[72px] shrink-0 items-center justify-center overflow-hidden rounded bg-[#0e1217]/60 shadow">
             {flag ? <img src={flag} alt="" className="max-h-full max-w-full object-contain" /> : null}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-black leading-none text-white drop-shadow">{team.code}</span>
-              <span className="truncate text-base font-semibold text-white/90">{team.name}</span>
-            </div>
-            <div className="truncate text-sm">
-              {team.nickname && <span className="font-bold uppercase tracking-wide text-white/80">“{team.nickname}” </span>}
-              {captain && <span className="text-[#fde68a]">★ {captain.firstName} {captain.lastName}</span>}
-            </div>
+            <div className="font-mono text-3xl font-black leading-none text-white drop-shadow">{team.code}</div>
+            <div className="truncate text-base font-semibold text-white/85">{team.name}</div>
           </div>
           {points && (
             <div className="shrink-0 rounded-md bg-[#0e1217]/70 px-2.5 py-1 text-center" title="Points in the group">
@@ -348,22 +276,15 @@ function TeamCard({ team, colour, lineup, points, races, history, onOpen }: {
               <div className="text-[11px] uppercase leading-tight text-[#a3afbf]">pts</div>
             </div>
           )}
+          <span className="shrink-0 text-2xl leading-none text-white/50 transition-colors group-hover:text-white" aria-hidden>›</span>
         </div>
       </header>
-      <div className="flex shrink-0 flex-wrap gap-1 border-b border-ink-800 bg-ink-900/60 px-2 py-1 text-sm">
-        {team.ranking && <Chip label="Rank" value={`#${team.ranking}`} />}
-        {team.rankingPoints && <Chip label="Pts" value={team.rankingPoints} />}
-        {team.declaration?.totalWeight && <Chip label="Crew" value={`${team.declaration.totalWeight} kg`} />}
-        {races?.length ? <Chip label="Races" value={races.join(' · ')} /> : null}
-        {(history ?? []).map((h, i) => <Chip key={i} label={h.stage} value={`${ordinal(h.rank)} of ${h.of}${h.total ? ` · ${h.total} pts` : ''}`} title={`${h.stage}, ${h.group}`} />)}
-        <span className={cx('ml-auto rounded px-1.5 py-0.5 text-xs font-semibold uppercase', source === 'Roster' ? 'bg-ink-800 text-ink-400' : 'bg-emerald-950/70 text-emerald-300')}>{source}</span>
-      </div>
-      <ol className="flex min-h-0 flex-1 cursor-pointer flex-col overflow-y-auto" style={{ fontSize: font }} onClick={onOpen}>
+      <ol className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto" style={{ fontSize: font }}>
         {lines.map((l) => {
           const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
           return (
-            <li key={l.key} className={cx('flex min-h-0 flex-1 items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0', l.captain && 'bg-amber-500/10')}>
-              <span className="w-[4.2em] shrink-0 text-[0.6em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>
+            <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0">
+              {hasPos && <span className="w-[4.2em] shrink-0 text-[0.6em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
               <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-semibold leading-tight text-ink-50" title={`${l.first} ${l.last}`}>
@@ -377,7 +298,7 @@ function TeamCard({ team, colour, lineup, points, races, history, onOpen }: {
         })}
         {!lines.length && <li className="px-3 py-4 text-center text-base text-ink-600">No crew yet</li>}
       </ol>
-    </section>
+    </button>
   );
 }
 
@@ -399,13 +320,14 @@ function EmptyCard({ place, label }: { place: number; label: string | null }) {
 // ---------- one team on its own (click a card): the crew in very large type and everything about the team ----------
 const kg = (v: string | undefined | null) => { const n = Number(String(v ?? '').replace(',', '.')); return n > 0 ? n : 0; };
 
-function TeamFocus({ team, colour, lineup, points, races, history, note, group, groupName, onClose }: {
+function TeamFocus({ team, colour, lineup, points, races, history, note, group, groupName, onClose, onStep }: {
   team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; races?: string[]; history?: History; note?: string;
-  group: OverviewTeam[]; groupName: string; onClose: () => void;
+  group: OverviewTeam[]; groupName: string; onClose: () => void; onStep: (d: number) => void;
 }) {
   const flag = team.assets.flag_big?.previewUrl ?? flagOf(team);
   const captain = team.sailors.find((s) => s.isCaptain);
-  const { lines, source } = crewOf(team, lineup);
+  const { lines } = crewOf(team, lineup);
+  const hasPos = lines.some((l) => l.position);
   const country = COUNTRY_FACTS[team.code.toUpperCase()];
   const rows = Math.max(6, lines.length);
   const font = `calc(clamp(24px, calc((100vh - 330px) / ${rows} * 0.36), 60px) * var(--cs, 1))`;
@@ -437,7 +359,20 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
     ['Points', points ?? ''], ['World rank', team.ranking ? `#${team.ranking}` : ''], ['Ranking pts', team.rankingPoints],
     ['Crew', team.declaration?.totalWeight ? `${team.declaration.totalWeight} kg` : ''], ['Sailors', lines.length ? String(lines.length) : ''],
   ] as [string, string][]).filter(([, v]) => v);
+  const at = group.findIndex((t) => t.id === team.id);
+  const prev = group[(at - 1 + group.length) % group.length];
+  const next = group[(at + 1) % group.length];
   return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <nav className="flex shrink-0 items-center gap-2" style={{ zoom: 'var(--cs, 1)' } as React.CSSProperties}>
+      <button onClick={onClose} title="Esc" className="rounded-md border border-ink-700 bg-ink-900 px-3 py-1.5 text-base font-semibold text-ink-100 hover:bg-ink-800">← Back to {groupName}</button>
+      {group.length > 1 && (
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={() => onStep(-1)} title="Key ←" className="rounded-md border border-ink-700 bg-ink-900 px-3 py-1.5 text-base font-semibold text-ink-100 hover:bg-ink-800">‹ {prev.code}</button>
+          <button onClick={() => onStep(1)} title="Key →" className="rounded-md border border-ink-700 bg-ink-900 px-3 py-1.5 text-base font-semibold text-ink-100 hover:bg-ink-800">{next.code} ›</button>
+        </div>
+      )}
+    </nav>
     <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
       <header className="relative shrink-0 px-4 py-3" style={{ background: css(colour) ?? '#1b212a', zoom: 'var(--cs, 1)' } as React.CSSProperties}>
         <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/85 via-[#0e1217]/55 to-[#0e1217]/25" aria-hidden />
@@ -463,7 +398,6 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
               </div>
             ))}
           </dl>
-          <button onClick={onClose} title="Esc: back to the group" className="shrink-0 self-start rounded-md bg-[#0e1217]/70 px-3 py-1.5 text-lg font-bold text-white hover:bg-[#0e1217]">✕</button>
         </div>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_minmax(320px,26%)]">
@@ -471,8 +405,8 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
           {lines.map((l) => {
             const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
             return (
-              <li key={l.key} className={cx('flex min-h-0 flex-1 items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0', l.captain && 'bg-amber-500/10')}>
-                <span className="w-[5em] shrink-0 text-[0.55em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>
+              <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0">
+                {hasPos && <span className="w-[5em] shrink-0 text-[0.55em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
                 <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold leading-tight text-ink-50">
@@ -488,7 +422,6 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
           {!lines.length && <li className="px-3 py-6 text-center text-2xl text-ink-600">No crew yet</li>}
         </ol>
         <aside className="min-h-0 space-y-4 overflow-y-auto border-l border-ink-800 bg-ink-950/40 p-4" style={{ fontSize: 'calc(17px * var(--cs, 1))' }}>
-          <span className={cx('inline-block rounded px-2 py-0.5 text-[0.75em] font-semibold uppercase', source === 'Roster' ? 'bg-ink-800 text-ink-400' : 'bg-emerald-950/70 text-emerald-300')}>Crew from: {source}</span>
           {facts.length > 0 && (
             <div>
               <h3 className="mb-1 text-[0.75em] font-bold uppercase tracking-wide text-ink-400">Talking points</h3>
@@ -516,6 +449,7 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
         </aside>
       </div>
     </section>
+    </div>
   );
 }
 
