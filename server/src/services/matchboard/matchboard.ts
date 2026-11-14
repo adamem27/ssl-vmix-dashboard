@@ -201,6 +201,8 @@ export class MatchboardExporter {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private fontsLoaded = '';
   lastWriteAt: string | null = null;
+  /** Called after each new file (the vMix titles showing the board load it again). */
+  onWrite: (() => void) | null = null;
   lastError: string | null = null;
 
   constructor(readonly ctx: { db: DB; assetsDir: string }, private log: (m: string) => void = () => {}) {}
@@ -294,6 +296,7 @@ export class MatchboardExporter {
     fs.renameSync(tmp, this.file);
     this.lastWriteAt = nowIso();
     this.lastError = null;
+    this.onWrite?.();
     return this.status();
   }
 }

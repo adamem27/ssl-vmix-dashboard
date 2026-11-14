@@ -7,6 +7,7 @@ import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
 import { getSetDetail, listSets } from './fleets.js';
 import { listPeople, personName } from './general.js';
+import { MATCHBOARD_REL } from './matchboard/matchboard.js';
 import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { BOARD_BOW_TO_STERN, BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
@@ -1576,6 +1577,28 @@ export class Show {
       this.syncError = msg;
     } finally { this.syncing = false; }
     return { sent };
+  }
+  /**
+   * After the Matchboard PNG is written (PNG generator → Matchboard): every vMix title showing it loads it again, so a
+   * change shows at once: the image fields that hold matchboard.png, and in the Matchboard title (ssl_matchboard) its
+   * image field (one named Matchboard, else its only one). Again a moment later, for the copy mirrored to the vMix PC.
+   */
+  async reloadMatchboard(again = true): Promise<number> {
+    this.invalidate();
+    const { inputs } = await this.snapshot();
+    const file = imagePath(this.ctx.db, this.ctx.assetsDir, MATCHBOARD_REL);
+    const isBoard = (v: string) => /(^|[\\/])matchboard\.png$/i.test(v.trim());
+    const own = this.resolve(this.graphic('matchboard'), inputs);
+    let n = 0;
+    for (const input of inputs) {
+      const src = input.fields.filter((f) => f.endsWith('.Source'));
+      const hits = src.filter((f) => isBoard(input.values?.[f] ?? ''));
+      if (!hits.length && input === own) { const pick = src.find((f) => /matchboard/i.test(f)) ?? (src.length === 1 ? src[0] : undefined); if (pick) hits.push(pick); }
+      const id = encodeURIComponent(input.key || input.number);
+      for (const f of hits) { await this.vmix(`?Function=SetImage&Input=${id}&SelectedName=${encodeURIComponent(f)}&Value=${encodeURIComponent(file)}`); n++; }
+    }
+    if (again && n) setTimeout(() => { void this.reloadMatchboard(false).catch(() => {}); }, 3000).unref?.();
+    return n;
   }
   /**
    * REFRESH PNG key: every picture of every vMix input that comes from the dashboard's files goes in again (same path),

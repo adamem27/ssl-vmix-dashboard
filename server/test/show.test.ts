@@ -566,6 +566,18 @@ describe('show control', () => {
     expect(v.calls).toEqual([`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`]);
   });
 
+  it('a new Matchboard PNG goes again into the titles showing it (ssl_matchboard\'s image field, any field holding matchboard.png)', async () => {
+    const s = setup();
+    const v = fakeVmix({ ssl_matchboard: ['Board.Source'], other: ['Pic.Source', 'Logo.Source'], img: ['#Image'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    v.vals.set('2|Pic.Source', 'D:\\SSL\\Matchboard\\matchboard.png');
+    v.vals.set('2|Logo.Source', 'D:\\SSL\\logo.png');
+    expect(await show.reloadMatchboard(false)).toBe(2);
+    const sets = v.calls.filter((c) => c.startsWith('?Function=SetImage'));
+    expect(sets.map((c) => c.split('&SelectedName=')[1].split('&')[0])).toEqual(['Board.Source', 'Pic.Source']);
+    expect(sets.every((c) => /matchboard\.png$/i.test(c))).toBe(true);
+  });
+
   it('the Last Chance Race: teams of other groups, its own results and comparison inputs (ssl_results_LCR, ssl_compare_LCR) and keys', async () => {
     const { s, ev, teams } = race();
     const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
