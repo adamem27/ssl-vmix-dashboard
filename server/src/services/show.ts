@@ -180,8 +180,8 @@ export interface PresetTeam { code: string; name: string; crew: { slot: string; 
 
 /** A group of the stage with a Team comparison of its own: key A, B… (FINAL…), its input ssl_compare_<key>. */
 export interface PresetGroup { fleetId: string; key: string; label: string }
-/** A group's key for its own inputs and keys: H, I…; the Last Chance Race is LCR (ssl_results_LCR, ssl_compare_LCR). */
-export const compareKey = (name: string) => (/last\s*chance|\blcr\b/i.test(name) ? 'LCR' : groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+/** A group's key for its own inputs and keys: H, I…; the Last Chance Race is LCR (ssl_results_LCR, ssl_compare_LCR), the Qualification Race QR (ssl_compare_QR). */
+export const compareKey = (name: string) => (/last\s*chance|\blcr\b/i.test(name) ? 'LCR' : /qualification\s*race|\bqr\b/i.test(name) ? 'QR' : groupLetter(name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
 export const compareInput = (key: string) => `ssl_compare_${key}`;
 /** A group's own Group results input (ssl_results_H…); without one, the shared results title takes the group's data. */
 export const resultsInput = (key: string) => `ssl_results_${key}`;
