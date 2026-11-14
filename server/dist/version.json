@@ -1,8 +1,14 @@
 {
-  "version": "1.0.182",
-  "commit": "868cc14",
-  "date": "2026-11-14T20:50:04Z",
+  "version": "1.0.183",
+  "commit": "a8ab23f",
+  "date": "2026-11-14T21:15:23Z",
   "changes": [
+    {
+      "version": "1.0.183",
+      "commit": "a8ab23f",
+      "date": "2026-11-14T21:15:23Z",
+      "text": "Matchboard: each new PNG goes straight into the vMix titles showing it (ssl_matchboard's image field, any field holding matchboard.png)"
+    },
     {
       "version": "1.0.182",
       "commit": "868cc14",
@@ -476,12 +482,6 @@
       "commit": "c0cd346",
       "date": "2026-11-09T23:41:30Z",
       "text": "GTZIP generator: a new group is cut to the area of its elements; FIT cuts an existing layer the same way"
-    },
-    {
-      "version": "1.0.103",
-      "commit": "751a43e",
-      "date": "2026-11-09T23:33:50Z",
-      "text": "Fold the left menu to icons; GTZIP generator: hide Layers or Properties for a bigger canvas, full screen preview (F)"
     }
   ]
 }

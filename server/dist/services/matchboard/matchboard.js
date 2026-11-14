@@ -228,6 +228,8 @@ export class MatchboardExporter {
     timer = null;
     fontsLoaded = '';
     lastWriteAt = null;
+    /** Called after each new file (the vMix titles showing the board load it again). */
+    onWrite = null;
     lastError = null;
     constructor(ctx, log = () => { }) {
         this.ctx = ctx;
@@ -327,6 +329,7 @@ export class MatchboardExporter {
         fs.renameSync(tmp, this.file);
         this.lastWriteAt = nowIso();
         this.lastError = null;
+        this.onWrite?.();
         return this.status();
     }
 }

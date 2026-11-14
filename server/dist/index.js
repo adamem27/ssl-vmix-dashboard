@@ -40,6 +40,8 @@ workbook.start();
 generator.start();
 lowerThirds.start();
 show.start();
+// a new Matchboard PNG goes straight into the vMix titles showing it (vMix may be off: nothing then)
+matchboard.onWrite = () => { void show.reloadMatchboard().catch(() => { }); };
 matchboard.schedule(2000);
 app.liveFeed.start(); // commentator screen online: pushes only when switched on in Settings
 app.staticSite.start(); // static commentator page: publishes only when switched on
