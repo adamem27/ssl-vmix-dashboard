@@ -469,6 +469,18 @@ describe('show control', () => {
     expect(teamKeyColours(null, 'CUB')!.normal).toEqual({ bg: '#e03a3e', fg: '#0a2a8c' });
   });
 
+  it('LAST CHANCE EXPLAINED on the BEFORE page puts the ready graphic in, nothing filled in', async () => {
+    const { s } = race();
+    const v = fakeVmix({ ...TITLES, ssl_lcr_info: [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const before = show.pages().find((p) => p.name === 'A BEFORE')!;
+    expect(before.keys.flat().some((x) => x?.action === 'show:lcrinfo')).toBe(true);
+    await show.run('show:lcrinfo');
+    expect(v.overlays[1]).toBe(v.num('ssl_lcr_info'));
+    await show.run('show:lcrinfo');
+    expect(v.overlays[1]).toBeFalsy();
+  });
+
   it("keeps the producer's PEOPLE page from Companion as it is in every preset", async () => {
     const { s } = race();
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
