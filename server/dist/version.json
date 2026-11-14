@@ -1,8 +1,14 @@
 {
-  "version": "1.0.181",
-  "commit": "a9a3776",
-  "date": "2026-11-14T20:33:27Z",
+  "version": "1.0.182",
+  "commit": "868cc14",
+  "date": "2026-11-14T20:50:04Z",
   "changes": [
+    {
+      "version": "1.0.182",
+      "commit": "868cc14",
+      "date": "2026-11-14T20:50:04Z",
+      "text": "Day schedule: a row typed QR / LCR finds the Qualification / Last Chance Race group; test that rows follow the day picked at the top"
+    },
     {
       "version": "1.0.181",
       "commit": "a9a3776",
@@ -476,12 +482,6 @@
       "commit": "751a43e",
       "date": "2026-11-09T23:33:50Z",
       "text": "Fold the left menu to icons; GTZIP generator: hide Layers or Properties for a bigger canvas, full screen preview (F)"
-    },
-    {
-      "version": "1.0.102",
-      "commit": "00230a1",
-      "date": "2026-11-09T23:25:48Z",
-      "text": "Show control: team keys show the group's teams (code and name) instead of BOAT 1–4"
     }
   ]
 }
