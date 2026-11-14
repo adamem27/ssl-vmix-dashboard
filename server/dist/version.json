@@ -1,8 +1,14 @@
 {
-  "version": "1.0.172",
-  "commit": "8df23a3",
-  "date": "2026-11-13T19:38:49Z",
+  "version": "1.0.173",
+  "commit": "213964d",
+  "date": "2026-11-14T12:14:11Z",
   "changes": [
+    {
+      "version": "1.0.173",
+      "commit": "213964d",
+      "date": "2026-11-14T12:14:11Z",
+      "text": "Commentator: declared position, number, name in large type; best results always; Group H names; points only; schedule after the next race"
+    },
     {
       "version": "1.0.172",
       "commit": "8df23a3",
@@ -476,12 +482,6 @@
       "commit": "678ce1c",
       "date": "2026-11-09T20:58:52Z",
       "text": "Lower thirds from Stream Deck/Companion: sailor, team and best-result keys with data-change swaps"
-    },
-    {
-      "version": "1.0.93",
-      "commit": "03a1734",
-      "date": "2026-11-09T20:37:05Z",
-      "text": "PNG generator: the stroke swatch shows the orange-yellow gradient when Gradient is ticked; new elements get the gradient stroke"
     }
   ]
 }
