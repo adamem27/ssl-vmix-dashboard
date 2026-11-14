@@ -1,8 +1,14 @@
 {
-  "version": "1.0.174",
-  "commit": "0ef79fb",
-  "date": "2026-11-14T12:19:59Z",
+  "version": "1.0.175",
+  "commit": "c540364",
+  "date": "2026-11-14T12:32:08Z",
   "changes": [
+    {
+      "version": "1.0.175",
+      "commit": "c540364",
+      "date": "2026-11-14T12:32:08Z",
+      "text": "Commentator: calmer layout - one header line, group tabs, plain team cards that open on click, back and next-team buttons"
+    },
     {
       "version": "1.0.174",
       "commit": "0ef79fb",
@@ -476,12 +482,6 @@
       "commit": "24b40ed",
       "date": "2026-11-09T21:47:36Z",
       "text": "Lower thirds: show the last key press and its error on the tab"
-    },
-    {
-      "version": "1.0.95",
-      "commit": "d4b3017",
-      "date": "2026-11-09T21:27:40Z",
-      "text": "Lower thirds: downloadable Companion page files with every key and its action"
     }
   ]
 }
