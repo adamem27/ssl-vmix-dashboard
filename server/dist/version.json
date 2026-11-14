@@ -1,8 +1,14 @@
 {
-  "version": "1.0.180",
-  "commit": "ccedd5e",
-  "date": "2026-11-14T20:19:27Z",
+  "version": "1.0.181",
+  "commit": "a9a3776",
+  "date": "2026-11-14T20:33:27Z",
   "changes": [
+    {
+      "version": "1.0.181",
+      "commit": "a9a3776",
+      "date": "2026-11-14T20:33:27Z",
+      "text": "Day schedule: places of a group with no team yet get the neutral ? flag, known teams their flags"
+    },
     {
       "version": "1.0.180",
       "commit": "ccedd5e",
@@ -476,12 +482,6 @@
       "commit": "00230a1",
       "date": "2026-11-09T23:25:48Z",
       "text": "Show control: team keys show the group's teams (code and name) instead of BOAT 1–4"
-    },
-    {
-      "version": "1.0.101",
-      "commit": "edceb16",
-      "date": "2026-11-09T23:24:53Z",
-      "text": "GTZIP generator as a design workspace: big zoomable artboard with a 10 px grid, rulers, handles, marquee, smart guides and snapping; toolbar to add text, shapes, pictures (dashboard or computer, drag and drop), layers, align, distribute, arrange, group; layers panel with drag and drop, lock and rename; Ctrl+C/V/X/D/G shortcuts"
     }
   ]
 }
