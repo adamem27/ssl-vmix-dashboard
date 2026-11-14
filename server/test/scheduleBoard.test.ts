@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { setup } from './helpers.js';
 import { activeEvent } from '../src/db/db.js';
 import { createScheduleItem, getScheduleOptions, setScheduleOptions } from '../src/services/general.js';
-import { scheduleHighlightPath, showDataFields } from '../src/services/showData.js';
+import { scheduleHighlightPath, showDataFields, unknownFlagPath } from '../src/services/showData.js';
 import { createFleet, createSet, placeTeam } from '../src/services/fleets.js';
 import { createTeam } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
@@ -44,7 +44,7 @@ describe('day schedule board', () => {
     expect(f.get('GROUP 1 C.Text')).not.toBe('');
   });
 
-  it('a group with only some teams known: only their flags are set, the other places stay as in the title; the name as typed', () => {
+  it('a group with only some teams known: their flags, the neutral “?” flag in the other places; the name as typed', () => {
     const { s, fields } = board();
     const ev = activeEvent(s.db).id;
     const set = createSet(s.db, ev, 'Final day');
@@ -61,9 +61,17 @@ describe('day schedule board', () => {
     expect(f.get('GROUP 4 C.Text')).toBe('Qualification Race');
     expect(f.get('RACE 4 C.Text')).toBe('Qualification');
     expect(f.get('FLAG 13 C.Source')).toMatch(/BRA/);
-    expect(f.has('FLAG 14 C.Source')).toBe(false); // unknown yet: the “?” flag in the title stays
+    const unknown = unknownFlagPath(s.ctx);
+    expect(unknown).toMatch(/flag_unknown\.png$/);
+    expect(fs.readFileSync(unknown).readUInt32BE(0)).toBe(0x89504e47);
+    expect(f.get('FLAG 14 C.Source')).toBe(unknown); // unknown yet: the “?” flag
     expect(f.get('FLAG 15 C.Source')).toMatch(/CHI/);
-    expect(f.has('FLAG 16 C.Source')).toBe(false);
+    expect(f.get('FLAG 16 C.Source')).toBe(unknown);
+    // with TIME on, the same in the row's own flags
+    setScheduleOptions(s.db, { showTime: true });
+    expect(fields().get('FLAG 14.Source')).toBe(unknown);
+    expect(fields().get('FLAG 13.Source')).toMatch(/BRA/);
+    setScheduleOptions(s.db, { showTime: false });
     // rows that are not in the schedule are still emptied
     expect(f.get('FLAG 17 C.Source')).toBe('');
   });

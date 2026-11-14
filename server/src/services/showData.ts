@@ -22,6 +22,7 @@ import { comparisonFlag } from './compareImages.js';
 import { currentStage } from './workbookSheets.js';
 import { getSetting, setSetting } from '../db/db.js';
 import { pad, textWidth } from './textFit.js';
+import { UNKNOWN_FLAG_PNG } from './unknownFlag.js';
 
 type Asset = { vmixPath: string | null; storedPath: string | null; enteredPath: string | null } | undefined | null;
 const img = (a: Asset) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
@@ -89,6 +90,16 @@ export function scheduleHighlightPath(ctx: AssetCtx) {
   return imagePath(ctx.db, ctx.assetsDir, SCHEDULE_HIGHLIGHT);
 }
 
+/** The neutral “?” flag of a place with no team yet (day schedule). */
+export const UNKNOWN_FLAG = 'icons/flag_unknown.png';
+export function unknownFlagPath(ctx: AssetCtx) {
+  if (ctx.assetsDir) {
+    const file = path.join(ctx.assetsDir, ...UNKNOWN_FLAG.split('/'));
+    try { if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, UNKNOWN_FLAG_PNG); } } catch { /* read-only folder: the path is still sent */ }
+  }
+  return imagePath(ctx.db, ctx.assetsDir, UNKNOWN_FLAG);
+}
+
 /** Today's schedule rows with the flags of each group's teams (current stage first). */
 export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
   const fleets = scheduleFleets(ctx, eventId);
@@ -100,7 +111,8 @@ export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
     const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key)];
     const f = same.find((x) => x.filled > 0) ?? same[0];
     const race = (s.race ?? '').trim();
-    return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `Race ${race}` : up(race), group: label, flags: (f ? f.positions : []).map((x) => (x ? flagOf(x) : null)) };
+    // no group of that name yet: four places with no team
+    return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `Race ${race}` : up(race), group: label, flags: (f ? f.positions : [null, null, null, null]).map((x) => (x ? flagOf(x) : null)) };
   });
 }
 
@@ -130,14 +142,14 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       f.set(`GROUP ${i + 1}.Text`, on(r?.group ?? ''));
       // the schedule board names its rows' group lines GROUP A, GROUP B, GROUP A1, GROUP B1
       if (i < SCHEDULE_GROUP_LAYERS.length) f.set(`${SCHEDULE_GROUP_LAYERS[i]}.Text`, on(r?.group ?? ''));
-      // a place of the group with no team yet (null): its flag field is left as it is in the title (a “?” flag)
-      const flag = (j: number) => (r ? r.flags[j] ?? null : '');
-      for (let j = 0; j < 4; j++) { const v = flag(j); if (v !== null || !time) f.set(`FLAG ${i * 4 + j + 1}.Source`, on(v ?? '')); }
+      // a place of the group with no team yet (null), or a group not set up yet: the neutral “?” flag
+      const flag = (j: number) => { const v = r ? r.flags[j] : ''; return v === null ? unknownFlagPath(ctx) : v ?? ''; };
+      for (let j = 0; j < 4; j++) f.set(`FLAG ${i * 4 + j + 1}.Source`, on(flag(j)));
       if (board) {
         f.set(`POSITION ${i + 1} C.Text`, off(r ? String(i + 1) : ''));
         f.set(`RACE ${i + 1} C.Text`, off(r?.race ?? ''));
         f.set(`GROUP ${i + 1} C.Text`, off(r?.group ?? ''));
-        for (let j = 0; j < 4; j++) { const v = flag(j); if (v !== null || time) f.set(`FLAG ${i * 4 + j + 1} C.Source`, off(v ?? '')); }
+        for (let j = 0; j < 4; j++) f.set(`FLAG ${i * 4 + j + 1} C.Source`, off(flag(j)));
         f.set(`HIGHLIGHT ${i + 1}.Source`, i === next ? hl : '');
       }
     }
