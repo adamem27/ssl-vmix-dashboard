@@ -44,7 +44,7 @@ export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
     // titles named the other way (overall_results: STAGE, LOCALIZATION, "Group A", position 1, flag 1, COUNTRY1,
     // R1 points1…, Total1): the stage and place from Welcome (General graphics), the group's name
     const welcome = listGraphicSets(ctx.db, activeEvent(ctx.db).id, 'welcome')[0]?.data ?? {};
-    const up = (v) => (v ?? '').trim().toUpperCase();
+    const up = (v) => (v ?? '').trim(); // as typed
     // the Results tab gives the group's title (Group A / GROUP) and the subtitle (the place: LOCALIZATION / LOCATION);
     // Welcome only fills in a subtitle left empty, and the stage
     const place = EVENT_LOCATION;
@@ -57,7 +57,7 @@ export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
         const r = g.rows[n - 1];
         const t = r ? teams.get(r.teamId) : undefined;
         f.set(`POS ${n}.Text`, r ? String(n) : '');
-        f.set(`TEAM ${n}.Text`, (t?.name ?? '').toUpperCase());
+        f.set(`TEAM ${n}.Text`, t?.name ?? '');
         f.set(`FLAG ${n}.Source`, img(t?.assets.flag_small));
         for (let j = 1; j <= 12; j++) {
             const k = j <= c ? raceAt(j) : -1;
@@ -65,7 +65,7 @@ export function resultFields(ctx, fleetId, rowsInTitle = 12, cols = 0) {
         }
         f.set(`POINTS ${n}.Text`, r ? r.total : '');
         f.set(`position ${n}.Text`, r ? String(n) : '');
-        f.set(`COUNTRY${n}.Text`, (t?.name ?? '').toUpperCase());
+        f.set(`COUNTRY${n}.Text`, t?.name ?? '');
         f.set(`flag ${n}.Source`, img(t?.assets.flag_small));
         for (let j = 1; j <= 12; j++) {
             const k = j <= c ? raceAt(j) : -1;

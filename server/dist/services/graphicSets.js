@@ -315,15 +315,15 @@ export function moveGraphicSet(db, id, dir) {
     const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
     db.transaction(() => list.forEach((x, n) => upd.run(n + 1, x.id)))();
 }
-const up = (s) => (s ?? '').trim().toUpperCase();
+const up = (s) => (s ?? '').trim(); // as typed
 /** The messages of a ticker: its lines, or the one sentence of a fixed ticker built from its fields. */
 export function tickerMessages(data, auto = {}) {
     const group = up(data.group) || up(auto.group) || '?';
     const race = up(data.race) || up(auto.race) || '?';
     switch (data.preset) {
-        case 'warning': return [`RACE ${race} OF GROUP ${group} WARNING SIGNAL AT ${up(data.time) || '?'}${data.timezone?.trim() ? ` (${up(data.timezone)})` : ''}`];
-        case 'thanks': return [`THANKS FOR WATCHING - JOIN US ${up(data.when) || 'TOMORROW'} FOR THE ${up(data.day) || '2ND DAY'} OF THE ${up(data.event)}`];
-        case 'delay': return [`WE ARE BACK SOON - RACE ${race} OF GROUP ${group} IS DELAYED DUE TO ${up(data.reason) || 'WEATHER CONDITIONS'}`];
+        case 'warning': return [`Race ${race} of Group ${group} warning signal at ${up(data.time) || '?'}${data.timezone?.trim() ? ` (${up(data.timezone)})` : ''}`];
+        case 'thanks': return [`Thanks for watching - join us ${up(data.when) || 'tomorrow'} for the ${up(data.day) || '2nd day'} of the ${up(data.event)}`];
+        case 'delay': return [`We are back soon - Race ${race} of Group ${group} is delayed due to ${up(data.reason) || 'weather conditions'}`];
         case 'custom': return data.text?.trim() ? [data.text.trim()] : [];
         default: return (data.items ?? '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
     }

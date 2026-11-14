@@ -107,7 +107,7 @@ export function resultSheetRows(ctx, eventId) {
                 const p = `T${i + 1}`;
                 row[`${p}Rank`] = String(i + 1);
                 row[`${p}Code`] = t?.code ?? '';
-                row[`${p}Name`] = (t?.name ?? '').toUpperCase();
+                row[`${p}Name`] = t?.name ?? '';
                 row[`${p}Ranking`] = t?.ranking ? `[${t.ranking}]` : '';
                 row[`${p}Flag`] = img(t?.assets.flag_small);
                 r.races.forEach((v, j) => { row[`${p}R${j + 1}`] = v; });

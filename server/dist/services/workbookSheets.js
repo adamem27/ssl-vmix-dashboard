@@ -162,7 +162,7 @@ export function lineupSheet(ctx, eventId) {
         if (stage)
             row.Group = group;
         Object.assign(row, {
-            Code: t.code, Team: (lu.data.teamName || t.name).toUpperCase(), Title: lu.data.title,
+            Code: t.code, Team: lu.data.teamName || t.name, Title: lu.data.title,
             'Flag big': img(a.flag_big), 'Flag small': img(a.flag_small), 'Emblem light': img(a.emblem_light), 'Emblem dark': img(a.emblem_dark),
             'Line-up background': img(a.background_2),
             'Sponsor 1': img(a.sponsor_1), 'Sponsor 2': img(a.sponsor_2), 'Sponsor 3': img(a.sponsor_3), 'Sponsor 4': img(a.sponsor_4), 'Sponsor 5': img(a.sponsor_5),
@@ -173,7 +173,7 @@ export function lineupSheet(ctx, eventId) {
             row[`${n} Place`] = r ? defs.find((d) => d.key === r.slot)?.label ?? r.slot : '';
             row[`${n} Number`] = filled ? r.number : '';
             row[`${n} Name`] = filled ? r.firstName : '';
-            row[`${n} Surname`] = filled ? r.lastName.toUpperCase() : '';
+            row[`${n} Surname`] = filled ? r.lastName : '';
             row[`${n} Position`] = r ? r.position : '';
             row[`${n} Captain`] = filled && r.captain ? 'Yes' : '';
             row[`${n} Photo`] = filled && r.sailorId ? img(listAssets(ctx, 'sailor', r.sailorId).photo) : '';
@@ -230,7 +230,7 @@ export function sailorsSheet(ctx, eventId, today) {
                     'Team code': t.code, Team: t.name, Captain: yes(p ? p.row.captain : s.isCaptain),
                     'Line-up place': p?.label ?? '', 'Line-up no.': p ? String(p.order) : '',
                     Number: p?.row.number || s.declared?.number || s.defaultNumber,
-                    'First name': p?.row.firstName || s.firstName, 'Last name': (p?.row.lastName || s.lastName).toUpperCase(),
+                    'First name': p?.row.firstName || s.firstName, 'Last name': p?.row.lastName || s.lastName,
                     Position: p?.row.position || s.declared?.position || s.defaultPosition,
                     'Declared today': yes(!!s.declared), Weight: s.declared?.weight ?? '',
                     'Best result 1': s.bestResult1, 'Best result 2': s.bestResult2, 'Best result 3': s.bestResult3,
@@ -246,7 +246,7 @@ export function sailorsSheet(ctx, eventId, today) {
                 const order = lu.data.rows.indexOf(r) + 1;
                 list.push({ order, name: `${r.lastName} ${r.firstName}`, row: {
                         'Team code': t.code, Team: t.name, Captain: yes(r.captain), 'Line-up place': defs.find((d) => d.key === r.slot)?.label ?? r.slot, 'Line-up no.': String(order),
-                        Number: r.number, 'First name': r.firstName, 'Last name': r.lastName.toUpperCase(), Position: r.position,
+                        Number: r.number, 'First name': r.firstName, 'Last name': r.lastName, Position: r.position,
                         'Declared today': '', Weight: '', 'Best result 1': '', 'Best result 2': '', 'Best result 3': '', Photo: '',
                     } });
             });
@@ -312,7 +312,7 @@ export function nowSheet(ctx, eventId, today) {
     const stage = g ? db.prepare('SELECT name FROM fleet_sets WHERE id = ?').get(g.setId) : undefined;
     const row = {
         Stage: stage?.name ?? '', Group: g?.label ?? '', 'Group letter': g?.letter ?? '', 'Next race': g ? nextRace(db, eventId, ev?.timezone ?? 'UTC') : '',
-        TITLE: (ev?.name ?? '').toUpperCase(), SUBTITLE: g?.label ?? '',
+        TITLE: ev?.name ?? '', SUBTITLE: g?.label ?? '',
     };
     const teams = new Map(listTeams(ctx).map((t) => [t.id, t]));
     const ov = new Map(overview(ctx, eventId, today, null).teams.map((t) => [t.id, t]));
@@ -321,7 +321,7 @@ export function nowSheet(ctx, eventId, today) {
         const t = teams.get(slots.find((x) => x.position === n)?.teamId ?? '');
         const captain = t ? loadLineup(db, eventId, t.id).data.rows.find((r) => r.captain) : undefined;
         Object.assign(row, {
-            [`T${n}Code`]: t?.code ?? '', [`T${n}Name`]: (t?.name ?? '').toUpperCase(), [`T${n}Nick`]: t?.nickname ?? '', [`T${n}Rank`]: t?.ranking ?? '',
+            [`T${n}Code`]: t?.code ?? '', [`T${n}Name`]: t?.name ?? '', [`T${n}Nick`]: t?.nickname ?? '', [`T${n}Rank`]: t?.ranking ?? '',
             [`T${n}Weight`]: t ? ov.get(t.id)?.declaration?.totalWeight ?? '' : '', [`T${n}Captain`]: captain ? `${captain.firstName} ${captain.lastName}`.trim() : '',
             [`T${n}Flag`]: img(t?.assets.flag_small),
         });

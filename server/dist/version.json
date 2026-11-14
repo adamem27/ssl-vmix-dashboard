@@ -1,8 +1,14 @@
 {
-  "version": "1.0.177",
-  "commit": "9a9d0e0",
-  "date": "2026-11-14T13:48:20Z",
+  "version": "1.0.178",
+  "commit": "ae49004",
+  "date": "2026-11-14T19:25:30Z",
   "changes": [
+    {
+      "version": "1.0.178",
+      "commit": "ae49004",
+      "date": "2026-11-14T19:25:30Z",
+      "text": "vMix texts exactly as typed (no forced capitals); day schedule leaves the flags of unknown group places untouched"
+    },
     {
       "version": "1.0.177",
       "commit": "9a9d0e0",
@@ -476,12 +482,6 @@
       "commit": "95ed05a",
       "date": "2026-11-09T23:00:56Z",
       "text": "Race results with times at marks: one race per group typed on the Results tab, sorted by finish, gap to the winner, points into the overall table, filled into the race results title by the RACE RESULTS key"
-    },
-    {
-      "version": "1.0.98",
-      "commit": "f3bb699",
-      "date": "2026-11-09T22:51:03Z",
-      "text": "Show control: lineup lower third in two parts, qualified team keys, placeholders as Image inputs, README"
     }
   ]
 }

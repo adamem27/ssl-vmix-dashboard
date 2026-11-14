@@ -22,7 +22,8 @@ import { comparisonFlag } from './compareImages.js';
 import { currentStage } from './workbookSheets.js';
 import { getSetting, setSetting } from '../db/db.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
-const up = (s) => (s ?? '').trim().toUpperCase();
+/** As typed (only trimmed): vMix gets the text exactly as it was written in the dashboard. */
+const up = (s) => (s ?? '').trim();
 /** DD.MM.YYYY, as on the SSL boards. */
 const dotted = (iso) => { const [y, m, d] = iso.split('-'); return y && m && d ? `${d}.${m}.${y}` : iso; };
 /** The first version of a graphic in General graphics (its data), or {}. */
@@ -97,7 +98,7 @@ export function scheduleRows(ctx, eventId, today) {
         const same = [...fleets.filter((x) => x.name.trim().toUpperCase() === (s.fleet ?? '').trim().toUpperCase()), ...fleets.filter((x) => groupKey(x.name) === key)];
         const f = same.find((x) => x.filled > 0) ?? same[0];
         const race = (s.race ?? '').trim();
-        return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `RACE ${race}` : up(race), group: label, flags: f ? f.positions.filter((x) => !!x).map(flagOf) : [] };
+        return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `Race ${race}` : up(race), group: label, flags: (f ? f.positions : []).map((x) => (x ? flagOf(x) : null)) };
     });
 }
 /** What a graphic's title gets when its key brings it in; null when General graphics has nothing for it. */
@@ -127,14 +128,22 @@ export function showDataFields(ctx, graphicId, o) {
             // the schedule board names its rows' group lines GROUP A, GROUP B, GROUP A1, GROUP B1
             if (i < SCHEDULE_GROUP_LAYERS.length)
                 f.set(`${SCHEDULE_GROUP_LAYERS[i]}.Text`, on(r?.group ?? ''));
-            for (let j = 0; j < 4; j++)
-                f.set(`FLAG ${i * 4 + j + 1}.Source`, on(r?.flags[j] ?? ''));
+            // a place of the group with no team yet (null): its flag field is left as it is in the title (a “?” flag)
+            const flag = (j) => (r ? r.flags[j] ?? null : '');
+            for (let j = 0; j < 4; j++) {
+                const v = flag(j);
+                if (v !== null || !time)
+                    f.set(`FLAG ${i * 4 + j + 1}.Source`, on(v ?? ''));
+            }
             if (board) {
                 f.set(`POSITION ${i + 1} C.Text`, off(r ? String(i + 1) : ''));
                 f.set(`RACE ${i + 1} C.Text`, off(r?.race ?? ''));
                 f.set(`GROUP ${i + 1} C.Text`, off(r?.group ?? ''));
-                for (let j = 0; j < 4; j++)
-                    f.set(`FLAG ${i * 4 + j + 1} C.Source`, off(r?.flags[j] ?? ''));
+                for (let j = 0; j < 4; j++) {
+                    const v = flag(j);
+                    if (v !== null || time)
+                        f.set(`FLAG ${i * 4 + j + 1} C.Source`, off(v ?? ''));
+                }
                 f.set(`HIGHLIGHT ${i + 1}.Source`, i === next ? hl : '');
             }
         }
@@ -167,12 +176,12 @@ export function showDataFields(ctx, graphicId, o) {
             return f;
         case 'lbar':
         case 'break':
-            f.set('TITLE.Text', 'TODAY');
+            f.set('TITLE.Text', 'Today');
             f.set('SUBTITLE.Text', dotted(today));
             f.set('WEBSITE.Text', up(socials.website));
             // the L-bar's side panel: the handles of Follow us, in order (SOCIAL 1–3)
             [socials.facebook, socials.youtube, socials.instagram, socials.tiktok, socials.x].map((v) => (v ?? '').trim()).filter(Boolean)
-                .concat('', '', '').slice(0, 3).forEach((v, i) => f.set(`SOCIAL ${i + 1}.Text`, v.toUpperCase()));
+                .concat('', '', '').slice(0, 3).forEach((v, i) => f.set(`SOCIAL ${i + 1}.Text`, v));
             sched();
             if (o.tickerText !== undefined)
                 f.set('Ticker1.Text', o.tickerText);
@@ -279,8 +288,8 @@ export function compareAuto(ctx, eventId, fleetId, today, o = {}) {
         // the team's panel from the PNG generator: left for teams 1 and 3, right for 2 and 4 (851×390); null: none
         const panel = t ? teamPictureFor(ctx, t, { w: 851, h: 390, key: `panel${n % 2 ? 'left' : 'right'}` }) : '';
         const v = {
-            name: (t?.name ?? '').toUpperCase(), nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
-            cptName: cpt?.firstName ?? '', cptSurname: (cpt?.lastName ?? '').toUpperCase(),
+            name: t?.name ?? '', nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
+            cptName: cpt?.firstName ?? '', cptSurname: cpt?.lastName ?? '',
             // the flag on the emblems' square canvas, made from the team's flag (its own files stay as they are)
             flag: t ? comparisonFlag(ctx, t.code, img(a.flag_big) || img(a.flag_small)) : '', emblem: img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark),
             photo: t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '', panel: panel ?? '',
