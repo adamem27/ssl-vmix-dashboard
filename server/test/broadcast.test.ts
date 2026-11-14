@@ -35,7 +35,7 @@ describe('general graphics versions', () => {
     gs.seedGraphicSets(db, eventId);
     const t = (p: string) => gs.listGraphicSets(db, eventId, 'ticker').find((x) => x.data.preset === p)!;
     gs.updateGraphicSet(db, t('warning').id, { data: { race: '1', group: 'h', time: '10:00' } });
-    expect(gs.tickerText(t('warning').data)).toBe(gs.repeatLoop('Race 1 of Group h warning signal at 10:00 (GMT-3) I '));
+    expect(gs.tickerText(t('warning').data)).toBe(gs.repeatLoop('RACE 1 OF GROUP H WARNING SIGNAL AT 10:00 (GMT-3) I ')); // always in capitals on air
     // repeated so the ticker runs on: 3× and 600 characters at least
     expect(gs.repeatLoop('A I ')).toBe('A I '.repeat(150));
     expect(gs.repeatLoop('x'.repeat(400))).toBe('x'.repeat(1200));

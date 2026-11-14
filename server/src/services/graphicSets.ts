@@ -346,7 +346,8 @@ export function tickerText(data: Record<string, string>, auto: TickerAuto = {}) 
   const items = tickerMessages(data, auto);
   if (!items.length) return '';
   const sep = data.separator || ' I ';
-  return repeatLoop(items.join(sep) + sep);
+  // the ticker on air is always in capitals, however it was typed
+  return repeatLoop(items.join(sep) + sep).toLocaleUpperCase('en-US');
 }
 
 /** One loop of a ticker repeated: 3× and 600 characters at least. */

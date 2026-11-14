@@ -28,7 +28,7 @@ const tickerText = (d: Record<string, string>, auto?: TickerAuto) => {
   const items = tickerMessages(d, auto);
   const sep = d.separator || ' I ';
   if (!items.length) return '';
-  const loop = items.join(sep) + sep;
+  const loop = (items.join(sep) + sep).toLocaleUpperCase('en-US'); // in capitals, as on air
   let out = loop;
   for (let i = 1; i < 3 || out.length < 600; i++) out += loop;
   return out;

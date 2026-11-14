@@ -222,7 +222,7 @@ describe('show control', () => {
     expect(v.calls).toContain(`?Function=SetText&Input=k11&SelectedName=Ticker1.Text&Value=${repeatLoop('BOAT CAPSIZED - ALL CREW SAFE I ')}`);
     // THANKS FOR WATCHING is the fixed ticker
     await show.run('ticker:thanks');
-    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=Thanks for watching'))).toBe(true);
+    expect(v.calls.some((c) => c.includes('Ticker1.Text&Value=THANKS FOR WATCHING'))).toBe(true);
 
     // a board gets General graphics at the press
     const w = listGraphicSets(s.db, ev, 'welcome')[0];
