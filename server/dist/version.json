@@ -1,8 +1,14 @@
 {
-  "version": "1.0.175",
-  "commit": "c540364",
-  "date": "2026-11-14T12:32:08Z",
+  "version": "1.0.176",
+  "commit": "285a04d",
+  "date": "2026-11-14T12:55:38Z",
   "changes": [
+    {
+      "version": "1.0.176",
+      "commit": "285a04d",
+      "date": "2026-11-14T12:55:38Z",
+      "text": "Commentator page: Publish now always sends fresh data, rounds 20x cheaper, no red stale badge when published by hand"
+    },
     {
       "version": "1.0.175",
       "commit": "c540364",
@@ -476,12 +482,6 @@
       "commit": "6e7901a",
       "date": "2026-11-09T22:45:54Z",
       "text": "Show control: both Stream Decks from one registry of graphics, overlays read from vMix, undo/all out/panic, break scene rotation, Companion page files with a fallback page"
-    },
-    {
-      "version": "1.0.96",
-      "commit": "24b40ed",
-      "date": "2026-11-09T21:47:36Z",
-      "text": "Lower thirds: show the last key press and its error on the tab"
     }
   ]
 }
