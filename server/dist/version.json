@@ -1,8 +1,14 @@
 {
-  "version": "1.0.184",
-  "commit": "8525f9c",
-  "date": "2026-11-14T22:11:36Z",
+  "version": "1.0.185",
+  "commit": "4d878e9",
+  "date": "2026-11-15T12:15:18Z",
   "changes": [
+    {
+      "version": "1.0.185",
+      "commit": "4d878e9",
+      "date": "2026-11-15T12:15:18Z",
+      "text": "Team LT qualified: bottom line QUALIFIED FOR THE FINAL SERIES"
+    },
     {
       "version": "1.0.184",
       "commit": "8525f9c",
@@ -476,12 +482,6 @@
       "commit": "db6156b",
       "date": "2026-11-09T23:53:21Z",
       "text": "GTZIP generator: animation preview (In, Out, In→Out, data change) with timeline and scrubbing; full screen preview fixed and plays animations"
-    },
-    {
-      "version": "1.0.105",
-      "commit": "2e17950",
-      "date": "2026-11-09T23:45:25Z",
-      "text": "Race signal flags (SSL style) come with the app: copied into assets/race-flags, offered in the GTZIP picture picker and synced to the vMix PC"
     }
   ]
 }

@@ -31,10 +31,10 @@ import { parseVmixXml, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmi
  *    animation; PANIC (pressed twice) cuts everything at once
  * State (what is on air) is always read from vMix, never remembered from key presses.
  */
-/** The bottom line of the qualified team lower third. */
 /** The lineup lower third's order: from the bow to the stern. */
 export const LINEUP_LT_ORDER = BOW_TO_STERN;
-export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
+/** The bottom line of the qualified team lower third (exactly as written, capitals). */
+export const QUALIFIED_TEXT = 'QUALIFIED FOR THE FINAL SERIES';
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS = [
     { id: 'welcome', label: 'Welcome', kind: 'board', overlay: 1, inputs: ['ssl_welcome'] },
