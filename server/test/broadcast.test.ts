@@ -48,7 +48,41 @@ describe('general graphics versions', () => {
     const ann = gs.listGraphicSets(db, eventId, 'announcement');
     expect(ann.length).toBe(gs.FLAG_ANNOUNCEMENTS.length + 1);
     expect(ann.find((a) => a.name === 'Yellow – Penalty')?.data).toMatchObject({ text: 'PENALTY', icon: 'race-flags/YELLOW_penalty.png' });
-    expect(ann.at(-1)).toMatchObject({ name: 'Replay', data: { text: 'REPLAY', icon: '' } });
+    expect(ann.find((a) => a.name === 'Replay')).toMatchObject({ data: { text: 'REPLAY', icon: '' } });
+    // the flags used most (and Replay), then the combinations, then the rest
+    expect(ann.map((a) => a.name)).toEqual(gs.ANNOUNCEMENT_ORDER);
+    expect(ann.slice(0, 11).map((a) => a.name)).toEqual(gs.OFTEN_ANNOUNCEMENTS.concat('C + red – Mark moved to port'));
+    expect(ann.find((a) => a.name === 'C + red – Mark moved to port')?.data).toMatchObject({ text: 'MARK MOVED TO PORT', icon: 'race-flags/C_red_mark_moved_to_port.png', deck: 'Often' });
+    expect(ann.find((a) => a.name === 'AP over 2 – Postponed 2 hours')?.data).toMatchObject({ text: 'RACE POSTPONED BY 2 HOURS', deck: 'Rare' });
+    expect(ann.filter(gs.isOften)).toHaveLength(14);
+    expect(ann.filter((a) => !gs.isOften(a)).length).toBeLessThanOrEqual(24); // one BUGS RARE page
+  });
+
+  it('gives an event made before the combinations of flags those, once, and sorts its list again', async () => {
+    const { db, eventId } = setup();
+    const { getSetting, setSetting } = await import('../src/db/db.js');
+    gs.seedGraphicSets(db, eventId);
+    // as an earlier version left it: no combinations, the flags in the old order, a version of your own in between
+    for (const a of gs.listGraphicSets(db, eventId, 'announcement')) if (a.name.startsWith('C + ') || a.name.startsWith('AP over 1')) gs.deleteGraphicSet(db, a.id);
+    const mine = gs.createGraphicSet(db, eventId, 'announcement', 'Lunch break', { text: 'LUNCH', deck: 'Often' });
+    const p = gs.listGraphicSets(db, eventId, 'announcement').find((a) => a.name === 'P – Preparatory')!;
+    gs.updateGraphicSet(db, p.id, { data: { text: 'MY OWN TEXT' } });
+    db.prepare("UPDATE graphic_sets SET sort = 0 WHERE id = ?").run(p.id);
+    gs.deleteGraphicSet(db, gs.listGraphicSets(db, eventId, 'announcement').find((a) => a.name === 'AP over 2 – Postponed 2 hours')!.id);
+    setSetting(db, `graphicSets.flags2.${eventId}`, '');
+    expect(getSetting(db, `graphicSets.flags2.${eventId}`)).toBeFalsy();
+    gs.seedGraphicSets(db, eventId);
+    const ann = gs.listGraphicSets(db, eventId, 'announcement');
+    const names = ann.map((a) => a.name);
+    // all the combinations again (AP over 2 too: it is one of the new ones), in their place; yours last; your text stays
+    expect(names).toEqual([...gs.ANNOUNCEMENT_ORDER, 'Lunch break']);
+    expect(ann.find((a) => a.id === p.id)?.data.text).toBe('MY OWN TEXT');
+    expect(ann.find((a) => a.id === mine)?.data.deck).toBe('Often');
+    expect(ann.find((a) => a.name === 'C + minus – Next leg shortened')?.data.deck).toBe('Often');
+    // once: deleted later, it stays deleted
+    gs.deleteGraphicSet(db, ann.find((a) => a.name === 'C + plus – Next leg lengthened')!.id);
+    gs.seedGraphicSets(db, eventId);
+    expect(gs.listGraphicSets(db, eventId, 'announcement').some((a) => a.name.startsWith('C + plus'))).toBe(false);
   });
 
   it('names groups as the broadcast does', () => {

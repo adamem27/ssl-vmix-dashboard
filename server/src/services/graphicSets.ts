@@ -156,23 +156,40 @@ export function seedGraphicSets(db: DB, eventId: string) {
   ensurePresets(db, eventId);
 }
 
-/** The announcement bugs: one per race flag (race-flags/ in the assets folder), plus Replay with the SSL star. */
+/**
+ * The announcement bugs: one per race signal (race-flags/ in the assets folder), plus Replay with the SSL star. In the
+ * order of the list: the flags used most, then the combinations of signals, then the rest (Racing Rules of Sailing
+ * 2025–2028, Race Signals; the coloured ones without a letter are the umpires' flags).
+ */
 export const FLAG_ANNOUNCEMENTS: { name: string; text: string; icon: string }[] = [
+  // used most (OFTEN_ANNOUNCEMENTS)
+  { name: 'X – Individual recall', text: 'INDIVIDUAL RECALL', icon: 'X_individual_recall.png' },
+  { name: 'First substitute – General recall', text: 'GENERAL RECALL', icon: 'FIRST_SUBSTITUTE_general_recall.png' },
+  { name: 'AP – Postponed', text: 'RACE POSTPONED', icon: 'AP_postponed.png' },
+  { name: 'AP over A – Postponed, no more racing today', text: 'RACE POSTPONED - NO MORE RACING TODAY', icon: 'AP_over_A_postponed_no_more_racing_today.png' },
+  { name: 'S – Shortened course', text: 'SHORTENED COURSE', icon: 'S_shortened_course.png' },
+  { name: 'C – Change of course', text: 'CHANGE OF COURSE', icon: 'C_change_of_course.png' },
+  { name: 'Green – No penalty', text: 'NO PENALTY', icon: 'GREEN_no_penalty.png' },
+  { name: 'Yellow – Penalty', text: 'PENALTY', icon: 'YELLOW_penalty.png' },
+  { name: 'Black – Disqualified', text: 'DISQUALIFIED', icon: 'BLACK_disqualified.png' },
+  // combinations: C with the red rectangle, green triangle, − or + (rule 33), AP over a numeral pennant, AP/N over H or A
+  { name: 'C + red – Mark moved to port', text: 'MARK MOVED TO PORT', icon: 'C_red_mark_moved_to_port.png' },
+  { name: 'C + green – Mark moved to starboard', text: 'MARK MOVED TO STARBOARD', icon: 'C_green_mark_moved_to_starboard.png' },
+  { name: 'C + minus – Next leg shortened', text: 'NEXT LEG SHORTENED', icon: 'C_minus_leg_shortened.png' },
+  { name: 'C + plus – Next leg lengthened', text: 'NEXT LEG LENGTHENED', icon: 'C_plus_leg_lengthened.png' },
+  { name: 'AP over H – Postponed, signals ashore', text: 'RACE POSTPONED - FURTHER SIGNALS ASHORE', icon: 'AP_over_H_postponed_signals_ashore.png' },
+  { name: 'AP over 1 – Postponed 1 hour', text: 'RACE POSTPONED BY 1 HOUR', icon: 'AP_over_1_postponed_1_hour.png' },
+  { name: 'AP over 2 – Postponed 2 hours', text: 'RACE POSTPONED BY 2 HOURS', icon: 'AP_over_2_postponed_2_hours.png' },
+  { name: 'AP over 3 – Postponed 3 hours', text: 'RACE POSTPONED BY 3 HOURS', icon: 'AP_over_3_postponed_3_hours.png' },
+  { name: 'N over H – Abandoned, signals ashore', text: 'RACE ABANDONED - FURTHER SIGNALS ASHORE', icon: 'N_over_H_abandoned_signals_ashore.png' },
+  { name: 'N over A – Abandoned, no more racing today', text: 'RACE ABANDONED - NO MORE RACING TODAY', icon: 'N_over_A_abandoned_no_more_racing_today.png' },
+  // the rest
   { name: 'P – Preparatory', text: 'PREPARATORY SIGNAL', icon: 'P_preparatory.png' },
   { name: 'I – Round the ends', text: 'I FLAG - ROUND THE ENDS RULE', icon: 'I_preparatory_round_the_ends.png' },
   { name: 'Z – 20% penalty', text: 'Z FLAG - 20% PENALTY RULE', icon: 'Z_preparatory_20_percent_penalty.png' },
   { name: 'U – U flag rule', text: 'U FLAG RULE', icon: 'U_preparatory_u_flag.png' },
   { name: 'Black – Black flag rule', text: 'BLACK FLAG RULE', icon: 'BLACK_preparatory_black_flag.png' },
-  { name: 'X – Individual recall', text: 'INDIVIDUAL RECALL', icon: 'X_individual_recall.png' },
-  { name: 'First substitute – General recall', text: 'GENERAL RECALL', icon: 'FIRST_SUBSTITUTE_general_recall.png' },
-  { name: 'AP – Postponed', text: 'RACE POSTPONED', icon: 'AP_postponed.png' },
-  { name: 'AP over H – Postponed, signals ashore', text: 'RACE POSTPONED - FURTHER SIGNALS ASHORE', icon: 'AP_over_H_postponed_signals_ashore.png' },
-  { name: 'AP over A – Postponed, no more racing today', text: 'RACE POSTPONED - NO MORE RACING TODAY', icon: 'AP_over_A_postponed_no_more_racing_today.png' },
   { name: 'N – Abandoned', text: 'RACE ABANDONED', icon: 'N_abandoned.png' },
-  { name: 'N over H – Abandoned, signals ashore', text: 'RACE ABANDONED - FURTHER SIGNALS ASHORE', icon: 'N_over_H_abandoned_signals_ashore.png' },
-  { name: 'N over A – Abandoned, no more racing today', text: 'RACE ABANDONED - NO MORE RACING TODAY', icon: 'N_over_A_abandoned_no_more_racing_today.png' },
-  { name: 'S – Shortened course', text: 'SHORTENED COURSE', icon: 'S_shortened_course.png' },
-  { name: 'C – Change of course', text: 'CHANGE OF COURSE', icon: 'C_change_of_course.png' },
   { name: 'M – Mark replaced', text: 'MARK REPLACED', icon: 'M_mark_replaced.png' },
   { name: 'L – Come within hail', text: 'COME WITHIN HAIL', icon: 'L_come_within_hail.png' },
   { name: 'Y – Wear lifejackets', text: 'WEAR LIFEJACKETS', icon: 'Y_wear_lifejackets.png' },
@@ -183,15 +200,28 @@ export const FLAG_ANNOUNCEMENTS: { name: string; text: string; icon: string }[] 
   { name: 'Blue – Finish line', text: 'FINISH LINE', icon: 'BLUE_finish_line.png' },
   { name: 'Red – Penalty / protest', text: 'PROTEST', icon: 'RED_penalty_protest.png' },
   { name: 'Green and white – No penalty', text: 'NO PENALTY', icon: 'GREEN_WHITE_no_penalty.png' },
-  { name: 'Green – No penalty', text: 'NO PENALTY', icon: 'GREEN_no_penalty.png' },
-  { name: 'Yellow – Penalty', text: 'PENALTY', icon: 'YELLOW_penalty.png' },
-  { name: 'Black – Disqualified', text: 'DISQUALIFIED', icon: 'BLACK_disqualified.png' },
 ];
+/** The combinations added in 1.0 (flags2): existing events get them once. */
+const NEW_COMBOS = ['C + red – Mark moved to port', 'C + green – Mark moved to starboard', 'C + minus – Next leg shortened',
+  'C + plus – Next leg lengthened', 'AP over 1 – Postponed 1 hour', 'AP over 2 – Postponed 2 hours', 'AP over 3 – Postponed 3 hours'];
 /** Replay: its icon is the SSL star, empty until that PNG is added (Icon field). */
 export const REPLAY_ANNOUNCEMENT = { name: 'Replay', text: 'REPLAY', icon: '' };
 /** The announcements used most, on the BUGS OFTEN page; every other one is on BUGS RARE. */
 export const OFTEN_ANNOUNCEMENTS = ['X – Individual recall', 'First substitute – General recall', 'AP – Postponed', 'AP over A – Postponed, no more racing today',
   'S – Shortened course', 'C – Change of course', 'Green – No penalty', 'Yellow – Penalty', 'Black – Disqualified', 'Replay'];
+/** On the BUGS OFTEN page as well (Stream Deck: Often): the mark moved signals, needed quickly during a race. */
+const OFTEN_DECK = [...OFTEN_ANNOUNCEMENTS, 'C + red – Mark moved to port', 'C + green – Mark moved to starboard', 'C + minus – Next leg shortened', 'C + plus – Next leg lengthened'];
+/** The order of the Announcements list: the flags used most (and Replay), the combinations, the rest; your own after them. */
+export const ANNOUNCEMENT_ORDER = [...OFTEN_ANNOUNCEMENTS, ...FLAG_ANNOUNCEMENTS.map((a) => a.name).filter((n) => !OFTEN_ANNOUNCEMENTS.includes(n))];
+
+function sortAnnouncements(db: DB, eventId: string) {
+  const order = ANNOUNCEMENT_ORDER.map((n) => n.toLowerCase());
+  const rank = (n: string) => { const i = order.indexOf(n.toLowerCase()); return i < 0 ? order.length : i; };
+  const sorted = [...listGraphicSets(db, eventId, 'announcement')].sort((x, y) => rank(x.name) - rank(y.name) || x.sort - y.sort);
+  const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
+  db.transaction(() => sorted.forEach((x, i) => upd.run(i + 1, x.id)))();
+}
+
 /** An announcement on the BUGS OFTEN page (Stream Deck: Often). */
 export const isOften = (a: { data: Record<string, string> }) => (a.data.deck ?? '').toLowerCase() === 'often';
 /** Announcements seeded by earlier versions; they go when the flag set comes in (versions you added stay). */
@@ -222,14 +252,23 @@ export function ensurePresets(db: DB, eventId: string) {
       for (const a of FLAG_ANNOUNCEMENTS) if (!have.has(a.name.toLowerCase())) createGraphicSet(db, eventId, 'announcement', a.name, { text: a.text, icon: `race-flags/${a.icon}` });
       if (!have.has('replay')) createGraphicSet(db, eventId, 'announcement', REPLAY_ANNOUNCEMENT.name, { text: REPLAY_ANNOUNCEMENT.text, icon: REPLAY_ANNOUNCEMENT.icon });
     })();
-    // the flags first, in the order above; Replay and your own after them
-    const order = [...FLAG_ANNOUNCEMENTS.map((a) => a.name.toLowerCase()), 'replay'];
-    const list = listGraphicSets(db, eventId, 'announcement');
-    const rank = (n: string) => { const i = order.indexOf(n.toLowerCase()); return i < 0 ? order.length : i; };
-    const sorted = [...list].sort((x, y) => rank(x.name) - rank(y.name) || x.sort - y.sort);
-    const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
-    db.transaction(() => sorted.forEach((x, i) => upd.run(i + 1, x.id)))();
+    sortAnnouncements(db, eventId);
     setSetting(db, flags, '1');
+  }
+  // the combinations of signals (C + red…, AP over 1…), once for the events made before them; then the list in its new
+  // order (used most, combinations, the rest, your own last). A deleted one stays deleted, your texts and icons stay.
+  const flags2 = `graphicSets.flags2.${eventId}`;
+  if (!getSetting(db, flags2)) {
+    const have = new Set(listGraphicSets(db, eventId, 'announcement').map((r) => r.name.toLowerCase()));
+    const often = new Set(OFTEN_DECK.map((n) => n.toLowerCase()));
+    db.transaction(() => {
+      for (const a of FLAG_ANNOUNCEMENTS) {
+        if (!NEW_COMBOS.includes(a.name) || have.has(a.name.toLowerCase())) continue;
+        createGraphicSet(db, eventId, 'announcement', a.name, { text: a.text, icon: `race-flags/${a.icon}`, deck: often.has(a.name.toLowerCase()) ? 'Often' : 'Rare' });
+      }
+    })();
+    sortAnnouncements(db, eventId);
+    setSetting(db, flags2, '1');
   }
   // Race officials: the panel's fields (title, roles, names), filled from the officials list once where empty
   const off = `graphicSets.officials2.${eventId}`;
@@ -246,7 +285,7 @@ export function ensurePresets(db: DB, eventId: string) {
   // every announcement on BUGS OFTEN or BUGS RARE by its name (once per event; later the Stream Deck field decides)
   const decks = `graphicSets.decks.${eventId}`;
   if (!getSetting(db, decks)) {
-    const often = new Set(OFTEN_ANNOUNCEMENTS.map((n) => n.toLowerCase()));
+    const often = new Set(OFTEN_DECK.map((n) => n.toLowerCase()));
     const upd = db.prepare('UPDATE graphic_sets SET data = ? WHERE id = ?');
     db.transaction(() => {
       for (const a of listGraphicSets(db, eventId, 'announcement')) upd.run(JSON.stringify({ ...a.data, deck: often.has(a.name.toLowerCase()) ? 'Often' : 'Rare' }), a.id);

@@ -168,18 +168,18 @@ describe('show control', () => {
     seedGraphicSets(s.db, ev);
     const v = fakeVmix({ ...TITLES, ssl_bug: ['#Image'], 'Announcement_bug 2.gtzip': ['bar.Source', 'TEXT.Text', 'icon_background.Source', 'Race flag.Source'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    await show.run('bug:6');
+    await show.run('bug:1');
     const n = v.num('Announcement_bug 2.gtzip');
     expect(v.calls).toContain(`?Function=SetText&Input=k${n}&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL`);
     expect(v.calls.some((c) => c.startsWith(`?Function=SetImage&Input=k${n}&SelectedName=Race flag.Source&Value=`) && c.endsWith('X_individual_recall.png'))).toBe(true);
     expect(v.overlays[1]).toBe(n);
     const only = fakeVmix({ ...TITLES, ssl_bug: ['#Image'] });
     const show2 = new Show(s.ctx, new LowerThirds(s.ctx, only.fetcher), only.fetcher);
-    await expect(show2.run('bug:6')).rejects.toThrow(/Image, no title fields/);
+    await expect(show2.run('bug:1')).rejects.toThrow(/Image, no title fields/);
     // a GTZIP title whose fields vMix does not list gets the data by the GTZIP's own names, and comes in
     const blind = fakeVmix({ ...TITLES, ssl_bug: [] });
     const show3 = new Show(s.ctx, new LowerThirds(s.ctx, blind.fetcher), blind.fetcher);
-    await show3.run('bug:6');
+    await show3.run('bug:1');
     const b = blind.num('ssl_bug');
     expect(blind.calls).toContain(`?Function=SetText&Input=k${b}&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL`);
     expect(blind.calls.some((c) => c.startsWith(`?Function=SetImage&Input=k${b}&SelectedName=icon.Source`))).toBe(true);
@@ -196,20 +196,20 @@ describe('show control', () => {
     // the announcements used most on BUGS OFTEN, the rest on BUGS RARE, each in its order
     const often = pages.find((p) => p.name === 'BUGS OFTEN')!;
     expect(often.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['X – INDIVIDUAL RECALL', 'FIRST SUBSTITUTE – GENERAL R', 'AP – POSTPONED']);
-    expect(often.keys.flat().filter((k) => k && !k.empty && k.action.startsWith('bug:')).length).toBe(10);
+    expect(often.keys.flat().filter((k) => k && !k.empty && k.action.startsWith('bug:')).length).toBe(14);
     const rare = pages.find((p) => p.name === 'BUGS RARE')!;
-    expect(rare.keys[0][0]).toMatchObject({ action: 'bug:r1', text: 'P – PREPARATORY', empty: false });
+    expect(rare.keys[0][0]).toMatchObject({ action: 'bug:r1', text: 'AP OVER H – POSTPONED, SIGNA', empty: false });
     await show.run('bug:o1');
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
     await show.run('bug:o1');
     v.calls.length = 0;
     // the announcement on its key: one line of text and the flag's PNG from the vMix assets folder
-    await show.run('bug:6');
+    await show.run('bug:1');
     expect(v.calls).toContain('?Function=SetText&Input=k4&SelectedName=TEXT.Text&Value=INDIVIDUAL RECALL');
     expect(v.calls).toContain('?Function=SetImage&Input=k4&SelectedName=Race flag.Source&Value=D:\\SSL\\assets\\race-flags\\X_individual_recall.png');
     expect(v.calls.some((c) => /icon_background|bar\.Source/.test(c))).toBe(false);
     expect(v.overlays[1]).toBe('4');
-    await show.run('bug:6');
+    await show.run('bug:1');
     expect(v.overlays[1]).toBe('');
 
     // a new ticker made during the show is on the next free ticker key at once

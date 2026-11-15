@@ -445,7 +445,25 @@ describe('race flags', () => {
     seedRaceFlags(dir);
     const files = fs.readdirSync(path.join(dir, 'race-flags'));
     expect(files).toContain('AP_postponed.png');
-    expect(files.length).toBeGreaterThanOrEqual(28);
+    expect(files).toContain('C_red_mark_moved_to_port.png');
+    expect(files.length).toBeGreaterThanOrEqual(35);
+  });
+
+  it('get the new pictures where an earlier version left its own, and keep a picture you put there', async () => {
+    const os = await import('node:os');
+    const { execFileSync } = await import('node:child_process');
+    const { seedRaceFlags } = await import('../src/app.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flags-'));
+    fs.mkdirSync(path.join(dir, 'race-flags'));
+    // the AP pennant as 1.0 shipped it (from git), and a P flag of your own
+    let old: Buffer;
+    try { old = execFileSync('git', ['show', '2e17950:server/fixtures/race-flags/AP_postponed.png'], { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'ignore'] }); } catch { return; } // a copy without the history
+    fs.writeFileSync(path.join(dir, 'race-flags', 'AP_postponed.png'), old);
+    fs.writeFileSync(path.join(dir, 'race-flags', 'P_preparatory.png'), 'mine');
+    seedRaceFlags(dir);
+    const bundled = path.join(__dirname, '..', 'fixtures', 'race-flags', 'AP_postponed.png');
+    expect(fs.readFileSync(path.join(dir, 'race-flags', 'AP_postponed.png')).equals(fs.readFileSync(bundled))).toBe(true);
+    expect(fs.readFileSync(path.join(dir, 'race-flags', 'P_preparatory.png'), 'utf8')).toBe('mine');
   });
 
 });
