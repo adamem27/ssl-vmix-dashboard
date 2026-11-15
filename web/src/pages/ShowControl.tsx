@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { LowerThirdSettings } from './LowerThirds';
+import { FoldTitle, useFold } from '../components/fold';
 import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
@@ -25,13 +25,14 @@ interface ShowData {
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useFold(`show:${title}`);
   return (
     <section className="card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{title}</h2>
-        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
+      <header className={cx('flex flex-wrap items-center gap-2 px-3 py-2', open && 'border-b border-ink-800')}>
+        <FoldTitle open={open} onToggle={() => setOpen(!open)}>{title}</FoldTitle>
+        {open && <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>}
       </header>
-      <div className="p-3">{children}</div>
+      {open && <div className="p-3">{children}</div>}
     </section>
   );
 }
@@ -164,9 +165,7 @@ function Show({ data }: { data: ShowData }) {
           })}
         </div>
       </Panel>
-      <Race data={data} onSaved={refresh} />
-      <Registry data={data} onSaved={refresh} />
-      <LowerThirdSettings />
+      <BreakScene data={data} onSaved={refresh} />
       <CompanionSetup data={data} onSaved={refresh} />
     </div>
   );
@@ -227,32 +226,13 @@ function useConfig(data: ShowData, onSaved: () => void) {
   return { c, setC, dirty, save };
 }
 
-function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
+function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
   const { c, setC, dirty, save } = useConfig(data, onSaved);
-  const sel = (label: string, value: string, set: (v: string) => void, opts: { id: string; name: string }[], none = '—') => (
-    <label className="block text-xs text-ink-400">{label}
-      <select className="input mt-1 w-72 py-1 text-sm" value={value} onChange={(e) => set(e.target.value)}>
-        <option value="">{none}</option>{opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-    </label>
-  );
   return (
-    <Panel title="Race now" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
-      <div className="grid gap-4 lg:grid-cols-3">
+    <Panel title="Break scene" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
+      <div className="max-w-3xl">
         <div className="space-y-2">
-          {sel('Group racing now (also at the top, next to Stage; its teams go on the team keys)', c.fleetId, (v) => setC({ ...c, fleetId: v }), data.fleets.map((f) => ({ ...f, name: groupLabel(f.name) === f.name.toUpperCase() ? f.name : `${groupLabel(f.name)} (${f.name})` })))}
-          <label className="block text-xs text-ink-400">Race on the RACE RESULTS key (times at marks on the Results tab)
-            <input type="number" min={1} max={12} className="input mt-1 w-20 py-1 text-sm" value={c.race} onChange={(e) => setC({ ...c, race: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })} />
-          </label>
-          <div className="flex flex-wrap gap-1">{data.boats.map((b, i) => <span key={b.id} className={cx('rounded px-2 py-1 text-xs font-bold', data.state.boat === i + 1 ? 'bg-amber-600 text-white' : 'bg-ink-800 text-ink-200')}>{b.code} · {b.name}</span>)}</div>
-        </div>
-        <div className="space-y-2">
-          {sel('Ticker before the next race (D)', c.tickerNext, (v) => setC({ ...c, tickerNext: v }), data.tickers, 'first ticker')}
-          {sel('Ticker at the end of the day (E)', c.tickerEnd, (v) => setC({ ...c, tickerEnd: v }), data.tickers, 'second ticker')}
-          <p className="text-xs text-ink-500">Ticker texts are edited under General graphics → Tickers. Now: {data.state.tickerMode === 'end' ? 'end of day (E)' : 'next race (D)'}.</p>
-        </div>
-        <div className="space-y-2">
-          <div className="text-xs font-semibold text-ink-300">Break scene: overlay channels</div>
+          <div className="text-xs font-semibold text-ink-300">Overlay channels</div>
           <div className="flex gap-2">
             {([['L-bar', 'breakLbarLayer', 2], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
               <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={2} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
@@ -282,46 +262,6 @@ function Race({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
           <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off.</p>
         </div>
       </div>
-      {data.sailors.length > 0 && (
-        <table className="mt-3 w-full text-sm">
-          <thead><tr className="text-left text-xs text-ink-500"><th>Key</th><th>Shirt</th><th>Sailor</th><th>Position</th><th>Photo</th></tr></thead>
-          <tbody>{data.sailors.map((s, i) => <tr key={s.slot} className="border-t border-ink-800"><td className="py-1 text-ink-500">{i + 1}</td><td className="font-bold text-ink-50">#{s.number || '?'}</td><td>{s.name}</td><td className="text-ink-300">{s.position}</td><td>{s.photo ? <span className="text-emerald-400">yes</span> : <span className="text-ink-500">no</span>}</td></tr>)}</tbody>
-        </table>
-      )}
-    </Panel>
-  );
-}
-
-function Registry({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
-  const toast = useToast();
-  const { c, setC, dirty, save } = useConfig(data, onSaved);
-  const missing = data.graphics.filter((g) => !g.input).length;
-  const placeholders = async () => {
-    try { const r = await api.post<{ added: string[] }>('/api/show/placeholders'); toast.ok(r.added.length ? `Added ${r.added.length} placeholders` : 'Nothing missing'); onSaved(); } catch (e) { toast.error(e); }
-  };
-  return (
-    <Panel title="Graphics and vMix inputs" right={<>
-      {data.vmix.ok && missing > 0 && <Button size="sm" variant="ghost" onClick={placeholders}>Add {missing} placeholder{missing > 1 ? 's' : ''} in vMix</Button>}
-      <Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>
-    </>}>
-      <p className="mb-2 text-sm text-ink-400">
-        Keys find their inputs by name. The first name that exists in vMix is used; {'{n}'} is the number of teams and {'{crew}'} the crew size (the nearest bigger lineup title is taken).
-        A placeholder is an empty input with the right name: replace it with the GTZIP later and give the title the same name, nothing else changes.
-      </p>
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-xs text-ink-500"><th>Graphic</th><th>Channel</th><th>vMix input names</th><th>In vMix</th></tr></thead>
-        <tbody>
-          {data.graphics.map((g) => (
-            <tr key={g.id} className="border-t border-ink-800">
-              <td className="py-1 text-ink-100">{g.label}</td>
-              <td className="text-xs text-ink-400">{OVERLAY[g.overlay]}</td>
-              <td><input className="input w-full py-0.5 text-xs" value={c.inputs[g.id] ?? g.inputs.join(', ')} onChange={(e) => setC({ ...c, inputs: { ...c.inputs, [g.id]: e.target.value } })} /></td>
-              <td className="text-xs">{g.input ? <span className={g.onAir ? 'font-bold text-red-400' : 'text-emerald-400'}>{g.input}{g.fields ? ` (${g.fields} fields)` : ' (placeholder)'}{g.onAir ? ' · ON AIR' : ''}</span> : <span className="text-amber-400">missing</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="mt-2 text-xs text-ink-500">Lower thirds of sailors and teams use the inputs and overlay set in the Lower thirds panel below (overlay 1, like every graphic but the break scene).</p>
     </Panel>
   );
 }

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 import { api, EventInfo, ImportSummary, RunOutcome, SettingsInfo, SyncRun, SyncStatus } from '../api';
 import { Badge, Button, cx, ErrorBox, Field, fmtDateTime, Loading, Modal, useConfirm, useToast } from '../components/ui';
+import { FoldTitle, useFold } from '../components/fold';
 
 const COMMON_TIMEZONES = ['Europe/Warsaw', 'America/Sao_Paulo', 'Europe/London', 'Europe/Lisbon', 'Europe/Madrid', 'Europe/Paris', 'Europe/Berlin', 'Europe/Rome', 'Europe/Athens', 'Atlantic/Canary', 'UTC'];
 const ALL_TIMEZONES: string[] = (() => { try { return (Intl as any).supportedValuesOf('timeZone'); } catch { return COMMON_TIMEZONES; } })();
@@ -10,11 +11,12 @@ const CITY_HINT: Record<string, string> = { 'America/Sao_Paulo': 'Rio de Janeiro
 const tzLabel = (t: string) => `${t.replace(/_/g, ' ')}${CITY_HINT[t] ? ` (${CITY_HINT[t]})` : ''}`;
 
 function Section({ id, title, children, desc }: { id: string; title: string; desc?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useFold(`settings:${id}`);
   return (
     <section id={id} className="card scroll-mt-20 p-5">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      {desc && <div className="mt-1 text-sm text-ink-400">{desc}</div>}
-      <div className="mt-4">{children}</div>
+      <FoldTitle open={open} onToggle={() => setOpen(!open)} className="text-lg font-semibold">{title}</FoldTitle>
+      {open && desc && <div className="mt-1 text-sm text-ink-400">{desc}</div>}
+      {open && <div className="mt-4">{children}</div>}
     </section>
   );
 }
@@ -153,19 +155,20 @@ function SyncSection() {
 
       <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-wide text-ink-400">Sync history</h3>
       {!runs.data?.length ? <p className="text-sm text-ink-500">No entries.</p> : (
-        <div className="overflow-x-auto">
+        // five runs show at once, the rest scroll
+        <div className="max-h-[232px] overflow-auto rounded border border-ink-800">
           <table className="w-full min-w-[720px] text-sm">
-            <thead className="text-left text-xs uppercase text-ink-500"><tr><th className="py-1">Start</th><th>Mode</th><th>Status</th><th>Result</th><th /></tr></thead>
+            <thead className="sticky top-0 z-[1] bg-ink-900 text-left text-xs uppercase text-ink-500"><tr><th className="px-2 py-1">Start</th><th>Mode</th><th>Status</th><th>Result</th><th /></tr></thead>
             <tbody>
               {runs.data.map((r) => (
                 <tr key={r.id} className="border-t border-ink-800">
-                  <td className="py-1.5 tabular-nums">{fmtDateTime(r.startedAt, tz)}</td>
+                  <td className="h-10 px-2 py-1.5 tabular-nums">{fmtDateTime(r.startedAt, tz)}</td>
                   <td>{r.trigger === 'auto' ? 'automatic' : r.trigger === 'manual' ? 'manual' : 'file'}</td>
                   <td>{r.status === 'success' ? <Badge tone="ok">OK</Badge> : r.status === 'error' ? <Badge tone="error">Error</Badge> : <Badge tone="info">Running</Badge>}</td>
                   <td className="max-w-[420px] truncate text-ink-400" title={r.error ?? ''}>
                     {r.summary ? `+${r.summary.declarationsAdded} decl., ${r.summary.declarationsUpdated} changed, +${r.summary.membersAdded}/~${r.summary.membersChanged}/−${r.summary.membersRemoved} people, ${r.summary.conflicts.length} conflicts, ${r.summary.warnings.length} warnings` : r.error}
                   </td>
-                  <td className="text-right"><Button size="sm" variant="ghost" onClick={() => setShown(r)}>Details</Button></td>
+                  <td className="pr-2 text-right"><Button size="sm" variant="ghost" onClick={() => setShown(r)}>Details</Button></td>
                 </tr>
               ))}
             </tbody>

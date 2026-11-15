@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { SaveInput, SaveTextArea } from '../components/fields';
+import { FoldTitle, useFold } from '../components/fold';
 
 interface GField { key: string; label: string; type?: 'text' | 'select' | 'list' | 'image'; options?: string[]; placeholder?: string; default?: string; wide?: boolean; hint?: string; only?: string[]; hidden?: boolean }
 interface GKind { kind: string; label: string; sheet: string; description: string; fields: GField[] }
@@ -52,6 +53,7 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
   const refresh = () => qc.invalidateQueries({ queryKey: ['graphic-sets'] });
   const run = async (fn: () => Promise<unknown>) => { try { await fn(); await refresh(); } catch (e) { toast.error(e); } };
   const add = () => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${k.label === 'Tickers' ? 'Ticker' : k.label} ${sets.length + 1}` }));
+  const [open, setOpen] = useFold(`gsets:${k.kind}`);
   const dup = (s: GSet) => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${s.name} copy`, copyFrom: s.id }));
   const move = (s: GSet, dir: -1 | 1) => run(() => api.post(`/api/graphic-sets/${s.id}/move`, { dir }));
   const remove = async (s: GSet) => { if (await ask(`Delete “${s.name}”?`, <>This version of {k.label} and its rows in the “General” sheet are removed.</>, 'Delete')) await run(() => api.del(`/api/graphic-sets/${s.id}`)); };
@@ -64,12 +66,12 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
 
   return (
     <section id={`g-${k.kind}`} className="card scroll-mt-28">
-      <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{k.label}</h2>
-        <span className="text-xs text-ink-500">{k.description} In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</span>
-        <Button size="sm" className="ml-auto" onClick={add}>+ New version</Button>
+      <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-ink-800' : ''}`}>
+        <FoldTitle open={open} onToggle={() => setOpen(!open)}>{k.label} <span className="font-normal normal-case text-ink-500">{sets.length}</span></FoldTitle>
+        {open && <span className="text-xs text-ink-500">{k.description} In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</span>}
+        {open && <Button size="sm" className="ml-auto" onClick={add}>+ New version</Button>}
       </header>
-      <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
+      {open && <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
         {sets.map((s, i) => (
           <div key={s.id} className="rounded-lg border border-ink-800 bg-ink-950/40">
             <div className="flex items-center gap-1 border-b border-ink-800 px-2 py-1.5">
@@ -112,7 +114,7 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
           </div>
         ))}
         {!sets.length && <p className="px-1 py-4 text-sm text-ink-500">No versions yet. Add one to put it in the Excel file.</p>}
-      </div>
+      </div>}
       {dialog}
     </section>
   );

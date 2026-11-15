@@ -7,6 +7,7 @@ import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { ElementSpec, Gradient, GradientStop, NEUTRAL_CODE, NEUTRAL_ID, NeutralSettings, neutralGradients, neutralSpec, parseHex, renderElement, toHex } from '../../../server/src/services/generator/render';
 import { useStageTeams } from '../components/StagePicker';
+import { FoldTitle, useFold } from '../components/fold';
 
 type Scope = 'teams' | 'neutral' | 'both';
 const forScope = (t: { scope: Scope }, neutral: boolean) => t.scope === 'both' || t.scope === (neutral ? 'neutral' : 'teams');
@@ -182,14 +183,15 @@ function Generator({ state }: { state: GenState }) {
 }
 
 function Panel({ title, right, children, titleExtra }: { title: string; right?: ReactNode; children: ReactNode; titleExtra?: ReactNode }) {
+  const [open, setOpen] = useFold(`generator:${title}`);
   return (
     <section className="card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{title}</h2>
-        {titleExtra}
-        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
+      <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-ink-800' : ''}`}>
+        <FoldTitle open={open} onToggle={() => setOpen(!open)}>{title}</FoldTitle>
+        {open && titleExtra}
+        {open && <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>}
       </header>
-      <div className="p-3">{children}</div>
+      {open && <div className="p-3">{children}</div>}
     </section>
   );
 }

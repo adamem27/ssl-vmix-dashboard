@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
+import { FoldTitle, useFold } from '../components/fold';
 
 interface Fields { top: string; bottom: string; photo: string; flag: string; emblem: string; bar: string }
 interface Config {
@@ -14,13 +15,14 @@ interface Sailor { slot: string; label: string; sailorId: string | null; firstNa
 interface LtData { config: Config; state: State; teams: { id: string; code: string; name: string }[]; keys: Key[][]; crew: Sailor[]; teamSlots: { key: string; label: string }[]; last: { at: string; what: string; error: string | null } | null }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useFold(`lt:${title}`);
   return (
     <section className="card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{title}</h2>
-        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
+      <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-ink-800' : ''}`}>
+        <h2><FoldTitle open={open} onToggle={() => setOpen(!open)}>{title}</FoldTitle></h2>
+        {open && <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>}
       </header>
-      <div className="p-3">{children}</div>
+      {open && <div className="p-3">{children}</div>}
     </section>
   );
 }

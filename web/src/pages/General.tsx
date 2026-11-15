@@ -8,6 +8,7 @@ import { GraphicSetsSections } from './GraphicSets';
 import { ComparePanel } from './CompareTab';
 import { useStage } from '../components/StagePicker';
 import { groupLabel } from '../../../server/src/services/groupNames';
+import { FoldTitle, useFold } from '../components/fold';
 
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -36,13 +37,14 @@ export function GeneralPage() {
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useFold(`general:${title}`);
   return (
     <section className="card">
-      <header className="flex flex-wrap items-center gap-2 border-b border-ink-800 px-3 py-2">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-ink-200">{title}</h2>
-        <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>
+      <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-ink-800' : ''}`}>
+        <FoldTitle open={open} onToggle={() => setOpen(!open)}>{title}</FoldTitle>
+        {open && <div className="ml-auto flex flex-wrap items-center gap-2">{right}</div>}
       </header>
-      <div className="p-2">{children}</div>
+      {open && <div className="p-2">{children}</div>}
     </section>
   );
 }
