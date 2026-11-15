@@ -24,8 +24,7 @@ import { getSetting, setSetting } from '../db/db.js';
 import { pad, textWidth } from './textFit.js';
 import { UNKNOWN_FLAG_PNG } from './unknownFlag.js';
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
-/** As typed (only trimmed): vMix gets the text exactly as it was written in the dashboard. */
-const up = (s) => (s ?? '').trim();
+const up = (s) => (s ?? '').trim().toUpperCase();
 /** DD.MM.YYYY, as on the SSL boards. */
 const dotted = (iso) => { const [y, m, d] = iso.split('-'); return y && m && d ? `${d}.${m}.${y}` : iso; };
 /** The first version of a graphic in General graphics (its data), or {}. */
@@ -119,7 +118,7 @@ export function scheduleRows(ctx, eventId, today) {
         const f = same.find((x) => x.filled > 0) ?? same[0];
         const race = (s.race ?? '').trim();
         // no group of that name yet: four places with no team
-        return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `Race ${race}` : up(race), group: label, flags: (f ? f.positions : [null, null, null, null]).map((x) => (x ? flagOf(x) : null)) };
+        return { id: s.id, time: s.time ?? '', race: /^\d+$/.test(race) ? `RACE ${race}` : up(race), group: label, flags: (f ? f.positions : [null, null, null, null]).map((x) => (x ? flagOf(x) : null)) };
     });
 }
 /** What a graphic's title gets when its key brings it in; null when General graphics has nothing for it. */
@@ -191,12 +190,12 @@ export function showDataFields(ctx, graphicId, o) {
             return f;
         case 'lbar':
         case 'break':
-            f.set('TITLE.Text', 'Today');
+            f.set('TITLE.Text', 'TODAY');
             f.set('SUBTITLE.Text', dotted(today));
             f.set('WEBSITE.Text', up(socials.website));
             // the L-bar's side panel: the handles of Follow us, in order (SOCIAL 1–3)
             [socials.facebook, socials.youtube, socials.instagram, socials.tiktok, socials.x].map((v) => (v ?? '').trim()).filter(Boolean)
-                .concat('', '', '').slice(0, 3).forEach((v, i) => f.set(`SOCIAL ${i + 1}.Text`, v));
+                .concat('', '', '').slice(0, 3).forEach((v, i) => f.set(`SOCIAL ${i + 1}.Text`, v.toUpperCase()));
             sched();
             if (o.tickerText !== undefined)
                 f.set('Ticker1.Text', o.tickerText);
@@ -303,8 +302,8 @@ export function compareAuto(ctx, eventId, fleetId, today, o = {}) {
         // the team's panel from the PNG generator: left for teams 1 and 3, right for 2 and 4 (851×390); null: none
         const panel = t ? teamPictureFor(ctx, t, { w: 851, h: 390, key: `panel${n % 2 ? 'left' : 'right'}` }) : '';
         const v = {
-            name: t?.name ?? '', nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
-            cptName: cpt?.firstName ?? '', cptSurname: cpt?.lastName ?? '',
+            name: (t?.name ?? '').toUpperCase(), nick: t?.nickname ?? '', rank: t?.ranking ?? '', weight: w,
+            cptName: cpt?.firstName ?? '', cptSurname: (cpt?.lastName ?? '').toUpperCase(),
             // the flag on the emblems' square canvas, made from the team's flag (its own files stay as they are)
             flag: t ? comparisonFlag(ctx, t.code, img(a.flag_big) || img(a.flag_small)) : '', emblem: img(a[o.emblemSlot || 'emblem_light']) || img(a.emblem_dark),
             photo: t && cpt ? crewOf(ctx, t.id).find((c) => c.slot === cpt.slot)?.photo ?? '' : '', panel: panel ?? '',
