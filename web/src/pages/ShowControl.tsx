@@ -21,7 +21,7 @@ interface ShowData {
   vmix: { ok: boolean; overlays: Record<string, string> };
   graphics: Graphic[]; boats: { id: string; code: string; name: string }[];
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
-  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; breakGroups: { id: string; name: string }[]; breakShown: string[];
+  pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; companion?: CompanionStatus; breakGroups: { id: string; name: string }[]; breakShown: string[];
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
@@ -266,24 +266,57 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
   );
 }
 
+type CompanionStatus = { enabled: boolean; labels: boolean; companionUrl: string; at?: string | null; sent?: number; unchanged?: number; missing?: number; error?: string | null };
+
 function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
   const { c, setC, dirty, save } = useConfig(data, onSaved);
+  const toast = useToast();
   const origin = window.location.origin;
   const teams = data.pages.filter((p) => p.page >= 9);
+  const [url, setUrl] = useState(data.companionUrl || '');
+  const [pushing, setPushing] = useState(false);
+  const st = data.companion;
+  const saveAll = async () => {
+    try { if (url !== (data.companionUrl || '')) await api.put('/api/lt/config', { companionUrl: url.trim() }); } catch (e) { toast.error(e); return; }
+    await save();
+  };
+  const push = async () => {
+    setPushing(true);
+    try {
+      const r = await api.post<CompanionStatus>('/api/show/labels');
+      if (r.error) toast.error(r.error); else toast.ok(`Sent ${r.sent ?? 0} keys${r.missing ? `, ${r.missing} places missing in Companion` : ''}`);
+    } catch (e) { toast.error(e); } finally { setPushing(false); onSaved(); }
+  };
   return (
-    <Panel title="Companion" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
-      <div className="flex flex-wrap gap-4">
+    <Panel title="Companion" right={<>
+      <Button size="sm" disabled={pushing || !st?.enabled} onClick={push}>{pushing ? 'Pushing…' : 'Push to Companion now'}</Button>
+      <Button size="sm" variant="primary" disabled={!dirty && url === (data.companionUrl || '')} onClick={saveAll}>Save</Button>
+    </>}>
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="block text-xs text-ink-400">Companion address
+          <input className="input mt-1 w-64 py-1 text-sm" placeholder="http://127.0.0.1:8000" value={url} onChange={(e) => setUrl(e.target.value)} />
+        </label>
         <label className="block text-xs text-ink-400">vMix address as Companion reaches it (fallback page)
           <input className="input mt-1 w-72 py-1 text-sm" placeholder="same as Settings → vMix" value={c.vmixForCompanion} onChange={(e) => setC({ ...c, vmixForCompanion: e.target.value })} />
         </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm text-ink-300">
+          <input type="checkbox" checked={c.labels !== false} onChange={(e) => setC({ ...c, labels: e.target.checked })} />
+          Send key texts and colours to Companion live
+        </label>
       </div>
+      <p className={cx('mt-2 text-xs', st?.error ? 'text-red-400' : 'text-ink-400')}>
+        {!st?.enabled ? 'Live keys are off: turn them on and give the Companion address.'
+          : st.error ? `Last push failed: ${st.error}`
+          : st.at ? `Last push ${new Date(st.at).toLocaleTimeString()}: ${st.sent ?? 0} keys sent${st.missing ? `, ${st.missing} places Companion has no button for (import the preset again)` : ''}.`
+          : 'Nothing pushed yet.'}
+      </p>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-300">
         <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–6 (TEAMS, BUGS OFTEN, BUGS RARE, TICKERS), the fallback on page 8, a page per team from page 9, then COMPARE and PEOPLE ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
           <div className="mt-2"><a className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600" href={`/api/show/preset.companionconfig?base=${encodeURIComponent(origin)}`} download>Download Companion preset</a></div>
         </li>
-        <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there.</li>
+        <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there. Then press <b>Push to Companion now</b> once.</li>
         <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page 1 and deck 2 on page 3.</li>
-        <li>On deck 2, TEAMS opens a team's page: its places with the sailors' names, QUALIFIED, LINEUP, LINEUP LT, NEXT RESULT and PHOTO mode; ◀ ▶ go to the previous and next team. The key texts are fixed in the preset: download and import it again after the line-ups, teams, announcements or tickers change.</li>
+        <li>After that import, changes in the key editor, teams, line-ups, announcements and tickers reach the decks by themselves: each key runs whatever is at its place now, and its text and colour are sent live. Download and import again only when the page-switching keys change or the number of teams changes.</li>
         <li>PANIC cuts everything only on a second press within 3 seconds. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
       </ol>
     </Panel>
