@@ -19,6 +19,7 @@ import { GeneratorPage } from './pages/Generator';
 import { GtzipGeneratorPage } from './pages/GtzipGenerator';
 import { ResultsPage } from './pages/Results';
 import { ShowControlPage } from './pages/ShowControl';
+import { GraphicsEditorPage } from './pages/GraphicsEditor';
 
 export function useMeta() {
   return useQuery({ queryKey: ['meta'], queryFn: () => api.get<Meta>('/api/meta'), staleTime: 60_000 });
@@ -84,6 +85,7 @@ const ICON: Record<string, string> = {
   general: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
   png: 'M4 4h16v16H4zM8.5 9.5m-1.5 0a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0M20 15l-5-5-11 10',
   gtzip: 'M6 3h9l4 4v14H6zM14 3v5h5M10 10h2M10 13h2M10 16h2',
+  editor: 'M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4',
   json: 'M8 4H7a2 2 0 0 0-2 2v4l-2 2 2 2v4a2 2 0 0 0 2 2h1M16 4h1a2 2 0 0 1 2 2v4l2 2-2 2v4a2 2 0 0 1-2 2h-1',
   settings: 'M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1',
 };
@@ -110,6 +112,7 @@ const NAV_GROUPS = [
     { to: '/vmix/general', label: 'General graphics', icon: 'general' },
     { to: '/vmix/generator', label: 'PNG generator', icon: 'png' },
     { to: '/vmix/gtzip', label: 'GTZIP generator', icon: 'gtzip' },
+    { to: '/vmix/editor', label: 'Graphics editor', icon: 'editor' },
   ] },
   { label: 'Output & setup', tone: { head: 'text-emerald-400', bar: 'bg-emerald-400', icon: 'text-emerald-400', active: 'bg-emerald-500/15 text-emerald-100 border-emerald-400' }, items: [
     { to: '/vmix/json', label: 'JSON', icon: 'json' },
@@ -188,6 +191,7 @@ function MainApp() {
           <Route path="json" element={<JsonPage />} />
           <Route path="generator" element={<GeneratorPage />} />
           <Route path="gtzip" element={<GtzipGeneratorPage />} />
+          <Route path="editor" element={<GraphicsEditorPage />} />
         </Route>
         <Route path="/commentator" element={<CommentatorPage />} />
         <Route path="*" element={<div className="p-10 text-center text-ink-400">Page not found.</div>} />

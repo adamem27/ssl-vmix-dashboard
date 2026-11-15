@@ -21,6 +21,7 @@ import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
 import { groupLabel, groupLetter } from './groupNames.js';
 import { currentStage } from './workbookSheets.js';
+import { getOverrides, inputKey, isTitleInput, withOverrides } from './fieldOverrides.js';
 import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatcher, VmixInput, vmixUrl } from './vmixResults.js';
 
 /**
@@ -556,6 +557,7 @@ export class Show {
    * changed only with the REFRESH PNG key (refreshPictures). The calls go a few at a time. Returns how many fields were set.
    */
   private async set(input: VmixInput, fields: Map<string, string>) {
+    fields = withOverrides(this.ctx, input, fields); // the Graphics editor's edits win
     const match = titleFieldMatcher(input.fields);
     const done = new Set<string>();
     const todo: [string, string][] = [];
@@ -577,6 +579,13 @@ export class Show {
       if (input.values) input.values[real] = value;
     }
     return todo.length;
+  }
+  /** Graphics editor: fields straight into one title input (by its name, number or key), edits applied. */
+  async editFields(inputName: string, fields: Map<string, string>) {
+    this.invalidate();
+    const { inputs } = await this.snapshot();
+    const input = findInput(inputs.filter(isTitleInput), inputName);
+    return input ? this.set(input, fields) : 0;
   }
   /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
   private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>, blind?: () => Map<string, string>) {
@@ -1620,6 +1629,9 @@ export class Show {
       if (!this.switching) for (const t of this.resultsTargets(inputs)) if (t.fleetId) { const fid = t.fleetId; jobs.push({ input: t.input, f: () => resultFieldsFor(this.ctx, fid, t.input).fields }); }
       // Team comparison: every group's own input, and the shared one for the group picked at the top
       for (const t of this.compareTargets(inputs)) jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
+      // every other title edited in the Graphics editor gets its edits (set() adds them)
+      const edited = getOverrides(this.ctx.db);
+      for (const input of inputs) if (isTitleInput(input) && edited[inputKey(input.title)] && !jobs.some((j) => j.input === input)) jobs.push({ input, f: () => new Map() });
       for (const { input, f: make } of jobs) {
         const f = make();
         if (!f) continue;
