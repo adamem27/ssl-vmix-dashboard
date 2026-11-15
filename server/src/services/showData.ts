@@ -104,7 +104,8 @@ export function scheduleRows(ctx: AssetCtx, eventId: string, today: string) {
   const fleets = scheduleFleets(ctx, eventId);
   const flagOf = (teamId: string) => { const a = listAssets(ctx, 'team', teamId) as Record<string, Asset>; return img(a.flag_small) || img(a.flag_big); };
   return listSchedule(ctx.db, eventId, today).map((s) => {
-    const label = groupLabel(s.fleet);
+    // the Qualification Race as written, like Group H (not in capitals)
+    const label = isQualificationRace(s.fleet) ? 'Qualification Race' : groupLabel(s.fleet);
     const key = groupKey(s.fleet);
     // same name first, then the same label; a group with teams placed before an empty one of the same name
     // (the Qualification Race / Last Chance Race also by their short names: QR, LCR)

@@ -59,7 +59,7 @@ describe('day schedule board', () => {
     createScheduleItem(s.db, ev, { date: day, time: '12:00', race: 'Qualification', fleet: 'Qualification Race' });
     setScheduleOptions(s.db, { showTime: false });
     const f = fields();
-    expect(f.get('GROUP 4 C.Text')).toBe('QUALIFICATION RACE');
+    expect(f.get('GROUP 4 C.Text')).toBe('Qualification Race'); // as written, like Group H
     expect(f.get('RACE 4 C.Text')).toBe('QUALIFICATION');
     expect(f.get('FLAG 13 C.Source')).toMatch(/BRA/);
     const unknown = unknownFlagPath(s.ctx);
