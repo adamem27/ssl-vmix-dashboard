@@ -17,6 +17,7 @@ import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
 import { createPerson, createScheduleItem, personName, setWeather } from '../src/services/general.js';
 import { groupLabel, groupLetter } from '../src/services/groupNames.js';
+import { buildApp } from '../src/app.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -407,7 +408,8 @@ describe('show control', () => {
     const url = (c: any) => c.steps[0].action_sets.down[0].options.url.value;
     const text = (c: any) => c.style.layers.find((l: any) => l.type === 'text').text.value;
     const page = (c: any) => c.steps[0].action_sets.down[0].options.page.value;
-    expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=show%3Awelcome');
+    // every key but navigation calls its place: the dashboard runs what the key has there now
+    expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/key/1/0/0');
     expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ definitionId: 'set_page', connectionId: 'internal', options: { surfaceId: { value: 'self' }, page: { value: 2 } } });
     // TEAMS: a key per team opens its page; ESP is the second by code
     expect(f.pages[3].name).toBe('SSL TEAMS');
@@ -418,12 +420,15 @@ describe('show control', () => {
     expect(esp.name).toBe('SSL ESP');
     expect(text(esp.controls[1][0])).toBe('BOW\\nPONS');
     expect(text(esp.controls[1][2])).toBe('PIT\\n#12 RUIZ');
-    expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/do?a=sailorof%3AESP%2FPit');
-    expect(url(esp.controls[0][0])).toBe('http://10.0.0.5:4310/api/show/do?a=qualified%3AESP');
-    // the team lower thirds sit on TEAMS, a row below each team's page key (not on the team's own page)
-    expect(f.pages[3].controls[1] ?? {}).toEqual({});
-    expect(url(f.pages[3].controls[2][1])).toBe('http://10.0.0.5:4310/api/show/do?a=teamlt%3AESP');
-    expect(Object.values(esp.controls).flatMap((r: any) => Object.values(r)).some((c: any) => /teamlt/.test(c?.steps?.[0]?.action_sets?.down?.[0]?.options?.url?.value ?? ''))).toBe(false);
+    expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/key/10/1/2');
+    expect(show.keyAt(10, 1, 2)?.action).toBe('sailorof:ESP/Pit');
+    expect(show.keyAt(10, 0, 0)?.action).toBe('qualified:ESP');
+    // the team lower thirds sit on TEAMS, a row below each team's page key (not on the team's own page); the row
+    // between has blank keys calling their place (for a key added there later)
+    expect(Object.values(f.pages[3].controls[1]).map(text)).toEqual(Array(8).fill(''));
+    expect(url(f.pages[3].controls[1][3])).toBe('http://10.0.0.5:4310/api/show/key/3/1/3');
+    expect(show.keyAt(3, 2, 1)?.action).toBe('teamlt:ESP');
+    expect(show.pages().find((p) => p.page === 10)!.keys.flat().some((k) => /teamlt/.test(k?.action ?? ''))).toBe(false);
     expect(page(esp.controls[3][1])).toBe(9); // ◀ BRA
     expect(page(esp.controls[3][2])).toBe(11); // ▶ GBR
     expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
@@ -493,14 +498,17 @@ describe('show control', () => {
     const pg = f.pages[people.page];
     expect(pg.name).toBe('SSL PEOPLE');
     const act = (r: number, c: number) => pg.controls[r][c].steps[0].action_sets.down[0];
-    expect(act(0, 0)).toMatchObject({ definitionId: 'get', connectionId: 'ssl_dashboard_show', options: { url: { value: 'http://10.0.0.5:4310/api/show/do?a=person%3A1' } } });
+    expect(act(0, 0)).toMatchObject({ definitionId: 'get', connectionId: 'ssl_dashboard_show', options: { url: { value: `http://10.0.0.5:4310/api/show/key/${people.page}/0/0` } } });
+    expect(show.keyAt(people.page, 0, 0)?.action).toBe('person:1');
     // the vMix and ATEM keys exactly as they were, with their connections in the file (matched by name on import)
     expect(act(1, 0)).toMatchObject({ definitionId: 'overlayFunctions', options: { input: { value: '15' } } });
     expect(act(2, 7)).toMatchObject({ definitionId: 'dskAuto' });
     expect(f.instances[act(1, 0).connectionId]).toMatchObject({ moduleId: 'studiocoast-vmix', label: 'vmix_stream1' });
     expect(f.instances[act(2, 7).connectionId]).toMatchObject({ moduleId: 'bmd-atem', label: 'atem' });
     expect(Object.values(f.instances).filter((x: any) => x.moduleId === 'generic-http')).toHaveLength(1);
-    expect(pg.controls[0][3]).toBeUndefined();
+    // a free place: a blank key calling its place
+    expect(pg.controls[0][3].style.layers.find((l: any) => l.type === 'text').text.value).toBe('');
+    expect(act(0, 3).options.url.value).toBe(`http://10.0.0.5:4310/api/show/key/${people.page}/0/3`);
   });
 
   it('the preset has pages only for the teams of the stage picked at the top, in group order', () => {
@@ -833,7 +841,94 @@ describe('show control', () => {
     const ls = f.page.controls[0][0].style.layers;
     expect(ls.find((l: any) => l.type === 'text')).toMatchObject({ text: { value: 'HELLO\\nWELCOME' }, color: { value: 0 } });
     expect(ls.find((l: any) => l.type === 'box').color.value).toBe(0x16a34a);
-    expect(f.page.controls[0][2]).toBeUndefined();
+    // the emptied place: a blank key calling its place
+    expect(f.page.controls[0][2].style.layers.find((l: any) => l.type === 'text').text.value).toBe('');
+    expect(f.page.controls[0][2].steps[0].action_sets.down[0].options.url.value).toBe('http://x/api/show/key/1/0/2');
+  });
+
+  it('a Companion key calls its place: an edit in the key editor changes what it does with no new import', async () => {
+    const { s } = race();
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.runKey(1, 0, 0); // A BEFORE 0/0: WELCOME
+    expect(v.overlays[1]).toBe(v.num('ssl_welcome'));
+    await show.run('show:welcome');
+    setShowConfig(s.ctx.db, { keys: { 'A BEFORE/0/0': { action: 'show:schedule' } } });
+    v.calls.length = 0;
+    await show.runKey(1, 0, 0);
+    expect(v.overlays[1]).toBe(v.num('ssl_schedule'));
+    expect(v.calls.at(-1)).toBe(`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`);
+    // an emptied place, a free one and a page key do nothing here (pages change in Companion)
+    setShowConfig(s.ctx.db, { keys: { 'A BEFORE/0/0': { action: '' } } });
+    expect(await show.runKey(1, 0, 0)).toEqual({ empty: true });
+    expect(await show.runKey(1, 1, 7)).toEqual({ empty: true });
+    expect(await show.runKey(1, 3, 2)).toEqual({ nav: 2 });
+    // older presets keep calling the action itself
+    v.calls.length = 0;
+    await show.run('show:welcome');
+    expect(v.overlays[1]).toBe(v.num('ssl_welcome'));
+  });
+
+  it('serves the key routes: by place, the push status', async () => {
+    const { s } = race();
+    const app = await buildApp({ db: s.db, assetsDir: s.ctx.assetsDir });
+    const nav = await app.inject({ url: '/api/show/key/1/3/2' });
+    expect(nav.json()).toEqual({ nav: 2 });
+    expect((await app.inject({ method: 'POST', url: '/api/show/key/1/1/7' })).json()).toEqual({ empty: true });
+    expect((await app.inject({ url: '/api/show/key/x/0/0' })).statusCode).toBe(400);
+    const st = (await app.inject({ url: '/api/show/labels' })).json();
+    expect(st).toMatchObject({ enabled: false, labels: true, companionUrl: '', at: null, sent: 0, error: null });
+    await app.close();
+  });
+
+  it('writes every key\'s text and colours into Companion, then only what changed', async () => {
+    const { s, ev } = race();
+    const posts: string[] = [];
+    let missing = false;
+    const fetcher = async (url: string) => {
+      if (url.startsWith('http://companion:8000/')) { posts.push(url.slice('http://companion:8000'.length)); return { ok: true, status: missing ? 204 : 200, text: async () => 'ok' }; }
+      return { ok: false, status: 500, text: async () => '' };
+    };
+    setSetting(s.db, 'lt.config', JSON.stringify({ companionUrl: 'http://companion:8000' }));
+    const show = new Show(s.ctx, new LowerThirds(s.ctx), fetcher as any);
+    const st = await show.pushLabels();
+    const all = show.pages().flatMap((p) => p.keys.flatMap((row, r) => row.flatMap((k, c) => (k ? [`${p.page}/${r}/${c}`] : []))));
+    // every dashboard key (boards, safety, navigation, teams…), the producer's vMix / ATEM keys on PEOPLE aside
+    expect(posts.length).toBeGreaterThan(100);
+    const at = (id: string) => posts.find((x) => x.startsWith(`/api/location/${id}/style?`));
+    expect(at('1/0/0')).toBe(`/api/location/1/0/0/style?text=WELCOME&bgcolor=${encodeURIComponent('#1e3a8a')}&color=${encodeURIComponent('#ffffff')}&size=auto`);
+    expect(at('1/3/7')).toMatch(/text=PANIC/);
+    expect(at('10/1/2')).toMatch(/text=PIT%5Cn%2312%20RUIZ/);
+    const people = show.pages().find((p) => p.name === 'PEOPLE')!.page;
+    expect(at(`${people}/1/0`)).toBeUndefined(); // the producer's vMix key keeps its look
+    expect(posts.length).toBe(all.filter((id) => !/^\d+\/(1\/[0-2]|2\/0|2\/7|3\/[0-3])$/.test(id) || !id.startsWith(`${people}/`)).length);
+    expect(st).toMatchObject({ enabled: true, sent: posts.length, error: null });
+    expect(st.at).toBeTruthy();
+    // nothing changed: nothing goes out
+    posts.length = 0;
+    expect((await show.pushLabels()).sent).toBe(0);
+    expect(posts).toEqual([]);
+    // a key edited (text, colours, another action) and a ticker added: only those keys go out
+    setShowConfig(s.ctx.db, { keys: { 'A BEFORE/0/0': { text: 'HELLO', bg: '#16a34a', fg: '#000000' }, 'A BEFORE/0/1': { action: '' } } });
+    createGraphicSet(s.db, ev, 'ticker', 'Wind delay');
+    show.invalidate();
+    const st2 = await show.pushLabels();
+    expect(posts).toContain(`/api/location/1/0/0/style?text=HELLO&bgcolor=${encodeURIComponent('#16a34a')}&color=${encodeURIComponent('#000000')}&size=auto`);
+    expect(posts).toContain(`/api/location/1/0/1/style?text=&bgcolor=${encodeURIComponent('#000000')}&color=${encodeURIComponent('#ffffff')}&size=auto`); // taken away: dark
+    expect(posts.some((x) => /text=TICKER%5CnWIND%20DELAY/.test(x))).toBe(true);
+    expect(posts.length).toBe(4); // the edited key, the emptied one, the new ticker on TICKERS and on the break scene ticker keys
+    expect(st2.sent).toBe(4);
+    // force: every key again; Companion without a button there answers 204
+    posts.length = 0;
+    missing = true;
+    const st3 = await show.pushLabels(true);
+    expect(posts.length).toBeGreaterThan(100);
+    expect(st3).toMatchObject({ sent: 0, missing: posts.length });
+    // off: nothing goes out
+    setShowConfig(s.ctx.db, { labels: false });
+    posts.length = 0;
+    expect((await show.pushLabels(true)).enabled).toBe(false);
+    expect(posts).toEqual([]);
   });
 
   it('colours team and sailor keys in national colours, with matching selected / on-air feedback', async () => {
