@@ -6,6 +6,7 @@ import { badRequest } from './errors.js';
 import { getResults } from './results.js';
 import { listTeams } from './teams.js';
 import { teamPictureFor } from './ltTitle.js';
+import { withOverrides } from './fieldOverrides.js';
 /**
  * Sends a group's overall results straight into a vMix title through the vMix Web API
  * (SetText / SetImage), so the title needs no Data Source mapping. Field names follow the
@@ -156,7 +157,8 @@ export async function pushResults(ctx, fleetId, inputName, fetcher = fetch) {
     const input = findInput(inputs, inputName);
     if (!input)
         throw badRequest(`vMix has no input “${inputName}”. Use the input's name or number as shown in vMix.`);
-    const { rowsInTitle, cols, fields } = resultFieldsFor(ctx, fleetId, input);
+    const { rowsInTitle, cols, fields: own } = resultFieldsFor(ctx, fleetId, input);
+    const fields = withOverrides(ctx, input, own); // Graphics editor edits win
     const match = titleFieldMatcher(input.fields);
     const done = new Set();
     let sent = 0;

@@ -11,7 +11,7 @@ import { listGraphicSets } from './graphicSets.js';
 import { compareTab, setCompareOverride } from './showData.js';
 import { getLtConfig } from './lowerthirds.js';
 import { todayIn } from './dates.js';
-/** Show control: one GET per Stream Deck key (/api/show/do?a=…), the tab's view and the Companion page files. */
+/** Show control: one GET per Stream Deck key (/api/show/key/<page>/<row>/<col>, older presets /api/show/do?a=…), the tab's view and the Companion page files. */
 export function registerShowRoutes(app, ctx, show) {
     const { db } = ctx;
     // a change anywhere in the dashboard (teams, groups, line-ups, General graphics…) shows on the keys at once
@@ -20,11 +20,11 @@ export function registerShowRoutes(app, ctx, show) {
     app.get('/api/show', async () => {
         const ev = activeEvent(db).id;
         const fleets = listSets(db, ev).flatMap((s) => getSetDetail(db, s.id).fleets.map((f) => ({ id: f.id, name: `${s.name} · ${f.name}`, size: f.filled })));
-        return { ...(await show.view()), fleets, tickers: listGraphicSets(db, ev, 'ticker').map((t) => ({ id: t.id, name: t.name })), breakGroups: show.breakStageFleets(), breakShown: show.breakFleets(), companionUrl: JSON.parse(getSetting(db, 'lt.config') || '{}').companionUrl ?? '' };
+        return { ...(await show.view()), fleets, tickers: listGraphicSets(db, ev, 'ticker').map((t) => ({ id: t.id, name: t.name })), breakGroups: show.breakStageFleets(), breakShown: show.breakFleets(), companionUrl: JSON.parse(getSetting(db, 'lt.config') || '{}').companionUrl ?? '', companion: show.companionStatus() };
     });
     app.put('/api/show/config', async (req) => {
         const c = setShowConfig(db, showConfigSchema.partial().parse(req.body));
-        void show.pushLabels(true);
+        void show.pushLabels(); // only the keys that changed (the key editor, colours…)
         return c;
     });
     const act = async (req) => {
@@ -69,7 +69,18 @@ export function registerShowRoutes(app, ctx, show) {
     });
     app.get('/api/show/do', act);
     app.post('/api/show/do', act);
+    // a Companion key by its place (the preset's keys call these): the action that place has now, edits included
+    const key = async (req) => {
+        const [page, row, col] = ['page', 'row', 'col'].map((x) => Number(req.params[x]));
+        if (![page, row, col].every((n) => Number.isInteger(n) && n >= 0) || page < 1)
+            throw badRequest('Use /api/show/key/<page>/<row>/<column>, e.g. /api/show/key/1/0/0');
+        return show.runKey(page, row, col);
+    };
+    app.get('/api/show/key/:page/:row/:col', key);
+    app.post('/api/show/key/:page/:row/:col', key);
+    // key texts and colours into Companion: POST pushes every key now (force), GET is the last push
     app.post('/api/show/labels', async () => show.pushLabels(true));
+    app.get('/api/show/labels', async () => show.companionStatus());
     app.post('/api/show/placeholders', async () => show.addPlaceholders());
     // ?base= is the dashboard address Companion should call, ?vmix= the vMix address for the fallback page
     // the whole preset: every page of both decks, a page per team, the fallback page (Companion: Import → full config)

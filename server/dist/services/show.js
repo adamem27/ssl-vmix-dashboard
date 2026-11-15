@@ -20,10 +20,12 @@ import { compareFields, showDataFields } from './showData.js';
 import { todayIn } from './dates.js';
 import { groupLabel, groupLetter } from './groupNames.js';
 import { currentStage } from './workbookSheets.js';
+import { getOverrides, inputKey, isTitleInput, withOverrides } from './fieldOverrides.js';
 import { parseVmixXml, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmixResults.js';
 /**
  * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
- * driven from two Stream Decks through Companion. Each key calls /api/show/do?a=<action>; the dashboard fills the
+ * driven from two Stream Decks through Companion. Each key calls its place (/api/show/key/<page>/<row>/<col>, which runs
+ * the action the key has there now; older presets /api/show/do?a=<action>); the dashboard fills the
  * title through the vMix Web API, brings it in on its overlay channel and keeps the rules:
  *  - every graphic on OV1 (one replaces the other), only the break scene on OV4
  *  - a board coming in takes the break scene off; the break scene takes OV1 off
@@ -548,6 +550,7 @@ export class Show {
      * changed only with the REFRESH PNG key (refreshPictures). The calls go a few at a time. Returns how many fields were set.
      */
     async set(input, fields) {
+        fields = withOverrides(this.ctx, input, fields); // the Graphics editor's edits win
         const match = titleFieldMatcher(input.fields);
         const done = new Set();
         const todo = [];
@@ -571,6 +574,17 @@ export class Show {
                 input.values[real] = value;
         }
         return todo.length;
+    }
+    /** Graphics editor: fields straight into a title input (by its title), edits applied. */
+    async editFields(inputName, fields) {
+        this.invalidate();
+        const { inputs } = await this.snapshot();
+        // every loaded copy of the title (the same name, with or without .gtzip)
+        let n = 0;
+        for (const input of inputs)
+            if (isTitleInput(input) && inputKey(input.title) === inputKey(inputName))
+                n += await this.set(input, new Map(fields));
+        return n;
     }
     /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
     async setOrExplain(input, g, fields, blind) {
@@ -1621,45 +1635,119 @@ export class Show {
         };
     }
     /**
-     * The keys of the version pages (bugs, tickers, people) get their names in Companion as soon as a version is added
-     * or renamed (POST /api/location/<page>/<row>/<col>/style). Only texts and fixed colours: no on-air feedback.
+     * The key at a Companion place (page/row/column) as the dashboard has it now: the deck pages with the key editor's
+     * edits. null where the place has no dashboard key (a free place, a vMix / ATEM key of the producer's PEOPLE page).
+     */
+    keyAt(page, row, col) {
+        const p = this.pages().find((x) => x.page === page);
+        return p?.keys[row]?.[col] ?? null;
+    }
+    /** A Companion key press by its place: the action the key has there now (/api/show/key/<page>/<row>/<col>). */
+    async runKey(page, row, col) {
+        const key = this.keyAt(page, row, col);
+        if (!key)
+            return { empty: true };
+        // a page change happens in Companion (its own key action); a key edited into one needs a new preset import
+        if (key.action.startsWith('nav:'))
+            return { nav: Number(key.action.split(':')[1]) };
+        return this.run(key.action);
+    }
+    /** The last push of key texts and colours into Companion, for Show control. */
+    labelStatus = { at: null, sent: 0, unchanged: 0, missing: 0, error: null };
+    pushing = null;
+    labelsUrl = '';
+    companionStatus() {
+        const cfg = this.config, url = getLtConfig(this.ctx.db).companionUrl;
+        return { enabled: !!(cfg.labels && url), labels: cfg.labels, companionUrl: url, ...this.labelStatus, cached: this.labels.size };
+    }
+    /**
+     * Every dashboard key's text and colours into Companion (Companion 3 and later: POST
+     * /api/location/<page>/<row>/<column>/style?text=&bgcolor=&color=&size=), so a key edited in Show control, a team,
+     * a ticker, an announcement, a person or a line-up name shows on the Stream Decks with no new import. Only what
+     * changed since the last push goes out (force: every key); only fixed colours, no on-air feedback.
      */
     async pushLabels(force = false) {
+        // one push at a time (the 2-second timer, a key press, a config save); a forced one waits for the running one
+        if (this.pushing) {
+            if (!force)
+                return this.companionStatus();
+            await this.pushing.catch(() => undefined);
+        }
+        const run = this.pushAll(force);
+        this.pushing = run;
+        try {
+            await run;
+        }
+        finally {
+            if (this.pushing === run)
+                this.pushing = null;
+        }
+        return this.companionStatus();
+    }
+    async pushAll(force) {
         const cfg = this.config;
-        const lt = getLtConfig(this.ctx.db);
-        if (!cfg.labels || !lt.companionUrl)
-            return { sent: 0 };
+        const url = getLtConfig(this.ctx.db).companionUrl;
+        // off, or another Companion: what was sent before says nothing about the buttons there
+        if (!cfg.labels || !url || url !== this.labelsUrl)
+            this.labels.clear();
+        this.labelsUrl = url;
+        if (!cfg.labels || !url)
+            return;
         if (force)
             this.labels.clear();
-        let n = 0;
+        const st = { sent: 0, unchanged: 0, missing: 0, error: null };
+        const style = (text, bg, fg) => `text=${encodeURIComponent(text)}&bgcolor=${encodeURIComponent(bg)}&color=${encodeURIComponent(fg)}&size=auto`;
+        const send = async (id, q) => {
+            if (this.labels.get(id) === q) {
+                st.unchanged++;
+                return;
+            }
+            const res = await this.fetcher(`${url}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
+            if (!res.ok) {
+                st.error = `Companion answered ${res.status} for ${id}`;
+                return;
+            }
+            // 204: Companion has no button there (the preset is older than this place, or the place was cleared in Companion)
+            if (res.status === 204)
+                st.missing++;
+            else
+                st.sent++;
+            this.labels.set(id, q);
+        };
         try {
+            const seen = new Set();
             for (const p of this.pages()) {
                 for (const [r, row] of p.keys.entries()) {
                     for (const [c, key] of row.entries()) {
-                        if (!key || !/^(bug|ticker|person):/.test(key.action))
+                        // the producer's own keys on PEOPLE (vMix, ATEM, its page keys) keep their look
+                        if (!key || (p.name === 'PEOPLE' && KEPT_PEOPLE_PLACES.has(`${r}/${c}`) && !keptPeopleAction(r, c)))
                             continue;
-                        const l = await this.keyLook(key, undefined, true);
-                        const q = `text=${encodeURIComponent(l.text)}&bgcolor=${encodeURIComponent(l.bg)}&color=${encodeURIComponent(l.fg)}&size=auto`;
                         const id = `${p.page}/${r}/${c}`;
-                        if (this.labels.get(id) === q)
-                            continue;
-                        const res = await this.fetcher(`${lt.companionUrl}/api/location/${id}/style?${q}`, { method: 'POST', signal: AbortSignal.timeout(3000) });
-                        if (res.ok) {
-                            this.labels.set(id, q);
-                            n++;
-                        }
+                        const l = await this.keyLook(key, undefined, true);
+                        seen.add(id);
+                        await send(id, style(l.text, l.bg, l.fg));
                     }
                 }
             }
+            // a key taken away since the last push: its place goes dark (only places this dashboard wrote, never the ATEM key)
+            const dark = style('', '#000000', '#ffffff');
+            for (const id of [...this.labels.keys()]) {
+                if (seen.has(id))
+                    continue;
+                await send(id, dark);
+                if (this.labels.get(id) === dark)
+                    this.labels.delete(id);
+            }
         }
         catch (e) {
-            this.log(`Companion labels: ${e?.message ?? e}`);
+            st.error = String(e?.message ?? e);
+            this.log(`Companion labels: ${st.error}`);
         }
-        return { sent: n };
+        this.labelStatus = { at: new Date().toISOString(), ...st };
     }
     /**
      * The whole Companion preset in one file (every page of both decks, a page per team, the fallback page): each key
-     * has its text and colours fixed in it, as they are now (no live labels).
+     * has its text and colours as they are now, and calls its place; later changes come live (pushLabels, runKey).
      */
     async companionPreset(base, vmixBase) {
         await this.snapshot().catch(() => null);
@@ -1722,6 +1810,11 @@ export class Show {
             // Team comparison: every group's own input, and the shared one for the group picked at the top
             for (const t of this.compareTargets(inputs))
                 jobs.push({ input: t.input, f: () => this.compareData(t.fleetId) });
+            // every other title edited in the Graphics editor gets its edits (set() adds them)
+            const edited = getOverrides(this.ctx.db);
+            for (const input of inputs)
+                if (isTitleInput(input) && edited[inputKey(input.title)] && !jobs.some((j) => j.input === input))
+                    jobs.push({ input, f: () => new Map() });
             for (const { input, f: make } of jobs) {
                 const f = make();
                 if (!f)
@@ -1837,23 +1930,35 @@ export class Show {
 /** Companion 5.1's export format (12): what Companion 5.1 exports itself, imported as it is. */
 const FILE_VERSION = 12;
 const BUILD = '5.1.2';
-/** The keys of a deck page as Companion buttons; on the PEOPLE page the producer's own keys stay as they are. */
+/** The dashboard address a Companion key calls: its place (page/row/column), the dashboard runs what is there now. */
+export const keyUrl = (b, page, r, c) => `${b}/api/show/key/${page}/${r}/${c}`;
+/**
+ * The keys of a deck page as Companion buttons; on the PEOPLE page the producer's own keys stay as they are.
+ * Every key but navigation calls its place (keyUrl), so a key edited in the dashboard does its new action with no new
+ * import; the free places get a blank key calling its place too, for a key added there later. Texts and colours come
+ * live through Companion's style API (Show.pushLabels).
+ */
 function pageControls(cfg, p, keys, b, taken = new Set()) {
     const controls = {};
     keys.forEach((row, r) => row.forEach((x, c) => {
         if (!x)
             return;
         const id = `p${p.page}r${r}c${c}`;
-        const act = x.key.action.startsWith('nav:') ? setPage(id, Number(x.key.action.split(':')[1])) : http(id, `${b}/api/show/do?a=${encodeURIComponent(x.key.action)}`);
+        const act = x.key.action.startsWith('nav:') ? setPage(id, Number(x.key.action.split(':')[1])) : http(id, keyUrl(b, p.page, r, c));
         (controls[r] ??= {})[c] = control(x.text, hex(x.bg), [act], hex(x.fg));
     }));
-    // the producer's PEOPLE page: each of its keys as it is (its dashboard calls to this dashboard's address)
+    // the producer's PEOPLE page: each of its keys as it is (its dashboard keys call their place on this dashboard)
     if (p.name === 'PEOPLE')
-        for (const [r, row] of Object.entries(keptControls(b)))
+        for (const [r, row] of Object.entries(keptControls(b, p.page)))
             for (const [c, ctl] of Object.entries(row))
                 (controls[Number(r)] ??= {})[Number(c)] = ctl;
     else
         addDsk(controls, p.page, (r, c) => !!keys[r]?.[c] || taken.has(`${r}/${c}`));
+    for (let r = GRID.minRow; r <= GRID.maxRow; r++)
+        for (let c = GRID.minColumn; c <= GRID.maxColumn; c++) {
+            if (!controls[r]?.[c])
+                (controls[r] ??= {})[c] = control('', 0, [http(`p${p.page}r${r}c${c}`, keyUrl(b, p.page, r, c))]);
+        }
     return controls;
 }
 /**
@@ -1874,14 +1979,20 @@ function addDsk(controls, page, used) {
 }
 /** Where the downstream key is on the producer's PEOPLE page (row 2, last column). */
 const DSK_AT = [2, 7];
-/** The kept page's keys without UNDO (no UNDO key on any page). */
-function keptControls(b) {
+/** The kept page's keys without UNDO (no UNDO key on any page); its dashboard keys call their place (keyUrl). */
+function keptControls(b, page) {
     const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
     const out = JSON.parse(json);
-    for (const row of Object.values(out))
-        for (const [c, ctl] of Object.entries(row))
-            if (/api\/show\/do\?a=undo"/.test(JSON.stringify(ctl)))
+    for (const [r, row] of Object.entries(out))
+        for (const [c, ctl] of Object.entries(row)) {
+            if (/api\/show\/do\?a=undo"/.test(JSON.stringify(ctl))) {
                 delete row[Number(c)];
+                continue;
+            }
+            const get = ctl?.steps?.[0]?.action_sets?.down?.find((a) => a.definitionId === 'get' && /\/api\/show\/do\?a=/.test(a.options?.url?.value ?? ''));
+            if (get)
+                get.options.url.value = keyUrl(b, page, Number(r), Number(c));
+        }
     return out;
 }
 /** The places of the producer's PEOPLE page that have a key ("row/col"). */
@@ -1900,10 +2011,9 @@ export function companionPresetFile(cfg, pages, base, vmixBase, graphics) {
     const b = base.replace(/\/+$/, '');
     const out = {};
     for (const p of pages) {
-        const keys = p.keys.map((row) => row.map((x) => (!x || (x.look.empty && x.key.kind !== 'nav') ? null : { key: x.key, text: x.look.text, bg: x.look.bg, fg: x.look.fg })));
-        // a key with no text now (a free version place) keeps its place: its name comes when the version is added
-        const taken = new Set(p.keys.flatMap((row, r) => row.flatMap((x, c) => (x ? [`${r}/${c}`] : []))));
-        out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b, taken), gridSize: GRID };
+        // a key with no text now (a free version place) is there dark: its name comes live when the version is added
+        const keys = p.keys.map((row) => row.map((x) => (x ? { key: x.key, text: x.look.text, bg: x.look.bg, fg: x.look.fg } : null)));
+        out[p.page] = { name: `SSL ${p.name}`, controls: pageControls(cfg, p, keys, b), gridSize: GRID };
     }
     const fb = fallbackControls(cfg, vmixBase, graphics);
     addDsk(fb, PRESET_PAGES.fallback, () => false);

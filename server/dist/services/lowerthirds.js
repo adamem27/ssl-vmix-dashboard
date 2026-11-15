@@ -7,6 +7,7 @@ import { listSailors } from './sailors.js';
 import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 import { findInput, parseVmixXml, vmixUrl } from './vmixResults.js';
+import { withOverrides } from './fieldOverrides.js';
 import { keyOf, ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
 import { stageTeamIds } from './workbookSheets.js';
 /**
@@ -205,7 +206,7 @@ export class LowerThirds {
         if (!input)
             throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
         const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
-        fields = this.fitToTitle(input, fields, next.teamId);
+        fields = withOverrides(this.ctx, input, this.fitToTitle(input, fields, next.teamId)); // Graphics editor edits win
         const has = new Set(input.fields);
         const id = input.key || input.number;
         this.cancelClear(id); // its photo is still in: emptied below, before it comes in
