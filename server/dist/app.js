@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
@@ -651,9 +652,18 @@ export async function buildApp(deps) {
     }
     return app;
 }
+/** The race flag PNGs of earlier versions (sha256, first 16 hex): a copy still like one of them gets the new picture. */
+const OLD_RACE_FLAGS = new Set(['848de9e2ca6f1c66', '914c7f5df8cf6c75', '19a8cde69f5407d4', '88b4d71494465192', '017d3dfe98f86132',
+    '73bf6c4bcbc143a8', '5e1b1b04963468fe', '635045e9ea3255c3', 'c2dfc39ff9ac0f71', '37c8085c497d3f05', 'ab4b08f159da1b36',
+    '386f8ba50a0af73c', 'e64201c96ce30585', '49e71ede7c64cc3c', '846d9ab02740fa4c', '89137e41b7885b3b', '8b34d36fb89eec8c',
+    'af4ef36194f507f4', '784b0f887769e06d', '523d7f01de8cc75b', '750e6f1ebc1fe8d0', '041ccd26e4e48f0a', '0aec71ba6ae6bf2d',
+    '95cd33e1656fa482', 'a34b858ac67fa2e8', '05ff371585387e52', '47c1ee3a4c721ea7', 'fcc30c01c7fb64f6']);
+const sha16 = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex').slice(0, 16);
 /**
- * Race signal flags (SSL style, rounded squares) that ship with the app, copied once into the assets folder as
- * race-flags/*.png, so the GTZIP generator and vMix titles can use them like any other picture. Files already there stay.
+ * Race signal flags (drawn like the Racing Rules of Sailing race signals chart) that ship with the app, copied into
+ * the assets folder as race-flags/*.png, so the GTZIP generator and vMix titles can use them like any other picture.
+ * A missing one is copied; one still as an earlier version shipped it gets the new picture (same name, so every
+ * version and title using it shows the new one); a picture you put there yourself under that name stays.
  */
 export function seedRaceFlags(assetsDir) {
     const src = path.join(mb.fixturesDir(), 'race-flags');
@@ -662,9 +672,14 @@ export function seedRaceFlags(assetsDir) {
     const dst = path.join(assetsDir, 'race-flags');
     try {
         fs.mkdirSync(dst, { recursive: true });
-        for (const f of fs.readdirSync(src))
-            if (f.endsWith('.png') && !fs.existsSync(path.join(dst, f)))
-                fs.copyFileSync(path.join(src, f), path.join(dst, f));
+        for (const f of fs.readdirSync(src)) {
+            if (!f.endsWith('.png'))
+                continue;
+            const to = path.join(dst, f);
+            if (fs.existsSync(to) && !OLD_RACE_FLAGS.has(sha16(to)))
+                continue;
+            fs.copyFileSync(path.join(src, f), to);
+        }
     }
     catch { /* read-only assets folder: the flags are simply not offered */ }
 }

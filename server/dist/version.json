@@ -1,8 +1,14 @@
 {
-  "version": "1.0.192",
-  "commit": "c867003",
-  "date": "2026-11-15T19:08:59Z",
+  "version": "1.0.193",
+  "commit": "592765f",
+  "date": "2026-11-15T19:09:27Z",
   "changes": [
+    {
+      "version": "1.0.193",
+      "commit": "592765f",
+      "date": "2026-11-15T19:09:27Z",
+      "text": "Race flags drawn like the race signals chart; combinations (C + red/green/−/+, AP over 1–3); Announcements sorted: often, combinations, rest"
+    },
     {
       "version": "1.0.192",
       "commit": "c867003",
@@ -476,12 +482,6 @@
       "commit": "d2567a3",
       "date": "2026-11-10T15:42:39Z",
       "text": "Fix Trimmer 2 lower third key; masks stay put in the animation preview"
-    },
-    {
-      "version": "1.0.113",
-      "commit": "d6ac839",
-      "date": "2026-11-10T14:10:26Z",
-      "text": "One name for each thing: Groups and Stages instead of fleets and fleet sets, teams instead of boats; Racing now sheet: one row about the group racing now for universal vMix titles"
     }
   ]
 }
