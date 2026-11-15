@@ -291,7 +291,7 @@ describe('show control', () => {
     fs.writeFileSync(path.join(dir, `${code}_lowerthird.png`), encodePng(4, 1, () => [0, 0, 0, 255]));
     fs.writeFileSync(path.join(dir, `${code}_qualified_bar.png`), encodePng(4, 1, () => [0, 0, 0, 255]));
     await show.run('qualified:2');
-    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=Qualified for the SSL Gold Cup finals');
+    expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=QUALIFIED FOR THE FINAL SERIES');
     expect(v.calls.find((c) => c.includes('SelectedName=Bar.Source'))).toMatch(new RegExp(`${code}_lowerthird\\.png$`));
     expect(v.overlays[1]).toBe('10');
   });

@@ -34,11 +34,11 @@ import { findInput, parseVmixXml, pushResults, resultFieldsFor, titleFieldMatche
  * State (what is on air) is always read from vMix, never remembered from key presses.
  */
 
-/** The bottom line of the qualified team lower third. */
 /** The lineup lower third's order: from the bow to the stern. */
 export const LINEUP_LT_ORDER = BOW_TO_STERN;
 
-export const QUALIFIED_TEXT = 'Qualified for the SSL Gold Cup finals';
+/** The bottom line of the qualified team lower third (exactly as written, capitals). */
+export const QUALIFIED_TEXT = 'QUALIFIED FOR THE FINAL SERIES';
 
 export type Kind = 'board' | 'lt' | 'bug' | 'scene';
 export interface Graphic { id: string; label: string; kind: Kind; overlay: number; inputs: string[]; aliases?: string[] }
