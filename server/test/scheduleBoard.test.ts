@@ -24,7 +24,7 @@ describe('day schedule board', () => {
     const { fields } = board();
     const f = fields();
     expect(f.get('TIME 1.Text')).toBe('10:00');
-    expect(f.get('RACE 2.Text')).toBe('Race 2');
+    expect(f.get('RACE 2.Text')).toBe('RACE 2');
     expect(f.get('POSITION 3.Text')).toBe('3');
     expect(f.get('RACE 2 C.Text')).toBe('');
     expect(f.get('POSITION 1 C.Text')).toBe('');
@@ -40,12 +40,12 @@ describe('day schedule board', () => {
     expect(f.get('TIME 1.Text')).toBe('');
     expect(f.get('RACE 1.Text')).toBe('');
     expect(f.get('GROUP A.Text')).toBe('');
-    expect(f.get('RACE 1 C.Text')).toBe('Race 1');
+    expect(f.get('RACE 1 C.Text')).toBe('RACE 1');
     expect(f.get('POSITION 2 C.Text')).toBe('2');
     expect(f.get('GROUP 1 C.Text')).not.toBe('');
   });
 
-  it('a group with only some teams known: their flags, the neutral “?” flag in the other places; the name as typed', () => {
+  it('a group with only some teams known: their flags, the neutral “?” flag in the other places', () => {
     const { s, fields } = board();
     const ev = activeEvent(s.db).id;
     const set = createSet(s.db, ev, 'Final day');
@@ -59,8 +59,8 @@ describe('day schedule board', () => {
     createScheduleItem(s.db, ev, { date: day, time: '12:00', race: 'Qualification', fleet: 'Qualification Race' });
     setScheduleOptions(s.db, { showTime: false });
     const f = fields();
-    expect(f.get('GROUP 4 C.Text')).toBe('Qualification Race');
-    expect(f.get('RACE 4 C.Text')).toBe('Qualification');
+    expect(f.get('GROUP 4 C.Text')).toBe('QUALIFICATION RACE');
+    expect(f.get('RACE 4 C.Text')).toBe('QUALIFICATION');
     expect(f.get('FLAG 13 C.Source')).toMatch(/BRA/);
     const unknown = unknownFlagPath(s.ctx);
     expect(unknown).toMatch(/flag_unknown\.png$/);
