@@ -580,12 +580,14 @@ export class Show {
     }
     return todo.length;
   }
-  /** Graphics editor: fields straight into one title input (by its name, number or key), edits applied. */
+  /** Graphics editor: fields straight into a title input (by its title), edits applied. */
   async editFields(inputName: string, fields: Map<string, string>) {
     this.invalidate();
     const { inputs } = await this.snapshot();
-    const input = findInput(inputs.filter(isTitleInput), inputName);
-    return input ? this.set(input, fields) : 0;
+    // every loaded copy of the title (the same name, with or without .gtzip)
+    let n = 0;
+    for (const input of inputs) if (isTitleInput(input) && inputKey(input.title) === inputKey(inputName)) n += await this.set(input, new Map(fields));
+    return n;
   }
   /** set(), but a title that takes none of the fields (a placeholder image, an old GTZIP) is an error naming what it has. */
   private async setOrExplain(input: VmixInput, g: Graphic, fields: Map<string, string>, blind?: () => Map<string, string>) {
