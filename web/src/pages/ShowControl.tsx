@@ -124,7 +124,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end; TICKER ON / OFF on channel 1 and TOP TICKER ON / OFF on the AFTER / BREAK page; COMPARE holds each group's Team comparison with its RESULTS, Provisional overall, under it); deck 2 has TEAMS (16 keys in group order, A1–A4, B1–B4…; each opens the team's page with its lower thirds TEAM LT, QUALIFIED and LINEUP LT and its places with the sailors' names and shirt numbers, PHOTO mode; a place with no team yet shows its name, A1…, until a team is put there), every announcement (BUGS OFTEN, BUGS RARE), every ticker and top ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end; TICKER ON / OFF on channel 1 and TOP TICKER ON / OFF on the AFTER / BREAK page; RESULTS/COMPARE holds each group's Team comparison with its RESULTS, Provisional overall, under it, for the stage picked at the top); deck 2 has TEAMS (16 keys in group order, A1–A4, B1–B4…; each opens the team's page with its lower thirds TEAM LT, QUALIFIED and LINEUP LT and its places with the sailors' names and shirt numbers, PHOTO mode; a place with no team yet shows its name, A1…, until a team is put there), every announcement (BUGS OFTEN, BUGS RARE), every ticker and top ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -286,7 +286,7 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
   const { c, setC, dirty, save } = useConfig(data, onSaved);
   const toast = useToast();
   const origin = window.location.origin;
-  const teams = data.pages.filter((p) => p.page >= 9 && p.name !== 'COMPARE' && p.name !== 'PEOPLE' && !/^TEAMS/.test(p.name));
+  const teams = data.pages.filter((p) => p.page >= 9 && p.name !== 'COMPARE' && p.name !== 'RESULTS/COMPARE' && p.name !== 'PEOPLE' && !/^TEAMS/.test(p.name));
   const [url, setUrl] = useState(data.companionUrl || '');
   const [pushing, setPushing] = useState(false);
   const st = data.companion;

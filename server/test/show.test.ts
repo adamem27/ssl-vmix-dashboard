@@ -555,7 +555,7 @@ describe('show control', () => {
     setCurrentStage(s.db, ev, stage.id);
     show.invalidate();
     expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', '', '', '', '']);
-    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'FLEET2 1', 'FLEET2 2', 'FLEET2 3', 'FLEET2 4', 'COMPARE', 'PEOPLE']);
+    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'FLEET2 1', 'FLEET2 2', 'FLEET2 3', 'FLEET2 4', 'RESULTS/COMPARE', 'PEOPLE']);
   });
 
   it('the next stages: 4 groups of 4 places in group order, empty places keep their pages and become the team once filled', async () => {
@@ -571,7 +571,7 @@ describe('show control', () => {
     const teamPages = pages.filter((p) => p.page >= 9 && p.page <= 24);
     expect(teamPages.map((p) => p.name)).toEqual(['A1', 'POL', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'GER', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4']);
     expect(teamPages.map((p) => p.page)).toEqual(Array.from({ length: 16 }, (_, i) => 9 + i));
-    expect(pages.find((p) => p.name === 'COMPARE')!.page).toBe(25);
+    expect(pages.find((p) => p.name === 'RESULTS/COMPARE')!.page).toBe(25);
     expect(pages.find((p) => p.name === 'PEOPLE')!.page).toBe(26);
     // TEAMS: A and B on the top row, C and D below, each key opening its place's page
     const teams = pages.find((p) => p.name === 'TEAMS')!;
@@ -588,7 +588,7 @@ describe('show control', () => {
     show.invalidate();
     expect(show.keyAt(9, 0, 4)?.action).toBe('teamlt:FRA');
     expect(show.pages().find((p) => p.page === 9)!.name).toBe('FRA');
-    expect(show.pages().find((p) => p.name === 'COMPARE')!.page).toBe(25);
+    expect(show.pages().find((p) => p.name === 'RESULTS/COMPARE')!.page).toBe(25);
   });
 
   it('everyone in People has a key; the COMPARE keys follow the Team comparison inputs vMix has', async () => {
@@ -603,7 +603,7 @@ describe('show control', () => {
     await show.run('person:2');
     expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=Ben LEE`);
     // every group of the stage has a COMPARE key, and a RESULTS key under it, before its input is in vMix
-    const compare = show.pages().find((p) => p.name === 'COMPARE')!;
+    const compare = show.pages().find((p) => p.name === 'RESULTS/COMPARE')!;
     expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
     expect(compare.keys[1].filter(Boolean).map((k) => k!.action)).toEqual([`results:${k1}`, `results:${k2}`]);
   });
@@ -615,7 +615,7 @@ describe('show control', () => {
     const [k1, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
     const v = fakeVmix({ ...TITLES, [`ssl_compare_${k1}`]: ['1 COUNTRY.Text', '1 FLAG.Source'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    const page = show.pages().find((p) => p.name === 'COMPARE')!;
+    const page = show.pages().find((p) => p.name === 'RESULTS/COMPARE')!;
     expect(page.keys[0].slice(0, 2).map((x) => x?.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
     expect(show.pages()[0].keys[0][7]?.action).toBe(`nav:${page.page}`);
     // the group's data into its own input, then in; the same key again takes it out
@@ -665,9 +665,9 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, ssl_results_LCR: ['COUNTRY1.Text', 'COUNTRY2.Text'], ssl_compare_LCR: ['1 COUNTRY.Text', '2 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.snapshot();
-    const after = show.pages().find((p) => p.name === 'COMPARE')!;
+    const after = show.pages().find((p) => p.name === 'RESULTS/COMPARE')!;
     expect(after.keys[1].map((x) => x?.action)).toContain('results:LCR');
-    expect(show.pages().find((p) => p.name === 'COMPARE')!.keys[0].map((x) => x?.action)).toContain('compare:LCR');
+    expect(show.pages().find((p) => p.name === 'RESULTS/COMPARE')!.keys[0].map((x) => x?.action)).toContain('compare:LCR');
     await show.run('results:LCR');
     expect(v.overlays[1]).toBe(v.num('ssl_results_LCR'));
     expect(v.vals.get(`${v.num('ssl_results_LCR')}|COUNTRY1.Text`)).toBe('TEAM BRA');
@@ -723,7 +723,7 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.snapshot();
     // a RESULTS key per group on the COMPARE page, under its comparison, each with its own input
-    const page = show.pages().find((p) => p.name === 'COMPARE')!;
+    const page = show.pages().find((p) => p.name === 'RESULTS/COMPARE')!;
     expect(page.keys[1].slice(0, 2).map((x) => x?.action)).toEqual([`results:${k1}`, `results:${k2}`]);
     expect(await show.run(`results:${k2}`)).toMatchObject({ in: 'results' });
     expect(v.overlays[1]).toBe(v.num(`ssl_results_${k2}`));
