@@ -469,6 +469,8 @@ function Flag({ team, className = '' }: { team: OutTeam; className?: string }) {
 }
 
 const PANEL_TOP = 12;
+/** the strips' (and in all groups the header's) margin from the sides of the screen */
+const STRIP_SIDE = 10;
 const EASE = 'cubic-bezier(.55,0,.2,1)';
 /** The page's styles for side strips this wide (DRAW → Screen texts and layout). */
 const css = (STRIP_W: number) => `
@@ -481,8 +483,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-bg { position: absolute; inset: 0; background:
   linear-gradient(115deg, transparent 0 55%, rgba(255,255,255,.05) 55% 61%, transparent 61% 100%),
   linear-gradient(28deg, #2c3e93 0%, #1867bb 20%, #0aa9df 42%, #0bbde6 52%, #3cc39a 70%, #86c540 86%, #c6d500 100%); }
+/* the header picture as far from the top of the screen as the TEAMS and GROUPS bars, its top edge level with theirs */
 .dr-mid { position: absolute; left: ${STRIP_W}px; top: 0; width: ${W - 2 * STRIP_W}px; height: ${H}px; display: flex; flex-direction: column; align-items: center;
-  transition: left .8s ${EASE}, width .8s ${EASE}; }
+  padding-top: ${PANEL_TOP}px; box-sizing: border-box; transition: left .8s ${EASE}, width .8s ${EASE}; }
 .dr-header { display: block; width: ${W - 2 * STRIP_W}px; height: auto; max-height: ${HEADER_MAX}px; object-fit: cover; flex: none; position: relative; z-index: 5;
   box-shadow: 0 6px 24px rgba(0,0,0,.3); transition: width .8s ${EASE}, max-height .8s ${EASE}; }
 
@@ -508,12 +511,13 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 
 .dr-strip { position: absolute; top: ${PANEL_TOP}px; width: ${STRIP_W - 20}px; height: ${H - PANEL_TOP - 12}px; z-index: 3; display: flex; flex-direction: column; gap: 10px;
   transition: transform .8s ${EASE}, opacity .8s ease; }
-.dr-left { left: 10px; }
-.dr-right { right: 10px; }
+.dr-left { left: ${STRIP_SIDE}px; }
+.dr-right { right: ${STRIP_SIDE}px; }
 .dr-stage.is-overview .dr-left { transform: translateX(-${STRIP_W + 40}px); opacity: 0; }
 .dr-stage.is-overview .dr-right { transform: translateX(${STRIP_W + 40}px); opacity: 0; }
-.dr-stage.is-overview .dr-mid { left: 0; width: ${W}px; }
-.dr-stage.is-overview .dr-header { width: ${W}px; max-height: 420px; }
+/* all groups: the header grows to the width of the screen, keeping the bars' margins from the top and the sides */
+.dr-stage.is-overview .dr-mid { left: ${STRIP_SIDE}px; width: ${W - 2 * STRIP_SIDE}px; }
+.dr-stage.is-overview .dr-header { width: ${W - 2 * STRIP_SIDE}px; max-height: 420px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .dr-pool { flex: 1; min-height: 0; padding: 8px 2px; display: flex; flex-direction: column; justify-content: space-evenly; }
 .dr-pool-row { flex: none; }
