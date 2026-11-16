@@ -216,7 +216,6 @@ export function DrawOutputPage() {
                     content={t.id} bg={t.gradient} lit={isCur}>
                     <Flag team={t} className="dr-row-flag" />
                     <span className="dr-row-code">{t.code}</span>
-                    {p && !isCur && <span className="dr-tag">{p.group}</span>}
                   </Row>
                 );
               })}
@@ -439,9 +438,6 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-skel-code { height: 12px; width: 92px; border-radius: 6px; background: rgba(255,255,255,.14); }
 .dr-dots { display: flex; justify-content: center; gap: 12px; }
 .dr-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.4); }
-/* the 1ST / 2ND tags of the matchboard, here the group a team went to */
-.dr-tag { margin-left: auto; flex: none; height: 34px; min-width: 36px; padding: 0 10px 0 6px; display: grid; place-items: center; background: #0d4ea8; color: #fff; font-size: 24px; font-weight: 600;
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%); }
 
 .dr-strip { position: absolute; top: ${PANEL_TOP}px; width: ${STRIP_W - 20}px; height: ${H - PANEL_TOP - 12}px; z-index: 3; display: flex; flex-direction: column; gap: 10px;
   transition: transform .8s ${EASE}, opacity .8s ease; }
@@ -464,12 +460,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-cell.dr-out { position: absolute; inset: 0; padding: inherit; animation: dr-fade-out .6s ease both; pointer-events: none; }
 /* the strips: flag and code centred in their row (the group tag sits at the right edge) */
 .dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: center; }
-.dr-pool-row .dr-cell { padding: 0 40px; }
-.dr-pool-row .dr-tag { position: absolute; right: -4px; top: 50%; margin: 0; transform: translateY(-50%); }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
-.dr-tag { animation: dr-fade-in ${MOVE_MS}ms ${EASE} both; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
 
 .dr-groups { justify-content: space-between; gap: 10px; }
