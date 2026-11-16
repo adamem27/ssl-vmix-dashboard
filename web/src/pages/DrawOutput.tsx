@@ -210,7 +210,7 @@ export function DrawOutputPage() {
                 const isCur = flag?.teamId === t.id || (!!landed && !!p && `${p.group}${p.place}` === landed);
                 return (
                   <Row key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH }}
-                    content={p && !isCur ? p.group : ''} bg={t.gradient} lit={isCur}>
+                    content={t.id} bg={t.gradient} lit={isCur}>
                     <Flag team={t} className="dr-row-flag" />
                     <span className="dr-row-code">{t.code}</span>
                     {p && !isCur && <span className="dr-tag">{p.group}</span>}
@@ -437,18 +437,18 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-stage.is-overview .dr-header { width: ${W}px; max-height: 420px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .dr-pool { flex: none; padding: 8px 2px; display: flex; flex-direction: column; gap: 6px; }
-.dr-pool-row { transition: opacity .6s; gap: 14px; padding: 0 12px; }
+.dr-pool-row { transition: opacity ${MOVE_MS}ms ${EASE}; gap: 14px; padding: 0 12px; }
 .dr-pool-row .dr-row-flag { width: 54px; height: 36px; }
 .dr-pool-row.is-done { opacity: .42; }
-.dr-pool-row.is-current { animation: dr-pulse 1.4s ease-in-out infinite; }
-.dr-row-bg { position: absolute; inset: 0; border-radius: inherit; transition: opacity .6s ease; pointer-events: none; }
+
+.dr-row-bg { position: absolute; inset: 0; border-radius: inherit; transition: opacity ${MOVE_MS}ms ${EASE}; pointer-events: none; }
 .dr-pool-row.is-current .dr-row-bg { box-shadow: 0 6px 18px rgba(0,0,0,.3); }
 .dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
 .dr-in { animation: dr-fade-in .6s ease both; }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
-.dr-tag { transition: opacity .4s; }
+.dr-tag { animation: dr-fade-in ${MOVE_MS}ms ${EASE} both; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
 
 .dr-groups { justify-content: space-between; gap: 10px; }
