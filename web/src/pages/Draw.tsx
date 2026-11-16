@@ -7,8 +7,8 @@ import { FoldTitle, useFold } from '../components/fold';
 interface DrawTeam { id: string; code: string; name: string; flag: string | null }
 interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
-  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number; emptyStyle: 'bars' | 'dots' | 'text' };
-  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; seq: number };
+  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number; emptyStyle: 'bars' | 'dots' | 'text'; autoSteps: boolean };
+  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; seq: number };
   teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; videos: Record<string, { file: string; bytes: number } | null>; input: string; matchboardInput: string;
   companion: { at: string; sent: number; error: string | null } | null;
 }
@@ -48,15 +48,24 @@ export function DrawPage() {
         <section className="flex flex-col gap-4">
           <Preview seq={st.seq} />
           <div className="rounded-lg border border-ink-800 bg-ink-900/60 p-4">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-ink-400">
-                {d.next ? `1 · Bring Group ${d.next} to the centre · 2 · Press the team drawn` : 'Every group is full'}
-              </span>
-              <Button size="sm" variant={st.focus ? 'secondary' : 'primary'} className="ml-auto" disabled={!d.next || run.isPending || st.focus === d.next} onClick={() => run.mutate('focus')}>
-                {d.next ? `Group ${d.next} to the centre` : 'Groups full'}
-              </Button>
-              <Button size="sm" variant="ghost" disabled={!st.focus || run.isPending} onClick={() => run.mutate('focus:off')}>Send it back</Button>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-ink-400">Steps of each team</span>
+              <div className="ml-auto flex overflow-hidden rounded-md border border-ink-700 text-xs">
+                {([[false, 'Manual (every step on a key)'], [true, 'Automatic (flag and group go by themselves)']] as const).map(([v, label]) => (
+                  <button key={String(v)} onClick={() => save.mutate({ autoSteps: v })}
+                    className={cx('px-2.5 py-1', d.config.autoSteps === v ? 'bg-accent-500 text-white' : 'bg-ink-850 text-ink-300 hover:bg-ink-800')}>{label}</button>
+                ))}
+              </div>
             </div>
+            <div className="mb-3 grid gap-2 sm:grid-cols-3">
+              <StepButton n={1} label={d.next ? `Group ${d.next} to the centre` : 'Every group is full'} hint="the group the next team goes to"
+                active={!!st.focus && !st.flag && st.focus === d.next} disabled={!d.next || run.isPending || (st.focus === d.next && !st.flag)} onClick={() => run.mutate('focus')} />
+              <StepButton n={3} label="Flag off · team in group" hint={d.config.autoSteps ? 'automatic now' : cur && st.flag ? `${cur.code} shows in Group ${st.current!.group}` : 'after the team is drawn'}
+                active={!!st.flag} disabled={!st.flag || run.isPending} onClick={() => run.mutate('reveal')} />
+              <StepButton n={4} label={st.focus ? `Group ${st.focus} back` : 'Group back'} hint={d.config.autoSteps ? 'automatic now' : 'to its place on the right'}
+                active={!!st.focus && !st.flag} disabled={!st.focus || run.isPending} onClick={() => run.mutate('back')} />
+            </div>
+            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-400">2 · Press the team drawn{d.next ? ` (it goes to Group ${d.next})` : ''}{!d.config.autoSteps ? ': its flag stays until step 3' : ''}</div>
             <div className="grid grid-cols-4 gap-2">
               {d.pool.map((t, i) => {
                 const p = picked.get(t.id);
@@ -90,7 +99,7 @@ export function DrawPage() {
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <Button onClick={() => run.mutate('undo')} disabled={!st.current && !st.picks.length}>Undo</Button>
-              <Button onClick={() => run.mutate('clear')} disabled={!st.current}>Clear centre</Button>
+              <Button onClick={() => run.mutate('clear')} disabled={!st.current && !st.focus}>Clear centre</Button>
               <Button onClick={() => run.mutate('overview')} variant={st.overview ? 'primary' : 'secondary'}>All groups in the centre{st.overview ? ' (on)' : ''}</Button>
               <Button variant="danger" className="ml-auto" onClick={async () => { if (await confirm.ask('Reset the draw?', 'Every team leaves its group and the screen starts again. The pool stays.', 'Reset')) run.mutate('reset'); }}>Reset draw</Button>
             </div>
@@ -125,6 +134,17 @@ function Preview({ seq }: { seq: number }) {
     <div ref={box} className="relative w-full overflow-hidden rounded-lg border border-ink-800 bg-black" style={{ height: (w * 1024) / 1536 }} data-seq={seq}>
       <iframe src="/draw/output" title="Draw output" style={{ width: 1536, height: 1024, transform: `scale(${w / 1536})`, transformOrigin: '0 0', border: 0 }} />
     </div>
+  );
+}
+
+function StepButton({ n, label, hint, active, disabled, onClick }: { n: number; label: string; hint: string; active: boolean; disabled: boolean; onClick: () => void }) {
+  return (
+    <button disabled={disabled} onClick={onClick}
+      className={cx('flex flex-col items-start rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed',
+        active ? 'border-amber-400 bg-amber-500/25 text-amber-100' : disabled ? 'border-ink-800 bg-ink-900 text-ink-500' : 'border-sky-600 bg-sky-800/50 text-white hover:bg-sky-700/60')}>
+      <span className="text-sm font-bold">{n} · {label}</span>
+      <span className="text-xs opacity-70">{hint}</span>
+    </button>
   );
 }
 
@@ -215,7 +235,7 @@ function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>
           <input value={caption} onChange={(e) => setCaption(e.target.value)} onBlur={() => caption !== d.config.caption && save({ caption })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
-        <Field label="Seconds the flag waves before it flies to its group">
+        <Field label="Seconds the flag shows (automatic steps only)">
           <input type="number" min={0} max={10} step={0.1} value={delay} onChange={(e) => setDelay(e.target.value)} onBlur={() => Number(delay) !== d.config.flightDelay && save({ flightDelay: Number(delay) || 0 })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
@@ -349,7 +369,7 @@ function Companion({ d, save }: { d: DrawView; save: (p: Partial<DrawView['confi
   return (
     <Section id="companion" title="Stream Deck (Companion)">
       <p className="mb-2 text-xs text-ink-400">
-        One page, <b>SSL DRAW</b>: the 16 pool teams in rows 1–2 (key n = team n of the pool), GROUP A–D (move the team just drawn), NEXT GROUP ▶ CENTRE, ALL GROUPS, CLEAR CENTRE and UNDO in row 3,
+        One page, <b>SSL DRAW</b>: the 16 pool teams in rows 1–2 (key n = team n of the pool), GROUP A–D (move the team just drawn), GROUP ▶ CENTRE, ALL GROUPS, CLEAR CENTRE and UNDO in row 3, FLAG OFF · TEAM IN and GROUP BACK next to
         DECK 1 HOME in row 4. Import it in Companion as a single page (Import → page) onto the page number below. Reset is only here, not on the deck.
         Key texts follow the draw live when Companion's address is set in Show control.
       </p>

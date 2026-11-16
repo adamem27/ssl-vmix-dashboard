@@ -19,7 +19,7 @@ type EmptyStyle = 'bars' | 'dots' | 'text';
 interface Out {
   seq: number; fonts: number[]; caption: string; flightDelay: number; stripWidth?: number; emptyStyle?: EmptyStyle;
   board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; pool: string[];
-  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; next?: string | null;
+  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; autoSteps?: boolean; next?: string | null;
 }
 
 // the LED wall at Marina da Glória: 6 × 4 m, 1536×1024 px
@@ -48,6 +48,8 @@ export function DrawOutputPage() {
   const groupEls = useRef(new Map<string, HTMLDivElement>());
   const timers = useRef<number[]>([]);
   const busy = useRef(false);
+  /** manual steps: the flag on the screen until the operator's FLAG OFF */
+  const pending = useRef<{ teamId: string; key: string } | null>(null);
   const spotRef = useRef<Spot | null>(null);
   spotRef.current = spot;
 
@@ -72,7 +74,17 @@ export function DrawOutputPage() {
   }, []);
 
   const later = (ms: number, f: () => void) => new Promise<void>((resolve) => { timers.current.push(window.setTimeout(() => { f(); resolve(); }, ms)); });
-  const stopAll = () => { timers.current.forEach(clearTimeout); timers.current = []; busy.current = false; setFlag(null); setHidden(null); setLanded(null); };
+  const stopAll = () => { timers.current.forEach(clearTimeout); timers.current = []; busy.current = false; pending.current = null; setFlag(null); setHidden(null); setLanded(null); };
+
+  /** FLAG OFF: the flag fades, the team stands in its row (the group stays where it is). */
+  const reveal = () => {
+    const pd = pending.current;
+    if (!pd) return;
+    pending.current = null;
+    setFlag({ teamId: pd.teamId, out: true }); setHidden(null); setLanded(pd.key);
+    timers.current.push(window.setTimeout(() => setFlag(null), FADE_MS));
+    timers.current.push(window.setTimeout(() => setLanded((l) => (l === pd.key ? null : l)), FADE_MS + HOLD_MS));
+  };
 
   /** The centre's box for the group: as big as fits inside the flag's area. */
   const measure = (letter: string): Spot | null => {
@@ -115,6 +127,14 @@ export function DrawOutputPage() {
       setHidden(key);
       void (async () => {
         await bringIn(p.group);
+        if (!data.autoSteps) {
+          // manual: the flag stays until FLAG OFF, the group until GROUP BACK
+          busy.current = false;
+          pending.current = { teamId: p.teamId, key };
+          if (prev.current?.flag) setFlag({ teamId: p.teamId, out: false });
+          else { reveal(); if (!prev.current?.focus) void sendBack(); }
+          return;
+        }
         setFlag({ teamId: p.teamId, out: false });
         await later(Math.max(1, data.flightDelay) * 1000, () => { setFlag({ teamId: p.teamId, out: true }); setHidden(null); setLanded(key); });
         await later(FADE_MS, () => setFlag(null));
@@ -128,6 +148,7 @@ export function DrawOutputPage() {
       return;
     }
     if (busy.current) return;
+    if (pending.current && !data.flag) reveal();
     // the operator moved a group in or out
     if (data.focus && data.focus !== spotRef.current?.letter) void (async () => { if (spotRef.current) await sendBack(); await bringIn(data.focus!); })();
     else if (!data.focus && spotRef.current) void sendBack();

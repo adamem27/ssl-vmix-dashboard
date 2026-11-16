@@ -51,8 +51,21 @@ describe('DRAW', () => {
     const { draw } = withPool();
     draw.run('focus');
     expect(draw.state.focus).toBe('A');
-    draw.run('team:1'); // the team goes in, the group goes back by itself
+    draw.run('team:1'); // manual steps: the flag stays, the group stays in the centre
+    expect(draw.state.focus).toBe('A');
+    expect(draw.state.flag).toBe(true);
+    draw.run('reveal');
+    expect(draw.state.flag).toBe(false);
+    expect(() => draw.run('reveal')).toThrow(/No flag/);
+    draw.run('back');
     expect(draw.state.focus).toBeNull();
+    expect(draw.keys()[3][1]!.action).toBe('reveal');
+    expect(draw.keys()[3][2]!.action).toBe('back');
+    // automatic steps: the output takes the flag off and sends the group back by itself
+    draw.setConfig({ autoSteps: true });
+    draw.run('focus'); draw.run('team:2');
+    expect(draw.state.focus).toBeNull();
+    expect(draw.state.flag).toBe(false);
     draw.run('focus:C');
     expect(draw.state.focus).toBe('C');
     draw.run('focus:off');
