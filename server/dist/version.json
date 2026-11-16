@@ -1,8 +1,14 @@
 {
-  "version": "1.0.225",
-  "commit": "809b4ca",
-  "date": "2026-11-16T21:18:19Z",
+  "version": "1.0.226",
+  "commit": "0414a8a",
+  "date": "2026-11-16T21:47:35Z",
   "changes": [
+    {
+      "version": "1.0.226",
+      "commit": "0414a8a",
+      "date": "2026-11-16T21:47:35Z",
+      "text": "Draw: the teams list fills the left strip to the bottom, teams spread evenly"
+    },
     {
       "version": "1.0.225",
       "commit": "809b4ca",
@@ -476,12 +482,6 @@
       "commit": "c02f1da",
       "date": "2026-11-11T22:08:13Z",
       "text": "Declaration sync: a floater takes the first usual place nobody was declared on, with the floater's data; the Floater place only when every usual place is taken"
-    },
-    {
-      "version": "1.0.146",
-      "commit": "db5a22f",
-      "date": "2026-11-11T20:46:25Z",
-      "text": "Numbered line-up boards: the two trimmers side by side and the grinder behind them; Adam's board for ten is filled by its place names"
     }
   ]
 }

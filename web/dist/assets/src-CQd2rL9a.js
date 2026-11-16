@@ -70,7 +70,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-stage.is-overview .dr-mid { left: 0; width: ${Bh}px; }
 .dr-stage.is-overview .dr-header { width: ${Bh}px; max-height: 420px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.dr-pool { flex: none; padding: 8px 2px; display: flex; flex-direction: column; gap: 6px; }
+.dr-pool { flex: 1; min-height: 0; padding: 8px 2px; display: flex; flex-direction: column; justify-content: space-evenly; }
+.dr-pool-row { flex: none; }
 .dr-pool-row { transition: opacity ${Uh}ms ${sg}; gap: 14px; padding: 0 12px; }
 .dr-pool-row .dr-row-flag { width: 54px; height: 36px; }
 .dr-pool-row.is-done { opacity: .42; }
