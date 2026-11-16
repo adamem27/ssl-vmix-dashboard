@@ -1,0 +1,1423 @@
+[
+ {
+  "code": "COL",
+  "crew": [
+   {
+    "firstName": "Ana Sofía",
+    "lastName": "Bermúdez",
+    "position": "Mid-Bow",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Silver medal Central American Games 2023"
+    ]
+   },
+   {
+    "firstName": "Paula",
+    "lastName": "Sánchez",
+    "position": "Floater",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Juegos bolivarianos 2022 4to lugar - medalla de plata, juegos de mar y playa 2021"
+    ]
+   },
+   {
+    "firstName": "Esteban",
+    "lastName": "Echavarria",
+    "position": "Tactician",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2 x Gold Bolivarian Games (Snipe and ISCA)"
+    ]
+   },
+   {
+    "firstName": "Juan Esteban",
+    "lastName": "Restrepo",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Continetal games - Gold/ National Championship - Gold"
+    ]
+   },
+   {
+    "firstName": "Juan Camilo",
+    "lastName": "Bustos",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "youth World Champion gold medal",
+     "National Championship - Gold"
+    ]
+   },
+   {
+    "firstName": "Julian",
+    "lastName": "Ramirez",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "youth World Champion gold medal",
+     "National Championship - Gold"
+    ]
+   },
+   {
+    "firstName": "Jhon James",
+    "lastName": "Medina",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "second place in national youth games"
+    ]
+   },
+   {
+    "firstName": "Samuel Eduardo",
+    "lastName": "Hormiga",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Top 5 nacional champions sunfish"
+    ]
+   },
+   {
+    "firstName": "Simon",
+    "lastName": "Gomez",
+    "position": "Helm",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "World Champion Sunfish 2025 gold medal"
+    ]
+   },
+   {
+    "firstName": "Andrey",
+    "lastName": "Quintero",
+    "position": "Tactician",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "London Olympic Games (Laser- ILCA)"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "EST",
+  "crew": [
+   {
+    "firstName": "Eliise",
+    "lastName": "Raamat",
+    "position": "Mid-Bow",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "ORC Europeans 2026 2. place"
+    ]
+   },
+   {
+    "firstName": "Maris",
+    "lastName": "Seersant",
+    "position": "Mid-Bow",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "49erFX Estonian champion 2026",
+     "WMRT Baltic Match Race 2022 4.",
+     "ILCA 6 U19 Europeans 2016 23."
+    ]
+   },
+   {
+    "firstName": "Angus Aarna",
+    "lastName": "Ant",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Orc European Championship 2026 C class overall 2nd place and corinthian 1st place."
+    ]
+   },
+   {
+    "firstName": "Kevin Melvin",
+    "lastName": "Aasav",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": []
+   },
+   {
+    "firstName": "Jasper Rufus",
+    "lastName": "Rytövaara",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Platu 25 Worlds 1st"
+    ]
+   },
+   {
+    "firstName": "Taavi Valter",
+    "lastName": "Taveter",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "National Champion in Optimist class"
+    ]
+   },
+   {
+    "firstName": "Ago",
+    "lastName": "Rebane",
+    "position": "Pit",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "First x-41 worlds"
+    ]
+   },
+   {
+    "firstName": "Mati",
+    "lastName": "Sepp",
+    "position": "",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "World Champion X-41 and Platu 25"
+    ]
+   },
+   {
+    "firstName": "Janno",
+    "lastName": "Hool",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Gold Platu 25 World Championship 2021"
+    ]
+   },
+   {
+    "firstName": "Karl Hannes",
+    "lastName": "Tagu",
+    "position": "Main Trimmer",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "ORC World 2nd and 3x European Champion"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "KOR",
+  "crew": [
+   {
+    "firstName": "Dajeong",
+    "lastName": "Kim",
+    "position": "Trimmer",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "⁠470 Class Korean National Team"
+    ]
+   },
+   {
+    "firstName": "Jia",
+    "lastName": "Kim",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "2023 Asian game bronze"
+    ]
+   },
+   {
+    "firstName": "Ju hyeon",
+    "lastName": "Park",
+    "position": "Bow",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "107th National Sports Festival 49er 2nd place"
+    ]
+   },
+   {
+    "firstName": "YEONGUN",
+    "lastName": "KIM",
+    "position": "Floater",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "korea national J70 second"
+    ]
+   },
+   {
+    "firstName": "Minje",
+    "lastName": "Lee",
+    "position": "Grinder",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "National Champion"
+    ]
+   },
+   {
+    "firstName": "Siyou",
+    "lastName": "Sung",
+    "position": "Mid-Bow",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "ILCA ASIAN CHAMPIONSHIPS",
+     "U21 2nd place"
+    ]
+   },
+   {
+    "firstName": "MINGYU",
+    "lastName": "JEONG",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "1st Place in South Korea"
+    ]
+   },
+   {
+    "firstName": "Sunjin",
+    "lastName": "AN",
+    "position": "Main Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "1st place in the National Sports Festival"
+    ]
+   },
+   {
+    "firstName": "sungbin",
+    "lastName": "son",
+    "position": "Pit",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "1st Place – 2014IncheonAsian Games"
+    ]
+   },
+   {
+    "firstName": "Seung",
+    "lastName": "Kim",
+    "position": "Helm",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "1st Place in ILCA 7 – High School Division at the Korean National Sports Festival"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "LTU",
+  "crew": [
+   {
+    "firstName": "Klaudio",
+    "lastName": "Kliucinskas",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Third place at the Platu World Championship.",
+     "Third place at the ORC World Championship."
+    ]
+   },
+   {
+    "firstName": "Raimondas",
+    "lastName": "Šiugždinis",
+    "position": "",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Olimpian 470 class 1992 Barcelona, Laser Radial WC 1997 - 1 st., ORC WC 2023 - 3 rd.3 vieta, 2023 ORC WC - 3 vieta, 2025 ORC WC - 5 vieta, 2026 ORC EC - 4 vieta."
+    ]
+   },
+   {
+    "firstName": "Kristoforas",
+    "lastName": "Akromas",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "SSL Finals in Gran Canaria"
+    ]
+   },
+   {
+    "firstName": "Domantas",
+    "lastName": "Juskevicius",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "The Ocean Race 2023"
+    ]
+   },
+   {
+    "firstName": "Karolis",
+    "lastName": "Janulionis",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2nd at ORC Europeans"
+    ]
+   },
+   {
+    "firstName": "Andrius",
+    "lastName": "Ramonaitis",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "SSL Finals Gran Canaria 2023",
+     "RS21 Worlds 2024 - Gold (corinthian)",
+     "470 Nationals 2x Gold, 2x Silver"
+    ]
+   },
+   {
+    "firstName": "Martin",
+    "lastName": "Volkovicki",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "The Ocean Race"
+    ]
+   },
+   {
+    "firstName": "Aistė",
+    "lastName": "Noreikaitė",
+    "position": "",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "Lithuanian ORC championship, 2nd place, with the team \"Cool Water\" (X-35), 2019"
+    ]
+   },
+   {
+    "firstName": "Egle",
+    "lastName": "Abramauskaite",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Corinthian Gold RS21 2024"
+    ]
+   },
+   {
+    "firstName": "Rokas",
+    "lastName": "Milevicius",
+    "position": "",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "2nd in the Volvo ocean race - team brunel"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "MAS",
+  "crew": [
+   {
+    "firstName": "Khairulnizam",
+    "lastName": "Bin Moha Afendy",
+    "position": "Helm",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "2x Asian Games Silver medalist"
+    ]
+   },
+   {
+    "firstName": "Nur Amirah",
+    "lastName": "Binti Hamid",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Silver Medal Laser 4.7 World Championship 2010"
+    ]
+   },
+   {
+    "firstName": "Khairunnisa",
+    "lastName": "Mohd Afendy",
+    "position": "Floater",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "Asian Games Silver medalist"
+    ]
+   },
+   {
+    "firstName": "Nor Nabila Natasha",
+    "lastName": "Binti Mohd Nazri",
+    "position": "Floater",
+    "number": "13",
+    "captain": false,
+    "best": [
+     "Sea Games Gold Medalist"
+    ]
+   },
+   {
+    "firstName": "Ahmad Faizul Aswad Bin",
+    "lastName": "Mohamed",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "World tour match racing second place- USA grand slam 2016",
+     "Polish match racing- second place- Poland"
+    ]
+   },
+   {
+    "firstName": "Muhammad Asnawi Iqbal Bin",
+    "lastName": "Adam",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Bronze Medal Asian Games 2023"
+    ]
+   },
+   {
+    "firstName": "Abdul Latif",
+    "lastName": "Bin Mansor",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Silver Medal Sea Games 2026"
+    ]
+   },
+   {
+    "firstName": "Muhamad Uzair Amin",
+    "lastName": "Mohd Yusof",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "Gold Medal Sea Games 2015 & 2017"
+    ]
+   },
+   {
+    "firstName": "Mohd Akiyuddin",
+    "lastName": "Bin Mat Zaki",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Silver Medal Sea Games 2027"
+    ]
+   },
+   {
+    "firstName": "Muhammad Faizal",
+    "lastName": "Bin Ahmad Asri",
+    "position": "Grinder",
+    "number": "12",
+    "captain": false,
+    "best": [
+     "Sea Games Bronze Medalist"
+    ]
+   },
+   {
+    "firstName": "Asmawi",
+    "lastName": "Bin Azman",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Silver Medal Sea Games 2025"
+    ]
+   },
+   {
+    "firstName": "Nasrul Syazwi",
+    "lastName": "Bin Hanami",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "National Champion windsurfing"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "MYA",
+  "crew": [
+   {
+    "firstName": "MIN",
+    "lastName": "MIN",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "1 x Silver 1 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Sithu Moe",
+    "lastName": "Myint",
+    "position": "Helm",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "2 x Gold 2 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Aung Myin",
+    "lastName": "Thu",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2 x Gold 2 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Sai Pyae Sone",
+    "lastName": "Hein",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "1 x Gold 2 x Bronze SEA Games"
+    ]
+   },
+   {
+    "firstName": "MIN THAW",
+    "lastName": "KAUNG",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "1 x Bronze Medallist SEA Games 3 x National Champion"
+    ]
+   },
+   {
+    "firstName": "Zwe",
+    "lastName": "Thura",
+    "position": "Floater",
+    "number": "13",
+    "captain": false,
+    "best": [
+     "1 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Si Thu",
+    "lastName": "Hein",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "1 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Thant Zaw",
+    "lastName": "Oo",
+    "position": "Grinder",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "1 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Saw Thaw Thi",
+    "lastName": "Htoo",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "1 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Khin Nyo",
+    "lastName": "Lynn",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "2 x Bronze Medallist SEA Games"
+    ]
+   },
+   {
+    "firstName": "Nan Khan",
+    "lastName": "Say",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "1 x Gold 2 x Silver 1 x Bronze Medallist SEA Games"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "OMA",
+  "crew": [
+   {
+    "firstName": "Abdulrahman",
+    "lastName": "Younis",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "IN 2018 WON THE DIAM 24 WORLD TOUR IN TAHITI."
+    ]
+   },
+   {
+    "firstName": "Hussain",
+    "lastName": "Said",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "ILCA 7 ARAB AND GCC CHAMPION"
+    ]
+   },
+   {
+    "firstName": "Ra’ad",
+    "lastName": "Khamis",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "SB 20 WORLD CHAMPION IN 2017"
+    ]
+   },
+   {
+    "firstName": "Yasir",
+    "lastName": "Salim",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "IN 2015 WORLD RECORD ROUND IRELAND IN BOAT MOD 70"
+    ]
+   },
+   {
+    "firstName": "Ali",
+    "lastName": "albalushi",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "GOLD AT THE DIAM24 SAILING ARABIA THE TOUR IN 2020"
+    ]
+   },
+   {
+    "firstName": "Akram",
+    "lastName": "Adaiyam",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "SILVER IN SAILING ARABIA THE TOUR 2021"
+    ]
+   },
+   {
+    "firstName": "Haitham",
+    "lastName": "Saif",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "WON FIRST AT DIAM24 Nastro Rosa tour IN 2021"
+    ]
+   },
+   {
+    "firstName": "Ibtisam",
+    "lastName": "Al Salmi",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "BONZE IN SAILING ARABIA THE TOUR IN DIAM 24 -2020"
+    ]
+   },
+   {
+    "firstName": "Marwa",
+    "lastName": "Al khaifi",
+    "position": "Floater",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "BRONZE IN SAILING ARABIA THE TOUR IN DIAM 24 -2020"
+    ]
+   },
+   {
+    "firstName": "Nasser",
+    "lastName": "Salim",
+    "position": "Trimmer",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "SILIVER AT THE GC 32 RACING TOUR IN 2019"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "POR",
+  "crew": [
+   {
+    "firstName": "Diana",
+    "lastName": "Neves",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "11th Olympic Games"
+    ]
+   },
+   {
+    "firstName": "Francisca",
+    "lastName": "Pinho",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Participation in the Volvo Ocean Race 2023"
+    ]
+   },
+   {
+    "firstName": "Afonso Manule",
+    "lastName": "Costa Gaspar",
+    "position": "",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Olimpic games"
+    ]
+   },
+   {
+    "firstName": "Vitor Hugo",
+    "lastName": "Simao do vale",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Bronze JO96 470",
+     "6 times world champion"
+    ]
+   },
+   {
+    "firstName": "Manuel",
+    "lastName": "Dantas",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "European Champion"
+    ]
+   },
+   {
+    "firstName": "Tomás",
+    "lastName": "Barreto",
+    "position": "Trimmer",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "3rd 49er Fx U23 Worlds"
+    ]
+   },
+   {
+    "firstName": "Nuno",
+    "lastName": "Santos",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "470 Bronze medal JO96",
+     "2x Gold 470 European"
+    ]
+   },
+   {
+    "firstName": "Renato",
+    "lastName": "Amarante",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "World champion"
+    ]
+   },
+   {
+    "firstName": "Paulo",
+    "lastName": "Manso",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "2 Times European Champion and Bronze medal worlds J70"
+    ]
+   },
+   {
+    "firstName": "Tomas",
+    "lastName": "Pires de Lima",
+    "position": "Grinder",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "2nd World Championship"
+    ]
+   },
+   {
+    "firstName": "João Filipe",
+    "lastName": "Gaspar Rodriguez",
+    "position": "",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "7 times Olympian - Barcelona 92 to Rio 2016 - multiple times World and European Champion, always in windsuring."
+    ]
+   }
+  ]
+ },
+ {
+  "code": "SEY",
+  "crew": [
+   {
+    "firstName": "Curtis",
+    "lastName": "Allcorn",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "FE28 round Mahe 5th, FE 28 National championship 4th"
+    ]
+   },
+   {
+    "firstName": "Joshua",
+    "lastName": "Allcorn",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "ILCA National Champion, Seychelles Junior sailor of the year"
+    ]
+   },
+   {
+    "firstName": "Brian Jean",
+    "lastName": "Toussaint",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Windsurf National Champion"
+    ]
+   },
+   {
+    "firstName": "Connor",
+    "lastName": "Haworth",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "ILCA National Champion, ILCA National runner up"
+    ]
+   },
+   {
+    "firstName": "Jayden",
+    "lastName": "Vidot",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "CJSOI ILCA (Indian ocean championships) Silver,"
+    ]
+   },
+   {
+    "firstName": "Marie Jean Eston",
+    "lastName": "Dubel",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "National windsurf champion"
+    ]
+   },
+   {
+    "firstName": "Roy",
+    "lastName": "Govinden",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2x gold ILCA regional championships, Indian Ocean Games ILCA Champion"
+    ]
+   },
+   {
+    "firstName": "Maria",
+    "lastName": "Dodsworth",
+    "position": "",
+    "number": "11",
+    "captain": false,
+    "best": []
+   },
+   {
+    "firstName": "Maryse",
+    "lastName": "Marie",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "420 national championships"
+    ]
+   },
+   {
+    "firstName": "Allan",
+    "lastName": "Julie",
+    "position": "",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "5x Olympic sailor, 7x Seychelles Sportsman of the Year"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "SGP",
+  "crew": [
+   {
+    "firstName": "Jia Yi",
+    "lastName": "Loh",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "World optimist 2013, Gold",
+     "ISAF youth worlds 2014, 420, gold"
+    ]
+   },
+   {
+    "firstName": "WILSON WEICHENG",
+    "lastName": "CAI",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "2022 Yisunsin Cup, J24, Gold",
+     "2016 FISU World Uni Games, Foundation 36"
+    ]
+   },
+   {
+    "firstName": "Umar",
+    "lastName": "Moiz",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "SB20 World Championship, Top 10 Youth team"
+    ]
+   },
+   {
+    "firstName": "Yong Soon",
+    "lastName": "Lee",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "RSYC Regatta 2026, SB20, Gold",
+     "Boryeong International Regatta 2025, J70, Silver"
+    ]
+   },
+   {
+    "firstName": "Abdullah",
+    "lastName": "Bin Mohamed Farid",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "CSC Trimaran Championships 2026, Corsair 750, Gold"
+    ]
+   },
+   {
+    "firstName": "Ethan Weiming",
+    "lastName": "Leong",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "2023 western circuit"
+    ]
+   },
+   {
+    "firstName": "Faith Ning",
+    "lastName": "Koy",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Youth Sailing World Championships 2022 - 29er, Female, 22nd",
+     "Youth Sailing World Championships 2023 - 29er, Female, 20th"
+    ]
+   },
+   {
+    "firstName": "Savannah",
+    "lastName": "Siew",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "Asian Games 2014, 420, Gold",
+     "U18 World Championship 2012/2014, 420, Gold"
+    ]
+   },
+   {
+    "firstName": "PEIYI TERENA",
+    "lastName": "LAM",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "South East Asian Games 2015, SB20, Gold"
+    ]
+   },
+   {
+    "firstName": "Jovina Bei Fen",
+    "lastName": "Choo",
+    "position": "",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "South East Asian Games 2015, SB20, Gold"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "TAH",
+  "crew": [
+   {
+    "firstName": "Manutea Antoine",
+    "lastName": "Mahai",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Second tour voile 2017 - 2nd French championship 2017 - 18th SSL Gold Cup 22"
+    ]
+   },
+   {
+    "firstName": "Moana",
+    "lastName": "Hugonot",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Qualifier pour la gold cup 2026 Team Tahiti 1er"
+    ]
+   },
+   {
+    "firstName": "Heiniti",
+    "lastName": "Maiarii",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": []
+   },
+   {
+    "firstName": "Maeva",
+    "lastName": "Rabbe",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "gold ISAF worlds",
+     "Bronze RC44 worlds"
+    ]
+   },
+   {
+    "firstName": "Herve",
+    "lastName": "Cunningham",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "RC44 Gold Cup winner"
+    ]
+   },
+   {
+    "firstName": "Yann",
+    "lastName": "Rigal",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "Bronze J80 World Championship",
+     "Silver Farr30 World Championship"
+    ]
+   },
+   {
+    "firstName": "Teriimana",
+    "lastName": "Degage",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "1/8 final SSL"
+    ]
+   },
+   {
+    "firstName": "Tom",
+    "lastName": "Lamotte",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "6th at nacra 15 European championship"
+    ]
+   },
+   {
+    "firstName": "Teiki",
+    "lastName": "Hacheche",
+    "position": "Tactician",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "gold optimist Oceania/Polynésie. 8eme optimist world cup"
+    ]
+   },
+   {
+    "firstName": "Teva",
+    "lastName": "Plichart",
+    "position": "Helm",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "European match racing champion 2006",
+     "Youth world match racing champion 1996",
+     "11 Tour de France à la voile participation (1 Time champion 2 Times 2nde)"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "UKR",
+  "crew": [
+   {
+    "firstName": "Andrii",
+    "lastName": "Klochko",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "European Champion, World Championship Medalist"
+    ]
+   },
+   {
+    "firstName": "Roman",
+    "lastName": "Tymofyeyev",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "Ukrainian Champion and Ukrainian Cup winner in the 470 sailing class."
+    ]
+   },
+   {
+    "firstName": "Volodymyr",
+    "lastName": "Bogomolkin",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "1 place European championship"
+    ]
+   },
+   {
+    "firstName": "Yurii",
+    "lastName": "Liudorovskyi",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "European Champion in the L30 class"
+    ]
+   },
+   {
+    "firstName": "Anastasiia",
+    "lastName": "Kolesnichenko",
+    "position": "",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "1st World Championship in Corinthian Devision"
+    ]
+   },
+   {
+    "firstName": "Rodion",
+    "lastName": "Luka",
+    "position": "",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "49er World Champion and Olympic medalist"
+    ]
+   },
+   {
+    "firstName": "Anastasiia",
+    "lastName": "Pototska",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Champion of Ukraine Laser Radial in Juniors"
+    ]
+   },
+   {
+    "firstName": "Oskar",
+    "lastName": "Madonich",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "U21 Ilca vice World Champion 2023"
+    ]
+   },
+   {
+    "firstName": "Heorhii",
+    "lastName": "Paches",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "Youth Laser Stanard Worlds 2nd U18, Ukrainian Cup Winner"
+    ]
+   },
+   {
+    "firstName": "Valerii",
+    "lastName": "Harnaha",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Bulgarian National champion 2 times 1ILCA 6(u19)2022, 1 IRC 3 2022"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "GRE",
+  "crew": [
+   {
+    "firstName": "Stylianos",
+    "lastName": "Noutsos",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Worlds platu25"
+    ]
+   },
+   {
+    "firstName": "AIMILIOS",
+    "lastName": "PAPATHANASIOU",
+    "position": "",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "5th OLYMPIC GAMES 2ND WORLD CHAMPIONSHIP 1ST EUROPEAN CHAMPIONSHIP"
+    ]
+   },
+   {
+    "firstName": "Georgios",
+    "lastName": "Kavvas",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "5th at 470 mixed worlds 2026"
+    ]
+   },
+   {
+    "firstName": "Filippos",
+    "lastName": "Koulouris",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "1st Corinthian Rs21 World Championship 2026"
+    ]
+   },
+   {
+    "firstName": "Athanasios",
+    "lastName": "Chatzinikolidakis",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "First place AEGEAN REGATTA ORCI PERFORMANCE"
+    ]
+   },
+   {
+    "firstName": "Elsa",
+    "lastName": "Asonitou",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "First place ORC B 2026 Greek national championship"
+    ]
+   },
+   {
+    "firstName": "Chrysa",
+    "lastName": "Marinou",
+    "position": "",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "5th women europeans 420 2018"
+    ]
+   },
+   {
+    "firstName": "Georgios",
+    "lastName": "Panagiotidis",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "15th place at 49er category at Europian championship"
+    ]
+   },
+   {
+    "firstName": "ANTONIOS",
+    "lastName": "BOUGIOURIS",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "7 times world champion",
+     "2 times second world champion",
+     "2 times 3rd world champion"
+    ]
+   },
+   {
+    "firstName": "Afroditi",
+    "lastName": "Zegers",
+    "position": "",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "4th at the Rio 2016 Olympics, world and European champion"
+    ]
+   }
+  ]
+ }
+]

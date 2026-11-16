@@ -1,8 +1,14 @@
 {
-  "version": "1.0.227",
-  "commit": "7c034c4",
-  "date": "2026-11-16T22:05:51Z",
+  "version": "1.0.228",
+  "commit": "0d0fd9e",
+  "date": "2026-11-16T22:45:31Z",
   "changes": [
+    {
+      "version": "1.0.228",
+      "commit": "0d0fd9e",
+      "date": "2026-11-16T22:45:31Z",
+      "text": "1/32 Finals crews: the 13 teams new to the Final Series from the hotel list's 1/32 sheet, with position, shirt number, captain and best results from their squad sheets (applied once)"
+    },
     {
       "version": "1.0.227",
       "commit": "7c034c4",
@@ -476,12 +482,6 @@
       "commit": "5b7a9f1",
       "date": "2026-11-12T00:27:47Z",
       "text": "Line-up from declaration: a second grinder sits beside the grinder (Main place), the main trimmer moves to Tactician"
-    },
-    {
-      "version": "1.0.148",
-      "commit": "fbab737",
-      "date": "2026-11-11T22:47:38Z",
-      "text": "Schedule board: TIME on/off with centred rows, highlight of the next race; Day/Date/location fields"
     }
   ]
 }
