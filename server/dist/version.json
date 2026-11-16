@@ -1,8 +1,14 @@
 {
-  "version": "1.0.207",
-  "commit": "a56906f",
-  "date": "2026-11-16T18:43:23Z",
+  "version": "1.0.208",
+  "commit": "3c9ce71",
+  "date": "2026-11-16T19:03:46Z",
   "changes": [
+    {
+      "version": "1.0.208",
+      "commit": "3c9ce71",
+      "date": "2026-11-16T19:03:46Z",
+      "text": "DRAW: flag video loops, rounded like the flags, fades from a still frame; group keeps its colour in the centre; drawn team stays lit until its group goes back"
+    },
     {
       "version": "1.0.207",
       "commit": "a56906f",
@@ -476,12 +482,6 @@
       "commit": "ffbdafb",
       "date": "2026-11-10T20:39:36Z",
       "text": "Generator: Lineup photo element (211x135, team colours) for the box behind each sailor's photo in the line-up"
-    },
-    {
-      "version": "1.0.128",
-      "commit": "35c5ab1",
-      "date": "2026-11-10T20:29:11Z",
-      "text": "Schedule groups from any stage; results bar_results; lineup photo boxes and qualified LT in team colours; bug race flag; Team comparison tab in General graphics"
     }
   ]
 }
