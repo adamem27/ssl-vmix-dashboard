@@ -14,30 +14,31 @@ function withPool(n = 16) {
 }
 
 describe('DRAW', () => {
-  it('draws a team, then its group, and places teams in order', () => {
+  it('puts each team drawn into the next place of the group with the fewest teams', () => {
     const { draw, ids } = withPool();
     expect(() => draw.run('group:A')).toThrow(/Draw a team first/);
     draw.run('team:3');
-    expect(draw.state.current).toEqual({ teamId: ids[2], group: null });
-    draw.run('group:b');
-    expect(draw.state.picks).toEqual([{ teamId: ids[2], group: 'B', place: 1 }]);
-    expect(draw.state.current).toEqual({ teamId: ids[2], group: 'B' });
+    expect(draw.state.picks).toEqual([{ teamId: ids[2], group: 'A', place: 1 }]);
+    expect(draw.state.current).toEqual({ teamId: ids[2], group: 'A' });
     expect(() => draw.run('team:3')).toThrow(/already has its group/);
-    draw.run('team:T05');
-    draw.run('group:B');
-    expect(draw.state.picks[1]).toEqual({ teamId: ids[4], group: 'B', place: 2 });
+    for (const n of [5, 6, 7, 8]) draw.run(`team:${n}`);
+    expect(draw.state.picks.map((p) => `${p.group}${p.place}`)).toEqual(['A1', 'B1', 'C1', 'D1', 'A2']);
+    expect(draw.nextGroup()).toBe('B');
+    // a correction: the team just drawn moves to another group
+    draw.run('group:C');
+    expect(draw.state.picks[4]).toEqual({ teamId: ids[7], group: 'C', place: 2 });
+    expect(draw.nextGroup()).toBe('A');
   });
 
-  it('refuses a full group and undoes step by step', () => {
+  it('undoes the last team drawn and fills every group', () => {
     const { draw } = withPool();
-    for (let i = 1; i <= 4; i++) { draw.run(`team:${i}`); draw.run('group:A'); }
-    draw.run('team:5');
-    expect(() => draw.run('group:A')).toThrow(/full/);
-    draw.run('undo'); // the drawn team goes back
+    draw.run('team:1'); draw.run('team:2');
+    draw.run('undo');
+    expect(draw.state.picks).toHaveLength(1);
     expect(draw.state.current).toBeNull();
-    draw.run('undo'); // the last pick: its team is drawn again, without a group
-    expect(draw.state.picks).toHaveLength(3);
-    expect(draw.state.current?.group).toBeNull();
+    for (let i = 2; i <= 16; i++) draw.run(`team:${i}`);
+    expect(['A', 'B', 'C', 'D'].map((g) => draw.state.picks.filter((p) => p.group === g).length)).toEqual([4, 4, 4, 4]);
+    expect(draw.nextGroup()).toBeNull();
     const seq = draw.state.seq;
     draw.run('overview');
     expect(draw.state.overview).toBe(true);
@@ -80,13 +81,10 @@ describe('DRAW', () => {
     expect(board.map((g) => g.slots.filter((x) => x.draw).length)).toEqual([3, 2, 3, 3]);
     expect(board[0].slots[0]).toEqual({ teamId: fixed.COL, text: '', draw: false });
     expect(board[2].slots.map((x) => x.text)).toEqual(['DRAW', 'DRAW', 'DRAW', '']);
-    draw.run('team:1'); draw.run('group:B');
-    draw.run('team:2'); draw.run('group:B');
-    expect(draw.state.picks.map((p) => p.place)).toEqual([3, 4]);
-    draw.run('team:3');
-    expect(() => draw.run('group:B')).toThrow(/full/);
-    draw.run('group:C');
-    expect(draw.state.picks[2].place).toBe(1);
+    // fixed: A 1, B 2, C 1, D 1 → A, C, D, then A B C D, then A B (full), C, D
+    for (let i = 1; i <= 11; i++) draw.run(`team:${i}`);
+    expect(draw.state.picks.map((p) => `${p.group}${p.place}`)).toEqual(['A2', 'C1', 'D1', 'A3', 'B3', 'C2', 'D2', 'A4', 'B4', 'C3', 'D3']);
+    expect(draw.nextGroup()).toBeNull();
     expect(draw.output().teams.map((t) => t.code)).toContain('MAS');
   });
 
@@ -97,7 +95,8 @@ describe('DRAW', () => {
     const out = await app.inject({ method: 'GET', url: '/api/draw/output' });
     expect(out.statusCode).toBe(200);
     expect(out.json().teams).toHaveLength(4);
-    expect(out.json().current.group).toBeNull();
+    expect(out.json().current.group).toBe('A');
+    expect(out.json().next).toBe('B');
     expect((await app.inject({ method: 'GET', url: '/api/draw/output/header.png' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/draw' })).statusCode).toBe(401);
     expect((await app.inject({ method: 'GET', url: '/api/draw/do?a=group:A' })).statusCode).toBe(401);

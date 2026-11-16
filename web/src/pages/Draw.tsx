@@ -9,7 +9,7 @@ interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
   config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number };
   state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; seq: number };
-  teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; input: string;
+  teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; input: string;
   companion: { at: string; sent: number; error: string | null } | null;
 }
 
@@ -30,7 +30,6 @@ export function DrawPage() {
   const byId = new Map(d.teams.map((t) => [t.id, t]));
   const picked = new Map(st.picks.map((p) => [p.teamId, p]));
   const cur = st.current ? byId.get(st.current.teamId) : undefined;
-  const waitingGroup = !!st.current && !st.current.group;
   const count = (g: string) => st.picks.filter((p) => p.group === g).length;
 
   return (
@@ -39,7 +38,8 @@ export function DrawPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-bold text-ink-50">Draw</h1>
         <Badge tone="neutral">{st.picks.length} / {d.pool.length} teams drawn</Badge>
-        {cur && <Badge tone="warn">{waitingGroup ? `${cur.code}: waiting for its group` : `${cur.code} → Group ${st.current!.group}`}</Badge>}
+        {cur && <Badge tone="warn">{`${cur.code} → Group ${st.current!.group}`}</Badge>}
+        {d.next && <Badge tone="neutral">Next team goes to Group {d.next}</Badge>}
         <span className="text-xs text-ink-500">Not tested on a real vMix or Companion yet.</span>
       </div>
 
@@ -49,14 +49,14 @@ export function DrawPage() {
           <Preview seq={st.seq} />
           <div className="rounded-lg border border-ink-800 bg-ink-900/60 p-4">
             <div className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-400">
-              {waitingGroup ? '2 · Press the group drawn for ' + cur?.code : '1 · Press the team drawn'}
+              {d.next ? `Press the team drawn: it goes to Group ${d.next} (the group with the fewest teams)` : 'Every group is full'}
             </div>
             <div className="grid grid-cols-4 gap-2">
               {d.pool.map((t, i) => {
                 const p = picked.get(t.id);
-                const isCur = st.current?.teamId === t.id && !st.current.group;
+                const isCur = st.current?.teamId === t.id;
                 return (
-                  <button key={t.id} disabled={!!p || run.isPending} onClick={() => run.mutate(`team:${i + 1}`)} title={t.name}
+                  <button key={t.id} disabled={!!p || !d.next || run.isPending} onClick={() => run.mutate(`team:${i + 1}`)} title={t.name}
                     className={cx('flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm font-semibold transition-colors',
                       isCur ? 'border-amber-400 bg-amber-500/25 text-amber-100' : p ? 'border-ink-800 bg-ink-900 text-ink-500' : 'border-ink-700 bg-ink-800 text-ink-100 hover:bg-ink-700')}>
                     {t.flag ? <img src={t.flag} alt="" className="h-5 w-7 shrink-0 rounded-sm object-cover" /> : <span className="h-5 w-7 shrink-0 rounded-sm bg-ink-700" />}
@@ -67,15 +67,17 @@ export function DrawPage() {
               })}
               {d.pool.length === 0 && <div className="col-span-4 text-sm text-ink-400">The pool is empty. Add the teams in “Draw pool” on the right.</div>}
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="mt-3 text-xs text-ink-500">Correction only: move {cur ? cur.code : 'the team just drawn'} to another group.</div>
+            <div className="mt-1 grid grid-cols-4 gap-2">
               {d.board.map(({ letter: g, slots }) => {
                 const n = count(g), cap = slots.filter((x) => x.draw).length;
+                const canMove = !!st.current && st.current.group !== g && n < cap;
                 return (
-                  <button key={g} disabled={!waitingGroup || n >= cap || run.isPending} onClick={() => run.mutate(`group:${g}`)}
+                  <button key={g} disabled={!canMove || run.isPending} onClick={() => run.mutate(`group:${g}`)}
                     className={cx('rounded-md border px-3 py-3 text-base font-bold transition-colors disabled:cursor-not-allowed',
                       st.current?.group === g ? 'border-amber-400 bg-amber-500/25 text-amber-100'
-                        : waitingGroup && n < cap ? 'border-teal-600 bg-teal-800/60 text-white hover:bg-teal-700' : 'border-ink-800 bg-ink-900 text-ink-500')}>
-                    GROUP {g} <span className="text-xs font-medium opacity-70">{n}/{cap}</span>
+                        : canMove ? 'border-teal-600 bg-teal-800/60 text-white hover:bg-teal-700' : 'border-ink-800 bg-ink-900 text-ink-500')}>
+                    GROUP {g} <span className="text-xs font-medium opacity-70">{n}/{cap}{d.next === g ? ' · next' : ''}</span>
                   </button>
                 );
               })}
@@ -205,7 +207,7 @@ function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>
           <input value={caption} onChange={(e) => setCaption(e.target.value)} onBlur={() => caption !== d.config.caption && save({ caption })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
-        <Field label="Seconds before the team flies to its group">
+        <Field label="Seconds the flag waves before it flies to its group">
           <input type="number" min={0} max={10} step={0.1} value={delay} onChange={(e) => setDelay(e.target.value)} onBlur={() => Number(delay) !== d.config.flightDelay && save({ flightDelay: Number(delay) || 0 })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>

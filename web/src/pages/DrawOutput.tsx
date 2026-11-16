@@ -2,15 +2,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * The DRAW stage screen, 1536×1024 (the LED wall): the header picture on top, the draw pool on the left, groups A–D on the right
- * (strips as wide as the L-bar's), the centre animating each step: a team drawn, then its group, then the team flying
- * into its place. Styled as the matchboard: its background, boxes, flags with codes, General Sans and the teams'
+ * (strips as wide as the L-bar's), the centre animating each step: the team drawn as a big waving flag with its name,
+ * then the flag flying into its place (the group with the fewest teams, chosen by the server). All groups: the strips
+ * fade out and the groups spread over the whole width. Styled as the matchboard: its background, boxes, flags with codes, General Sans and the teams'
  * gradients. A vMix Browser input opens /draw/output; it reads /api/draw/output a few times a second.
  */
 interface OutTeam { id: string; code: string; name: string; flag: string | null; gradient: string }
 interface Pick { teamId: string; group: string; place: number }
 interface Out {
   seq: number; fonts: number[]; caption: string; flightDelay: number; stripWidth?: number; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; pool: string[];
-  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean;
+  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean; next?: string | null;
 }
 
 // the LED wall at Marina da Glória: 6 × 4 m, 1536×1024 px; strips as wide as the L-bar's (272 of 1920 → 218 of 1536)
@@ -24,6 +25,9 @@ export function DrawOutputPage() {
   /** the place a team is flying to: shown empty until it lands */
   const [flying, setFlying] = useState<string | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
+  /** the team shown in the centre (a waving flag) until its flag flies off; leaving: the flag is on its way */
+  const [shown, setShown] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const prev = useRef<Out | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const centreFlag = useRef<HTMLDivElement>(null);
@@ -55,29 +59,46 @@ export function DrawOutputPage() {
     if (!data) return;
     const before = prev.current;
     prev.current = data;
-    if (!before || data.picks.length <= before.picks.length) { if (!before || data.picks.length < before.picks.length) { setFlying(null); setLanded(null); } return; }
     const p = data.picks[data.picks.length - 1];
+    const was = before?.picks[before.picks.length - 1];
+    if (!before || data.picks.length < before.picks.length || (before.current && !data.current)) { stopAll(); setShown(null); return; }
+    if (data.picks.length === before.picks.length) {
+      // a correction (the team just drawn moved to another group): it goes there without a second flight
+      if (p && was && p.teamId === was.teamId && (p.group !== was.group || p.place !== was.place)) setFlying((f) => (f ? `${p.group}${p.place}` : f));
+      return;
+    }
     const key = `${p.group}${p.place}`;
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    setFlying(key); setLanded(null);
-    timers.current.push(window.setTimeout(() => fly(key), data.flightDelay * 1000));
+    stopAll();
+    setFlying(key); setLanded(null); setShown(p.teamId); setLeaving(false);
+    timers.current.push(window.setTimeout(() => fly(p.teamId), Math.max(data.flightDelay, 1.2) * 1000));
   }, [data]);
 
-  const fly = (key: string) => {
+  const stopAll = () => { timers.current.forEach(clearTimeout); timers.current = []; stage.current?.querySelectorAll('.dr-ghost').forEach((g) => g.remove()); setFlying(null); setLanded(null); setLeaving(false); };
+
+  const fly = (teamId: string) => {
+    // the place may have changed since (a correction): read it now
+    const d = prev.current, p = d?.picks.find((x) => x.teamId === teamId);
+    const key = p ? `${p.group}${p.place}` : '';
     const st = stage.current, from = centreFlag.current, to = slots.current.get(key)?.querySelector('.dr-row-flag') as HTMLElement | null;
-    const land = () => { setFlying(null); setLanded(key); timers.current.push(window.setTimeout(() => setLanded(null), 1400)); };
-    if (!st || !from || !to) { land(); return; }
+    const land = () => {
+      setFlying(null); setLanded(key); setShown(null); setLeaving(false);
+      timers.current.push(window.setTimeout(() => setLanded(null), 1400));
+    };
+    if (!st || !from || !to || !p) { land(); return; }
+    setFlying(key);
     const s = st.getBoundingClientRect(), k = s.width / W;
     const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-    const ghost = from.cloneNode(true) as HTMLElement;
+    const team = d!.teams.find((t) => t.id === teamId);
+    const ghost = document.createElement('div');
     ghost.className = 'dr-ghost';
+    ghost.innerHTML = team?.flag ? `<img class="dr-flag" src="${team.flag}" alt="" />` : `<span class="dr-flag dr-flag-none">${team?.code ?? ''}</span>`;
+    setLeaving(true);
     Object.assign(ghost.style, { left: `${(a.left - s.left) / k}px`, top: `${(a.top - s.top) / k}px`, width: `${a.width / k}px`, height: `${a.height / k}px` });
     st.appendChild(ghost);
     const dx = (b.left - a.left) / k, dy = (b.top - a.top) / k, sx = b.width / a.width, sy = b.height / a.height;
     const anim = ghost.animate([
       { transform: 'translate(0,0) scale(1,1)', opacity: 1 },
-      { transform: `translate(${dx * 0.55}px, ${dy * 0.55 - 120}px) scale(${(1 + sx) / 2}, ${(1 + sy) / 2})`, opacity: 1, offset: 0.55 },
+      { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 140}px) scale(${(1 + sx) / 2.4}, ${(1 + sy) / 2.4})`, opacity: 1, offset: 0.5 },
       { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 1 },
     ], { duration: FLIGHT_MS, easing: 'cubic-bezier(.6,0,.3,1)', fill: 'forwards' });
     anim.onfinish = () => { ghost.remove(); land(); };
@@ -89,10 +110,10 @@ export function DrawOutputPage() {
   const teams = new Map(data.teams.map((t) => [t.id, t]));
   const picked = new Map(data.picks.map((p) => [p.teamId, p]));
   const inGroup = (g: string) => data.picks.filter((p) => p.group === g);
-  const cur = data.current ? teams.get(data.current.teamId) ?? null : null;
+  const cur = shown ? teams.get(shown) ?? null : null;
   const pool = data.pool.map((id) => teams.get(id)).filter((t): t is OutTeam => !!t);
   const done = pool.length > 0 && data.picks.length >= pool.length;
-  const mode: 'overview' | 'team' | 'group' | 'idle' = data.overview || (done && !data.current) ? 'overview' : cur ? (data.current!.group ? 'group' : 'team') : 'idle';
+  const mode: 'overview' | 'reveal' | 'idle' = data.overview || (done && !cur) ? 'overview' : cur ? 'reveal' : 'idle';
   // the list stays in the upper part of the left strip: the host stands in front of its lower part
   const rowH = Math.min(50, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
@@ -101,7 +122,7 @@ export function DrawOutputPage() {
   return (
     <div className="dr-root">
       <style>{fontCss + css(data.stripWidth ?? 300)}</style>
-      <div ref={stage} className="dr-stage" style={{ transform: `scale(${scale})` }}>
+      <div ref={stage} className={`dr-stage${mode === 'overview' ? ' is-overview' : ''}`} style={{ transform: `scale(${scale})` }}>
         <div className="dr-bg" />
 
         {/* left: the pool */}
@@ -111,7 +132,7 @@ export function DrawOutputPage() {
             <div className="dr-box dr-pool">
               {pool.map((t) => {
                 const p = picked.get(t.id);
-                const isCur = data.current?.teamId === t.id && !data.current.group;
+                const isCur = shown === t.id;
                 return (
                   <div key={t.id} className={`dr-row dr-pool-row${p ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH, ...(isCur ? { background: t.gradient } : {}) }}>
                     <Flag team={t} className="dr-row-flag" />
@@ -130,7 +151,7 @@ export function DrawOutputPage() {
           <div className="dr-pill">Groups</div>
           <div className="dr-panel dr-groups">
             {data.board.map(({ letter: g, slots: rows }) => (
-              <div key={g} className={`dr-box dr-group${data.current?.group === g && mode !== 'overview' ? ' is-target' : ''}`}>
+              <div key={g} className={`dr-box dr-group${cur && data.current?.teamId === cur.id && data.current.group === g ? ' is-target' : ''}`}>
                 <div className="dr-box-label">GROUP {g}</div>
                 {rows.map((row, i) => {
                   const key = `${g}${i + 1}`;
@@ -161,26 +182,12 @@ export function DrawOutputPage() {
               <div className="dr-idle-count"><b>{data.picks.length}</b> / {pool.length} teams drawn</div>
             </div>
           )}
-          {(mode === 'team' || mode === 'group') && cur && (
-            <div key={`t${cur.id}`} className={`dr-reveal${mode === 'group' ? ' has-group' : ''}`}>
-              <div className="dr-card">
-                <div className="dr-pill dr-kicker">Team drawn</div>
-                <div className="dr-card-body" style={{ background: cur.gradient }}>
-                  <div ref={centreFlag} className="dr-big-flag"><Flag team={cur} /></div>
-                  <div className="dr-big-code">{cur.code}</div>
-                  <div className="dr-big-name">{cur.name}</div>
-                </div>
+          {mode === 'reveal' && cur && (
+            <div key={`t${cur.id}`} className={`dr-reveal${leaving ? ' is-leaving' : ''}`}>
+              <div ref={centreFlag} className="dr-wave-box">
+                {cur.flag ? <WavingFlag src={cur.flag} /> : <Flag team={cur} className="dr-wave-none" />}
               </div>
-              {mode === 'group' && (
-                <div key={`g${data.current!.group}`} className="dr-group-reveal">
-                  <div className="dr-arrow">›</div>
-                  <div className="dr-box dr-group-badge">
-                    <div className="dr-box-label">GROUP</div>
-                    <div className="dr-group-badge-l">{data.current!.group}</div>
-                  </div>
-                </div>
-              )}
-              {mode === 'team' && <div className="dr-waiting">Drawing the group…</div>}
+              <div className="dr-reveal-name">{cur.name}</div>
             </div>
           )}
           {mode === 'overview' && (
@@ -209,6 +216,22 @@ export function DrawOutputPage() {
   );
 }
 
+/** A flag waving in the wind: thin vertical slices of the picture, each rising and falling a little after the one before. */
+const WAVE_W = 640, WAVE_H = 427, SLICES = 80;
+function WavingFlag({ src }: { src: string }) {
+  const sw = WAVE_W / SLICES;
+  return (
+    <div className="dr-wave" style={{ width: WAVE_W, height: WAVE_H }}>
+      {Array.from({ length: SLICES }, (_, i) => (
+        <div key={i} className="dr-wave-slice" style={{
+          left: i * sw, width: sw + 1.2, backgroundImage: `url(${src})`, backgroundSize: `${WAVE_W}px ${WAVE_H}px`, backgroundPosition: `${-i * sw}px 0`,
+          animationDelay: `${(-i * 0.033).toFixed(3)}s`, ['--a' as string]: `${(3 + (18 * i) / SLICES).toFixed(1)}px`,
+        }} />
+      ))}
+    </div>
+  );
+}
+
 function Flag({ team, className = '' }: { team: OutTeam; className?: string }) {
   return team.flag
     ? <img className={`dr-flag ${className}`} src={team.flag} alt="" />
@@ -228,7 +251,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
   linear-gradient(115deg, transparent 0 55%, rgba(255,255,255,.05) 55% 61%, transparent 61% 100%),
   linear-gradient(28deg, #2c3e93 0%, #1867bb 20%, #0aa9df 42%, #0bbde6 52%, #3cc39a 70%, #86c540 86%, #c6d500 100%); }
 .dr-mid { position: absolute; left: ${STRIP_W}px; top: 0; width: ${W - 2 * STRIP_W}px; height: ${H}px; display: flex; flex-direction: column; }
-.dr-header { display: block; width: 100%; height: auto; max-height: ${HEADER_MAX}px; object-fit: cover; flex: none; position: relative; z-index: 5; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.dr-header { display: block; width: ${W - 2 * STRIP_W}px; align-self: center; height: auto; max-height: ${HEADER_MAX}px; object-fit: cover; flex: none; position: relative; z-index: 5; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
 
 /* the matchboard's white title bars with cut ends */
 .dr-pill { height: 40px; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 24px; font-weight: 600;
@@ -277,36 +300,36 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-idle-count { font-size: 28px; font-weight: 500; }
 .dr-idle-count b { font-size: 38px; font-weight: 600; }
 
-.dr-reveal { position: relative; display: flex; align-items: center; justify-content: center; gap: 22px; width: 100%; }
-.dr-card { display: flex; flex-direction: column; align-items: center; gap: 16px; transition: transform .7s cubic-bezier(.5,0,.2,1); }
-.dr-reveal.has-group .dr-card { transform: translateX(-10px) scale(.84); }
-.dr-kicker { padding: 0 40px; font-size: 22px; animation: dr-fade-up .5s ease-out both; }
-.dr-card-body { width: 520px; padding: 34px 30px 30px; border-radius: 26px; display: flex; flex-direction: column; align-items: center;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 24px 60px rgba(0,30,80,.45); animation: dr-pop .8s cubic-bezier(.3,1.3,.5,1) both .1s; }
-.dr-big-flag { width: 300px; height: 200px; perspective: 900px; animation: dr-flip 1s cubic-bezier(.3,1.4,.5,1) both .35s; }
-.dr-big-flag .dr-flag { width: 100%; height: 100%; border-radius: 14px; box-shadow: 0 0 0 3px rgba(255,255,255,.95), 0 14px 34px rgba(0,0,0,.35); }
-.dr-big-flag .dr-flag-none { font-size: 70px; }
-.dr-big-code { margin-top: 20px; font-size: 104px; font-weight: 600; line-height: 1; text-shadow: 0 4px 18px rgba(0,0,0,.35); animation: dr-fade-up .6s ease-out both .7s; }
-.dr-big-name { margin-top: 8px; font-size: 34px; font-weight: 500; text-align: center; text-shadow: 0 2px 10px rgba(0,0,0,.35); animation: dr-fade-up .6s ease-out both .85s; }
-.dr-waiting { position: absolute; bottom: -62px; font-size: 22px; font-weight: 500; animation: dr-blink 1.4s ease-in-out infinite 1.2s; opacity: 0; }
+.dr-reveal { display: flex; flex-direction: column; align-items: center; animation: dr-pop .9s cubic-bezier(.3,1.25,.5,1) both; }
+.dr-wave-box { width: ${640}px; height: ${427}px; filter: drop-shadow(0 18px 30px rgba(0,20,60,.45)); transition: opacity .15s; }
+.dr-wave { position: relative; }
+.dr-wave-slice { position: absolute; top: 0; height: 100%; background-repeat: no-repeat; animation: dr-wave 2.2s ease-in-out infinite; }
+.dr-wave-slice:first-child { border-radius: 8px 0 0 8px; }
+.dr-wave-slice:last-child { border-radius: 0 8px 8px 0; }
+.dr-wave-none { width: 100%; height: 100%; font-size: 120px; border-radius: 10px; }
+.dr-reveal-name { margin-top: 40px; font-size: 96px; font-weight: 600; line-height: 1; text-align: center; letter-spacing: .01em; text-shadow: 0 6px 26px rgba(0,30,80,.45); animation: dr-fade-up .7s ease-out both .5s; max-width: 100%; }
+.dr-reveal.is-leaving .dr-wave-box { opacity: 0; }
+.dr-reveal.is-leaving .dr-reveal-name { opacity: 0; transform: translateY(20px); transition: opacity .6s .3s, transform .6s .3s; animation: none; }
 
-.dr-group-reveal { display: flex; align-items: center; gap: 14px; }
-.dr-arrow { font-size: 120px; font-weight: 500; line-height: 1; margin-top: -14px; animation: dr-slide-in .5s ease-out both; }
-.dr-group-badge { width: 260px; padding: 10px 0 18px; border-radius: 22px; box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 20px 50px rgba(0,30,80,.4); animation: dr-pop .8s cubic-bezier(.3,1.6,.5,1) both .2s; }
-.dr-group-badge .dr-box-label { height: 44px; font-size: 26px; }
-.dr-group-badge-l { text-align: center; font-size: 200px; font-weight: 600; line-height: 1; margin-top: 8px; }
+.dr-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; width: calc(100% - 96px); }
+.dr-ov-col { padding: 10px 14px 18px; animation: dr-fade-up .6s ease-out both .25s; }
+.dr-ov-col .dr-box-label { height: 64px; font-size: 32px; margin-bottom: 10px; }
+.dr-ov-row { height: 112px; flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; padding: 0 14px; }
+.dr-ov-row .dr-row-flag { width: 72px; height: 48px; }
+.dr-ov-row .dr-row-code { font-size: 54px; }
+.dr-ov-row .dr-slot-place { font-size: 40px; }
+.dr-ov-name { width: 100%; font-size: 22px; font-weight: 500; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.dr-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; width: calc(100% - 44px); }
-.dr-ov-col { padding: 6px 6px 10px; animation: dr-fade-up .6s ease-out both; }
-.dr-ov-col .dr-box-label { height: 48px; font-size: 22px; margin-bottom: 6px; }
-.dr-ov-row { height: 64px; flex-wrap: wrap; align-content: center; column-gap: 10px; row-gap: 0; }
-.dr-ov-row .dr-row-flag { width: 45px; height: 30px; }
-.dr-ov-row .dr-row-code { font-size: 32px; }
-.dr-ov-name { width: 100%; font-size: 14px; font-weight: 500; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* all groups: the strips fade away, the centre takes the whole width (the header stays as it is) */
+.dr-strip { transition: opacity .7s ease; }
+.dr-stage.is-overview .dr-strip { opacity: 0; }
+.dr-mid { transition: left .7s cubic-bezier(.5,0,.2,1), width .7s cubic-bezier(.5,0,.2,1); }
+.dr-stage.is-overview .dr-mid { left: 0; width: ${W}px; }
 
 .dr-ghost { position: absolute; z-index: 10; transform-origin: 0 0; pointer-events: none; }
-.dr-ghost .dr-flag { width: 100%; height: 100%; border-radius: 14px; }
+.dr-ghost .dr-flag { width: 100%; height: 100%; border-radius: 8px; box-shadow: none; }
 
+@keyframes dr-wave { 0%, 100% { transform: translateY(calc(var(--a) * -1)); filter: brightness(1.08); } 50% { transform: translateY(var(--a)); filter: brightness(.88); } }
 @keyframes dr-fade-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
 @keyframes dr-flip { from { opacity: 0; transform: rotateY(90deg) scale(.6); } to { opacity: 1; transform: none; } }
 @keyframes dr-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
