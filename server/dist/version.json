@@ -1,8 +1,14 @@
 {
-  "version": "1.0.209",
-  "commit": "7677a12",
-  "date": "2026-11-16T19:11:16Z",
+  "version": "1.0.210",
+  "commit": "df5beed",
+  "date": "2026-11-16T19:13:14Z",
   "changes": [
+    {
+      "version": "1.0.210",
+      "commit": "df5beed",
+      "date": "2026-11-16T19:13:14Z",
+      "text": "DRAW: all groups only on the operator's key, also after the last team"
+    },
     {
       "version": "1.0.209",
       "commit": "7677a12",
@@ -476,12 +482,6 @@
       "commit": "6c0fbaa",
       "date": "2026-11-10T21:00:14Z",
       "text": "Team comparison: flags on the emblems' square canvas (new files, team flags untouched); upload PNG/JPG pictures for any place"
-    },
-    {
-      "version": "1.0.130",
-      "commit": "dd1ee32",
-      "date": "2026-11-10T20:52:20Z",
-      "text": "Lineup photo box: bottom notch like the artwork, left and right versions; each team picks its side on the Line-up tab"
     }
   ]
 }
