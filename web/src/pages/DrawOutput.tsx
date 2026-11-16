@@ -297,7 +297,7 @@ function GroupRows({ g, rows, data, teams, hidden, landed, empty }: {
     const t = row.teamId ? teams.get(row.teamId) : p && hidden !== key ? teams.get(p.teamId) : undefined;
     const fresh = !!t && landed === key;
     return (
-      <Row key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} content={t?.id ?? ''} bg={t?.gradient} lit={fresh}>
+      <Row key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} content={t?.id ?? ''} bg={t?.gradient} lit={fresh} instant={landed === key}>
         {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span></> : <EmptyPlace style={empty} text={row.text} />}
       </Row>
     );
@@ -311,14 +311,15 @@ function ovWanted(d: Out, _done: boolean, _busy: boolean, _spot: boolean) { retu
  * A row whose content cross-fades when it changes (a team arriving, leaving, a group tag), and whose highlight
  * (the team's gradient) fades in and out. The first content shows without a fade.
  */
-function Row({ className, style, content, bg, lit = false, children }: { className: string; style?: CSSProperties; content: string; bg?: string; lit?: boolean; children: ReactNode }) {
+function Row({ className, style, content, bg, lit = false, instant = false, children }: { className: string; style?: CSSProperties; content: string; bg?: string; lit?: boolean; instant?: boolean; children: ReactNode }) {
   const was = useRef(content);
-  const [n, setN] = useState(0);
-  useLayoutEffect(() => { if (was.current !== content) { was.current = content; setN((x) => x + 1); } }, [content]);
+  // the fade of a change is decided once, when the content changes: a later class change never replays it
+  const [change, setChange] = useState({ n: 0, fade: false });
+  useLayoutEffect(() => { if (was.current !== content) { was.current = content; setChange((c) => ({ n: c.n + 1, fade: !instant })); } }, [content]);
   return (
     <div className={className} style={style}>
       {bg !== undefined && <span className="dr-row-bg" style={{ background: bg, opacity: lit ? 1 : 0 }} />}
-      <span key={n} className={`dr-cell${n ? ' dr-in' : ''}`}>{children}</span>
+      <span key={change.n} className={`dr-cell${change.fade ? ' dr-in' : ''}`}>{children}</span>
     </div>
   );
 }
@@ -459,7 +460,6 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-slot .dr-row-code { font-size: 42px; }
 /* the team in its group as the flag fades: there at once, no animation of its own (its highlight fades only when the group goes back) */
 .dr-slot.is-landed .dr-row-bg { transition: none; }
-.dr-slot.is-landed .dr-in { animation: none; }
 
 /* the group in the centre */
 .dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${MOVE_MS}ms ${EASE}, box-shadow ${MOVE_MS}ms; }
