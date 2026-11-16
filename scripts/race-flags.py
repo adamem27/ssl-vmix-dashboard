@@ -7,7 +7,8 @@ other, each as wide as the square and just under half its height. Most pictures 
 Drawn here, in that style:
   - the cut flags: AP as a tapered pennant and A as a swallowtail, alone and in every combination (AP over A/H/1/2/3,
     N over A), with the same rounded corners;
-  - the combinations that came later: C + red / green / minus / plus, AP over 1 / 2 / 3.
+  - the combinations that came later: C + red / green, AP over 1 / 2 / 3.
+  C + minus and C + plus use the plain C picture (C_change_of_course.png) without the minus / plus board.
 Needs Pillow; no fonts (the contact sheet uses one if it finds one).
 
   python3 scripts/race-flags.py [out-dir] [--sheet preview.png]
@@ -162,8 +163,6 @@ DRAWN = [
     ('N_over_A_abandoned_no_more_racing_today.png', ['N', 'A']),
     ('C_red_mark_moved_to_port.png', ['C', 'PORT']),
     ('C_green_mark_moved_to_starboard.png', ['C', 'STARBOARD']),
-    ('C_minus_leg_shortened.png', ['C', 'MINUS']),
-    ('C_plus_leg_lengthened.png', ['C', 'PLUS']),
 ]
 
 
