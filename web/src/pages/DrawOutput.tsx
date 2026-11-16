@@ -500,7 +500,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-cflag.is-out { animation: dr-flag-out ${FADE_MS}ms ease both; }
 .dr-cflag-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .dr-cflag-none { position: absolute; inset: 0; font-size: 140px; }
-.dr-cflag-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 20px 34px; text-align: center; font-size: 92px; font-weight: 600; line-height: 1;
+.dr-cflag-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 20px 34px; text-align: center; font-size: 92px; font-weight: 600; text-transform: uppercase; line-height: 1;
   background: linear-gradient(180deg, transparent, rgba(0,20,60,.55)); text-shadow: 0 4px 20px rgba(0,0,0,.5); animation: dr-fade-up .7s ease-out both .5s; }
 .dr-wave { position: absolute; inset: 0; overflow: hidden; }
 .dr-wave-slice { position: absolute; top: 0; height: 100%; background-repeat: no-repeat; animation: dr-wave 2.2s ease-in-out infinite; }
@@ -513,7 +513,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-ov-row .dr-row-code { font-size: 54px; }
 .dr-ov-row .dr-slot-place { font-size: 40px; }
 .dr-ov-row .dr-skel-code { width: 120px; height: 16px; }
-.dr-ov-name { width: 100%; font-size: 22px; font-weight: 500; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dr-ov-name { width: 100%; font-size: 22px; font-weight: 500; text-transform: uppercase; letter-spacing: .02em; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 @keyframes dr-wave { 0%, 100% { transform: translateY(calc(var(--a) * -1)); filter: brightness(1.08); } 50% { transform: translateY(var(--a)); filter: brightness(.88); } }
 @keyframes dr-fade-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
