@@ -397,7 +397,24 @@ function CentreFlag({ team, out, centre, stage }: { team: OutTeam; out: boolean;
     const cx = (b.left - s0.left) / k, cy = (b.top - s0.top) / k, cw = b.width / k, ch = b.height / k;
     // the name's band above the flag, then the flag: both together in the middle of the centre
     const w = Math.min(cw - 24, (ch - 24 - NAME_BAND) / FLAG_RATIO), h = w * FLAG_RATIO;
-    setBox({ x: cx + (cw - w) / 2, y: cy + (ch - h - NAME_BAND) / 2 + NAME_BAND, w, h, cx, cw });
+    const place = () => {
+      // the letters of the name as far below the header picture as they are above the flag: from the font's own
+      // measures (General Sans, capitals at NAME_PX): where the baseline sits in the name's line, how tall a capital is
+      const hd = st.querySelector('.dr-header')?.getBoundingClientRect();
+      const ctx = document.createElement('canvas').getContext('2d');
+      let y = cy + (ch - h - NAME_BAND) / 2 + NAME_BAND;
+      if (hd && ctx) {
+        ctx.font = `600 ${NAME_PX}px ${getComputedStyle(st).fontFamily}`;
+        const m = ctx.measureText('H');
+        const base = (NAME_BAND - 12 - (m.fontBoundingBoxAscent + m.fontBoundingBoxDescent)) / 2 + m.fontBoundingBoxAscent;
+        const gap = NAME_BAND - base; // baseline of the name → top of the flag
+        const top = (hd.bottom - s0.top) / k + gap - base + m.actualBoundingBoxAscent;
+        if (Number.isFinite(top) && top + NAME_BAND + h <= cy + ch) y = top + NAME_BAND;
+      }
+      setBox({ x: cx + (cw - w) / 2, y, w, h, cx, cw });
+    };
+    place();
+    void document.fonts?.ready.then(place);
   }, []);
   // a long name gets smaller until it fits the width of the centre, on one line
   useLayoutEffect(() => {
@@ -505,6 +522,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 /* the soft bars of an empty place line up with the flags and codes */
 .dr-ov-row:not(.is-empty) .dr-cell, .dr-ov-row.is-bars .dr-cell { justify-content: flex-start; padding-left: var(--ov-pad, calc(50% - 110px)); }
+.dr-ov-row .dr-cell.dr-out { justify-content: flex-start; padding-left: var(--ov-pad, calc(50% - 110px)); }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
