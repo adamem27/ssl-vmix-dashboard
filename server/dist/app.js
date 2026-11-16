@@ -661,7 +661,7 @@ export async function buildApp(deps) {
     return app;
 }
 /** The race flag PNGs of earlier versions (sha256, first 16 hex): a copy still like one of them gets the new picture. */
-const OLD_RACE_FLAGS = new Set(['848de9e2ca6f1c66', '914c7f5df8cf6c75', '19a8cde69f5407d4', '88b4d71494465192', '017d3dfe98f86132',
+const OLD_RACE_FLAGS = new Set(['adca74c35232b376', '477649a74c97e457', '848de9e2ca6f1c66', '914c7f5df8cf6c75', '19a8cde69f5407d4', '88b4d71494465192', '017d3dfe98f86132',
     '73bf6c4bcbc143a8', '5e1b1b04963468fe', '635045e9ea3255c3', 'c2dfc39ff9ac0f71', '37c8085c497d3f05', 'ab4b08f159da1b36',
     '386f8ba50a0af73c', 'e64201c96ce30585', '49e71ede7c64cc3c', '846d9ab02740fa4c', '89137e41b7885b3b', '8b34d36fb89eec8c',
     'af4ef36194f507f4', '784b0f887769e06d', '523d7f01de8cc75b', '750e6f1ebc1fe8d0', '041ccd26e4e48f0a', '0aec71ba6ae6bf2d',
