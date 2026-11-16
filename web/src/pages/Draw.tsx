@@ -43,10 +43,9 @@ export function DrawPage() {
         <span className="text-xs text-ink-500">Not tested on a real vMix or Companion yet.</span>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        {/* live control */}
-        <section className="flex flex-col gap-4">
-          <Preview seq={st.seq} />
+      {/* the screen and, next to it, the keys of the draw */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <Preview seq={st.seq} />
           <div className="rounded-lg border border-ink-800 bg-ink-900/60 p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wide text-ink-400">Steps of each team</span>
@@ -104,14 +103,17 @@ export function DrawPage() {
               <Button variant="danger" className="ml-auto" onClick={async () => { if (await confirm.ask('Reset the draw?', 'Every team leaves its group and the screen starts again. The pool stays.', 'Reset')) run.mutate('reset'); }}>Reset draw</Button>
             </div>
           </div>
-          <Groups d={d} byId={byId} />
-        </section>
+      </div>
 
-        {/* setup */}
+      {/* under the screen: the groups and the setup */}
+      <div className="grid items-start gap-4 xl:grid-cols-2">
         <section className="flex flex-col gap-4">
+          <Groups d={d} byId={byId} />
           <PoolEditor d={d} save={(pool) => save.mutate({ pool })} busy={save.isPending} />
           <Texts d={d} save={(p) => save.mutate(p)} />
           <FlagVideos d={d} onChange={refresh} />
+        </section>
+        <section className="flex flex-col gap-4">
           <DrawMatchboard d={d} />
           <HeaderPicture seq={st.seq} stripWidth={d.config.stripWidth} onChange={refresh} />
           <VmixInput input={d.input} />
