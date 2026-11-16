@@ -7,7 +7,7 @@ import { FoldTitle, useFold } from '../components/fold';
 interface DrawTeam { id: string; code: string; name: string; flag: string | null }
 interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
-  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number };
+  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number };
   state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; seq: number };
   teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; input: string;
   companion: { at: string; sent: number; error: string | null } | null;
@@ -94,7 +94,7 @@ export function DrawPage() {
         <section className="flex flex-col gap-4">
           <PoolEditor d={d} save={(pool) => save.mutate({ pool })} busy={save.isPending} />
           <Texts d={d} save={(p) => save.mutate(p)} />
-          <HeaderPicture seq={st.seq} onChange={refresh} />
+          <HeaderPicture seq={st.seq} stripWidth={d.config.stripWidth} onChange={refresh} />
           <VmixInput input={d.input} />
           <Companion d={d} save={(p) => save.mutate(p)} />
         </section>
@@ -197,9 +197,10 @@ function PoolEditor({ d, save, busy }: { d: DrawView; save: (pool: string[]) => 
 function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>) => void }) {
   const [caption, setCaption] = useState(d.config.caption);
   const [delay, setDelay] = useState(String(d.config.flightDelay));
+  const [strip, setStrip] = useState(String(d.config.stripWidth));
   return (
-    <Section id="texts" title="Screen texts and timing">
-      <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+    <Section id="texts" title="Screen texts, layout and timing">
+      <div className="grid gap-3 sm:grid-cols-[1fr_10rem_10rem]">
         <Field label="Caption in the centre (before a team is drawn)">
           <input value={caption} onChange={(e) => setCaption(e.target.value)} onBlur={() => caption !== d.config.caption && save({ caption })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
@@ -208,19 +209,23 @@ function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>
           <input type="number" min={0} max={10} step={0.1} value={delay} onChange={(e) => setDelay(e.target.value)} onBlur={() => Number(delay) !== d.config.flightDelay && save({ flightDelay: Number(delay) || 0 })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
+        <Field label="Side strip width (px of 1536)">
+          <input type="number" min={160} max={420} step={10} value={strip} onChange={(e) => setStrip(e.target.value)} onBlur={() => Number(strip) !== d.config.stripWidth && save({ stripWidth: Math.min(420, Math.max(160, Math.round(Number(strip)) || 300)) })}
+            className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
+        </Field>
       </div>
     </Section>
   );
 }
 
-function HeaderPicture({ seq, onChange }: { seq: number; onChange: () => void }) {
+function HeaderPicture({ seq, stripWidth, onChange }: { seq: number; stripWidth: number; onChange: () => void }) {
   const toast = useToast();
   const file = useRef<HTMLInputElement>(null);
   const up = async (f: File) => { try { await api.upload('/api/draw/header', f); toast.ok('Header changed.'); onChange(); } catch (e) { toast.error(e); } };
   return (
     <Section id="header" title="Header picture">
       <img src={`/api/draw/output/header.png?v=${seq}`} alt="Header" className="mb-2 w-full rounded border border-ink-800" />
-      <p className="mb-2 text-xs text-ink-400">PNG, placed between the two strips: 1100 px wide, its height follows the picture (at most 260 px). Best exported at 1100 px wide, e.g. 1100×170.</p>
+      <p className="mb-2 text-xs text-ink-400">PNG, placed between the two strips: {1536 - 2 * stripWidth} px wide at the current strip width, its height follows the picture (at most 260 px). Best exported at that width.</p>
       <input ref={file} type="file" accept="image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void up(f); e.target.value = ''; }} />
       <div className="flex gap-2">
         <Button size="sm" onClick={() => file.current?.click()}>Upload PNG…</Button>
