@@ -65,15 +65,24 @@ export function DrawOutputPage() {
     const fit = () => {
       const cells = [...el.querySelectorAll<HTMLElement>('.dr-ov-row:not(.is-empty) .dr-cell:not(.dr-out)')];
       if (!cells.length) return;
-      const k = el.getBoundingClientRect().width / (el.offsetWidth || 1) || 1;
+      // widths of the content itself, not of how it lies now: while the groups grow in, a narrow row wraps the code
+      // and cuts the name short (…), so the name is measured with the font and the code by its own box
+      const ctx = document.createElement('canvas').getContext('2d');
       let widest = 0;
       for (const c of cells) {
         const flag = c.querySelector<HTMLElement>('.dr-row-flag'), code = c.querySelector<HTMLElement>('.dr-row-code'), nm = c.querySelector<HTMLElement>('.dr-ov-name');
-        if (flag && code) widest = Math.max(widest, code.offsetLeft + code.offsetWidth - flag.offsetLeft);
-        if (nm) { const r = document.createRange(); r.selectNodeContents(nm); widest = Math.max(widest, r.getBoundingClientRect().width / k); }
+        if (flag && code) widest = Math.max(widest, flag.offsetWidth + (parseFloat(getComputedStyle(c).columnGap) || 0) + code.offsetWidth);
+        if (nm && ctx) {
+          const cs = getComputedStyle(nm);
+          ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const text = (nm.textContent ?? '').toUpperCase();
+          widest = Math.max(widest, ctx.measureText(text).width + (parseFloat(cs.letterSpacing) || 0) * text.length);
+        }
       }
-      const pad = `${Math.max(0, Math.floor((cells[0].clientWidth - widest) / 2))}px`;
-      if (el.style.getPropertyValue('--ov-pad') !== pad) el.style.setProperty('--ov-pad', pad);
+      // half the widest team: the padding is worked out by CSS from the row's width at every moment, so it stays
+      // right while the groups grow into place (the centre widens as the strips go)
+      const half = `${Math.ceil(widest / 2)}px`;
+      if (el.style.getPropertyValue('--ov-half') !== half) el.style.setProperty('--ov-half', half);
     };
     fit();
     void document.fonts?.ready.then(fit);
@@ -521,8 +530,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: flex-start; padding-left: calc(50% - 84px); }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 /* the soft bars of an empty place line up with the flags and codes */
-.dr-ov-row:not(.is-empty) .dr-cell, .dr-ov-row.is-bars .dr-cell { justify-content: flex-start; padding-left: var(--ov-pad, calc(50% - 110px)); }
-.dr-ov-row .dr-cell.dr-out { justify-content: flex-start; padding-left: var(--ov-pad, calc(50% - 110px)); }
+.dr-ov-row:not(.is-empty) .dr-cell, .dr-ov-row.is-bars .dr-cell { justify-content: flex-start; padding-left: max(0px, calc(50% - var(--ov-half, 110px))); }
+.dr-ov-row .dr-cell.dr-out { justify-content: flex-start; padding-left: max(0px, calc(50% - var(--ov-half, 110px))); }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
