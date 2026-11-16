@@ -181,6 +181,11 @@ export function DrawOutputPage() {
 
   if (!data) return <div style={{ width: '100vw', height: '100vh', background: '#0b5ea8' }} />;
 
+  // a team just drawn is hidden from its row in this very render (the effect that starts its sequence runs only
+  // after it): it never shows in its group before its waving flag has come and gone
+  const before = prev.current;
+  const last = data.picks[data.picks.length - 1];
+  const hide = hidden ?? (before && last && data.picks.length > before.picks.length ? `${last.group}${last.place}` : null);
   const teams = new Map(data.teams.map((t) => [t.id, t]));
   const picked = new Map(data.picks.map((p) => [p.teamId, p]));
   const pool = data.pool.map((id) => teams.get(id)).filter((t): t is OutTeam => !!t);
@@ -193,7 +198,7 @@ export function DrawOutputPage() {
   const rowH = Math.min(50, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
   const fontCss = data.fonts.map((w) => `@font-face { font-family: 'DrawGS'; font-weight: ${w}; font-display: block; src: url('/api/matchboard/fonts/general-sans-${w}'); }`).join('\n');
-  const group = (g: string, rows: Out['board'][number]['slots']) => <GroupRows g={g} rows={rows} data={data} teams={teams} hidden={hidden} landed={landed} empty={empty} />;
+  const group = (g: string, rows: Out['board'][number]['slots']) => <GroupRows g={g} rows={rows} data={data} teams={teams} hidden={hide} landed={landed} empty={empty} />;
 
   return (
     <div className="dr-root">
@@ -209,7 +214,7 @@ export function DrawOutputPage() {
               {pool.map((t) => {
                 const pk = picked.get(t.id);
                 // not shown as drawn before its flag is on the screen
-                const p = pk && hidden === `${pk.group}${pk.place}` && flag?.teamId !== t.id && !landed ? undefined : pk;
+                const p = pk && hide === `${pk.group}${pk.place}` && flag?.teamId !== t.id && !landed ? undefined : pk;
                 const isCur = flag?.teamId === t.id || (!!landed && !!p && `${p.group}${p.place}` === landed);
                 return (
                   <Row key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH }}
