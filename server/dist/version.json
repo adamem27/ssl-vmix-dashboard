@@ -1,8 +1,14 @@
 {
-  "version": "1.0.214",
-  "commit": "2ecf866",
-  "date": "2026-11-16T19:36:45Z",
+  "version": "1.0.215",
+  "commit": "725ab87",
+  "date": "2026-11-16T19:43:50Z",
   "changes": [
+    {
+      "version": "1.0.215",
+      "commit": "725ab87",
+      "date": "2026-11-16T19:43:50Z",
+      "text": "DRAW: the drawn team's flag and code fill its row once the waving flag has gone; the list waits for the flag too"
+    },
     {
       "version": "1.0.214",
       "commit": "2ecf866",
@@ -476,12 +482,6 @@
       "commit": "8e5835d",
       "date": "2026-11-11T00:29:38Z",
       "text": "Announcement bug: data goes into a GTZIP title even when vMix lists no fields for it; the error names every input of that name; Replay bug input removed"
-    },
-    {
-      "version": "1.0.135",
-      "commit": "7da9e54",
-      "date": "2026-11-10T22:27:06Z",
-      "text": "Every graphic on overlay 1, one OUT key, no key feedback, tidier Companion pages; bug titles found by their GTZIP name"
     }
   ]
 }
