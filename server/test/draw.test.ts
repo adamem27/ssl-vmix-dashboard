@@ -47,6 +47,20 @@ describe('DRAW', () => {
     expect(draw.state.picks).toEqual([]);
   });
 
+  it('brings the next group to the centre and back', () => {
+    const { draw } = withPool();
+    draw.run('focus');
+    expect(draw.state.focus).toBe('A');
+    draw.run('team:1'); // the team goes in, the group goes back by itself
+    expect(draw.state.focus).toBeNull();
+    draw.run('focus:C');
+    expect(draw.state.focus).toBe('C');
+    draw.run('focus:off');
+    expect(draw.state.focus).toBeNull();
+    expect(() => draw.run('focus:X')).toThrow(/Use A–D/);
+    expect(draw.keys()[2][4]!.action).toBe('focus');
+  });
+
   it('takes a team out of the groups when it leaves the pool', () => {
     const { draw, ids } = withPool(6);
     draw.run('team:1'); draw.run('group:C');
@@ -86,6 +100,11 @@ describe('DRAW', () => {
     expect(draw.state.picks.map((p) => `${p.group}${p.place}`)).toEqual(['A2', 'C1', 'D1', 'A3', 'B3', 'C2', 'D2', 'A4', 'B4', 'C3', 'D3']);
     expect(draw.nextGroup()).toBeNull();
     expect(draw.output().teams.map((t) => t.code)).toContain('MAS');
+    // the matchboard after the draw: every team drawn in its DRAW row of R1 A–D
+    const mb = draw.matchboardState();
+    const rows = board.map((g) => g.slotIds!.map((id) => mb.slots[id].teamId));
+    expect(rows[0]).toEqual([fixed.COL, drawn[0], drawn[3], drawn[7]]);
+    expect(rows[1].slice(0, 2)).toEqual([fixed.KOR, fixed.GRE]);
   });
 
   it('serves the output page and its data without a login, the rest still needs one', async () => {
@@ -99,6 +118,29 @@ describe('DRAW', () => {
     expect(out.json().next).toBe('B');
     expect((await app.inject({ method: 'GET', url: '/api/draw/output/header.png' })).statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/draw' })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: `/api/draw/output/video/${draw.config.pool[0]}` })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: '/api/draw/do?a=group:A' })).statusCode).toBe(401);
+  });
+});
+
+describe('DRAW flag videos', () => {
+  it('stores a video per team and streams it in byte ranges', async () => {
+    const { db, ctx, sync, ids } = withPool(2);
+    const app = await buildApp({ db, assetsDir: ctx.assetsDir, sync });
+    const body = Buffer.concat([
+      Buffer.from('--XX\r\nContent-Disposition: form-data; name="file"; filename="flag.webm"\r\nContent-Type: video/webm\r\n\r\n'),
+      Buffer.alloc(5000, 7), Buffer.from('\r\n--XX--\r\n'),
+    ]);
+    const up = await app.inject({ method: 'POST', url: `/api/draw/video/${ids[0]}`, payload: body, headers: { 'content-type': 'multipart/form-data; boundary=XX' } });
+    expect(up.statusCode).toBe(200);
+    const out = (await app.inject({ method: 'GET', url: '/api/draw/output' })).json();
+    expect(out.teams[0].video).toMatch(new RegExp(`^/api/draw/output/video/${ids[0]}\\?v=`));
+    expect(out.teams[1].video).toBeNull();
+    const part = await app.inject({ method: 'GET', url: `/api/draw/output/video/${ids[0]}`, headers: { range: 'bytes=100-199' } });
+    expect(part.statusCode).toBe(206);
+    expect(part.headers['content-range']).toBe('bytes 100-199/5000');
+    expect(part.rawPayload.length).toBe(100);
+    expect((await app.inject({ method: 'DELETE', url: `/api/draw/video/${ids[0]}` })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: `/api/draw/output/video/${ids[0]}` })).statusCode).toBe(404);
   });
 });

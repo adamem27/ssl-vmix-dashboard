@@ -7,9 +7,9 @@ import { FoldTitle, useFold } from '../components/fold';
 interface DrawTeam { id: string; code: string; name: string; flag: string | null }
 interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
-  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number };
-  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; seq: number };
-  teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; input: string;
+  config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number; emptyStyle: 'bars' | 'dots' | 'text' };
+  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; seq: number };
+  teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; videos: Record<string, { file: string; bytes: number } | null>; input: string; matchboardInput: string;
   companion: { at: string; sent: number; error: string | null } | null;
 }
 
@@ -48,8 +48,14 @@ export function DrawPage() {
         <section className="flex flex-col gap-4">
           <Preview seq={st.seq} />
           <div className="rounded-lg border border-ink-800 bg-ink-900/60 p-4">
-            <div className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-400">
-              {d.next ? `Press the team drawn: it goes to Group ${d.next} (the group with the fewest teams)` : 'Every group is full'}
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-ink-400">
+                {d.next ? `1 · Bring Group ${d.next} to the centre · 2 · Press the team drawn` : 'Every group is full'}
+              </span>
+              <Button size="sm" variant={st.focus ? 'secondary' : 'primary'} className="ml-auto" disabled={!d.next || run.isPending || st.focus === d.next} onClick={() => run.mutate('focus')}>
+                {d.next ? `Group ${d.next} to the centre` : 'Groups full'}
+              </Button>
+              <Button size="sm" variant="ghost" disabled={!st.focus || run.isPending} onClick={() => run.mutate('focus:off')}>Send it back</Button>
             </div>
             <div className="grid grid-cols-4 gap-2">
               {d.pool.map((t, i) => {
@@ -96,6 +102,8 @@ export function DrawPage() {
         <section className="flex flex-col gap-4">
           <PoolEditor d={d} save={(pool) => save.mutate({ pool })} busy={save.isPending} />
           <Texts d={d} save={(p) => save.mutate(p)} />
+          <FlagVideos d={d} onChange={refresh} />
+          <DrawMatchboard d={d} />
           <HeaderPicture seq={st.seq} stripWidth={d.config.stripWidth} onChange={refresh} />
           <VmixInput input={d.input} />
           <Companion d={d} save={(p) => save.mutate(p)} />
@@ -202,7 +210,7 @@ function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>
   const [strip, setStrip] = useState(String(d.config.stripWidth));
   return (
     <Section id="texts" title="Screen texts, layout and timing">
-      <div className="grid gap-3 sm:grid-cols-[1fr_10rem_10rem]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_10rem_11rem_10rem]">
         <Field label="Caption in the centre (before a team is drawn)">
           <input value={caption} onChange={(e) => setCaption(e.target.value)} onBlur={() => caption !== d.config.caption && save({ caption })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
@@ -211,10 +219,83 @@ function Texts({ d, save }: { d: DrawView; save: (p: Partial<DrawView['config']>
           <input type="number" min={0} max={10} step={0.1} value={delay} onChange={(e) => setDelay(e.target.value)} onBlur={() => Number(delay) !== d.config.flightDelay && save({ flightDelay: Number(delay) || 0 })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
+        <Field label="Places still to draw look like">
+          <select value={d.config.emptyStyle} onChange={(e) => save({ emptyStyle: e.target.value as DrawView['config']['emptyStyle'] })}
+            className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100">
+            <option value="bars">Soft bars (flag + code)</option>
+            <option value="dots">Three dots</option>
+            <option value="text">The word DRAW</option>
+          </select>
+        </Field>
         <Field label="Side strip width (px of 1536)">
           <input type="number" min={160} max={420} step={10} value={strip} onChange={(e) => setStrip(e.target.value)} onBlur={() => Number(strip) !== d.config.stripWidth && save({ stripWidth: Math.min(420, Math.max(160, Math.round(Number(strip)) || 300)) })}
             className="w-full rounded-md border border-ink-700 bg-ink-850 px-2 py-1.5 text-sm text-ink-100" />
         </Field>
+      </div>
+    </Section>
+  );
+}
+
+/** One flag animation per team (the 1536×1024 videos): the centre plays it when the team is drawn. */
+function FlagVideos({ d, onChange }: { d: DrawView; onChange: () => void }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const up = async (teamId: string, f: File) => {
+    setBusy(teamId);
+    try { await api.upload(`/api/draw/video/${teamId}`, f); toast.ok('Flag video saved.'); onChange(); } catch (e) { toast.error(e); } finally { setBusy(null); }
+  };
+  const mb = (n: number) => `${(n / 1024 / 1024).toFixed(0)} MB`;
+  return (
+    <Section id="videos" title="Flag animations (videos)">
+      <p className="mb-2 text-xs text-ink-400">
+        A waving-flag video per team (MP4 or WebM, 1536×1024). When the team is drawn it covers the group in the centre for the seconds set in “Screen texts”,
+        then fades away. A team without a video gets a drawn waving flag instead. Big files take a while to upload.
+      </p>
+      <div className="flex flex-col gap-1">
+        {d.pool.map((t) => {
+          const v = d.videos[t.id];
+          return (
+            <div key={t.id} className="flex items-center gap-2 rounded-md bg-ink-850 px-2 py-1 text-sm">
+              {t.flag ? <img src={t.flag} alt="" className="h-4 w-6 shrink-0 rounded-sm object-cover" /> : <span className="h-4 w-6 shrink-0 rounded-sm bg-ink-700" />}
+              <span className="w-12 font-semibold text-ink-100">{t.code}</span>
+              <span className={cx('min-w-0 flex-1 truncate text-xs', v ? 'text-emerald-300' : 'text-ink-500')}>{v ? `${v.file} · ${mb(v.bytes)}` : 'no video'}</span>
+              <label className={cx('cursor-pointer rounded px-2 py-0.5 text-xs text-ink-200 hover:bg-ink-700', busy && 'pointer-events-none opacity-50')}>
+                {busy === t.id ? 'Uploading…' : v ? 'Replace…' : 'Upload…'}
+                <input type="file" accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void up(t.id, f); e.target.value = ''; }} />
+              </label>
+              {v && <button className="rounded px-2 py-0.5 text-xs text-ink-400 hover:bg-ink-700" onClick={async () => { try { await api.del(`/api/draw/video/${t.id}`); onChange(); } catch (e) { toast.error(e); } }}>Remove</button>}
+            </div>
+          );
+        })}
+        {d.pool.length === 0 && <div className="text-sm text-ink-400">Add the teams to the pool first.</div>}
+      </div>
+    </Section>
+  );
+}
+
+/** The matchboard with the teams drawn in their rows: a PNG of its own, made again after every team, and its vMix input. */
+function DrawMatchboard({ d }: { d: DrawView }) {
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['draw-mb'], queryFn: () => api.get<{ lastWriteAt: string | null; error: string | null; vmixPath: string; exists: boolean }>('/api/draw/matchboard'), refetchInterval: 3000 });
+  const make = useMutation({ mutationFn: () => api.post('/api/draw/matchboard'), onSuccess: () => { void q.refetch(); toast.ok('Matchboard made.'); }, onError: toast.error });
+  const add = useMutation({
+    mutationFn: () => api.post<{ added: boolean }>('/api/draw/matchboard-input'),
+    onSuccess: (r) => toast.ok(r.added ? `Added the Image input ${d.matchboardInput} in vMix.` : `${d.matchboardInput} already there: it shows the new picture.`),
+    onError: toast.error,
+  });
+  const v = q.data?.lastWriteAt ?? d.state.seq;
+  return (
+    <Section id="matchboard" title="Matchboard after the draw">
+      <p className="mb-2 text-xs text-ink-400">
+        The matchboard with every team drawn in its row of R1 A–D, saved as <code>{q.data?.vmixPath ?? 'Matchboard/matchboard_draw.png'}</code> and made again a moment
+        after each team. The matchboard tab itself does not change. The vMix Image input <code>{d.matchboardInput}</code> shows it and is updated with every new picture.
+      </p>
+      {q.data?.exists && <img src={`/api/draw/matchboard.png?v=${encodeURIComponent(String(v))}`} alt="Matchboard after the draw" className="mb-2 w-full rounded border border-ink-800" />}
+      {q.data?.error && <p className="mb-2 text-xs text-red-300">{q.data.error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" busy={make.isPending} onClick={() => make.mutate()}>Make it now</Button>
+        <Button size="sm" variant="primary" busy={add.isPending} onClick={() => add.mutate()}>Add / update {d.matchboardInput} in vMix</Button>
+        <a className="inline-flex items-center rounded-md px-2.5 py-1 text-xs text-ink-300 hover:bg-ink-800" href="/api/draw/matchboard.png" target="_blank" rel="noreferrer">Open PNG</a>
       </div>
     </Section>
   );
@@ -268,7 +349,7 @@ function Companion({ d, save }: { d: DrawView; save: (p: Partial<DrawView['confi
   return (
     <Section id="companion" title="Stream Deck (Companion)">
       <p className="mb-2 text-xs text-ink-400">
-        One page, <b>SSL DRAW</b>: the 16 pool teams in rows 1–2 (key n = team n of the pool), GROUP A–D, ALL GROUPS, CLEAR CENTRE and UNDO in row 3,
+        One page, <b>SSL DRAW</b>: the 16 pool teams in rows 1–2 (key n = team n of the pool), GROUP A–D (move the team just drawn), NEXT GROUP ▶ CENTRE, ALL GROUPS, CLEAR CENTRE and UNDO in row 3,
         DECK 1 HOME in row 4. Import it in Companion as a single page (Import → page) onto the page number below. Reset is only here, not on the deck.
         Key texts follow the draw live when Companion's address is set in Show control.
       </p>

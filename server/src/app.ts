@@ -606,7 +606,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const show = deps.show ?? new Show(ctx, lt);
   registerShowRoutes(app, ctx, show);
   registerFieldOverrideRoutes(app, ctx, show);
-  registerDrawRoutes(app, ctx, deps.draw ?? new Draw(ctx));
+  registerDrawRoutes(app, ctx, deps.draw ?? new Draw(ctx), fetch, matchboard);
   registerGtzipRoutes(app, new GtzipService(ctx, () => getSetting(db, 'paths.vmixAssetsRoot') || null, () => matchboard.fonts()));
 
   // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------

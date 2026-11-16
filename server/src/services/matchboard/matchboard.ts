@@ -258,13 +258,14 @@ export class MatchboardExporter {
 
   stop() { if (this.timer) clearTimeout(this.timer); }
 
-  async renderBuffer(): Promise<Buffer> {
+  /** The board as a PNG; with a state of its own, a variant of the board (DRAW: the groups with the teams drawn). */
+  async renderBuffer(override?: MbState): Promise<Buffer> {
     const c = await canvas();
     if (!c) throw badRequest(`The matchboard cannot be drawn on this computer: ${canvasError}`);
     await this.fonts();
     const { db } = this.ctx;
     const layout = loadLayout();
-    const state = getState(db);
+    const state = override ?? getState(db);
     const tpl = listTemplates(db).find((t) => t.id === state.highlightTemplateId) ?? null;
     const gradients = new Map(listGradients(db).map((g) => [g.teamId, g.gradients]));
     const used = new Set([...resolveTeams(layout, state).values()].map((r) => r.teamId));
