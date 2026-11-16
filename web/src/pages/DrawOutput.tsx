@@ -94,8 +94,9 @@ export function DrawOutputPage() {
     const pd = pending.current;
     if (!pd) return;
     pending.current = null;
-    setFlag({ teamId: pd.teamId, out: true }); setHidden(null); setLanded(pd.key);
-    timers.current.push(window.setTimeout(() => setFlag((f) => (f && f.out ? null : f)), FADE_MS));
+    // the highlight is there at once; the team's flag and code fill in once the waving flag is gone
+    setFlag({ teamId: pd.teamId, out: true }); setLanded(pd.key);
+    timers.current.push(window.setTimeout(() => { setFlag((f) => (f && f.out ? null : f)); setHidden((h) => (h === pd.key ? null : h)); }, FADE_MS));
   };
 
   /** The centre's box for the group: as big as fits inside the flag's area. */
@@ -149,8 +150,8 @@ export function DrawOutputPage() {
           return;
         }
         setFlag({ teamId: p.teamId, out: false });
-        await later(Math.max(1, data.flightDelay) * 1000, () => { setFlag({ teamId: p.teamId, out: true }); setHidden(null); setLanded(key); });
-        await later(FADE_MS, () => setFlag((f) => (f && f.out ? null : f)));
+        await later(Math.max(1, data.flightDelay) * 1000, () => { setFlag({ teamId: p.teamId, out: true }); setLanded(key); });
+        await later(FADE_MS, () => { setFlag((f) => (f && f.out ? null : f)); setHidden(null); });
         await later(HOLD_MS, () => {});
         busy.current = false;
         const now = prev.current;
@@ -206,7 +207,9 @@ export function DrawOutputPage() {
           <div className="dr-panel">
             <div className="dr-box dr-pool">
               {pool.map((t) => {
-                const p = picked.get(t.id);
+                const pk = picked.get(t.id);
+                // not shown as drawn before its flag is on the screen
+                const p = pk && hidden === `${pk.group}${pk.place}` && flag?.teamId !== t.id && !landed ? undefined : pk;
                 const isCur = flag?.teamId === t.id || (!!landed && !!p && `${p.group}${p.place}` === landed);
                 return (
                   <Row key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH }}
@@ -294,11 +297,13 @@ function GroupRows({ g, rows, data, teams, hidden, landed, empty }: {
   return <>{rows.map((row, i) => {
     const key = `${g}${i + 1}`;
     const p = data.picks.find((x) => x.group === g && x.place === i + 1);
-    const t = row.teamId ? teams.get(row.teamId) : p && hidden !== key ? teams.get(p.teamId) : undefined;
-    const fresh = !!t && landed === key;
+    const drawn = row.teamId ? teams.get(row.teamId) : p ? teams.get(p.teamId) : undefined;
+    // the team drawn last: its highlight first, its flag and code a moment later (when the waving flag is gone)
+    const t = hidden === key ? undefined : drawn;
+    const fresh = !!drawn && landed === key;
     return (
-      <Row key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} content={t?.id ?? ''} bg={t?.gradient} lit={fresh} instant={landed === key}>
-        {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span></> : <EmptyPlace style={empty} text={row.text} />}
+      <Row key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} content={t?.id ?? (fresh ? 'lit' : '')} bg={drawn?.gradient} lit={fresh}>
+        {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span></> : fresh ? null : <EmptyPlace style={empty} text={row.text} />}
       </Row>
     );
   })}</>;
