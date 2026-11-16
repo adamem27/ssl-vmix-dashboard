@@ -29,6 +29,8 @@ const W = 1536, H = 1024, HEADER_MAX = 260;
 const MOVE_MS = 800, FADE_MS = 700, HOLD_MS = 1800;
 /** the flag in the centre: 3:2, as wide as the centre allows */
 const FLAG_RATIO = 2 / 3;
+/** corner radius of the flags, as the static flag pictures have it (server: flagShape FLAG_RADIUS, of the height) */
+const FLAG_RADIUS = 0.18;
 
 interface Spot { letter: string; on: boolean; x: number; y: number; w: number; h: number; tx: number; ty: number; s: number }
 interface FlagShow { teamId: string; out: boolean }
@@ -92,7 +94,6 @@ export function DrawOutputPage() {
     pending.current = null;
     setFlag({ teamId: pd.teamId, out: true }); setHidden(null); setLanded(pd.key);
     timers.current.push(window.setTimeout(() => setFlag((f) => (f && f.out ? null : f)), FADE_MS));
-    timers.current.push(window.setTimeout(() => setLanded((l) => (l === pd.key ? null : l)), FADE_MS + HOLD_MS));
   };
 
   /** The centre's box for the group: as big as fits inside the flag's area. */
@@ -115,6 +116,7 @@ export function DrawOutputPage() {
     requestAnimationFrame(() => requestAnimationFrame(() => { setSpot((sp) => (sp && sp.letter === letter ? { ...sp, on: true } : sp)); timers.current.push(window.setTimeout(resolve, MOVE_MS)); }));
   });
   const sendBack = () => new Promise<void>((resolve) => {
+    setLanded(null); // the team's highlight fades while its group goes back
     if (!spotRef.current) { resolve(); return; }
     setSpot((sp) => (sp ? { ...sp, on: false } : sp));
     timers.current.push(window.setTimeout(() => { setSpot(null); resolve(); }, MOVE_MS));
@@ -200,7 +202,7 @@ export function DrawOutputPage() {
             <div className="dr-box dr-pool">
               {pool.map((t) => {
                 const p = picked.get(t.id);
-                const isCur = flag?.teamId === t.id;
+                const isCur = flag?.teamId === t.id || (!!landed && !!p && `${p.group}${p.place}` === landed);
                 return (
                   <Row key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH }}
                     content={p && !isCur ? p.group : ''} bg={t.gradient} lit={isCur}>
@@ -327,6 +329,16 @@ function EmptyPlace({ style, text }: { style: EmptyStyle; text: string }) {
 function CentreFlag({ team, out, centre, stage }: { team: OutTeam; out: boolean; centre: RefObject<HTMLElement | null>; stage: RefObject<HTMLDivElement | null> }) {
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [videoOk, setVideoOk] = useState(true);
+  const video = useRef<HTMLVideoElement>(null);
+  const still = useRef<HTMLCanvasElement>(null);
+  // fading out: the video's current picture goes onto a canvas and the video stops, so the fade works whatever
+  // the browser does with video layers (some draw a playing video above everything, ignoring the fade)
+  useLayoutEffect(() => {
+    const v = video.current, c = still.current;
+    if (!out || !v || !c || !v.videoWidth) return;
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    try { c.getContext('2d')?.drawImage(v, 0, 0); c.style.visibility = 'visible'; v.style.visibility = 'hidden'; v.pause(); } catch { /* keep the video */ }
+  }, [out]);
   useLayoutEffect(() => {
     const st = stage.current, c = centre.current;
     if (!st || !c) return;
@@ -337,9 +349,10 @@ function CentreFlag({ team, out, centre, stage }: { team: OutTeam; out: boolean;
   }, []);
   if (!box) return null;
   return (
-    <div className={`dr-cflag${out ? ' is-out' : ''}`} style={{ left: box.x, top: box.y, width: box.w, height: box.h }}>
+    <div className={`dr-cflag${out ? ' is-out' : ''}`} style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: FLAG_RADIUS * box.h }}>
       {team.video && videoOk
-        ? <video className="dr-cflag-video" src={team.video} autoPlay muted playsInline preload="auto" onError={() => setVideoOk(false)} />
+        ? <><video ref={video} className="dr-cflag-video" src={team.video} autoPlay loop muted playsInline preload="auto" onError={() => setVideoOk(false)} />
+          <canvas ref={still} className="dr-cflag-video" style={{ visibility: 'hidden' }} /></>
         : team.flag ? <WavingFlag src={team.flag} w={box.w} h={box.h} /> : <span className="dr-flag dr-flag-none dr-cflag-none">{team.code}</span>}
       <div className="dr-cflag-name">{team.name}</div>
     </div>
@@ -442,7 +455,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 
 /* the group in the centre */
 .dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${MOVE_MS}ms ${EASE}, box-shadow ${MOVE_MS}ms; }
-.dr-spot.is-on { box-shadow: 0 10px 30px rgba(0,30,80,.35); background: linear-gradient(180deg, rgba(14,88,170,.96), rgba(10,74,156,.94)); }
+.dr-spot.is-on { box-shadow: 0 10px 30px rgba(0,30,80,.35); }
 
 .dr-centre { position: relative; flex: 1; min-height: 0; width: 100%; overflow: hidden; display: grid; place-items: center; }
 
