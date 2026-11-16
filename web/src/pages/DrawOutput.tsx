@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 interface OutTeam { id: string; code: string; name: string; flag: string | null; gradient: string }
 interface Pick { teamId: string; group: string; place: number }
 interface Out {
-  seq: number; fonts: number[]; caption: string; flightDelay: number; groups: string[]; groupSize: number;
+  seq: number; fonts: number[]; caption: string; flightDelay: number; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; pool: string[];
   teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean;
 }
 
@@ -89,9 +89,10 @@ export function DrawOutputPage() {
   const picked = new Map(data.picks.map((p) => [p.teamId, p]));
   const inGroup = (g: string) => data.picks.filter((p) => p.group === g);
   const cur = data.current ? teams.get(data.current.teamId) ?? null : null;
-  const done = data.teams.length > 0 && data.picks.length >= data.teams.length;
+  const pool = data.pool.map((id) => teams.get(id)).filter((t): t is OutTeam => !!t);
+  const done = pool.length > 0 && data.picks.length >= pool.length;
   const mode: 'overview' | 'team' | 'group' | 'idle' = data.overview || (done && !data.current) ? 'overview' : cur ? (data.current!.group ? 'group' : 'team') : 'idle';
-  const rowH = Math.min(44, Math.floor((H - HEADER_H - 16 - 44 - 12 - 24) / Math.max(data.teams.length, 1)));
+  const rowH = Math.min(44, Math.floor((H - HEADER_H - 16 - 44 - 12 - 24) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
   const fontCss = data.fonts.map((w) => `@font-face { font-family: 'DrawGS'; font-weight: ${w}; font-display: block; src: url('/api/matchboard/fonts/general-sans-${w}'); }`).join('\n');
 
@@ -107,7 +108,7 @@ export function DrawOutputPage() {
           <div className="dr-pill">Teams</div>
           <div className="dr-panel">
             <div className="dr-box dr-pool">
-              {data.teams.map((t) => {
+              {pool.map((t) => {
                 const p = picked.get(t.id);
                 const isCur = data.current?.teamId === t.id && !data.current.group;
                 return (
@@ -118,7 +119,7 @@ export function DrawOutputPage() {
                   </div>
                 );
               })}
-              {data.teams.length === 0 && <div className="dr-empty-note">Add the teams to the draw pool in the dashboard (DRAW).</div>}
+              {pool.length === 0 && <div className="dr-empty-note">Add the teams to the draw pool in the dashboard (DRAW).</div>}
             </div>
           </div>
         </aside>
@@ -127,19 +128,19 @@ export function DrawOutputPage() {
         <aside className="dr-strip dr-right">
           <div className="dr-pill">Groups</div>
           <div className="dr-panel dr-groups">
-            {data.groups.map((g) => (
+            {data.board.map(({ letter: g, slots: rows }) => (
               <div key={g} className={`dr-box dr-group${data.current?.group === g && mode !== 'overview' ? ' is-target' : ''}`}>
                 <div className="dr-box-label">GROUP {g}</div>
-                {Array.from({ length: data.groupSize }, (_, i) => {
+                {rows.map((row, i) => {
                   const key = `${g}${i + 1}`;
                   const p = inGroup(g).find((x) => x.place === i + 1);
-                  const t = p && flying !== key ? teams.get(p.teamId) : undefined;
+                  const t = row.teamId ? teams.get(row.teamId) : p && flying !== key ? teams.get(p.teamId) : undefined;
                   const fresh = !!t && data.current?.teamId === t.id && data.current.group === g;
                   return (
                     <div key={key} ref={(el) => { if (el) slots.current.set(key, el); }} className={`dr-row dr-slot${t ? ' is-filled' : ''}${landed === key ? ' is-landed' : ''}`}
                       style={fresh ? { background: t!.gradient } : undefined}>
                       {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span></>
-                        : <><span className="dr-row-flag dr-flag-slot" /><span className="dr-slot-place">{key}</span></>}
+                        : <><span className="dr-row-flag dr-flag-slot" /><span className="dr-slot-place">{row.text}</span></>}
                     </div>
                   );
                 })}
@@ -154,7 +155,7 @@ export function DrawOutputPage() {
             <div key={`idle${data.seq}`} className="dr-idle">
               <div className="dr-pill dr-pill-big">{data.caption}</div>
               <div className="dr-idle-big">{data.picks.length === 0 ? 'The Draw' : 'Next team'}</div>
-              <div className="dr-idle-count"><b>{data.picks.length}</b> / {data.teams.length} teams drawn</div>
+              <div className="dr-idle-count"><b>{data.picks.length}</b> / {pool.length} teams drawn</div>
             </div>
           )}
           {(mode === 'team' || mode === 'group') && cur && (
@@ -181,16 +182,16 @@ export function DrawOutputPage() {
           )}
           {mode === 'overview' && (
             <div key={`o${data.seq}`} className="dr-overview">
-              {data.groups.map((g, gi) => (
+              {data.board.map(({ letter: g, slots: rows }, gi) => (
                 <div key={g} className="dr-box dr-ov-col" style={{ animationDelay: `${gi * 120}ms` }}>
                   <div className="dr-box-label">GROUP {g}</div>
-                  {Array.from({ length: data.groupSize }, (_, i) => {
+                  {rows.map((row, i) => {
                     const p = inGroup(g).find((x) => x.place === i + 1);
-                    const t = p ? teams.get(p.teamId) : undefined;
+                    const t = row.teamId ? teams.get(row.teamId) : p ? teams.get(p.teamId) : undefined;
                     return (
                       <div key={i} className={`dr-row dr-ov-row${t ? '' : ' is-empty'}`}>
                         {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span><span className="dr-ov-name">{t.name}</span></>
-                          : <span className="dr-slot-place">{g}{i + 1}</span>}
+                          : <span className="dr-slot-place">{row.text}</span>}
                       </div>
                     );
                   })}
@@ -236,8 +237,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-row-code { font-size: 22px; font-weight: 600; letter-spacing: .01em; }
 .dr-flag { display: block; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 .6px rgba(216,225,239,.9); }
 .dr-flag-none { display: grid; place-items: center; background: #33415f; color: #fff; font-weight: 700; font-size: 10px; }
-.dr-flag-slot { border-radius: 3px; border: 1.3px dashed rgba(255,255,255,.45); }
-.dr-slot-place { flex: 1; text-align: center; font-size: 18px; font-weight: 500; color: rgba(255,255,255,.85); margin-left: -45px; }
+.dr-flag-slot { position: absolute; left: 12px; visibility: hidden; }
+/* an empty place reads as on the matchboard: its text (DRAW 1…) centred */
+.dr-slot-place { flex: 1; text-align: center; font-size: 18px; font-weight: 500; color: #fff; }
 /* the 1ST / 2ND tags of the matchboard, here the group a team went to */
 .dr-tag { margin-left: auto; height: 22px; min-width: 30px; padding: 0 10px 0 7px; display: grid; place-items: center; background: #0d4ea8; color: #fff; font-size: 15px; font-weight: 600;
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%); }
@@ -246,7 +248,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-left { left: 10px; }
 .dr-right { right: 10px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.dr-pool { flex: 1; padding: 6px 4px; display: flex; flex-direction: column; justify-content: space-evenly; }
+.dr-pool { flex: 1; padding: 8px 4px; display: flex; flex-direction: column; gap: 6px; }
 .dr-pool-row { transition: opacity .6s; }
 .dr-pool-row.is-done { opacity: .42; }
 .dr-pool-row.is-current { box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 6px 18px rgba(0,0,0,.3); animation: dr-pulse 1.4s ease-in-out infinite; }
@@ -294,7 +296,6 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-ov-row .dr-row-flag { width: 36px; height: 24px; }
 .dr-ov-row .dr-row-code { font-size: 24px; }
 .dr-ov-name { width: 100%; font-size: 14px; font-weight: 500; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dr-ov-row.is-empty .dr-slot-place { margin-left: 0; }
 
 .dr-ghost { position: absolute; z-index: 10; transform-origin: 0 0; pointer-events: none; }
 .dr-ghost .dr-flag { width: 100%; height: 100%; border-radius: 14px; }

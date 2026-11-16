@@ -1,15 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { activeEvent, getSetting, setSetting } from '../db/db.js';
+import { getSetting, setSetting } from '../db/db.js';
 import { AssetCtx, listAssets } from './assets.js';
 import { badRequest } from './errors.js';
 import { listTeams } from './teams.js';
-import { listSets } from './fleets.js';
-import { starredForSet } from './stages.js';
+import { starredBefore, starredTeams } from './matchboard/rounds.js';
 import { getLtConfig } from './lowerthirds.js';
 import { getShowConfig } from './show.js';
-import { fixturesDir, uploadedSansFiles } from './matchboard/matchboard.js';
+import { fixturesDir, getState, loadLayout, resolveTeams, uploadedSansFiles } from './matchboard/matchboard.js';
 import { listGradients, TEAM_GRADIENTS_SSL26 } from './generator/generator.js';
 import { nationColours } from './nationColours.js';
 
@@ -76,6 +75,34 @@ export function saveHeader(assetsDir: string, buf: Buffer | null) {
   fs.writeFileSync(own, buf);
 }
 
+/** A place of a group on the screen: a team already there (fixed on the matchboard) or a place the draw fills. */
+export interface BoardSlot { teamId: string | null; text: string; draw: boolean }
+export interface BoardGroup { letter: string; slots: BoardSlot[] }
+
+/**
+ * The 1/32 Finals groups as the matchboard has them (boxes R1 A–D): a row with a team not in the draw pool stays as it
+ * is (COL in R1 A), every other row (DRAW 1, DRAW 2…) is a place the draw fills, top to bottom. Without such boxes:
+ * four groups of four draw places.
+ */
+export function drawBoard(db: AssetCtx['db'], pool: Set<string>): BoardGroup[] {
+  let layout, state;
+  try { layout = loadLayout(); state = getState(db); } catch { layout = null; }
+  const out: BoardGroup[] = [];
+  for (const letter of DRAW_GROUPS) {
+    const g = layout?.groups.find((x) => /^R\s*1\s*([A-D])$/i.exec(((state!.texts[x.labelId] ?? layout!.texts.find((t) => t.id === x.labelId)?.text) ?? '').trim())?.[1]?.toUpperCase() === letter);
+    if (!g || !layout || !state) { out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, (_, i) => ({ teamId: null, text: `${letter}${i + 1}`, draw: true })) }); continue; }
+    const resolved = resolveTeams(layout, state);
+    out.push({ letter, slots: g.slots.map((sid, i) => {
+      const teamId = resolved.get(sid)?.teamId ?? null;
+      const text = (state!.slots[sid]?.text ?? layout!.slots.find((x) => x.id === sid)?.text ?? '').trim() || `${letter}${i + 1}`;
+      return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text, draw: true };
+    }) });
+  }
+  return out;
+}
+/** The rows (1-based) of a group the draw fills, in order. */
+const drawPlaces = (g: BoardGroup) => g.slots.map((s, i) => (s.draw ? i + 1 : 0)).filter(Boolean);
+
 export interface DrawTeam { id: string; code: string; name: string; flag: string | null; flagAsset: string | null }
 
 export class Draw {
@@ -94,7 +121,7 @@ export class Draw {
     const st = this.state;
     const inPool = new Set(next.pool);
     if (st.picks.some((p) => !inPool.has(p.teamId)) || (st.current && !inPool.has(st.current.teamId))) {
-      saveState(this.ctx.db, { ...st, picks: renumber(st.picks.filter((p) => inPool.has(p.teamId))), current: st.current && inPool.has(st.current.teamId) ? st.current : null });
+      saveState(this.ctx.db, { ...st, picks: renumber(st.picks.filter((p) => inPool.has(p.teamId)), drawBoard(this.ctx.db, inPool)), current: st.current && inPool.has(st.current.teamId) ? st.current : null });
     } else saveState(this.ctx.db, st); // the output shows the new pool / caption
     void this.pushLabels();
     return next;
@@ -112,22 +139,23 @@ export class Draw {
     return this.config.pool.map((id) => by.get(id)).filter((t): t is DrawTeam => !!t);
   }
 
-  /** The teams starred through to the 1/32 Finals on the matchboard (the stage named so, else the latest stage). */
+  /** The teams starred in the Qualifying Series on the matchboard: the ones drawn into the 1/32 Finals, in its order. */
   qualified(): string[] {
-    const ev = activeEvent(this.ctx.db).id;
-    const sets = listSets(this.ctx.db, ev) as { id: string; name: string }[];
-    const set = sets.find((s) => /^1\s*\/\s*32/.test(s.name)) ?? sets[sets.length - 1];
-    if (!set) return [];
-    return starredForSet(this.ctx.db, set.id).map((s) => s.teamId);
+    try { return starredBefore(starredTeams(loadLayout(), getState(this.ctx.db)), 1).map((x) => x.teamId); } catch { return []; }
   }
+
 
   /** What the output page needs (no ids of assets: the flags come through /api/draw/output/flag/<team id>). */
   output() {
     const cfg = this.config, st = this.state;
     const grads = new Map(listGradients(this.ctx.db).map((g) => [g.teamId, g.gradients[1]]));
-    const teams = this.poolTeams().map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
+    const board = this.board();
+    const fixed = new Set(board.flatMap((g) => g.slots.map((x) => x.teamId).filter((x): x is string => !!x)));
+    const all = this.allTeams();
+    const pool = this.poolTeams();
+    const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
     const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-    return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, groups: DRAW_GROUPS, groupSize: DRAW_GROUP_SIZE, teams, picks: st.picks, current: st.current, overview: st.overview };
+    return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview };
   }
   flagFile(teamId: string) {
     const t = this.allTeams().find((x) => x.id === teamId);
@@ -137,7 +165,12 @@ export class Draw {
   /** Something the output shows changed outside the steps (header picture): it reloads. */
   touch() { return saveState(this.ctx.db, this.state); }
 
-  view() { return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), groups: DRAW_GROUPS, groupSize: DRAW_GROUP_SIZE, input: DRAW_INPUT }; }
+  board() { return drawBoard(this.ctx.db, new Set(this.config.pool)); }
+  view() {
+    // the first time: the pool is the teams starred in the Qualifying Series on the matchboard
+    if (!getSetting(this.ctx.db, CFG)) { const q = this.qualified(); if (q.length) this.setConfig({ pool: q.slice(0, DRAW_POOL_MAX) }); }
+    return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), input: DRAW_INPUT };
+  }
 
   /**
    * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE>, group:<A–D>, undo, clear, overview
@@ -149,6 +182,8 @@ export class Draw {
     const pool = this.poolTeams();
     const placed = new Set(st.picks.map((p) => p.teamId));
     const groupCount = (g: string) => st.picks.filter((p) => p.group === g).length;
+    const board = this.board();
+    const places = (g: string) => drawPlaces(board.find((x) => x.letter === g)!);
     let next: Omit<DrawState, 'seq'> = st;
     switch (verb) {
       case 'team': {
@@ -163,8 +198,8 @@ export class Draw {
         const g = arg.toUpperCase();
         if (!(DRAW_GROUPS as readonly string[]).includes(g)) throw badRequest(`Group ${arg}? Use A–D.`);
         if (!st.current || st.current.group) throw badRequest('Draw a team first.');
-        if (groupCount(g) >= DRAW_GROUP_SIZE) throw badRequest(`Group ${g} is full.`);
-        const pick = { teamId: st.current.teamId, group: g, place: groupCount(g) + 1 };
+        if (groupCount(g) >= places(g).length) throw badRequest(`Group ${g} is full.`);
+        const pick = { teamId: st.current.teamId, group: g, place: places(g)[groupCount(g)] };
         next = { ...st, picks: [...st.picks, pick], current: { teamId: st.current.teamId, group: g }, overview: false };
         break;
       }
@@ -187,7 +222,7 @@ export class Draw {
   // ---------- Companion ----------
   /** The DRAW page's keys: [row][col] → action, text, colours (live look: drawn teams dark, the current one gold). */
   keys(): ({ action: string; text: string; bg: string; fg: string } | null)[][] {
-    const st = this.state, pool = this.poolTeams();
+    const st = this.state, pool = this.poolTeams(), board = this.board();
     const done = new Map(st.picks.map((p) => [p.teamId, p]));
     const rows: ({ action: string; text: string; bg: string; fg: string } | null)[][] = [[], [], [], []];
     for (let i = 0; i < DRAW_POOL_MAX; i++) {
@@ -199,9 +234,10 @@ export class Draw {
     }
     DRAW_GROUPS.forEach((g, i) => {
       const n = st.picks.filter((p) => p.group === g).length;
-      const full = n >= DRAW_GROUP_SIZE;
+      const cap = drawPlaces(board.find((x) => x.letter === g)!).length;
+      const full = n >= cap;
       const just = st.current?.group === g;
-      rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${DRAW_GROUP_SIZE}`, bg: just ? '#d97706' : full ? '#27272a' : '#0f766e', fg: full ? '#71717a' : '#ffffff' };
+      rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${cap}`, bg: just ? '#d97706' : full ? '#27272a' : '#0f766e', fg: full ? '#71717a' : '#ffffff' };
     });
     rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
     rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
@@ -270,9 +306,9 @@ export function teamGradient(db: AssetCtx['db'], code: string, g: { angle: numbe
 }
 
 /** Places in each group counted again after a pick is taken away (A1, A2… stay without gaps). */
-function renumber(picks: DrawPick[]): DrawPick[] {
+function renumber(picks: DrawPick[], board: BoardGroup[]): DrawPick[] {
   const n: Record<string, number> = {};
-  return picks.map((p) => ({ ...p, place: (n[p.group] = (n[p.group] ?? 0) + 1) }));
+  return picks.map((p) => { const k = (n[p.group] = (n[p.group] ?? 0) + 1); const g = board.find((x) => x.letter === p.group); return { ...p, place: (g && drawPlaces(g)[k - 1]) || k }; });
 }
 
 // Companion 5.1 button pieces (as in show.ts; kept here so the DRAW page does not depend on the show preset)

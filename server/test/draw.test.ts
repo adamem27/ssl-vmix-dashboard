@@ -70,6 +70,26 @@ describe('DRAW', () => {
     expect(keys[2][3]!.text).toBe('GROUP D\\n1/4');
   });
 
+  it('takes the groups from the matchboard: fixed teams stay, the drawn ones fill DRAW 1–11 in order', () => {
+    const s = setup();
+    const fixed = Object.fromEntries(['COL', 'KOR', 'GRE', 'MAS', 'SGP'].map((c) => [c, createTeam(s.db, { name: `Team ${c}`, code: c })]));
+    const drawn = ['MYA', 'OMA', 'TAH', 'SEY', 'EST', 'LTU', 'UKR', 'POR', 'URU', 'ANT', 'CUB'].map((c) => createTeam(s.db, { name: `Team ${c}`, code: c }));
+    const draw = new Draw(s.ctx);
+    draw.setConfig({ pool: drawn });
+    const board = draw.board();
+    expect(board.map((g) => g.slots.filter((x) => x.draw).length)).toEqual([3, 2, 3, 3]);
+    expect(board[0].slots[0]).toEqual({ teamId: fixed.COL, text: '', draw: false });
+    expect(board[2].slots.map((x) => x.text)).toEqual(['DRAW 6', 'DRAW 7', 'DRAW 8', '']);
+    draw.run('team:1'); draw.run('group:B');
+    draw.run('team:2'); draw.run('group:B');
+    expect(draw.state.picks.map((p) => p.place)).toEqual([3, 4]);
+    draw.run('team:3');
+    expect(() => draw.run('group:B')).toThrow(/full/);
+    draw.run('group:C');
+    expect(draw.state.picks[2].place).toBe(1);
+    expect(draw.output().teams.map((t) => t.code)).toContain('MAS');
+  });
+
   it('serves the output page and its data without a login, the rest still needs one', async () => {
     const { db, ctx, sync, draw } = withPool(4);
     draw.run('team:1');

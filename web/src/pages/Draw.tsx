@@ -9,7 +9,7 @@ interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
   config: { caption: string; pool: string[]; companionPage: number; flightDelay: number };
   state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; seq: number };
-  teams: DrawTeam[]; pool: DrawTeam[]; groups: string[]; groupSize: number; input: string;
+  teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; input: string;
   companion: { at: string; sent: number; error: string | null } | null;
 }
 
@@ -68,14 +68,14 @@ export function DrawPage() {
               {d.pool.length === 0 && <div className="col-span-4 text-sm text-ink-400">The pool is empty. Add the teams in “Draw pool” on the right.</div>}
             </div>
             <div className="mt-3 grid grid-cols-4 gap-2">
-              {d.groups.map((g) => {
-                const n = count(g);
+              {d.board.map(({ letter: g, slots }) => {
+                const n = count(g), cap = slots.filter((x) => x.draw).length;
                 return (
-                  <button key={g} disabled={!waitingGroup || n >= d.groupSize || run.isPending} onClick={() => run.mutate(`group:${g}`)}
+                  <button key={g} disabled={!waitingGroup || n >= cap || run.isPending} onClick={() => run.mutate(`group:${g}`)}
                     className={cx('rounded-md border px-3 py-3 text-base font-bold transition-colors disabled:cursor-not-allowed',
                       st.current?.group === g ? 'border-amber-400 bg-amber-500/25 text-amber-100'
-                        : waitingGroup && n < d.groupSize ? 'border-teal-600 bg-teal-800/60 text-white hover:bg-teal-700' : 'border-ink-800 bg-ink-900 text-ink-500')}>
-                    GROUP {g} <span className="text-xs font-medium opacity-70">{n}/{d.groupSize}</span>
+                        : waitingGroup && n < cap ? 'border-teal-600 bg-teal-800/60 text-white hover:bg-teal-700' : 'border-ink-800 bg-ink-900 text-ink-500')}>
+                    GROUP {g} <span className="text-xs font-medium opacity-70">{n}/{cap}</span>
                   </button>
                 );
               })}
@@ -121,13 +121,13 @@ function Preview({ seq }: { seq: number }) {
 function Groups({ d, byId }: { d: DrawView; byId: Map<string, DrawTeam> }) {
   return (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-      {d.groups.map((g) => (
+      {d.board.map(({ letter: g, slots }) => (
         <div key={g} className="rounded-lg border border-ink-800 bg-ink-900/60 p-3">
-          <div className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-400">Group {g}</div>
-          {Array.from({ length: d.groupSize }, (_, i) => {
+          <div className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-400">Group {g} · R1 {g}</div>
+          {slots.map((row, i) => {
             const p = d.state.picks.find((x) => x.group === g && x.place === i + 1);
-            const t = p && byId.get(p.teamId);
-            return <div key={i} className={cx('py-0.5 text-sm', t ? 'text-ink-100' : 'text-ink-600')}>{g}{i + 1} · {t ? `${t.code} ${t.name}` : '—'}</div>;
+            const t = row.teamId ? byId.get(row.teamId) : p && byId.get(p.teamId);
+            return <div key={i} className={cx('py-0.5 text-sm', t ? (row.draw ? 'text-amber-200' : 'text-ink-100') : 'text-ink-600')}>{g}{i + 1} · {t ? `${t.code} ${t.name}` : row.text}{!row.draw && <span className="ml-1 text-xs text-ink-500">(matchboard)</span>}</div>;
           })}
         </div>
       ))}
@@ -155,8 +155,8 @@ function PoolEditor({ d, save, busy }: { d: DrawView; save: (pool: string[]) => 
   const fillQualified = async () => {
     try {
       const { teamIds } = await api.get<{ teamIds: string[] }>('/api/draw/qualified');
-      if (!teamIds.length) { toast.info('No starred teams before the 1/32 Finals on the matchboard yet.'); return; }
-      save([...new Set([...pool, ...teamIds])].slice(0, 16));
+      if (!teamIds.length) { toast.info('No starred teams in the Qualifying Series on the matchboard yet.'); return; }
+      save(teamIds.slice(0, 16));
     } catch (e) { toast.error(e); }
   };
   return (
@@ -186,7 +186,7 @@ function PoolEditor({ d, save, busy }: { d: DrawView; save: (pool: string[]) => 
           {free.map((t) => <option key={t.id} value={t.id}>{t.code} · {t.name}</option>)}
         </select>
         <Button size="sm" disabled={!add || pool.length >= 16 || busy} onClick={() => { save([...pool, add]); setAdd(''); }}>Add</Button>
-        <Button size="sm" onClick={fillQualified} disabled={busy} title="Teams starred through to the 1/32 Finals on the matchboard">Add ★ qualified</Button>
+        <Button size="sm" onClick={fillQualified} disabled={busy} title="Teams starred in the Qualifying Series on the matchboard">Take ★ from matchboard</Button>
         <Button size="sm" onClick={() => save([...pool].sort((a, b) => (byId.get(a)?.name ?? '').localeCompare(byId.get(b)?.name ?? '')))} disabled={busy}>Sort A–Z</Button>
         <Button size="sm" variant="ghost" onClick={() => save([])} disabled={!pool.length || busy}>Empty</Button>
       </div>
