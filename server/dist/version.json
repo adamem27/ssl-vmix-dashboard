@@ -1,8 +1,14 @@
 {
-  "version": "1.0.213",
-  "commit": "79a6023",
-  "date": "2026-11-16T19:31:12Z",
+  "version": "1.0.214",
+  "commit": "2ecf866",
+  "date": "2026-11-16T19:36:45Z",
   "changes": [
+    {
+      "version": "1.0.214",
+      "commit": "2ecf866",
+      "date": "2026-11-16T19:36:45Z",
+      "text": "DRAW: no blink of the drawn team's flag and code when its highlight fades on the way back"
+    },
     {
       "version": "1.0.213",
       "commit": "79a6023",
@@ -476,12 +482,6 @@
       "commit": "7da9e54",
       "date": "2026-11-10T22:27:06Z",
       "text": "Every graphic on overlay 1, one OUT key, no key feedback, tidier Companion pages; bug titles found by their GTZIP name"
-    },
-    {
-      "version": "1.0.134",
-      "commit": "34645ac",
-      "date": "2026-11-10T21:54:11Z",
-      "text": "Welcome bar fields (Top text, Day number, Date, City, Country) and the team name on the lineup lower third"
     }
   ]
 }
