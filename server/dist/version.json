@@ -1,8 +1,14 @@
 {
-  "version": "1.0.218",
-  "commit": "6a526c8",
-  "date": "2026-11-16T19:53:52Z",
+  "version": "1.0.219",
+  "commit": "ac99707",
+  "date": "2026-11-16T19:56:45Z",
   "changes": [
+    {
+      "version": "1.0.219",
+      "commit": "ac99707",
+      "date": "2026-11-16T19:56:45Z",
+      "text": "DRAW: flags in one column in the strips, codes as long as they are"
+    },
     {
       "version": "1.0.218",
       "commit": "6a526c8",
@@ -476,12 +482,6 @@
       "commit": "762bc06",
       "date": "2026-11-11T13:33:51Z",
       "text": "Lineup LT: 9 sailors bow to stern, 5 ⇄ 4 swap key per team; Group H labels, fixed city/location, weather unit removed"
-    },
-    {
-      "version": "1.0.139",
-      "commit": "24b0584",
-      "date": "2026-11-11T12:10:19Z",
-      "text": "Race officials tab mirrors the panel (title, 8 roles, 11 names from the officials list); Welcome keeps stage, day and a date; new qualified line"
     }
   ]
 }

@@ -80,8 +80,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
 .dr-in { animation: dr-fade-in .6s ease both; }
 .dr-cell.dr-out { position: absolute; inset: 0; padding: inherit; animation: dr-fade-out .6s ease both; pointer-events: none; }
-/* the strips: flag and code centred in their row (the group tag sits at the right edge) */
-.dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: center; }
+/* the strips: every flag at the same place, so that a flag with a 3-letter code sits in the middle of the row;
+   the codes end where their letters end */
+.dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: flex-start; padding-left: calc(50% - 84px); }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 .dr-overview.is-out { animation: dr-fade-out ${Kh}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
