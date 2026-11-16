@@ -220,7 +220,7 @@ function HeaderPicture({ seq, onChange }: { seq: number; onChange: () => void })
   return (
     <Section id="header" title="Header picture">
       <img src={`/api/draw/output/header.png?v=${seq}`} alt="Header" className="mb-2 w-full rounded border border-ink-800" />
-      <p className="mb-2 text-xs text-ink-400">PNG, shown 1536 px wide across the top of the LED wall (about 239 px high for the current picture). Best as a 1536 px wide export.</p>
+      <p className="mb-2 text-xs text-ink-400">PNG, placed between the two strips: 1100 px wide, its height follows the picture (at most 260 px). Best exported at 1100 px wide, e.g. 1100×170.</p>
       <input ref={file} type="file" accept="image/png" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void up(f); e.target.value = ''; }} />
       <div className="flex gap-2">
         <Button size="sm" onClick={() => file.current?.click()}>Upload PNG…</Button>

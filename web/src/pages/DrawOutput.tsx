@@ -14,7 +14,8 @@ interface Out {
 }
 
 // the LED wall at Marina da Glória: 6 × 4 m, 1536×1024 px; strips as wide as the L-bar's (272 of 1920 → 218 of 1536)
-const W = 1536, H = 1024, HEADER_H = 239, STRIP_W = 218;
+// the strips run the full height; the header picture sits between them, its height following the picture (at most HEADER_MAX)
+const W = 1536, H = 1024, HEADER_MAX = 260, STRIP_W = 218;
 const FLIGHT_MS = 950;
 
 export function DrawOutputPage() {
@@ -92,7 +93,8 @@ export function DrawOutputPage() {
   const pool = data.pool.map((id) => teams.get(id)).filter((t): t is OutTeam => !!t);
   const done = pool.length > 0 && data.picks.length >= pool.length;
   const mode: 'overview' | 'team' | 'group' | 'idle' = data.overview || (done && !data.current) ? 'overview' : cur ? (data.current!.group ? 'group' : 'team') : 'idle';
-  const rowH = Math.min(44, Math.floor((H - HEADER_H - 16 - 44 - 12 - 24) / Math.max(pool.length, 1) - 6));
+  // the list stays in the upper part of the left strip: the host stands in front of its lower part
+  const rowH = Math.min(42, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
   const fontCss = data.fonts.map((w) => `@font-face { font-family: 'DrawGS'; font-weight: ${w}; font-display: block; src: url('/api/matchboard/fonts/general-sans-${w}'); }`).join('\n');
 
@@ -101,7 +103,6 @@ export function DrawOutputPage() {
       <style>{fontCss + CSS}</style>
       <div ref={stage} className="dr-stage" style={{ transform: `scale(${scale})` }}>
         <div className="dr-bg" />
-        <img className="dr-header" src={`/api/draw/output/header.png?v=${data.seq}`} alt="" />
 
         {/* left: the pool */}
         <aside className="dr-strip dr-left">
@@ -150,6 +151,8 @@ export function DrawOutputPage() {
         </aside>
 
         {/* centre */}
+        <div className="dr-mid">
+        <img className="dr-header" src={`/api/draw/output/header.png?v=${data.seq}`} alt="" />
         <main className="dr-centre">
           {mode === 'idle' && (
             <div key={`idle${data.seq}`} className="dr-idle">
@@ -200,6 +203,7 @@ export function DrawOutputPage() {
             </div>
           )}
         </main>
+        </div>
       </div>
     </div>
   );
@@ -211,7 +215,7 @@ function Flag({ team, className = '' }: { team: OutTeam; className?: string }) {
     : <span className={`dr-flag dr-flag-none ${className}`}>{team.code}</span>;
 }
 
-const PANEL_TOP = HEADER_H + 14;
+const PANEL_TOP = 12;
 const CSS = `
 @font-face { font-family: 'DrawGrotesk'; font-weight: 700; src: url('/api/matchboard/fonts/space-grotesk'); }
 html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidden; }
@@ -222,7 +226,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-bg { position: absolute; inset: 0; background:
   linear-gradient(115deg, transparent 0 55%, rgba(255,255,255,.05) 55% 61%, transparent 61% 100%),
   linear-gradient(28deg, #2c3e93 0%, #1867bb 20%, #0aa9df 42%, #0bbde6 52%, #3cc39a 70%, #86c540 86%, #c6d500 100%); }
-.dr-header { position: absolute; left: 0; top: 0; width: ${W}px; height: ${HEADER_H}px; object-fit: cover; z-index: 5; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
+.dr-mid { position: absolute; left: ${STRIP_W}px; top: 0; width: ${W - 2 * STRIP_W}px; height: ${H}px; display: flex; flex-direction: column; }
+.dr-header { display: block; width: 100%; height: auto; max-height: ${HEADER_MAX}px; object-fit: cover; flex: none; position: relative; z-index: 5; box-shadow: 0 6px 24px rgba(0,0,0,.3); }
 
 /* the matchboard's white title bars with cut ends */
 .dr-pill { height: 36px; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 20px; font-weight: 600;
@@ -248,21 +253,21 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-left { left: 10px; }
 .dr-right { right: 10px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.dr-pool { flex: 1; padding: 8px 4px; display: flex; flex-direction: column; gap: 6px; }
+.dr-pool { flex: none; padding: 8px 4px; display: flex; flex-direction: column; gap: 6px; }
 .dr-pool-row { transition: opacity .6s; }
 .dr-pool-row.is-done { opacity: .42; }
 .dr-pool-row.is-current { box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 6px 18px rgba(0,0,0,.3); animation: dr-pulse 1.4s ease-in-out infinite; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
 
-.dr-groups { justify-content: space-between; gap: 6px; }
-.dr-group { padding: 1px 4px 5px; transition: box-shadow .4s; }
+.dr-groups { justify-content: space-between; gap: 10px; }
+.dr-group { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding: 2px 4px 6px; transition: box-shadow .4s; }
 .dr-group.is-target { box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 0 24px rgba(255,255,255,.35); }
-.dr-slot { height: 31px; }
-.dr-slot .dr-row-flag { width: 30px; height: 20px; }
-.dr-slot .dr-row-code { font-size: 20px; }
+.dr-slot { height: 40px; }
+.dr-slot .dr-row-flag { width: 33px; height: 22px; }
+.dr-slot .dr-row-code { font-size: 22px; }
 .dr-slot.is-landed { animation: dr-land 1.3s ease-out; }
 
-.dr-centre { position: absolute; left: ${STRIP_W}px; top: ${HEADER_H}px; width: ${W - 2 * STRIP_W}px; height: ${H - HEADER_H}px; overflow: hidden; display: grid; place-items: center; }
+.dr-centre { position: relative; flex: 1; min-height: 0; overflow: hidden; display: grid; place-items: center; }
 
 .dr-idle { text-align: center; animation: dr-fade-up .8s ease-out both; display: flex; flex-direction: column; align-items: center; }
 .dr-pill-big { height: 46px; font-size: 24px; padding: 0 46px; }
