@@ -20,6 +20,8 @@ import { GtzipGeneratorPage } from './pages/GtzipGenerator';
 import { ResultsPage } from './pages/Results';
 import { ShowControlPage } from './pages/ShowControl';
 import { GraphicsEditorPage } from './pages/GraphicsEditor';
+import { DrawPage } from './pages/Draw';
+import { DrawOutputPage } from './pages/DrawOutput';
 
 export function useMeta() {
   return useQuery({ queryKey: ['meta'], queryFn: () => api.get<Meta>('/api/meta'), staleTime: 60_000 });
@@ -61,6 +63,7 @@ function TopBar() {
         <nav className="flex" aria-label="Modules">
           <NavLink to="/vmix" className={tab}>vMix graphics</NavLink>
           <NavLink to="/commentator" className={tab}>Commentator</NavLink>
+          <NavLink to="/draw" end className={tab}>DRAW</NavLink>
         </nav>
         <div className="ml-auto"><StagePicker /></div>
         <div className="truncate text-xs text-ink-400" title="Active event">
@@ -163,6 +166,8 @@ export function App() {
     <Routes>
       {/* Commentator screen on its own, without the menu: what the commentator link opens online. */}
       <Route path="/live" element={<div className="min-h-screen"><CommentatorPage live /></div>} />
+      {/* DRAW stage screen (vMix Browser input), 1536×1024 LED wall, no menu and no login */}
+      <Route path="/draw/output" element={<DrawOutputPage />} />
       <Route path="*" element={<MainApp />} />
     </Routes>
   );
@@ -194,6 +199,7 @@ function MainApp() {
           <Route path="editor" element={<GraphicsEditorPage />} />
         </Route>
         <Route path="/commentator" element={<CommentatorPage />} />
+        <Route path="/draw" element={<DrawPage />} />
         <Route path="*" element={<div className="p-10 text-center text-ink-400">Page not found.</div>} />
       </Routes>
     </div>
