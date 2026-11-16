@@ -9,7 +9,9 @@ import { listSets } from './fleets.js';
 import { starredForSet } from './stages.js';
 import { getLtConfig } from './lowerthirds.js';
 import { getShowConfig } from './show.js';
-import { fixturesDir } from './matchboard/matchboard.js';
+import { fixturesDir, uploadedSansFiles } from './matchboard/matchboard.js';
+import { listGradients, TEAM_GRADIENTS_SSL26 } from './generator/generator.js';
+import { nationColours } from './nationColours.js';
 
 /**
  * DRAW: the stage screen of the official draw (1/32 Finals). Teams are drawn one by one from a pool, then each gets
@@ -122,8 +124,10 @@ export class Draw {
   /** What the output page needs (no ids of assets: the flags come through /api/draw/output/flag/<team id>). */
   output() {
     const cfg = this.config, st = this.state;
-    const teams = this.poolTeams().map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null }));
-    return { seq: st.seq, caption: cfg.caption, flightDelay: cfg.flightDelay, groups: DRAW_GROUPS, groupSize: DRAW_GROUP_SIZE, teams, picks: st.picks, current: st.current, overview: st.overview };
+    const grads = new Map(listGradients(this.ctx.db).map((g) => [g.teamId, g.gradients[1]]));
+    const teams = this.poolTeams().map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
+    const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
+    return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, groups: DRAW_GROUPS, groupSize: DRAW_GROUP_SIZE, teams, picks: st.picks, current: st.current, overview: st.overview };
   }
   flagFile(teamId: string) {
     const t = this.allTeams().find((x) => x.id === teamId);
@@ -249,6 +253,20 @@ export class Draw {
       oldPageNumber: page,
     };
   }
+}
+
+/**
+ * A team's gradient as CSS (the PNG generator's variant 1, as on the matchboard's highlighted rows): the one set in
+ * the generator, else the built-in SSL26 one, else the national colours.
+ */
+export function teamGradient(db: AssetCtx['db'], code: string, g: { angle: number; stops: { pos: number; color: string; opacity: number }[] } | null): string {
+  const rgba = (c: string, o: number) => { const n = parseInt(c.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${o / 100})`; };
+  if (g?.stops?.length) return `linear-gradient(${90 + g.angle}deg, ${[...g.stops].sort((a, b) => a.pos - b.pos).map((s) => `${rgba(s.color, s.opacity)} ${s.pos}%`).join(', ')})`;
+  const built = TEAM_GRADIENTS_SSL26[code.toUpperCase()];
+  if (built) return `linear-gradient(70deg, ${built.map(([pos, c]) => `${c} ${pos}%`).join(', ')})`;
+  const cs = nationColours(db, code);
+  if (cs.length >= 2) return `linear-gradient(70deg, ${cs.map((c, i) => `${c} ${Math.round((i / (cs.length - 1)) * 100)}%`).join(', ')})`;
+  return 'linear-gradient(70deg, #1e3a8a, #0ea5e9)';
 }
 
 /** Places in each group counted again after a pick is taken away (A1, A2… stay without gaps). */
