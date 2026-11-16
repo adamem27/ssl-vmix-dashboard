@@ -274,7 +274,7 @@ export function DrawOutputPage() {
             {!overview && !leaving && (
               <div className="dr-idle-wrap"><div key={`idle${data.picks.length}`} className="dr-idle">
                 <div className="dr-pill dr-pill-big">{data.caption}</div>
-                <div className="dr-idle-big">{data.picks.length === 0 ? 'The Draw' : done ? 'Draw complete' : 'Next team'}</div>
+                <div className={`dr-idle-big${done && data.picks.length ? ' is-long' : ''}`}>{data.picks.length === 0 ? 'The Draw' : done ? 'Draw complete' : 'Next team'}</div>
                 <div className="dr-idle-count"><b>{data.picks.length}</b> / {pool.length} teams drawn</div>
               </div></div>
             )}
@@ -449,7 +449,7 @@ const css = (STRIP_W: number) => `
 @font-face { font-family: 'DrawGrotesk'; font-weight: 700; src: url('/api/matchboard/fonts/space-grotesk'); }
 html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidden; }
 .dr-root { width: 100vw; height: 100vh; overflow: hidden; background: #0b5ea8; }
-.dr-stage { position: relative; width: ${W}px; height: ${H}px; transform-origin: 0 0; overflow: hidden; color: #fff;
+.dr-stage { position: relative; width: ${W}px; height: ${H}px; transform-origin: 0 0; overflow: hidden; color: #fff; text-transform: uppercase; /* every text on the screen in capitals */
   font-family: 'General Sans', 'DrawGS', 'DrawGrotesk', 'Segoe UI', system-ui, sans-serif; font-weight: 600; }
 /* the matchboard's background: deep blue bottom left, cyan, green, lime top right */
 .dr-bg { position: absolute; inset: 0; background:
@@ -531,6 +531,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-stage.is-spot .dr-idle-wrap { opacity: 0; }
 .dr-pill-big { height: 46px; font-size: 24px; padding: 0 46px; }
 .dr-idle-big { font-size: 132px; font-weight: 600; line-height: 1; margin: 26px 0 18px; text-shadow: 0 8px 30px rgba(0,30,80,.35); }
+/* in capitals DRAW COMPLETE is wider: one line across the centre */
+.dr-idle-big.is-long { font-size: 106px; white-space: nowrap; }
 .dr-idle-count { font-size: 28px; font-weight: 500; }
 .dr-idle-count b { font-size: 38px; font-weight: 600; }
 
