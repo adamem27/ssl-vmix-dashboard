@@ -1,8 +1,14 @@
 {
-  "version": "1.0.220",
-  "commit": "fc5af6c",
-  "date": "2026-11-16T20:01:38Z",
+  "version": "1.0.221",
+  "commit": "5aeb4d5",
+  "date": "2026-11-16T20:05:56Z",
   "changes": [
+    {
+      "version": "1.0.221",
+      "commit": "5aeb4d5",
+      "date": "2026-11-16T20:05:56Z",
+      "text": "Draw: show country names in uppercase in overview and centre flag"
+    },
     {
       "version": "1.0.220",
       "commit": "fc5af6c",
@@ -476,12 +482,6 @@
       "commit": "4658aab",
       "date": "2026-11-11T16:18:32Z",
       "text": "Weather layers by the tab's field names and kept in step; TEAM LT a row lower; no OUT key; EXTRAS gone (SOCIALS on BEFORE and AFTER, PHOTO on team pages and PEOPLE); People: Name and SURNAME"
-    },
-    {
-      "version": "1.0.141",
-      "commit": "1277de8",
-      "date": "2026-11-11T15:08:59Z",
-      "text": "Sailor lower thirds: no out before the next sailor (data change), photo emptied off air; shirt numbers on sailor keys; 9 | MIDBOW; Lineup LT I. NAME and 5 | POSITION; key edits kept by page name"
     }
   ]
 }
