@@ -357,7 +357,7 @@ describe('show control', () => {
     // a ticker key while the scene is on air: the ticker goes out on channel 3, takes the text and comes back
     setShowConfig(s.db, { breakOutMs: 0 });
     v.calls.length = 0;
-    const r = await show.run('ticker:1');
+    const r = await show.run('ticker:5'); // Top ticker (the four fixed ones first)
     expect(r).toMatchObject({ in: 'ticker', scene: true });
     expect(v.calls[0]).toBe('?Function=OverlayInput3Out');
     expect(v.calls.some((c) => c.startsWith(`?Function=SetText&Input=${k('ssl_ticker')}`))).toBe(true);

@@ -313,6 +313,18 @@ export function ensurePresets(db: DB, eventId: string) {
     })();
     setSetting(db, decks, '1');
   }
+  // the lists in the order of the Stream Deck keys, once: announcements on BUGS OFTEN, then BUGS RARE; the fixed tickers
+  // first (as the Tickers tab showed them). After this the order is yours: moved by hand (setGraphicSetOrder), never sorted again.
+  const order = `graphicSets.order.${eventId}`;
+  if (!getSetting(db, order)) {
+    const ann = listGraphicSets(db, eventId, 'announcement');
+    const tick = listGraphicSets(db, eventId, 'ticker');
+    db.transaction(() => {
+      setGraphicSetOrder(db, eventId, 'announcement', [...ann.filter(isOften), ...ann.filter((a) => !isOften(a))].map((a) => a.id));
+      setGraphicSetOrder(db, eventId, 'ticker', [...tick.filter((t) => t.data.preset), ...tick.filter((t) => !t.data.preset)].map((t) => t.id));
+    })();
+    setSetting(db, order, '1');
+  }
 }
 
 /**
@@ -364,6 +376,21 @@ export function deleteGraphicSet(db: DB, id: string) {
   const r = db.prepare('SELECT * FROM graphic_sets WHERE id = ?').get(id);
   if (r && fromRow(r).data.preset) throw badRequest('This is a fixed version: change its fields instead of deleting it.');
   if (!db.prepare('DELETE FROM graphic_sets WHERE id = ?').run(id).changes) throw notFound('Graphic version');
+}
+
+/**
+ * The versions of a graphic in the order given (by hand in General graphics): its rows in the sheet and its Stream Deck
+ * keys follow it (announcements: by position on BUGS OFTEN / BUGS RARE, tickers on TICKERS). Versions not named keep
+ * their order after the named ones; ids of other graphics or events are ignored.
+ */
+export function setGraphicSetOrder(db: DB, eventId: string, kind: string, ids: string[]) {
+  kindOf(kind);
+  const list = (db.prepare('SELECT id FROM graphic_sets WHERE event_id = ? AND kind = ? ORDER BY sort, created_at').all(eventId, kind) as { id: string }[]).map((r) => r.id);
+  const known = new Set(list);
+  const named = [...new Set(ids)].filter((id) => known.has(id));
+  const rest = list.filter((id) => !named.includes(id));
+  const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
+  db.transaction(() => [...named, ...rest].forEach((id, n) => upd.run(n + 1, id)))();
 }
 
 /** Moves a version up or down among the versions of its graphic (row order in the sheet). */

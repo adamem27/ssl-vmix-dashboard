@@ -1,4 +1,8 @@
+import { ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api';
 import { Button, cx, ErrorBox, Loading, useConfirm, useToast } from '../components/ui';
 import { SaveInput, SaveTextArea } from '../components/fields';
@@ -43,7 +47,27 @@ export function GraphicSetsSections({ kinds }: { kinds?: string[] }) {
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorBox error={q.error} onRetry={() => q.refetch()} />;
   const list = kinds ? kinds.map((id) => q.data!.kinds.find((k) => k.kind === id)).filter((k): k is GKind => !!k) : q.data!.kinds;
-  return <>{list.map((k) => <KindPanel key={k.kind} k={k} auto={q.data!.auto} sets={q.data!.sets.filter((s) => s.kind === k.kind).sort((a, b) => Number(!a.data.preset) - Number(!b.data.preset) || a.sort - b.sort)} />)}</>;
+  return <>{list.map((k) => <KindPanel key={k.kind} k={k} auto={q.data!.auto} sets={q.data!.sets.filter((s) => s.kind === k.kind).sort((a, b) => a.sort - b.sort)} />)}</>;
+}
+
+/** An announcement on the BUGS OFTEN page (as graphicSets.isOften). */
+const isOften = (s: GSet) => (s.data.deck ?? '').toLowerCase() === 'often';
+/** The versions as the Stream Deck has them: announcements on BUGS OFTEN, then BUGS RARE (each by position); others one list. */
+const groupsOf = (k: GKind, sets: GSet[]): { label?: string; page?: string; items: GSet[] }[] =>
+  k.kind === 'announcement'
+    ? [{ label: 'Stream Deck: BUGS OFTEN', page: 'BUGS OFTEN', items: sets.filter(isOften) }, { label: 'Stream Deck: BUGS RARE', page: 'BUGS RARE', items: sets.filter((s) => !isOften(s)) }]
+    : [{ items: sets }];
+
+type Handle = ReturnType<typeof useSortable>['listeners'] & ReturnType<typeof useSortable>['attributes'];
+/** A card that can be dragged by its handle to another place. */
+function SortableCard({ id, children }: { id: string; children: (handle: Handle, dragging: boolean) => ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition, zIndex: isDragging ? 10 : undefined }}
+      className={cx('rounded-lg border border-ink-800 bg-ink-950/40', isDragging && 'opacity-80 shadow-lg ring-1 ring-accent-500/60')}>
+      {children({ ...attributes, ...listeners } as Handle, isDragging)}
+    </div>
+  );
 }
 
 function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAuto }) {
@@ -55,7 +79,21 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
   const add = () => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${k.label === 'Tickers' ? 'Ticker' : k.label} ${sets.length + 1}` }));
   const [open, setOpen] = useFold(`gsets:${k.kind}`);
   const dup = (s: GSet) => run(() => api.post('/api/graphic-sets', { kind: k.kind, name: `${s.name} copy`, copyFrom: s.id }));
-  const move = (s: GSet, dir: -1 | 1) => run(() => api.post(`/api/graphic-sets/${s.id}/move`, { dir }));
+  const groups = groupsOf(k, sets);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  // a new order (by hand): shown at once, saved as a whole; the deck keys follow it
+  const reorder = async (order: GSet[]) => {
+    const pos = new Map(order.map((x, i) => [x.id, i + 1]));
+    qc.setQueryData(['graphic-sets'], (d: { kinds: GKind[]; sets: GSet[] } | undefined) => d && { ...d, sets: d.sets.map((x) => (pos.has(x.id) ? { ...x, sort: pos.get(x.id)! } : x)) });
+    await run(() => api.post('/api/graphic-sets/order', { kind: k.kind, ids: order.map((x) => x.id) }));
+  };
+  const withGroup = (g: number, items: GSet[]) => reorder(groups.flatMap((x, i) => (i === g ? items : x.items)));
+  const move = (g: number, i: number, dir: -1 | 1) => withGroup(g, arrayMove(groups[g].items, i, i + dir));
+  const onDragEnd = (g: number) => (e: DragEndEvent) => {
+    const items = groups[g].items;
+    const from = items.findIndex((x) => x.id === e.active.id), to = e.over ? items.findIndex((x) => x.id === e.over!.id) : -1;
+    if (from >= 0 && to >= 0 && from !== to) void withGroup(g, arrayMove(items, from, to));
+  };
   const remove = async (s: GSet) => { if (await ask(`Delete “${s.name}”?`, <>This version of {k.label} and its rows in the “General” sheet are removed.</>, 'Delete')) await run(() => api.del(`/api/graphic-sets/${s.id}`)); };
   const save = async (s: GSet, patch: { name?: string; data?: Record<string, string> }) => {
     try {
@@ -71,15 +109,22 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
         {open && <span className="text-xs text-ink-500">{k.description}{k.kind !== 'tickertop' && <> In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</>}</span>}
         {open && <Button size="sm" className="ml-auto" onClick={add}>+ New version</Button>}
       </header>
-      {open && <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
-        {sets.map((s, i) => (
-          <div key={s.id} className="rounded-lg border border-ink-800 bg-ink-950/40">
+      {open && groups.map((grp, g) => (
+        <div key={g}>
+          {grp.label && <h3 className="px-3 pt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-400">{grp.label} <span className="font-normal normal-case text-ink-500">· {grp.items.length} · in the order of its keys; drag ⠿ or use ▲▼ to move, the Stream Deck field changes the page</span></h3>}
+          {!grp.label && sets.length > 1 && <p className="px-3 pt-2 text-[11px] text-ink-500">Drag ⠿ or use ▲▼ to move a version: its row in the sheet and its Stream Deck key follow.</p>}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd(g)}>
+          <SortableContext items={grp.items.map((x) => x.id)} strategy={rectSortingStrategy}>
+          <div className={cx('grid gap-3 md:grid-cols-2 2xl:grid-cols-3', grp.items.length ? 'p-3' : 'px-3 pb-1')}>
+        {grp.items.map((s, i) => (
+          <SortableCard key={s.id} id={s.id}>{(handle) => (<>
             <div className="flex items-center gap-1 border-b border-ink-800 px-2 py-1.5">
-              <span className="w-5 text-center text-[11px] font-semibold tabular-nums text-ink-500" title="Order in the sheet">{i + 1}</span>
+              <button type="button" {...handle} className="h-7 w-5 cursor-grab touch-none text-ink-500 hover:text-ink-100 active:cursor-grabbing" aria-label={`Drag ${s.name} to another place`} title="Drag to another place">⠿</button>
+              <span className="w-5 text-center text-[11px] font-semibold tabular-nums text-ink-500" title={grp.page ? `Key ${i + 1} on ${grp.page}` : 'Order in the sheet and on the Stream Deck'}>{i + 1}</span>
               <SaveInput value={s.name} onSave={(name) => save(s, { name })} label="Version name" className="max-w-[16rem] border-transparent bg-transparent font-semibold" maxLength={80} />
               <div className="ml-auto flex items-center">
-                <button disabled={i === 0} onClick={() => move(s, -1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move up">▲</button>
-                <button disabled={i === sets.length - 1} onClick={() => move(s, 1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move down">▼</button>
+                <button disabled={i === 0} onClick={() => move(g, i, -1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move up">▲</button>
+                <button disabled={i === grp.items.length - 1} onClick={() => move(g, i, 1)} className="h-7 w-6 text-xs text-ink-500 hover:text-ink-100 disabled:opacity-20" aria-label="Move down">▼</button>
                 <button onClick={() => dup(s)} className="h-7 rounded px-2 text-xs text-ink-400 hover:bg-ink-800 hover:text-ink-100" title="Duplicate this version">Duplicate</button>
                 {s.data.preset ? <span className="rounded bg-accent-900/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-accent-200" title="A fixed version: always there, only its changing parts are typed">Fixed</span>
                   : <button onClick={() => remove(s)} className="h-7 w-7 rounded text-ink-500 hover:bg-ink-800 hover:text-red-300" aria-label={`Delete ${s.name}`}>✕</button>}
@@ -111,10 +156,14 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
                 </div>
               )}
             </div>
-          </div>
+          </>)}</SortableCard>
         ))}
-        {!sets.length && <p className="px-1 py-4 text-sm text-ink-500">No versions yet. Add one to put it in the Excel file.</p>}
-      </div>}
+          </div>
+          </SortableContext>
+          </DndContext>
+        </div>
+      ))}
+      {open && !sets.length && <p className="px-4 pb-4 text-sm text-ink-500">No versions yet. Add one to put it in the Excel file.</p>}
       {dialog}
     </section>
   );

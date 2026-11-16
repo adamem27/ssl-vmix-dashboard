@@ -34,6 +34,12 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     gs.updateGraphicSet(db, req.params.id, z.object({ name: s(80), data: z.record(z.string(), s(4000)) }).partial().parse(req.body)));
   app.post<{ Params: { id: string } }>('/api/graphic-sets/:id/move', async (req) => { gs.moveGraphicSet(db, req.params.id, z.object({ dir: z.union([z.literal(-1), z.literal(1)]) }).parse(req.body).dir); return { ok: true }; });
   app.delete<{ Params: { id: string } }>('/api/graphic-sets/:id', async (req) => { gs.deleteGraphicSet(db, req.params.id); return { ok: true }; });
+  // the versions of a graphic in the order moved by hand (Announcements, Tickers…)
+  app.post('/api/graphic-sets/order', async (req) => {
+    const b = z.object({ kind: s(40), ids: z.array(s(64)).max(1000) }).parse(req.body);
+    gs.setGraphicSetOrder(db, ev().id, b.kind, b.ids);
+    return { ok: true };
+  });
 
   // icons of the announcements (PNG): kept in the assets folder under icons/, so vMix reads them from there
   app.post('/api/graphic-sets/icon', async (req) => {

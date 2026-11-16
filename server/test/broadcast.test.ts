@@ -15,9 +15,10 @@ describe('general graphics versions', () => {
     const { db, ctx, eventId } = setup();
     gs.seedGraphicSets(db, eventId);
     const tickers = gs.listGraphicSets(db, eventId, 'ticker');
-    expect(tickers.map((t) => t.name)).toEqual(['Top ticker', 'Bottom ticker', 'Warning signal', 'Thanks for watching', 'Delay', 'Custom text']);
-    gs.updateGraphicSet(db, tickers[1].id, { data: { items: 'RACE 2 WILL START SOON\n\nGROUP A NEXT' } });
-    expect(gs.graphicSheetRows(db, eventId, 'ticker')[1].text).toBe(gs.repeatLoop('RACE 2 WILL START SOON I GROUP A NEXT I '));
+    // the fixed tickers first, as the Tickers tab shows them (and the TICKERS keys)
+    expect(tickers.map((t) => t.name)).toEqual(['Warning signal', 'Thanks for watching', 'Delay', 'Custom text', 'Top ticker', 'Bottom ticker']);
+    gs.updateGraphicSet(db, tickers[5].id, { data: { items: 'RACE 2 WILL START SOON\n\nGROUP A NEXT' } });
+    expect(gs.graphicSheetRows(db, eventId, 'ticker')[5].text).toBe(gs.repeatLoop('RACE 2 WILL START SOON I GROUP A NEXT I '));
     const copy = gs.createGraphicSet(db, eventId, 'socials', 'Spanish', {}, gs.listGraphicSets(db, eventId, 'socials')[0].id);
     gs.moveGraphicSet(db, copy, -1);
     const socials = gs.graphicSheetRows(db, eventId, 'socials');
@@ -83,6 +84,41 @@ describe('general graphics versions', () => {
     gs.deleteGraphicSet(db, ann.find((a) => a.name === 'C + plus – Next leg lengthened')!.id);
     gs.seedGraphicSets(db, eventId);
     expect(gs.listGraphicSets(db, eventId, 'announcement').some((a) => a.name.startsWith('C + plus'))).toBe(false);
+  });
+
+  it('lists announcements as the Stream Deck pages have them, once, then keeps the order moved by hand', async () => {
+    const { db, eventId } = setup();
+    const { setSetting } = await import('../src/db/db.js');
+    gs.seedGraphicSets(db, eventId);
+    const list = () => gs.listGraphicSets(db, eventId, 'announcement');
+    // BUGS OFTEN first, then BUGS RARE: a rare one moved to Often before the order came in joins the often ones
+    const often = list().filter(gs.isOften).length;
+    expect(list().slice(0, often).every(gs.isOften)).toBe(true);
+    const y = list().find((a) => a.name === 'Y – Wear lifejackets')!;
+    gs.updateGraphicSet(db, y.id, { data: { deck: 'Often' } });
+    setSetting(db, `graphicSets.order.${eventId}`, '');
+    gs.seedGraphicSets(db, eventId);
+    expect(list()[often].name).toBe('Y – Wear lifejackets');
+    expect(list().slice(0, often + 1).every(gs.isOften)).toBe(true);
+    // by hand: Black to the top, Replay last; seeding again does not sort it back
+    const ids = list().map((a) => a.id);
+    const black = list().find((a) => a.name === 'Black – Disqualified')!.id, replay = list().find((a) => a.name === 'Replay')!.id;
+    gs.setGraphicSetOrder(db, eventId, 'announcement', [black, ...ids.filter((id) => id !== black && id !== replay), replay]);
+    gs.seedGraphicSets(db, eventId);
+    expect(list()[0].name).toBe('Black – Disqualified');
+    expect(list().at(-1)!.name).toBe('Replay');
+    expect(list().filter(gs.isOften)[0].name).toBe('Black – Disqualified'); // key 1 of BUGS OFTEN
+    // a partial order: the rest keeps its order after it; ids of another graphic are ignored
+    const tick = gs.listGraphicSets(db, eventId, 'ticker');
+    gs.setGraphicSetOrder(db, eventId, 'announcement', [replay, tick[0].id]);
+    expect(list()[0].name).toBe('Replay');
+    expect(list()[1].name).toBe('Black – Disqualified');
+    expect(gs.listGraphicSets(db, eventId, 'ticker').map((t) => t.id)).toEqual(tick.map((t) => t.id));
+    // tickers too
+    gs.setGraphicSetOrder(db, eventId, 'ticker', [...tick].reverse().map((t) => t.id));
+    gs.seedGraphicSets(db, eventId);
+    expect(gs.listGraphicSets(db, eventId, 'ticker').map((t) => t.id)).toEqual([...tick].reverse().map((t) => t.id));
+    expect(() => gs.setGraphicSetOrder(db, eventId, 'nope', [])).toThrow(/Unknown graphic/);
   });
 
   it('names groups as the broadcast does', () => {

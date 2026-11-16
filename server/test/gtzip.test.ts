@@ -466,6 +466,23 @@ describe('race flags', () => {
     expect(fs.readFileSync(path.join(dir, 'race-flags', 'P_preparatory.png'), 'utf8')).toBe('mine');
   });
 
+  it('come back to the square look from the chart-style pictures (592765f): A swallowtail and AP pennant redrawn, the rest as 1.0', async () => {
+    const os = await import('node:os');
+    const { execFileSync } = await import('node:child_process');
+    const { seedRaceFlags } = await import('../src/app.js');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flags-'));
+    fs.mkdirSync(path.join(dir, 'race-flags'));
+    const git = (rev: string, f: string) => execFileSync('git', ['show', `${rev}:server/fixtures/race-flags/${f}`], { cwd: path.join(__dirname, '..'), stdio: ['ignore', 'pipe', 'ignore'] });
+    const names = ['A_ashore.png', 'C_plus_leg_lengthened.png', 'X_individual_recall.png', 'AP_over_1_postponed_1_hour.png'];
+    try { for (const f of names) fs.writeFileSync(path.join(dir, 'race-flags', f), git('592765f', f)); } catch { return; } // a copy without the history
+    seedRaceFlags(dir);
+    const bundled = (f: string) => fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'race-flags', f));
+    for (const f of names) expect(fs.readFileSync(path.join(dir, 'race-flags', f)).equals(bundled(f)), f).toBe(true);
+    // X is the original picture again; A is not (cut as a swallowtail)
+    expect(bundled('X_individual_recall.png').equals(git('2e17950', 'X_individual_recall.png'))).toBe(true);
+    expect(bundled('A_ashore.png').equals(git('2e17950', 'A_ashore.png'))).toBe(false);
+  });
+
 });
 
 describe('layer size', () => {
