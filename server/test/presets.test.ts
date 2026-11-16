@@ -83,4 +83,30 @@ describe('rooming list', () => {
     expect(rows.find((s) => s.last_name === 'Di Croce').is_captain).toBe(1);
     expect(rows.find((s) => s.id === worked)).toBeTruthy();
   });
+
+  it('1/32 squad sheets: position, number and best results from the team, once; Pan-Am qualifiers untouched', async () => {
+    const { applyFinalsSquadsOnStart, loadFinalsSquads } = await import('../src/services/presets.js');
+    const { createTeam } = await import('../src/services/teams.js');
+    const { createSailor } = await import('../src/services/sailors.js');
+    const db = openDb(':memory:');
+    const ctx = { db, assetsDir: '/tmp/ssl-rooming-test' };
+    const squads = loadFinalsSquads();
+    expect(squads.map((t) => t.code)).toEqual(['COL', 'EST', 'KOR', 'LTU', 'MAS', 'MYA', 'OMA', 'POR', 'SEY', 'SGP', 'TAH', 'UKR', 'GRE']);
+    // only names, positions, shirt numbers, captains and best results (nothing personal from the sheets)
+    for (const t of squads) for (const m of t.crew) expect(Object.keys(m).sort()).toEqual(['best', 'captain', 'firstName', 'lastName', 'number', 'position']);
+    const col = createTeam(db, { name: 'Colombia', code: 'COL' });
+    const simon = createSailor(db, col, { firstName: 'Simon', lastName: 'Gomez', defaultPosition: 'Trimmer' });
+    const ant = createTeam(db, { name: 'Antigua and Barbuda', code: 'ANT' });
+    createSailor(db, ant, { firstName: 'Jules', lastName: 'Mitchell', defaultPosition: 'Tactician' });
+    const r = applyFinalsSquadsOnStart(ctx)!;
+    expect(r.teams).toBe(1);
+    const s = db.prepare('SELECT * FROM sailors WHERE id = ?').get(simon) as any;
+    expect([s.default_position, s.default_number, s.best_result_1]).toEqual(['Helm', '10', 'World Champion Sunfish 2025 gold medal']);
+    expect((db.prepare('SELECT COUNT(*) n FROM sailors WHERE team_id = ?').get(col) as any).n).toBe(10);
+    expect((db.prepare('SELECT COUNT(*) n FROM sailors WHERE team_id = ?').get(ant) as any).n).toBe(1);
+    // once: an edit made afterwards stays
+    db.prepare("UPDATE sailors SET default_position = 'Pit' WHERE id = ?").run(simon);
+    expect(applyFinalsSquadsOnStart(ctx)).toBeNull();
+    expect((db.prepare('SELECT default_position p FROM sailors WHERE id = ?').get(simon) as any).p).toBe('Pit');
+  });
 });

@@ -169,7 +169,7 @@ export function applyTeamPages(db: DB, pages: TeamPage[] = loadTeamPages(), skip
 }
 
 // ---------- official rooming list (who actually travels and sails) ----------
-export interface RoomingSailor { firstName: string; lastName: string; position: string; number: string; captain: boolean }
+export interface RoomingSailor { firstName: string; lastName: string; position: string; number: string; captain: boolean; best?: string[] }
 export interface RoomingTeam { code: string; crew: RoomingSailor[] }
 
 export function loadRooming(): RoomingTeam[] {
@@ -187,7 +187,7 @@ export interface RoomingResult { teams: number; added: number; updated: number; 
  * number is filled in), missing ones are added, the rest are removed unless they carry operator work
  * (a photo or best results), which is reported instead. A captain marked on the list replaces the current one.
  */
-export function applyRooming(ctx: AssetCtx, teams: RoomingTeam[] = loadRooming()): RoomingResult {
+export function applyRooming(ctx: AssetCtx, teams: RoomingTeam[] = loadRooming(), opts: { official?: boolean } = {}): RoomingResult {
   const { db } = ctx;
   const r: RoomingResult = { teams: 0, added: 0, updated: 0, removed: 0, kept: [], captains: 0, missingTeams: [] };
   db.transaction(() => {
@@ -212,13 +212,18 @@ export function applyRooming(ctx: AssetCtx, teams: RoomingTeam[] = loadRooming()
         let id: string;
         if (hit) {
           id = hit.id;
-          const pos = hit.default_position || m.position, num = hit.default_number || m.number;
-          if (pos !== hit.default_position || num !== hit.default_number) {
-            db.prepare('UPDATE sailors SET default_position = ?, default_number = ?, updated_at = ? WHERE id = ?').run(pos, num, nowIso(), id);
+          // the team's own squad sheet (official) gives position and shirt number; otherwise only empty ones are filled
+          const pos = opts.official ? m.position || hit.default_position : hit.default_position || m.position;
+          const num = opts.official ? m.number || hit.default_number : hit.default_number || m.number;
+          // best results only where the sailor has none yet
+          const b = m.best ?? [], none = !hit.best_result_1 && !hit.best_result_2 && !hit.best_result_3 && b.length > 0;
+          if (pos !== hit.default_position || num !== hit.default_number || none) {
+            db.prepare('UPDATE sailors SET default_position = ?, default_number = ?, best_result_1 = ?, best_result_2 = ?, best_result_3 = ?, updated_at = ? WHERE id = ?')
+              .run(pos, num, none ? b[0] ?? '' : hit.best_result_1, none ? b[1] ?? '' : hit.best_result_2, none ? b[2] ?? '' : hit.best_result_3, nowIso(), id);
             r.updated++;
           }
         } else {
-          id = createSailor(db, team.id, { firstName: m.firstName, lastName: m.lastName, defaultPosition: m.position, defaultNumber: m.number });
+          id = createSailor(db, team.id, { firstName: m.firstName, lastName: m.lastName, defaultPosition: m.position, defaultNumber: m.number, bestResult1: m.best?.[0], bestResult2: m.best?.[1], bestResult3: m.best?.[2] });
           r.added++;
         }
         used.add(id);
@@ -255,6 +260,31 @@ export function applyGoldCupAll(ctx: AssetCtx) {
   const rooming = from < GOLDCUP_DATA_VERSION || !from ? applyRooming(ctx, roomingTeams) : null;
   setSetting(ctx.db, 'preset.goldcup.version', GOLDCUP_DATA_VERSION);
   return { removedDemoTeams: removed.removedTeams, ...matchboard, teamPages, rooming };
+}
+
+// ---------- 1/32 Finals: squad sheets of the teams new to the Final Series ----------
+/** Bump when goldcup-finals-squads.json changes. */
+export const FINALS_SQUADS_VERSION = '2026-11-16';
+
+/**
+ * Crews of the teams that start in the 1/32 Finals (the hotel list's 1/32 sheet), with position, shirt number, captain
+ * and best results from each team's squad sheet. Teams that came through the Pan-American qualifiers are not in it:
+ * they keep what the dashboard has.
+ */
+export function loadFinalsSquads(): RoomingTeam[] {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const p of [path.join(here, '..', '..', 'fixtures', 'goldcup-finals-squads.json'), path.join(here, '..', 'fixtures', 'goldcup-finals-squads.json')]) {
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  }
+  return [];
+}
+
+/** Applies the 1/32 squads once per version at server start, so later edits in the panel stay. */
+export function applyFinalsSquadsOnStart(ctx: AssetCtx) {
+  if (getSetting(ctx.db, 'preset.finals-squads.version') === FINALS_SQUADS_VERSION) return null;
+  const r = applyRooming(ctx, loadFinalsSquads(), { official: true });
+  setSetting(ctx.db, 'preset.finals-squads.version', FINALS_SQUADS_VERSION);
+  return r;
 }
 
 /** Runs once per data version at server start. */

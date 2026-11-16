@@ -7,7 +7,7 @@ import { buildApp } from './app.js';
 import { SyncService } from './services/sync.js';
 import { WorkbookWriter } from './services/workbook.js';
 import { tidyAssetsFolder } from './services/assets.js';
-import { applyGoldCupOnStart } from './services/presets.js';
+import { applyFinalsSquadsOnStart, applyGoldCupOnStart } from './services/presets.js';
 import { GeneratorExporter, seedGenerator } from './services/generator/generator.js';
 import { applyTeamGraphicsOnStart } from './services/teamGraphics.js';
 import { roundStoredFlagsOnStart } from './services/flags.js';
@@ -26,6 +26,8 @@ const app = await buildApp({ liveDir: path.join(config.dataDir, 'live-feed'), si
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
+const squads = applyFinalsSquadsOnStart({ db, assetsDir: config.assetsDir });
+if (squads) app.log.info(`1/32 Finals squads applied: ${JSON.stringify(squads)}`);
 seedGenerator(db);
 seedHighlightTemplate(db, (t) => createTemplate(db, t));
 const graphics = applyTeamGraphicsOnStart({ db, assetsDir: config.assetsDir });
