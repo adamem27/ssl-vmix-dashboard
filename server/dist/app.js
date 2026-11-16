@@ -13,6 +13,7 @@ import { SAILOR_SLOTS, TEAM_SLOTS } from './services/slots.js';
 import { createTeam, deleteTeam, getTeam, listTeams, updateTeam } from './services/teams.js';
 import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateSailor } from './services/sailors.js';
 import * as fleets from './services/fleets.js';
+import { prepareFinalSeries, starredForSet } from './services/stages.js';
 import * as decl from './services/declarations.js';
 import * as ranking from './services/ranking.js';
 import * as mb from './services/matchboard/matchboard.js';
@@ -291,7 +292,14 @@ export async function buildApp(deps) {
         const b = z.object({ name: str(120).min(1, 'Name is required'), fleetCount: z.number().int().min(0).max(30).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
         return fleets.getSetDetail(db, fleets.createSet(db, ev().id, b.name.trim(), b.fleetCount ?? 0, b.fleetSize));
     });
+    // the 1/32 Finals … Quarterfinals, groups A–D of four places, ready to be filled (nothing existing is removed)
+    app.post('/api/fleet-sets/prepare-final-series', async (req) => {
+        const b = z.object({ fromMatchboard: z.boolean().optional(), clear: z.boolean().optional() }).parse(req.body ?? {});
+        return { stages: prepareFinalSeries(db, ev().id, b), sets: fleets.listSets(db, ev().id) };
+    });
     app.get('/api/fleet-sets/:id', async (req) => fleets.getSetDetail(db, req.params.id));
+    // teams starred (through) on the matchboard in the stages before this one
+    app.get('/api/fleet-sets/:id/starred', async (req) => starredForSet(db, req.params.id));
     app.patch('/api/fleet-sets/:id', async (req) => {
         const b = z.object({ name: str(120).min(1).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
         if (b.name !== undefined)
@@ -657,10 +665,17 @@ const OLD_RACE_FLAGS = new Set(['848de9e2ca6f1c66', '914c7f5df8cf6c75', '19a8cde
     '73bf6c4bcbc143a8', '5e1b1b04963468fe', '635045e9ea3255c3', 'c2dfc39ff9ac0f71', '37c8085c497d3f05', 'ab4b08f159da1b36',
     '386f8ba50a0af73c', 'e64201c96ce30585', '49e71ede7c64cc3c', '846d9ab02740fa4c', '89137e41b7885b3b', '8b34d36fb89eec8c',
     'af4ef36194f507f4', '784b0f887769e06d', '523d7f01de8cc75b', '750e6f1ebc1fe8d0', '041ccd26e4e48f0a', '0aec71ba6ae6bf2d',
-    '95cd33e1656fa482', 'a34b858ac67fa2e8', '05ff371585387e52', '47c1ee3a4c721ea7', 'fcc30c01c7fb64f6']);
+    '95cd33e1656fa482', 'a34b858ac67fa2e8', '05ff371585387e52', '47c1ee3a4c721ea7', 'fcc30c01c7fb64f6',
+    // as drawn like the race signals chart (592765f), before the original square look came back
+    '0bdd303a051bef61', '14bd80947a074a4e', '2441729f52b0eec2', '2a625e863010024d', '2b229a154ed77974', '2f1e1123a169fcde',
+    '3e0e89d07405c7ba', '47b61ca4635aed31', '4b3bf219382d43c4', '4f1ce243ca98b715', '5c10eed516a0b9c4', '63ddaf16406f40d4',
+    '7329d22f5f2f2fd0', '7c7b1071b99737ca', '82eeb5cc834b651d', '84bdaba75757a733', '8546087f41d5de15', '8c2db2a3b14906f8',
+    '9c05dc2bb04558ec', 'a9e95050ee47c15d', 'b0c791403a77dcf3', 'b7cb521e1acb9f3e', 'c23f3ede474270fa', 'c6696b96fa7ad20a',
+    'c97c38a26f821bcd', 'd21251917cc2fd32', 'd419c2e26fd40ff5', 'd4d275ff0ade462a', 'd9294295e04a664a', 'e488219cb5f0d369',
+    'eab53f54b827a874', 'ec0739849ff840d9', 'fcce70731e8088ad', 'fe468b3f7a8acbda']);
 const sha16 = (f) => createHash('sha256').update(fs.readFileSync(f)).digest('hex').slice(0, 16);
 /**
- * Race signal flags (drawn like the Racing Rules of Sailing race signals chart) that ship with the app, copied into
+ * Race signal flags (square with rounded corners; AP a pennant, A a swallowtail) that ship with the app, copied into
  * the assets folder as race-flags/*.png, so the GTZIP generator and vMix titles can use them like any other picture.
  * A missing one is copied; one still as an earlier version shipped it gets the new picture (same name, so every
  * version and title using it shows the new one); a picture you put there yourself under that name stays.
@@ -676,9 +691,13 @@ export function seedRaceFlags(assetsDir) {
             if (!f.endsWith('.png'))
                 continue;
             const to = path.join(dst, f);
-            if (fs.existsSync(to) && !OLD_RACE_FLAGS.has(sha16(to)))
-                continue;
-            fs.copyFileSync(path.join(src, f), to);
+            const from = path.join(src, f);
+            if (fs.existsSync(to)) {
+                const h = sha16(to);
+                if (!OLD_RACE_FLAGS.has(h) || h === sha16(from))
+                    continue; // yours, or already the shipped one
+            }
+            fs.copyFileSync(from, to);
         }
     }
     catch { /* read-only assets folder: the flags are simply not offered */ }

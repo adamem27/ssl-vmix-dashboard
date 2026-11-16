@@ -1,8 +1,26 @@
 {
-  "version": "1.0.193",
-  "commit": "592765f",
-  "date": "2026-11-15T19:09:27Z",
+  "version": "1.0.196",
+  "commit": "19096e4",
+  "date": "2026-11-16T14:13:45Z",
   "changes": [
+    {
+      "version": "1.0.196",
+      "commit": "19096e4",
+      "date": "2026-11-16T14:13:45Z",
+      "text": "Race flags back in the original square look (AP pennant, A swallowtail cut, rounded); Announcements in Stream Deck order; drag to reorder versions"
+    },
+    {
+      "version": "1.0.195",
+      "commit": "3ff0fbc",
+      "date": "2026-11-16T14:13:45Z",
+      "text": "Stream Decks for the next stages: 16 team places in group order, team LTs on the team pages, ticker and top ticker on/off"
+    },
+    {
+      "version": "1.0.194",
+      "commit": "8dbce8f",
+      "date": "2026-11-16T14:11:34Z",
+      "text": "Final Series stages: one click prepares 1/32 Finals to Quarterfinals (groups A–D of four), starred teams first in the pickers"
+    },
     {
       "version": "1.0.193",
       "commit": "592765f",
@@ -464,24 +482,6 @@
       "commit": "cf60d79",
       "date": "2026-11-10T17:02:16Z",
       "text": "Lower thirds fill the title as designed: its own field names and the team bar made like the title's"
-    },
-    {
-      "version": "1.0.116",
-      "commit": "6b043ce",
-      "date": "2026-11-10T16:18:13Z",
-      "text": "GTZIP: a layer's composition takes the layer's size"
-    },
-    {
-      "version": "1.0.115",
-      "commit": "0a09836",
-      "date": "2026-11-10T15:49:04Z",
-      "text": "Announcement bugs = race flags + Replay with icons; a key for every bug and ticker; General graphics into vMix at the press"
-    },
-    {
-      "version": "1.0.114",
-      "commit": "d2567a3",
-      "date": "2026-11-10T15:42:39Z",
-      "text": "Fix Trimmer 2 lower third key; masks stay put in the animation preview"
     }
   ]
 }

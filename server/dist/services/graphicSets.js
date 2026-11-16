@@ -100,7 +100,19 @@ export const GRAPHIC_KINDS = [
         ],
         defaults: [{ name: 'Follow us', data: {} }],
     },
+    {
+        // last, so the blocks of the General sheet keep their cells (it is not in that sheet: its keys fill the title)
+        kind: 'tickertop', label: 'Top ticker', sheet: 'Top ticker',
+        description: 'The scrolling bar at the top of the screen (vMix input ssl_ticker_top), on and off with TOP TICKER ON / OFF (page AFTER / BREAK) whatever else is on air. One message per line; every version on its own key (page TICKERS, bottom row), a new one at once.',
+        fields: [
+            { key: 'separator', label: 'Separator', default: ' I ' },
+            { key: 'items', label: 'Messages', type: 'list', wide: true, hint: 'One message per line' },
+        ],
+        defaults: [{ name: 'Top ticker', data: { items: 'SSL GOLD CUP 2026' } }],
+    },
 ];
+/** Graphics added after events were made: their default versions once for those events too (a deleted one stays deleted). */
+const LATER_KINDS = ['tickertop'];
 const kindOf = (kind) => {
     const k = GRAPHIC_KINDS.find((x) => x.kind === kind);
     if (!k)
@@ -129,6 +141,7 @@ const fromRow = (r) => {
 export function seedGraphicSets(db, eventId) {
     const flag = `graphicSets.seeded.${eventId}`;
     if (getSetting(db, flag)) {
+        seedLaterKinds(db, eventId);
         ensurePresets(db, eventId);
         return;
     }
@@ -139,7 +152,19 @@ export function seedGraphicSets(db, eventId) {
             createGraphicSet(db, eventId, k.kind, d.name, d.data);
     }
     setSetting(db, flag, '1');
+    seedLaterKinds(db, eventId);
     ensurePresets(db, eventId);
+}
+function seedLaterKinds(db, eventId) {
+    for (const kind of LATER_KINDS) {
+        const flag = `graphicSets.seeded.${eventId}.${kind}`;
+        if (getSetting(db, flag))
+            continue;
+        if (!db.prepare('SELECT 1 FROM graphic_sets WHERE event_id = ? AND kind = ?').get(eventId, kind))
+            for (const d of kindOf(kind).defaults)
+                createGraphicSet(db, eventId, kind, d.name, d.data);
+        setSetting(db, flag, '1');
+    }
 }
 /**
  * The announcement bugs: one per race signal (race-flags/ in the assets folder), plus Replay with the SSL star. In the
@@ -285,6 +310,18 @@ export function ensurePresets(db, eventId) {
         })();
         setSetting(db, decks, '1');
     }
+    // the lists in the order of the Stream Deck keys, once: announcements on BUGS OFTEN, then BUGS RARE; the fixed tickers
+    // first (as the Tickers tab showed them). After this the order is yours: moved by hand (setGraphicSetOrder), never sorted again.
+    const order = `graphicSets.order.${eventId}`;
+    if (!getSetting(db, order)) {
+        const ann = listGraphicSets(db, eventId, 'announcement');
+        const tick = listGraphicSets(db, eventId, 'ticker');
+        db.transaction(() => {
+            setGraphicSetOrder(db, eventId, 'announcement', [...ann.filter(isOften), ...ann.filter((a) => !isOften(a))].map((a) => a.id));
+            setGraphicSetOrder(db, eventId, 'ticker', [...tick.filter((t) => t.data.preset), ...tick.filter((t) => !t.data.preset)].map((t) => t.id));
+        })();
+        setSetting(db, order, '1');
+    }
 }
 /**
  * Where vMix finds a picture of a graphic: a path in the dashboard's assets folder (race-flags/X.png) under the vMix
@@ -339,6 +376,20 @@ export function deleteGraphicSet(db, id) {
         throw badRequest('This is a fixed version: change its fields instead of deleting it.');
     if (!db.prepare('DELETE FROM graphic_sets WHERE id = ?').run(id).changes)
         throw notFound('Graphic version');
+}
+/**
+ * The versions of a graphic in the order given (by hand in General graphics): its rows in the sheet and its Stream Deck
+ * keys follow it (announcements: by position on BUGS OFTEN / BUGS RARE, tickers on TICKERS). Versions not named keep
+ * their order after the named ones; ids of other graphics or events are ignored.
+ */
+export function setGraphicSetOrder(db, eventId, kind, ids) {
+    kindOf(kind);
+    const list = db.prepare('SELECT id FROM graphic_sets WHERE event_id = ? AND kind = ? ORDER BY sort, created_at').all(eventId, kind).map((r) => r.id);
+    const known = new Set(list);
+    const named = [...new Set(ids)].filter((id) => known.has(id));
+    const rest = list.filter((id) => !named.includes(id));
+    const upd = db.prepare('UPDATE graphic_sets SET sort = ? WHERE id = ?');
+    db.transaction(() => [...named, ...rest].forEach((id, n) => upd.run(n + 1, id)))();
 }
 /** Moves a version up or down among the versions of its graphic (row order in the sheet). */
 export function moveGraphicSet(db, id, dir) {
@@ -396,7 +447,7 @@ export function graphicSheetRows(db, eventId, kind, auto = {}, assetsDir = null)
         const row = { set: s.name };
         for (const f of k.fields)
             row[f.key] = f.type === 'image' ? imagePath(db, assetsDir, s.data[f.key]) : f.type === 'list' ? (s.data[f.key] ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : s.data[f.key] ?? '';
-        if (kind === 'ticker')
+        if (kind === 'ticker' || kind === 'tickertop')
             row.text = tickerText(s.data, auto);
         return row;
     });
