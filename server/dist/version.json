@@ -1,8 +1,14 @@
 {
-  "version": "1.0.203",
-  "commit": "bec0302",
-  "date": "2026-11-16T17:30:20Z",
+  "version": "1.0.204",
+  "commit": "2bcae3a",
+  "date": "2026-11-16T17:33:01Z",
   "changes": [
+    {
+      "version": "1.0.204",
+      "commit": "2bcae3a",
+      "date": "2026-11-16T17:33:01Z",
+      "text": "DRAW: teams go to the group with the fewest teams, waving-flag reveal, full-width all-groups view"
+    },
     {
       "version": "1.0.203",
       "commit": "bec0302",
@@ -476,12 +482,6 @@
       "commit": "f97f269",
       "date": "2026-11-10T18:43:14Z",
       "text": "Show control: preset pages only for the teams of the picked stage; a view 12× faster"
-    },
-    {
-      "version": "1.0.124",
-      "commit": "fed4bbe",
-      "date": "2026-11-10T18:13:48Z",
-      "text": "Standard animation, lower third: the bar fades in (0.75 s) and out (0.5 s) instead of a fast Reveal from the left"
     }
   ]
 }

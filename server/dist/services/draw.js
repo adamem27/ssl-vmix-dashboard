@@ -33,7 +33,7 @@ export const drawConfigSchema = z.object({
 });
 const CFG = 'draw.config';
 const STATE = 'draw.state';
-const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 1.6, stripWidth: 300 };
+const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300 };
 const EMPTY = { picks: [], current: null, overview: false, seq: 0 };
 export function getDrawConfig(db) {
     try {
@@ -104,6 +104,22 @@ export function drawBoard(db, pool) {
 }
 /** The rows (1-based) of a group the draw fills, in order. */
 const drawPlaces = (g) => g.slots.map((s, i) => (s.draw ? i + 1 : 0)).filter(Boolean);
+/**
+ * The group the next team drawn goes to: the one with the fewest teams so far (its fixed teams and the ones drawn),
+ * the first in A–D order on a tie, so the groups stay as even as they can after every step. Null when all are full.
+ */
+export function nextDrawGroup(board, picks) {
+    let best = null;
+    for (const g of board) {
+        const drawn = picks.filter((p) => p.group === g.letter).length;
+        if (drawn >= drawPlaces(g).length)
+            continue;
+        const n = g.slots.filter((x) => !x.draw).length + drawn;
+        if (!best || n < best.n)
+            best = { letter: g.letter, n };
+    }
+    return best?.letter ?? null;
+}
 export class Draw {
     ctx;
     fetcher;
@@ -162,7 +178,7 @@ export class Draw {
         const pool = this.poolTeams();
         const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
         const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview };
+        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, next: nextDrawGroup(board, st.picks) };
     }
     flagFile(teamId) {
         const t = this.allTeams().find((x) => x.id === teamId);
@@ -178,12 +194,15 @@ export class Draw {
             if (q.length)
                 this.setConfig({ pool: q.slice(0, DRAW_POOL_MAX) });
         }
-        return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), input: DRAW_INPUT };
+        return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), next: this.nextGroup(), input: DRAW_INPUT };
     }
     /**
-     * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE>, group:<A–D>, undo, clear, overview
-     * (on/off), overview:on|off, reset.
+     * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE> draws a team: it goes straight to the next
+     * free place of the group with the fewest teams (nextDrawGroup). group:<A–D> moves the team just drawn to another
+     * group (a correction). undo, clear, overview (on/off), overview:on|off, reset.
      */
+    /** The group the next team drawn goes to. */
+    nextGroup() { return nextDrawGroup(this.board(), this.state.picks); }
     run(a) {
         const [verb, arg = ''] = a.split(':');
         const st = this.state;
@@ -201,30 +220,35 @@ export class Draw {
                     throw badRequest(`No team ${arg} in the draw pool.`);
                 if (placed.has(t.id))
                     throw badRequest(`${t.code} already has its group.`);
-                next = { ...st, current: { teamId: t.id, group: null }, overview: false };
+                const g = nextDrawGroup(board, st.picks);
+                if (!g)
+                    throw badRequest('Every group is full.');
+                const pick = { teamId: t.id, group: g, place: places(g)[groupCount(g)] };
+                next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false };
                 break;
             }
             case 'group': {
                 const g = arg.toUpperCase();
                 if (!DRAW_GROUPS.includes(g))
                     throw badRequest(`Group ${arg}? Use A–D.`);
-                if (!st.current || st.current.group)
+                const last = st.picks[st.picks.length - 1];
+                if (!st.current || !last || last.teamId !== st.current.teamId)
                     throw badRequest('Draw a team first.');
-                if (groupCount(g) >= places(g).length)
+                if (last.group === g)
+                    break;
+                const rest = st.picks.slice(0, -1);
+                if (rest.filter((p) => p.group === g).length >= places(g).length)
                     throw badRequest(`Group ${g} is full.`);
-                const pick = { teamId: st.current.teamId, group: g, place: places(g)[groupCount(g)] };
-                next = { ...st, picks: [...st.picks, pick], current: { teamId: st.current.teamId, group: g }, overview: false };
+                const pick = { teamId: last.teamId, group: g, place: places(g)[rest.filter((p) => p.group === g).length] };
+                next = { ...st, picks: [...rest, pick], current: { teamId: last.teamId, group: g }, overview: false };
                 break;
             }
             case 'undo': {
-                if (st.current?.group)
-                    next = { ...st, picks: st.picks.slice(0, -1), current: { teamId: st.current.teamId, group: null } };
+                // the last team drawn goes back to the pool
+                if (st.picks.length)
+                    next = { ...st, picks: st.picks.slice(0, -1), current: null };
                 else if (st.current)
                     next = { ...st, current: null };
-                else if (st.picks.length) {
-                    const last = st.picks[st.picks.length - 1];
-                    next = { ...st, picks: st.picks.slice(0, -1), current: { teamId: last.teamId, group: null } };
-                }
                 break;
             }
             case 'clear':
@@ -251,7 +275,7 @@ export class Draw {
         for (let i = 0; i < DRAW_POOL_MAX; i++) {
             const t = pool[i];
             const p = t && done.get(t.id);
-            const cur = t && st.current?.teamId === t.id && !st.current.group;
+            const cur = t && st.current?.teamId === t.id;
             rows[Math.floor(i / 8)][i % 8] = !t ? { action: `team:${i + 1}`, text: '', bg: '#000000', fg: '#ffffff' }
                 : { action: `team:${i + 1}`, text: p ? `${t.code}\\n→ ${p.group}` : t.code, bg: cur ? '#d97706' : p ? '#27272a' : '#1e3a5f', fg: p ? '#71717a' : '#ffffff' };
         }
@@ -260,7 +284,8 @@ export class Draw {
             const cap = drawPlaces(board.find((x) => x.letter === g)).length;
             const full = n >= cap;
             const just = st.current?.group === g;
-            rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${cap}`, bg: just ? '#d97706' : full ? '#27272a' : '#0f766e', fg: full ? '#71717a' : '#ffffff' };
+            const nxt = !just && g === nextDrawGroup(board, st.picks);
+            rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${cap}${nxt ? ' NEXT' : ''}`, bg: just ? '#d97706' : full ? '#27272a' : nxt ? '#0f766e' : '#134e4a', fg: full ? '#71717a' : '#ffffff' };
         });
         rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
         rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
