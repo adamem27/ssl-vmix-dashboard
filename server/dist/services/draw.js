@@ -19,6 +19,8 @@ export const DRAW_GROUPS = ['A', 'B', 'C', 'D'];
 export const DRAW_GROUP_SIZE = 4;
 export const DRAW_POOL_MAX = 16;
 export const DRAW_INPUT = 'ssl_draw';
+export const DRAW_MATCHBOARD_INPUT = 'ssl_draw_matchboard';
+export const DRAW_MATCHBOARD_REL = 'Matchboard/matchboard_draw.png';
 export const drawConfigSchema = z.object({
     /** a short caption in the centre when nothing is being drawn (the header picture has the event title) */
     caption: z.string().max(80),
@@ -30,11 +32,13 @@ export const drawConfigSchema = z.object({
     flightDelay: z.number().min(0).max(10),
     /** width of each side strip on the 1536 px wide screen */
     stripWidth: z.number().int().min(160).max(420),
+    /** how a place still to be drawn looks: soft bars where the flag and code go, three dots, or the word DRAW */
+    emptyStyle: z.enum(['bars', 'dots', 'text']),
 });
 const CFG = 'draw.config';
 const STATE = 'draw.state';
-const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300 };
-const EMPTY = { picks: [], current: null, overview: false, seq: 0 };
+const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300, emptyStyle: 'bars' };
+const EMPTY = { picks: [], current: null, overview: false, focus: null, seq: 0 };
 export function getDrawConfig(db) {
     try {
         return drawConfigSchema.parse({ ...DEFAULT_CFG, ...JSON.parse(getSetting(db, CFG) || '{}') });
@@ -72,6 +76,38 @@ export function saveHeader(assetsDir, buf) {
     fs.mkdirSync(path.dirname(own), { recursive: true });
     fs.writeFileSync(own, buf);
 }
+/** Flag animations (one video per team, as the LED wall shows it: 1536×1024): assets/draw/flags/<team id>.<ext>. */
+export const FLAG_VIDEO_EXT = ['mp4', 'webm', 'mov'];
+const flagsDir = (assetsDir) => path.join(assetsDir, 'draw', 'flags');
+export function flagVideoPath(assetsDir, teamId) {
+    if (!/^[\w-]+$/.test(teamId))
+        return null;
+    for (const ext of FLAG_VIDEO_EXT) {
+        const f = path.join(flagsDir(assetsDir), `${teamId}.${ext}`);
+        if (fs.existsSync(f))
+            return f;
+    }
+    return null;
+}
+export async function saveFlagVideo(assetsDir, teamId, filename, stream) {
+    const ext = (path.extname(filename).slice(1).toLowerCase() || 'mp4');
+    if (!FLAG_VIDEO_EXT.includes(ext))
+        throw badRequest('Send an MP4, WebM or MOV video.');
+    fs.mkdirSync(flagsDir(assetsDir), { recursive: true });
+    const target = path.join(flagsDir(assetsDir), `${teamId}.${ext}`);
+    const tmp = `${target}.part`;
+    await new Promise((resolve, reject) => { const out = fs.createWriteStream(tmp); stream.on('error', reject); out.on('error', reject); out.on('finish', () => resolve()); stream.pipe(out); });
+    if (stream.truncated) {
+        fs.rmSync(tmp, { force: true });
+        throw badRequest('The video is too big (2 GB at most).');
+    }
+    deleteFlagVideo(assetsDir, teamId);
+    fs.renameSync(tmp, target);
+}
+export function deleteFlagVideo(assetsDir, teamId) {
+    for (let f = flagVideoPath(assetsDir, teamId); f; f = flagVideoPath(assetsDir, teamId))
+        fs.rmSync(f, { force: true });
+}
 /**
  * The 1/32 Finals groups as the matchboard has them (boxes R1 A–D): a row with a team not in the draw pool stays as it
  * is (COL in R1 A), every other row (DRAW 1, DRAW 2…) is a place the draw fills, top to bottom. Without such boxes:
@@ -90,11 +126,11 @@ export function drawBoard(db, pool) {
     for (const letter of DRAW_GROUPS) {
         const g = layout?.groups.find((x) => /^R\s*1\s*([A-D])$/i.exec(((state.texts[x.labelId] ?? layout.texts.find((t) => t.id === x.labelId)?.text) ?? '').trim())?.[1]?.toUpperCase() === letter);
         if (!g || !layout || !state) {
-            out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, () => ({ teamId: null, text: 'DRAW', draw: true })) });
+            out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, () => ({ teamId: null, text: 'DRAW', draw: true })), slotIds: [] });
             continue;
         }
         const resolved = resolveTeams(layout, state);
-        out.push({ letter, slots: g.slots.map((sid) => {
+        out.push({ letter, slotIds: [...g.slots], slots: g.slots.map((sid) => {
                 const teamId = resolved.get(sid)?.teamId ?? null;
                 // an empty place says just DRAW (the matchboard's DRAW 1…11 would read as an order of the draw)
                 return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text: 'DRAW', draw: true };
@@ -146,6 +182,7 @@ export class Draw {
         else
             saveState(this.ctx.db, st); // the output shows the new pool / caption
         void this.pushLabels();
+        this.onPicks?.();
         return next;
     }
     /** Every team of the event, with its flag for the pickers. */
@@ -176,9 +213,10 @@ export class Draw {
         const fixed = new Set(board.flatMap((g) => g.slots.map((x) => x.teamId).filter((x) => !!x)));
         const all = this.allTeams();
         const pool = this.poolTeams();
-        const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
+        const video = (id) => { const f = flagVideoPath(this.ctx.assetsDir, id); return f ? `/api/draw/output/video/${id}?v=${Math.round(fs.statSync(f).mtimeMs)}` : null; };
+        const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, video: video(t.id), gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
         const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, next: nextDrawGroup(board, st.picks) };
+        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, focus: st.focus ?? null, emptyStyle: cfg.emptyStyle, next: nextDrawGroup(board, st.picks) };
     }
     flagFile(teamId) {
         const t = this.allTeams().find((x) => x.id === teamId);
@@ -194,15 +232,30 @@ export class Draw {
             if (q.length)
                 this.setConfig({ pool: q.slice(0, DRAW_POOL_MAX) });
         }
-        return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), next: this.nextGroup(), input: DRAW_INPUT };
+        const videos = Object.fromEntries(this.config.pool.map((id) => { const f = flagVideoPath(this.ctx.assetsDir, id); return [id, f ? { file: path.basename(f), bytes: fs.statSync(f).size } : null]; }));
+        return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), next: this.nextGroup(), videos, input: DRAW_INPUT, matchboardInput: DRAW_MATCHBOARD_INPUT };
+    }
+    /** The matchboard as it stands, with every team drawn so far in its row of R1 A–D (the DRAW rows it fills). */
+    matchboardState() {
+        const state = getState(this.ctx.db);
+        const board = this.board();
+        for (const p of this.state.picks) {
+            const sid = board.find((g) => g.letter === p.group)?.slotIds?.[p.place - 1];
+            if (sid && state.slots[sid])
+                state.slots[sid] = { ...state.slots[sid], teamId: p.teamId };
+        }
+        return state;
     }
     /**
      * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE> draws a team: it goes straight to the next
      * free place of the group with the fewest teams (nextDrawGroup). group:<A–D> moves the team just drawn to another
-     * group (a correction). undo, clear, overview (on/off), overview:on|off, reset.
+     * group (a correction). focus brings the group the next team goes to into the centre (focus:<A–D> a given one,
+     * focus:off sends it back). undo, clear, overview (on/off), overview:on|off, reset.
      */
     /** The group the next team drawn goes to. */
     nextGroup() { return nextDrawGroup(this.board(), this.state.picks); }
+    /** Called when the teams in the groups change (the draw matchboard is made again). */
+    onPicks = null;
     run(a) {
         const [verb, arg = ''] = a.split(':');
         const st = this.state;
@@ -224,7 +277,7 @@ export class Draw {
                 if (!g)
                     throw badRequest('Every group is full.');
                 const pick = { teamId: t.id, group: g, place: places(g)[groupCount(g)] };
-                next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false };
+                next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false, focus: null };
                 break;
             }
             case 'group': {
@@ -246,16 +299,25 @@ export class Draw {
             case 'undo': {
                 // the last team drawn goes back to the pool
                 if (st.picks.length)
-                    next = { ...st, picks: st.picks.slice(0, -1), current: null };
-                else if (st.current)
-                    next = { ...st, current: null };
+                    next = { ...st, picks: st.picks.slice(0, -1), current: null, focus: null };
+                else if (st.current || st.focus)
+                    next = { ...st, current: null, focus: null };
+                break;
+            }
+            case 'focus': {
+                const g = !arg || arg === 'next' ? nextDrawGroup(board, st.picks) : arg === 'off' ? null : arg.toUpperCase();
+                if (g && !DRAW_GROUPS.includes(g))
+                    throw badRequest(`Group ${arg}? Use A–D.`);
+                if (!g && arg !== 'off')
+                    throw badRequest('Every group is full.');
+                next = { ...st, focus: g, overview: false };
                 break;
             }
             case 'clear':
-                next = { ...st, current: null };
+                next = { ...st, current: null, focus: null };
                 break;
             case 'overview':
-                next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview };
+                next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview, focus: null };
                 break;
             case 'reset':
                 next = { ...EMPTY };
@@ -264,6 +326,8 @@ export class Draw {
         }
         const saved = saveState(this.ctx.db, next);
         void this.pushLabels();
+        if (next.picks !== st.picks)
+            this.onPicks?.();
         return saved;
     }
     // ---------- Companion ----------
@@ -287,6 +351,8 @@ export class Draw {
             const nxt = !just && g === nextDrawGroup(board, st.picks);
             rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${cap}${nxt ? ' NEXT' : ''}`, bg: just ? '#d97706' : full ? '#27272a' : nxt ? '#0f766e' : '#134e4a', fg: full ? '#71717a' : '#ffffff' };
         });
+        const nx = nextDrawGroup(board, st.picks);
+        rows[2][4] = { action: 'focus', text: nx ? `GROUP ${nx}\\n▶ CENTRE` : 'GROUPS\\nFULL', bg: st.focus ? '#d97706' : nx ? '#1d4ed8' : '#27272a', fg: '#ffffff' };
         rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
         rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
         rows[2][7] = { action: 'undo', text: 'UNDO', bg: '#7c2d12', fg: '#ffffff' };
