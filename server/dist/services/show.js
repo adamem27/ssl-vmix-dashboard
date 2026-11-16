@@ -53,7 +53,7 @@ export const DEFAULT_GRAPHICS = [
     { id: 'lineup5', label: 'Lineup LT (9 sailors, 5 + 4)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
     { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 1, inputs: ['ssl_bug'], aliases: ['Announcement_bug', 'Announcement_bug_flag'] },
     // the ticker on its own overlay channel (the break scene's ticker channel), so it stays on under boards and lower thirds
-    { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 3, inputs: ['ssl_ticker'] },
+    { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
     // the second ticker, at the top of the screen: its versions in General graphics → Top ticker, its own channel
     { id: 'tickertop', label: 'Top ticker', kind: 'bug', overlay: 2, inputs: ['ssl_ticker_top'] },
     { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
@@ -81,7 +81,7 @@ export const showConfigSchema = z.object({
     breakLbarLayer: z.number().int().min(2).max(4).default(2),
     breakTickerLayer: z.number().int().min(2).max(4).default(3),
     breakBoardLayer: z.number().int().min(2).max(4).default(4),
-    /** the top ticker's overlay channel (TOP TICKER ON/OFF); the bottom ticker stays on the break scene's ticker channel */
+    /** the top ticker's overlay channel (TOP TICKER ON/OFF); the bottom ticker on its own is on channel 1 */
     tickerTopLayer: z.number().int().min(1).max(4).default(2),
     /** the board in the break scene switches by itself (day schedule, then each group's results) */
     breakAuto: z.boolean().default(true),
@@ -228,9 +228,8 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         },
         {
             deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
-                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), 
-                // a key per group: its own results input (ssl_results_<KEY>)
-                ...resultGroups.slice(0, 4).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
+                // the groups' results (Provisional overall) are on COMPARE, under each group's comparison
+                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'COMPARE /\\nRESULTS', 'nav')),
                 // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
                 // scene's ticker channel) and the top one (ssl_ticker_top)
                 row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
@@ -250,10 +249,10 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
         {
             deck: 1, name: 'COMPARE', page: comparePage, keys: [
-                ...[0, 1].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
-                    const g = groups[r * 8 + c];
-                    return g ? k(`compare:${g.key}`, `COMPARE\\n${g.label}`, 'board') : null;
-                }))),
+                // the comparison of each group: the stage picked at the top first, then the other inputs vMix has
+                row8(...groups.slice(0, 8).map((g) => k(`compare:${g.key}`, `COMPARE\\n${g.label}`, 'board'))),
+                // under it, each group's Provisional overall (its own results input ssl_results_<KEY>)
+                row8(...resultGroups.slice(0, 8).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
                 row8(k('show:compare', 'COMPARE\\nPICKED', 'board'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
                 nav(p1, p1, 'BEFORE', p1 + 1, 'AFTER'),
             ],
@@ -402,8 +401,9 @@ export class Show {
     // ---------- data the keys need ----------
     graphics() {
         const cfg = this.config, over = cfg.inputs;
-        // the tickers on the channels picked on Show control: the bottom one on the break scene's ticker channel
-        const overlay = { ticker: cfg.breakTickerLayer, tickertop: cfg.tickerTopLayer };
+        // TICKER ON / OFF and the ticker keys put the bottom ticker on channel 1 (the break scene's channels 3 and 4 are
+        // cut to the room beside the L-bar, so they serve only with the L-bar); the top ticker on its channel from Show control
+        const overlay = { tickertop: cfg.tickerTopLayer };
         return DEFAULT_GRAPHICS.map((g) => {
             const x = over[g.id]?.trim() ? { ...g, inputs: over[g.id].split(',').map((s) => s.trim()).filter(Boolean) } : g;
             return overlay[g.id] ? { ...x, overlay: overlay[g.id] } : x;
@@ -839,15 +839,13 @@ export class Show {
             return this.groupsOf(stage ? [stage.id, ...all.filter((x) => x !== stage.id)] : all);
         });
     }
-    /** The COMPARE keys: one per Team comparison input vMix has (ssl_compare_A…), else one per group of the stage; the stage's Last Chance Race always. */
+    /** The COMPARE keys: one per group of the stage picked at the top, then one per other Team comparison input vMix has (ssl_compare_H…). */
     deckCompareGroups() {
         const has = (g) => this.lastInputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
-        const inVmix = this.allCompareGroups().filter(has);
-        if (!inVmix.length)
-            return this.compareGroups();
-        // the stage's Last Chance Race has its key from the start (its input ssl_compare_LCR)
-        const lcr = this.compareGroups().filter((g) => g.key === 'LCR' && !inVmix.some((x) => x.key === 'LCR'));
-        return [...inVmix, ...lcr];
+        // every group of the stage picked at the top has its key from the start (its input ssl_compare_A…, to be added in
+        // vMix), then the other stages' groups vMix has an input for
+        const stage = this.compareGroups();
+        return [...stage, ...this.allCompareGroups().filter((g) => has(g) && !stage.some((x) => x.key === g.key))];
     }
     /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */
     compareTargets(inputs) {
