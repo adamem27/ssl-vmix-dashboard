@@ -1,8 +1,14 @@
 {
-  "version": "1.0.223",
-  "commit": "c986c31",
-  "date": "2026-11-16T20:58:01Z",
+  "version": "1.0.224",
+  "commit": "6a1bf6b",
+  "date": "2026-11-16T21:10:28Z",
   "changes": [
+    {
+      "version": "1.0.224",
+      "commit": "6a1bf6b",
+      "date": "2026-11-16T21:10:28Z",
+      "text": "Draw: flag name as far below the header as above the flag; all groups keep alignment while a row changes"
+    },
     {
       "version": "1.0.223",
       "commit": "c986c31",
@@ -476,12 +482,6 @@
       "commit": "b01e99e",
       "date": "2026-11-11T19:30:26Z",
       "text": "Crews of 8 to 10 and a Floater: Floater place (between Pit and Grinder on the boat), Lineup LT on two even screens (5+5, 5+4, 4+4), line-up boards with numbered places S1 (bow) to S10 filled from the bow"
-    },
-    {
-      "version": "1.0.144",
-      "commit": "0f27391",
-      "date": "2026-11-11T18:35:59Z",
-      "text": "Group results: a title saved as QS H shows as GROUP H; a Date picker next to Stage and Racing that every tab's today follows"
     }
   ]
 }
