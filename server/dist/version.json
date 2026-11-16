@@ -1,8 +1,14 @@
 {
-  "version": "1.0.219",
-  "commit": "ac99707",
-  "date": "2026-11-16T19:56:45Z",
+  "version": "1.0.220",
+  "commit": "fc5af6c",
+  "date": "2026-11-16T20:01:38Z",
   "changes": [
+    {
+      "version": "1.0.220",
+      "commit": "fc5af6c",
+      "date": "2026-11-16T20:01:38Z",
+      "text": "DRAW: a team just drawn never shows in its group before its waving flag has gone"
+    },
     {
       "version": "1.0.219",
       "commit": "ac99707",
@@ -476,12 +482,6 @@
       "commit": "1277de8",
       "date": "2026-11-11T15:08:59Z",
       "text": "Sailor lower thirds: no out before the next sailor (data change), photo emptied off air; shirt numbers on sailor keys; 9 | MIDBOW; Lineup LT I. NAME and 5 | POSITION; key edits kept by page name"
-    },
-    {
-      "version": "1.0.140",
-      "commit": "762bc06",
-      "date": "2026-11-11T13:33:51Z",
-      "text": "Lineup LT: 9 sailors bow to stern, 5 ⇄ 4 swap key per team; Group H labels, fixed city/location, weather unit removed"
     }
   ]
 }
