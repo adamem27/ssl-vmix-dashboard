@@ -28,10 +28,12 @@ export const drawConfigSchema = z.object({
     companionPage: z.number().int().min(1).max(99),
     /** seconds the drawn team stays in the centre before it flies to its group */
     flightDelay: z.number().min(0).max(10),
+    /** width of each side strip on the 1536 px wide screen */
+    stripWidth: z.number().int().min(160).max(420),
 });
 const CFG = 'draw.config';
 const STATE = 'draw.state';
-const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 1.6 };
+const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 1.6, stripWidth: 300 };
 const EMPTY = { picks: [], current: null, overview: false, seq: 0 };
 export function getDrawConfig(db) {
     try {
@@ -160,7 +162,7 @@ export class Draw {
         const pool = this.poolTeams();
         const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
         const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview };
+        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview };
     }
     flagFile(teamId) {
         const t = this.allTeams().find((x) => x.id === teamId);

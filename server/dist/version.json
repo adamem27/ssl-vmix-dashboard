@@ -1,8 +1,14 @@
 {
-  "version": "1.0.201",
-  "commit": "ff24344",
-  "date": "2026-11-16T16:11:24Z",
+  "version": "1.0.202",
+  "commit": "f32e2b6",
+  "date": "2026-11-16T16:16:27Z",
   "changes": [
+    {
+      "version": "1.0.202",
+      "commit": "f32e2b6",
+      "date": "2026-11-16T16:16:27Z",
+      "text": "DRAW: wider side strips (adjustable, default 300 px) with bigger country rows"
+    },
     {
       "version": "1.0.201",
       "commit": "ff24344",
@@ -476,12 +482,6 @@
       "commit": "c669540",
       "date": "2026-11-10T18:04:43Z",
       "text": "Companion: one preset with every page and a page per team; no live key labels"
-    },
-    {
-      "version": "1.0.122",
-      "commit": "c741afb",
-      "date": "2026-11-10T18:00:56Z",
-      "text": "Tickers repeat their loop so the scroll runs on; L-bar socials; Replay bug key uses the Replay title"
     }
   ]
 }
