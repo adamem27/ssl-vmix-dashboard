@@ -94,9 +94,9 @@ export function DrawOutputPage() {
     const pd = pending.current;
     if (!pd) return;
     pending.current = null;
-    // the highlight is there at once; the team's flag and code fill in once the waving flag is gone
-    setFlag({ teamId: pd.teamId, out: true }); setLanded(pd.key);
-    timers.current.push(window.setTimeout(() => { setFlag((f) => (f && f.out ? null : f)); setHidden((h) => (h === pd.key ? null : h)); }, FADE_MS));
+    // once the waving flag is gone: the row's highlight and the team's flag and code fade in together
+    setFlag({ teamId: pd.teamId, out: true });
+    timers.current.push(window.setTimeout(() => { setFlag((f) => (f && f.out ? null : f)); setHidden((h) => (h === pd.key ? null : h)); setLanded(pd.key); }, FADE_MS));
   };
 
   /** The centre's box for the group: as big as fits inside the flag's area. */
@@ -150,8 +150,8 @@ export function DrawOutputPage() {
           return;
         }
         setFlag({ teamId: p.teamId, out: false });
-        await later(Math.max(1, data.flightDelay) * 1000, () => { setFlag({ teamId: p.teamId, out: true }); setLanded(key); });
-        await later(FADE_MS, () => { setFlag((f) => (f && f.out ? null : f)); setHidden(null); });
+        await later(Math.max(1, data.flightDelay) * 1000, () => setFlag({ teamId: p.teamId, out: true }));
+        await later(FADE_MS, () => { setFlag((f) => (f && f.out ? null : f)); setHidden(null); setLanded(key); });
         await later(HOLD_MS, () => {});
         busy.current = false;
         const now = prev.current;
@@ -298,7 +298,7 @@ function GroupRows({ g, rows, data, teams, hidden, landed, empty }: {
     const key = `${g}${i + 1}`;
     const p = data.picks.find((x) => x.group === g && x.place === i + 1);
     const drawn = row.teamId ? teams.get(row.teamId) : p ? teams.get(p.teamId) : undefined;
-    // the team drawn last: its highlight first, its flag and code a moment later (when the waving flag is gone)
+    // the team drawn last: its row stays empty until the waving flag is gone, then highlight, flag and code fade in together
     const t = hidden === key ? undefined : drawn;
     const fresh = !!drawn && landed === key;
     return (
@@ -318,12 +318,22 @@ function ovWanted(d: Out, _done: boolean, _busy: boolean, _spot: boolean) { retu
  */
 function Row({ className, style, content, bg, lit = false, instant = false, children }: { className: string; style?: CSSProperties; content: string; bg?: string; lit?: boolean; instant?: boolean; children: ReactNode }) {
   const was = useRef(content);
-  // the fade of a change is decided once, when the content changes: a later class change never replays it
-  const [change, setChange] = useState({ n: 0, fade: false });
-  useLayoutEffect(() => { if (was.current !== content) { was.current = content; setChange((c) => ({ n: c.n + 1, fade: !instant })); } }, [content]);
+  const shown = useRef<ReactNode>(children);
+  // a change is decided once, when the content changes (a later class change never replays it): the old content
+  // fades out while the new one fades in
+  const [change, setChange] = useState<{ n: number; fade: boolean; old: ReactNode }>({ n: 0, fade: false, old: null });
+  useLayoutEffect(() => {
+    if (was.current === content) return;
+    was.current = content;
+    const old = instant ? null : shown.current;
+    setChange((c) => ({ n: c.n + 1, fade: !instant, old }));
+    if (old) { const t = window.setTimeout(() => setChange((c) => (c.old === old ? { ...c, old: null } : c)), 650); return () => clearTimeout(t); }
+  }, [content]);
+  useLayoutEffect(() => { shown.current = children; });
   return (
     <div className={className} style={style}>
       {bg !== undefined && <span className="dr-row-bg" style={{ background: bg, opacity: lit ? 1 : 0 }} />}
+      {change.old && <span key={`o${change.n}`} className="dr-cell dr-out">{change.old}</span>}
       <span key={change.n} className={`dr-cell${change.fade ? ' dr-in' : ''}`}>{children}</span>
     </div>
   );
@@ -451,6 +461,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-pool-row.is-current .dr-row-bg { box-shadow: 0 6px 18px rgba(0,0,0,.3); }
 .dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
 .dr-in { animation: dr-fade-in .6s ease both; }
+.dr-cell.dr-out { position: absolute; inset: 0; padding: inherit; animation: dr-fade-out .6s ease both; pointer-events: none; }
 /* the strips: flag and code centred in their row (the group tag sits at the right edge) */
 .dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: center; }
 .dr-pool-row .dr-cell { padding: 0 40px; }
@@ -468,7 +479,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-slot .dr-row-flag { width: 54px; height: 36px; }
 .dr-slot .dr-row-code { font-size: 42px; }
 /* the team in its group as the flag fades: there at once, no animation of its own (its highlight fades only when the group goes back) */
-.dr-slot.is-landed .dr-row-bg { transition: none; }
+.dr-slot.is-landed .dr-row-bg { transition: opacity .6s ease; }
 
 /* the group in the centre */
 .dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${MOVE_MS}ms ${EASE}, box-shadow ${MOVE_MS}ms; }
