@@ -29,6 +29,8 @@ import { Show } from './services/show.js';
 import { registerShowRoutes } from './services/showRoutes.js';
 import { registerFieldOverrideRoutes } from './services/fieldOverrideRoutes.js';
 import { registerLowerThirdRoutes } from './services/lowerthirdRoutes.js';
+import { Draw } from './services/draw.js';
+import { isDrawOutputPath, registerDrawRoutes } from './services/drawRoutes.js';
 import { demoSourceHtml, hasDemo, removeDemo, seedDemo } from './services/demo.js';
 import { overview } from './services/overview.js';
 import * as gen from './services/general.js';
@@ -91,6 +93,9 @@ export async function buildApp(deps) {
     app.addHook('onRequest', async (req, reply) => {
         const [pathname, qs = ''] = req.url.split('?');
         if (pathname === '/api/health' || pathname === '/login' || pathname.startsWith('/c/'))
+            return;
+        // the DRAW output page (vMix Browser input): its page, the app's own script files, its data and fonts, no login
+        if (req.method === 'GET' && (isDrawOutputPath(pathname) || /^\/assets\/[\w.-]+\.(js|css|woff2?|ttf|otf|svg|png)$/.test(pathname) || pathname.startsWith('/api/matchboard/fonts/')))
             return;
         if (req.headers['x-ssl-internal'] === INTERNAL_KEY)
             return;
@@ -630,6 +635,7 @@ export async function buildApp(deps) {
     const show = deps.show ?? new Show(ctx, lt);
     registerShowRoutes(app, ctx, show);
     registerFieldOverrideRoutes(app, ctx, show);
+    registerDrawRoutes(app, ctx, deps.draw ?? new Draw(ctx));
     registerGtzipRoutes(app, new GtzipService(ctx, () => getSetting(db, 'paths.vmixAssetsRoot') || null, () => matchboard.fonts()));
     // ---------- mirror of the assets folder for the vMix machine (vmix-sync) ----------
     // The sync program polls the manifest every few seconds; its last visit is the vMix machine's heartbeat.
