@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { activeEvent, getSetting, setSetting } from '../db/db.js';
 import { AssetCtx } from './assets.js';
 import { badRequest, notFound } from './errors.js';
-import { getSetDetail, listSets } from './fleets.js';
+import { getSetDetail, isExtraGroup, listSets } from './fleets.js';
 import { listPeople, personName } from './general.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
 import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
@@ -60,7 +60,10 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'comm', label: 'Commentator LT', kind: 'lt', overlay: 1, inputs: ['ssl_lt_comm_photo', 'ssl_lt_comm_nophoto'] },
   { id: 'lineup5', label: 'Lineup LT (9 sailors, 5 + 4)', kind: 'lt', overlay: 1, inputs: ['ssl_lt_lineup5'] },
   { id: 'bug', label: 'Announcement bug', kind: 'bug', overlay: 1, inputs: ['ssl_bug'], aliases: ['Announcement_bug', 'Announcement_bug_flag'] },
-  { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 1, inputs: ['ssl_ticker'] },
+  // the ticker on its own overlay channel (the break scene's ticker channel), so it stays on under boards and lower thirds
+  { id: 'ticker', label: 'Ticker', kind: 'bug', overlay: 3, inputs: ['ssl_ticker'] },
+  // the second ticker, at the top of the screen: its versions in General graphics → Top ticker, its own channel
+  { id: 'tickertop', label: 'Top ticker', kind: 'bug', overlay: 2, inputs: ['ssl_ticker_top'] },
   { id: 'socials', label: 'Socials', kind: 'bug', overlay: 1, inputs: ['ssl_socials'] },
   { id: 'sponsors', label: 'Event sponsors bar', kind: 'bug', overlay: 1, inputs: ['ssl_sponsors'] },
   // no input of its own: the L-bar, the ticker and the boards each on an overlay channel of their own (2, 3, 4)
@@ -68,9 +71,9 @@ export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
   // the second L-bar (ranking): a key of its own, never part of the break scene
   { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
-  // a ready graphic in vMix (Image or Title input) explaining how the Last Chance group works; nothing is filled in
-  { id: 'lcrinfo', label: 'Last Chance explained', kind: 'board', overlay: 1, inputs: ['ssl_lcr_info'] },
 ];
+/** Actions of keys taken off the decks: a key edit that set one is left out (the key keeps its built-in action). */
+const REMOVED_ACTIONS = new Set(['show:lcrinfo']);
 
 export const showConfigSchema = z.object({
   /** input names per graphic id (comma separated alternatives), overriding the defaults */
@@ -87,6 +90,8 @@ export const showConfigSchema = z.object({
   breakLbarLayer: z.number().int().min(2).max(4).default(2),
   breakTickerLayer: z.number().int().min(2).max(4).default(3),
   breakBoardLayer: z.number().int().min(2).max(4).default(4),
+  /** the top ticker's overlay channel (TOP TICKER ON/OFF); the bottom ticker stays on the break scene's ticker channel */
+  tickerTopLayer: z.number().int().min(1).max(4).default(2),
   /** the board in the break scene switches by itself (day schedule, then each group's results) */
   breakAuto: z.boolean().default(true),
   rotateSeconds: z.number().int().min(4).max(120).default(30),
@@ -146,12 +151,13 @@ export interface ShowState {
   last: { at: string; action: string; error: string | null } | null;
   bug: string; // announcement shown on the bug
   bugId: string; // its version (General graphics → Announcements)
-  tickerId: string; // the ticker version on air from a ticker key ('' = TICKER key: next race / end of day)
+  tickerId: string; // the ticker version picked last on a ticker key ('' = the automatic one: next race / end of day)
+  tickerTopId: string; // the top ticker version picked last ('' = its first version)
   lineupPart: number; // 0 = off, 1 = the first five, 2 = the other four
   lineupTeam: string; // the team on the lineup lower third
   compareMark: 'flag' | 'emblem'; // what Team comparison shows by each team
 }
-const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', lineupPart: 0, lineupTeam: '', compareMark: 'flag' };
+const EMPTY_STATE: ShowState = { tickerMode: 'next', boat: 1, photo: 'auto', rotating: false, slide: 0, armedPanic: 0, undo: [], last: null, bug: '', bugId: '', tickerId: '', tickerTopId: '', lineupPart: 0, lineupTeam: '', compareMark: 'flag' };
 export function getShowState(db: AssetCtx['db']): ShowState {
   try { return { ...EMPTY_STATE, ...JSON.parse(getSetting(db, STATE) || '{}') }; } catch { return { ...EMPTY_STATE }; }
 }
@@ -172,14 +178,22 @@ const row8 = (...keys: (DeckKey | null)[]) => Array.from({ length: 8 }, (_, i) =
 
 /**
  * Page numbers of the Companion preset (one file with every page): deck 1 starts on page 1, deck 2 on page 3, the
- * fallback page is 8 and every team has a page of its own from 9 on, its places with the sailors' names on the keys.
+ * fallback page is 8 and every place of the stage's groups has a page of its own from 9 on (its team's lower thirds,
+ * its sailors' names on the keys). 16 team pages are always kept (9–24), so COMPARE (25) and PEOPLE (26) stay where
+ * they are while the groups fill up; only a stage with more than 16 places moves them.
  */
 /** vMix calls sent at once when a title takes many fields. */
 const SET_BATCH = 8;
-export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9 } as const;
+export const PRESET_PAGES = { deck1: 1, deck2: 3, fallback: 8, teams: 9, teamPages: 16 } as const;
 
-/** A team page: the team and its places (slot, place label, the name on the key). */
-export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string; number?: string }[] }
+/**
+ * A team page: the team and its places (slot, place label, the name on the key). A place of a group with no team yet
+ * has no code: its page is there with its keys (named by the place, A1…), and becomes the team's once one is put there.
+ */
+export interface PresetTeam { code: string; name: string; crew: { slot: string; label: string; name: string; number?: string }[]; place?: string; placeholder?: string }
+/** The team a page's keys act on: its code, or @<place> while the place is empty (a key press then says so). */
+const teamArg = (t: PresetTeam) => t.code || `@${t.place ?? ''}`;
+const pageName = (t: PresetTeam) => t.code || t.place || '—';
 
 /** A group of the stage with a Team comparison of its own: key A, B… (FINAL…), its input ssl_compare_<key>. */
 export interface PresetGroup { fleetId: string; key: string; label: string }
@@ -209,10 +223,11 @@ function keptPeople(p: DeckPage): DeckPage {
 }
 
 function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: PresetGroup[] = [], resultGroups: PresetGroup[] = groups): DeckPage[] {
-  const comparePage = PRESET_PAGES.teams + teams.length;
+  const comparePage = PRESET_PAGES.teams + Math.max(PRESET_PAGES.teamPages, teams.length);
   const cfg = { ...cfg0, deck1Page: PRESET_PAGES.deck1, deck2Page: PRESET_PAGES.deck2, fallbackPage: PRESET_PAGES.fallback };
   const p1 = cfg.deck1Page, p2 = cfg.deck2Page;
-  // TEAMS: 8 teams a page (the team's page key, its team lower third under it); more teams go on TEAMS 2… after COMPARE
+  // TEAMS: 16 teams a page in group order (groups of 4: A and B on the top row, C and D below), each key opens the
+  // team's page; more teams go on TEAMS 2… after COMPARE
   const teamsPages = Math.max(1, Math.ceil(teams.length / TEAMS_PER_PAGE));
   const teamsPage = (n: number) => (n === 0 ? p2 : comparePage + n);
   const peoplePage = comparePage + teamsPages;
@@ -221,16 +236,14 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
   const teamsName = (n: number) => (n ? `TEAMS ${n + 1}` : 'TEAMS');
   const teamsPageOf = (n: number): DeckPage => ({
     deck: 2, name: teamsName(n), page: teamsPage(n), keys: [
-      row8(...Array.from({ length: 8 }, (_, c) => {
-        const i = n * TEAMS_PER_PAGE + c, t = teams[i];
-        return t ? { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code } : null;
-      })),
-      // a row between the team keys and their TEAM LT, so a press does not hit the wrong one
+      ...[0, 1].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
+        const i = n * TEAMS_PER_PAGE + r * 8 + c, t = teams[i];
+        if (!t) return null;
+        // an empty place: its name (A1) and what the group says goes there, until a team is put there
+        if (!t.code) return k(`nav:${PRESET_PAGES.teams + i}`, `${t.place}\\n${(t.placeholder || 'TBD').toUpperCase().slice(0, 12)}`, 'team');
+        return { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code };
+      }))),
       row8(),
-      row8(...Array.from({ length: 8 }, (_, c) => {
-        const t = teams[n * TEAMS_PER_PAGE + c];
-        return t ? { ...k(`teamlt:${t.code}`, `TEAM LT\\n${t.code}`, 'lt'), team: t.code } : null;
-      })),
       nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'BUGS OFTEN'),
     ],
   });
@@ -241,8 +254,8 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
       deck: 1, name: 'A BEFORE', page: p1, keys: [
         row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'),
           k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
+        row8(),
         // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
-        row8(k('show:lcrinfo', 'LAST\\nCHANCE\\nEXPLAINED', 'board')),
         row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
         nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
       ],
@@ -252,7 +265,10 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
         row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
           // a key per group: its own results input (ssl_results_<KEY>)
           ...resultGroups.slice(0, 4).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
-        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene')),
+        // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
+        // scene's ticker channel) and the top one (ssl_ticker_top)
+        row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
+          k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
         // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
         row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
         nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
@@ -263,8 +279,9 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
     // on the next free key at once (Companion keys too, they call the position)
     slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS RARE')),
     slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 1, 'BUGS OFTEN', p2 + 3, 'TICKERS')),
-    // the ticker input: its versions, the automatic one (next race / end of day) and that mode
-    slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE')),
+    // the ticker input: its versions (two rows); the top ticker's versions on the row under them
+    slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE'),
+      row8(...Array.from({ length: 8 }, (_, n) => k(`tickertop:${n + 1}`, '—', 'bug')))),
     ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
     // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
     {
@@ -283,27 +300,31 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
   ];
 }
 
-const TEAMS_PER_PAGE = 8;
+const TEAMS_PER_PAGE = 16;
 /** The bottom row of every page: its way around, then OUT (OV1), UNDO, ALL OUT and PANIC. */
 // no UNDO key (the producer's ask); its place takes the ATEM downstream key in Companion where 2/7 is taken
 const navRow = (...keys: DeckKey[]) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
 /** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
 const withPhoto = (row: (DeckKey | null)[]) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
 
-/** A team's page on deck 2: its qualified and line-up graphics, its places (sailor's name on the key), ◀ ▶ to the next team. */
+/**
+ * A team's page on deck 2: its lower thirds (TEAM LT, QUALIFIED, LINEUP LT) and line-up board, its places (sailor's
+ * name on the key), ◀ ▶ to the next team. An empty place of a group has the same keys, named by the place (A1).
+ */
 function teamPage(t: PresetTeam, i: number, teams: PresetTeam[], teamsPage: number): DeckPage {
   const page = PRESET_PAGES.teams + i;
   const other = (d: number) => teams[(i + d + teams.length) % teams.length];
-  const tk = (action: string, text: string, kind: DeckKey['kind']): DeckKey => ({ ...k(action, text, kind), team: t.code });
-  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${t.code}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
+  const arg = teamArg(t), label = pageName(t);
+  const tk = (action: string, text: string, kind: DeckKey['kind']): DeckKey => (t.code ? { ...k(action, text, kind), team: t.code } : k(action, text, kind));
+  const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${arg}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
   return {
-    deck: 2, name: t.code, page, keys: [
-      row8(tk(`qualified:${t.code}`, `QUALIFIED\\n${t.code}`, 'lt'), tk(`lineup:${t.code}`, `LINEUP\\n${t.code}`, 'board'),
-        tk(`lult:${t.code}`, `LINEUP LT\\n${t.code}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), null, null, null, k('next', 'NEXT\\nRESULT', 'lt')),
+    deck: 2, name: label, page, keys: [
+      row8(tk(`qualified:${arg}`, `QUALIFIED\\n${label}`, 'lt'), tk(`lineup:${arg}`, `LINEUP\\n${label}`, 'board'),
+        tk(`lult:${arg}`, `LINEUP LT\\n${label}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), tk(`teamlt:${arg}`, `TEAM LT\\n${label}`, 'lt'), null, null, k('next', 'NEXT\\nRESULT', 'lt')),
       row8(...places.slice(0, 8)),
       row8(...places.slice(8, 16)),
-      withPhoto(navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${other(-1).code}`, 'nav'),
-        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${other(1).code}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'BUGS\\nOFTEN', 'nav'))),
+      withPhoto(navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${pageName(other(-1))}`, 'nav'),
+        k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${pageName(other(1))}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'BUGS\\nOFTEN', 'nav'))),
     ],
   };
 }
@@ -335,7 +356,7 @@ function applyKeyEdits(cfg: ShowConfig, pages: DeckPage[]): DeckPage[] {
     ...p,
     keys: p.keys.map((row, r) => row.map((key, c) => {
       const o = cfg.keys[`${p.name}/${r}/${c}`];
-      if (!o) return key;
+      if (!o || REMOVED_ACTIONS.has(o.action ?? '')) return key;
       let next: DeckKey | null = key;
       if (o.action !== undefined) {
         if (!o.action) return null;
@@ -401,8 +422,13 @@ export class Show {
 
   // ---------- data the keys need ----------
   graphics(): Graphic[] {
-    const over = this.config.inputs;
-    return DEFAULT_GRAPHICS.map((g) => (over[g.id]?.trim() ? { ...g, inputs: over[g.id].split(',').map((s) => s.trim()).filter(Boolean) } : g));
+    const cfg = this.config, over = cfg.inputs;
+    // the tickers on the channels picked on Show control: the bottom one on the break scene's ticker channel
+    const overlay: Record<string, number> = { ticker: cfg.breakTickerLayer, tickertop: cfg.tickerTopLayer };
+    return DEFAULT_GRAPHICS.map((g) => {
+      const x = over[g.id]?.trim() ? { ...g, inputs: over[g.id].split(',').map((s) => s.trim()).filter(Boolean) } : g;
+      return overlay[g.id] ? { ...x, overlay: overlay[g.id] } : x;
+    });
   }
   graphic(id: string) { const g = this.graphics().find((x) => x.id === id); if (!g) throw notFound(`Graphic ${id}`); return g; }
 
@@ -422,14 +448,36 @@ export class Show {
     return [];
   }
   /**
-   * The teams of the stage picked at the top of the dashboard (group by group, in fleet order), each with its places,
-   * for its page; every team only when no stage is picked.
+   * The places of the stage picked at the top of the dashboard, group by group and in each group by place (A1, A2…
+   * B1…), each with its team and the team's places, for its page; a place with no team yet is there too (no code),
+   * so the pages keep their numbers while the groups fill up. A team only in the Last Chance / Qualification Race
+   * comes after them. Every team (by code) when no stage is picked.
    */
   presetTeams(): PresetTeam[] {
-    return this.cached('presetTeams', () => ltTeams(this.ctx).filter((t) => t.code).map((t) => ({
-      code: t.code, name: t.name,
-      crew: crewOf(this.ctx, t.id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName, number: c.number })),
-    })));
+    return this.cached('presetTeams', () => {
+      const crew = (id: string) => crewOf(this.ctx, id).map((c) => ({ slot: c.slot, label: c.label, name: c.lastName || c.firstName, number: c.number }));
+      const team = (t: { id: string; code: string; name: string }, place?: string): PresetTeam => ({ code: t.code, name: t.name, crew: crew(t.id), ...(place ? { place } : {}) });
+      const stage = currentStage(this.ctx.db, activeEvent(this.ctx.db).id);
+      if (!stage) return ltTeams(this.ctx).filter((t) => t.code).map((t) => team(t));
+      const byId = new Map(listTeams(this.ctx).filter((t) => t.code).map((t) => [t.id, t]));
+      const fleets = getSetDetail(this.ctx.db, stage.id).fleets;
+      const empty = slotDefs(0).map((d) => ({ slot: d.key, label: d.label, name: '' }));
+      const out: PresetTeam[] = [];
+      const seen = new Set<string>();
+      for (const f of fleets.filter((x) => !isExtraGroup(x.name))) {
+        const key = compareKey(f.name);
+        f.positions.forEach((id, i) => {
+          const place = `${key}${key.length > 1 ? ' ' : ''}${i + 1}`;
+          const t = id ? byId.get(id) : undefined;
+          if (t && !seen.has(t.id)) { seen.add(t.id); out.push(team(t, place)); } else out.push({ code: '', name: '', place, placeholder: f.placeholders[i] ?? '', crew: empty });
+        });
+      }
+      for (const f of fleets.filter((x) => isExtraGroup(x.name))) for (const id of f.positions) {
+        const t = id ? byId.get(id) : undefined;
+        if (t && !seen.has(t.id)) { seen.add(t.id); out.push(team(t)); }
+      }
+      return out;
+    });
   }
   /** The pages of both decks with a page per team. */
   pages() {
@@ -465,6 +513,8 @@ export class Show {
   /** A team by key: its position in the group racing now (1–4) or its code. */
   teamRef(arg: string) {
     if (/^\d+$/.test(arg)) return this.boat(Number(arg));
+    // a key of a group's place with no team yet (@A1)
+    if (arg.startsWith('@')) throw badRequest(`No team on place ${arg.slice(1)} yet: put a team in its group (Fleets tab), and its keys follow.`);
     const t = this.teams().find((x) => x.code.toLowerCase() === arg.toLowerCase());
     if (!t) throw notFound(`Team ${arg}`);
     return { id: t.id, code: t.code, name: t.name };
@@ -707,7 +757,16 @@ export class Show {
       if (!this.config.fleetId) throw badRequest('Pick the race (group) on the Show control tab.');
       await this.set(input, this.compareData());
     } else if (g.id === 'ticker') {
-      await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', this.tickerText()]]));
+      // TICKER ON / OFF: the ticker picked last (as the break scene shows it), else the automatic one
+      const t = this.state.tickerId ? this.tickerVersion(this.state.tickerId) : undefined;
+      const text = t ? tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : this.tickerText();
+      await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
+    } else if (g.id === 'tickertop') {
+      // TOP TICKER ON / OFF: the top ticker version picked last, else its first
+      const t = (this.state.tickerTopId && this.tickerTopVersion(this.state.tickerTopId)) || this.topTickers()[0];
+      if (!t) throw badRequest('No top ticker. Add it under General graphics → Top ticker.');
+      await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)))]]));
+      this.patchState({ tickerTopId: t.id });
     } else if (g.id === 'lineup5') {
       const b = this.boats()[this.state.boat - 1];
       if (b) { await this.set(input, this.lineupLtFields(b.id, 1)); this.patchState({ lineupPart: 1, lineupTeam: b.id }); }
@@ -930,7 +989,6 @@ export class Show {
       return { out: g.id };
     }
     await this.fill(g, input);
-    if (g.id === 'ticker') this.patchState({ tickerId: '' });
     await this.bringIn(g, input, snap);
     return { in: g.id, input: input.title };
   }
@@ -1101,6 +1159,32 @@ export class Show {
     this.patchState({ tickerId: t.id });
     if (!on) await this.bringIn(g, input, snap);
     return { in: 'ticker', text };
+  }
+
+  topTickers() { return this.cached('topTickers', () => listGraphicSets(this.ctx.db, activeEvent(this.ctx.db).id, 'tickertop')); }
+  /** A top ticker version by key: its position (tickertop:2) or its version id. */
+  private tickerTopVersion(which: string) {
+    const list = this.topTickers();
+    return list.find((x) => x.id === which) ?? (/^\d+$/.test(which) ? list[Number(which) - 1] : undefined);
+  }
+  /** Top ticker of one version (General graphics → Top ticker): its text goes in, then it comes in; again = out; on air another one is a data change. */
+  async tickerTop(which: string) {
+    const t = this.tickerTopVersion(which);
+    if (!t) throw badRequest(`No top ticker ${which}. Add it under General graphics → Top ticker.`);
+    const g = this.graphic('tickertop');
+    const snap = await this.snapshot();
+    const input = this.need(g, snap.inputs);
+    const on = snap.overlays[g.overlay] === input.number;
+    if (on && this.state.tickerTopId === t.id) {
+      this.pushUndo(snap.overlays);
+      await this.overlayOut(g.overlay, snap.overlays);
+      return { out: 'tickertop' };
+    }
+    const text = tickerText(t.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db)));
+    await this.set(input, new Map([[this.textField(input, /ticker|text/i) ?? '', text]]));
+    this.patchState({ tickerTopId: t.id });
+    if (!on) await this.bringIn(g, input, snap);
+    return { in: 'tickertop', text };
   }
 
   /** Lower thirds of a sailor on the selected boat, by key index (1–16, sorted by shirt number) or by shirt number. */
@@ -1377,6 +1461,7 @@ export class Show {
       case 'out': case 'ltout': case 'boardout': return this.layerOut();
       case 'bug': return this.bug(arg);
       case 'ticker': return this.ticker(arg);
+      case 'tickertop': return this.tickerTop(arg);
       case 'bugout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.overlayOut(this.graphic('bug').overlay, s.overlays); return { out: 'bug' }; }
       case 'breakout': { const s = await this.snapshot(); this.pushUndo(s.overlays); await this.sceneOut(s.overlays); return { out: 'scene' }; }
       case 'rotate': return this.toggleRotation();
@@ -1404,7 +1489,10 @@ export class Show {
     const isOn = (id: string) => { if (!ctxt) return false; const g = this.graphics().find((x) => x.id === id); const i = g && this.resolve(g, ctxt.inputs); return !!(g && i && ov[g.overlay] === i.number); };
     const lt = getLtState(this.ctx.db);
     let team: { id: string; code: string } | undefined; // the team whose national colours the key takes
-    if (key.team) {
+    if (arg.startsWith('@')) {
+      // a key of a group's place with no team yet: dark, with its place's name, until a team is put there
+      empty = true;
+    } else if (key.team) {
       // a key of a team's page (or the TEAMS page): its text is fixed, the team gives the colours
       const t = this.teams().find((x) => x.code === key.team);
       team = t;
@@ -1437,6 +1525,11 @@ export class Show {
       text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
       empty = !t;
       if (t) onAir = isOn('ticker') && st.tickerId === t.id;
+    } else if (kind === 'tickertop') {
+      const t = this.tickerTopVersion(arg);
+      text = t ? `TOP TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
+      empty = !t;
+      if (t) onAir = isOn('tickertop') && st.tickerTopId === t.id;
     } else if (kind === 'breakticker') {
       const t = this.tickerVersion(arg);
       text = t ? `TICKER\\n${t.name.toUpperCase().slice(0, 24)}` : '';
@@ -1874,7 +1967,7 @@ function fallbackControls(cfg: ShowConfig, vmixBase: string, graphics: Graphic[]
   const v = vmixBase.replace(/\/+$/, '');
   const fb: Controls = {};
   const first = (g: Graphic) => g.inputs.map((x) => x.replace('{n}', '4').replace('{crew}', '9')).find((x) => !x.includes('{'))!;
-  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'socials', 'sponsors', 'lbar'];
+  const pick = ['welcome', 'schedule', 'matchboard', 'results', 'compare', 'course', 'officials', 'weather', 'comm', 'bug', 'ticker', 'tickertop', 'socials', 'sponsors', 'lbar'];
   const fbKeys = pick.map((id) => graphics.find((g) => g.id === id)).filter((g): g is Graphic => !!g);
   fbKeys.slice(0, 16).forEach((g, i) => {
     const r = Math.floor(i / 8), c = i % 8;

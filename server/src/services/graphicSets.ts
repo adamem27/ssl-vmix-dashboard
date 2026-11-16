@@ -120,7 +120,19 @@ export const GRAPHIC_KINDS: GraphicKind[] = [
     ],
     defaults: [{ name: 'Follow us', data: {} }],
   },
+  {
+    // last, so the blocks of the General sheet keep their cells (it is not in that sheet: its keys fill the title)
+    kind: 'tickertop', label: 'Top ticker', sheet: 'Top ticker',
+    description: 'The scrolling bar at the top of the screen (vMix input ssl_ticker_top), on and off with TOP TICKER ON / OFF (page AFTER / BREAK) whatever else is on air. One message per line; every version on its own key (page TICKERS, bottom row), a new one at once.',
+    fields: [
+      { key: 'separator', label: 'Separator', default: ' I ' },
+      { key: 'items', label: 'Messages', type: 'list', wide: true, hint: 'One message per line' },
+    ],
+    defaults: [{ name: 'Top ticker', data: { items: 'SSL GOLD CUP 2026' } }],
+  },
 ];
+/** Graphics added after events were made: their default versions once for those events too (a deleted one stays deleted). */
+const LATER_KINDS = ['tickertop'];
 
 const kindOf = (kind: string) => {
   const k = GRAPHIC_KINDS.find((x) => x.kind === kind);
@@ -147,13 +159,22 @@ const fromRow = (r: any): GraphicSet => {
 /** Adds the default versions once per event (deleting them later is respected). */
 export function seedGraphicSets(db: DB, eventId: string) {
   const flag = `graphicSets.seeded.${eventId}`;
-  if (getSetting(db, flag)) { ensurePresets(db, eventId); return; }
+  if (getSetting(db, flag)) { seedLaterKinds(db, eventId); ensurePresets(db, eventId); return; }
   for (const k of GRAPHIC_KINDS) {
     if (db.prepare('SELECT 1 FROM graphic_sets WHERE event_id = ? AND kind = ?').get(eventId, k.kind)) continue;
     for (const d of k.defaults) createGraphicSet(db, eventId, k.kind, d.name, d.data);
   }
   setSetting(db, flag, '1');
+  seedLaterKinds(db, eventId);
   ensurePresets(db, eventId);
+}
+function seedLaterKinds(db: DB, eventId: string) {
+  for (const kind of LATER_KINDS) {
+    const flag = `graphicSets.seeded.${eventId}.${kind}`;
+    if (getSetting(db, flag)) continue;
+    if (!db.prepare('SELECT 1 FROM graphic_sets WHERE event_id = ? AND kind = ?').get(eventId, kind)) for (const d of kindOf(kind).defaults) createGraphicSet(db, eventId, kind, d.name, d.data);
+    setSetting(db, flag, '1');
+  }
 }
 
 /**
@@ -403,7 +424,7 @@ export function graphicSheetRows(db: DB, eventId: string, kind: string, auto: Ti
   return listGraphicSets(db, eventId, kind).map((s) => {
     const row: Record<string, string> = { set: s.name };
     for (const f of k.fields) row[f.key] = f.type === 'image' ? imagePath(db, assetsDir, s.data[f.key]) : f.type === 'list' ? (s.data[f.key] ?? '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean).join(' | ') : s.data[f.key] ?? '';
-    if (kind === 'ticker') row.text = tickerText(s.data, auto);
+    if (kind === 'ticker' || kind === 'tickertop') row.text = tickerText(s.data, auto);
     return row;
   });
 }

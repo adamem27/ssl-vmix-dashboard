@@ -13,7 +13,7 @@ import { FoldTitle, useFold } from '../components/fold';
 const CONDITIONS = ['Sunny', 'Mostly sunny', 'Partly cloudy', 'Cloudy', 'Overcast', 'Light rain', 'Rain', 'Showers', 'Thunderstorm', 'Fog', 'Windy'];
 const DIRECTIONS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
-const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People'], ['g-compare', 'Team comparison']];
+const SECTIONS: [string, string][] = [['g-welcome', 'Welcome'], ['g-schedule', 'Schedule'], ['g-weather', 'Weather'], ['g-announcement', 'Announcements'], ['g-ticker', 'Tickers'], ['g-tickertop', 'Top ticker'], ['g-officials', 'Race officials'], ['g-socials', 'Follow us'], ['g-people', 'People'], ['g-compare', 'Team comparison']];
 
 const shiftDate = (d: string, days: number) => new Date(Date.parse(d + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
 
@@ -29,7 +29,7 @@ export function GeneralPage() {
       <GraphicSetsSections kinds={['welcome']} />
       <div id="g-schedule" className="scroll-mt-28"><SchedulePanel /></div>
       <div id="g-weather" className="scroll-mt-28"><WeatherPanel /></div>
-      <GraphicSetsSections kinds={['announcement', 'ticker', 'officials', 'socials']} />
+      <GraphicSetsSections kinds={['announcement', 'ticker', 'tickertop', 'officials', 'socials']} />
       <div id="g-people" className="scroll-mt-28"><PeoplePanel /></div>
       <div id="g-compare" className="scroll-mt-28"><ComparePanel /></div>
     </div>

@@ -112,7 +112,7 @@ export function generalSheet(ctx: AssetCtx, eventId: string, today: string): She
   const ev2 = db.prepare('SELECT id, timezone FROM events WHERE id = ?').get(eventId) as { id: string; timezone: string } | undefined;
   const auto = ev2 ? tickerAuto(db, ev2) : {};
   for (const k of GRAPHIC_KINDS) {
-    if (k.kind === 'announcement') continue; // own sheet: adding one shifts nothing here
+    if (k.kind === 'announcement' || k.kind === 'tickertop') continue; // own sheet / its keys fill the title: adding one shifts nothing here
     const vs = sets.filter((x) => x.kind === k.kind);
     // tickers: the same rows for free and fixed versions (a fixed one's messages are its sentence)
     const fields = k.kind === 'ticker' ? k.fields.filter((f) => f.key === 'position' || f.key === 'separator' || f.key === 'items') : k.fields.filter((f) => !f.hidden);

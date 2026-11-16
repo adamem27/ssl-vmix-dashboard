@@ -68,7 +68,7 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
     <section id={`g-${k.kind}`} className="card scroll-mt-28">
       <header className={`flex flex-wrap items-center gap-2 px-3 py-2 ${open ? 'border-b border-ink-800' : ''}`}>
         <FoldTitle open={open} onToggle={() => setOpen(!open)}>{k.label} <span className="font-normal normal-case text-ink-500">{sets.length}</span></FoldTitle>
-        {open && <span className="text-xs text-ink-500">{k.description} In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</span>}
+        {open && <span className="text-xs text-ink-500">{k.description}{k.kind !== 'tickertop' && <> In the Excel “General” sheet as Graphic “{k.label}”, Version = the name of the card.</>}</span>}
         {open && <Button size="sm" className="ml-auto" onClick={add}>+ New version</Button>}
       </header>
       {open && <div className="grid gap-3 p-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -104,7 +104,7 @@ function KindPanel({ k, sets, auto }: { k: GKind; sets: GSet[]; auto?: TickerAut
                   )}
                 </label>
               ))}
-              {k.kind === 'ticker' && (
+              {(k.kind === 'ticker' || k.kind === 'tickertop') && (
                 <div className="col-span-2 min-w-0">
                   <span className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-500">Ticker text</span>
                   <div className="truncate rounded border border-ink-800 bg-ink-900 px-2 py-1 font-mono text-xs text-ink-300" title={tickerText(s.data, auto)}>{tickerText(s.data, auto) || '—'}</div>

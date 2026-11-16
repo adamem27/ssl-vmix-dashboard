@@ -6,7 +6,7 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -37,7 +37,7 @@ function Panel({ title, right, children }: { title: string; right?: ReactNode; c
   );
 }
 
-const OVERLAY = ['', 'OV1', 'OV2', 'OV3', 'OV4 break scene'];
+const OVERLAY = ['', 'OV1', 'OV2', 'OV3', 'OV4'];
 
 export function ShowControlPage() {
   const q = useQuery({ queryKey: ['show'], queryFn: () => api.get<ShowData>('/api/show'), refetchInterval: 2000 });
@@ -124,7 +124,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end); deck 2 has TEAMS (a page per team, its places with the sailors' names and shirt numbers, PHOTO mode), every announcement (BUGS OFTEN, BUGS RARE), every ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end; TICKER and TOP TICKER ON / OFF on the AFTER / BREAK page); deck 2 has TEAMS (16 keys in group order, A1–A4, B1–B4…; each opens the team's page with its lower thirds TEAM LT, QUALIFIED and LINEUP LT and its places with the sailors' names and shirt numbers, PHOTO mode; a place with no team yet shows its name, A1…, until a team is put there), every announcement (BUGS OFTEN, BUGS RARE), every ticker and top ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -234,8 +234,8 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
         <div className="space-y-2">
           <div className="text-xs font-semibold text-ink-300">Overlay channels</div>
           <div className="flex gap-2">
-            {([['L-bar', 'breakLbarLayer', 2], ['Ticker', 'breakTickerLayer', 3], ['Schedule / results', 'breakBoardLayer', 4]] as const).map(([label, k, d]) => (
-              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={2} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k]} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
+            {([['L-bar', 'breakLbarLayer', 2, 2], ['Ticker', 'breakTickerLayer', 3, 2], ['Schedule / results', 'breakBoardLayer', 4, 2], ['Top ticker', 'tickerTopLayer', 2, 1]] as const).map(([label, k, d, min]) => (
+              <label key={k} className="block text-xs text-ink-400">{label}<input type="number" min={min} max={4} className="input mt-1 w-16 py-1 text-sm" value={c[k] ?? d} onChange={(e) => setC({ ...c, [k]: Number(e.target.value) || d })} /></label>
             ))}
           </div>
           {data.breakGroups.length > 0 && (
@@ -259,7 +259,7 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="block text-xs text-ink-400">Team comparison: wait for the flags' out animation (ms)<input type="number" min={0} max={3000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.flagChangeMs ?? 500} onChange={(e) => setC({ ...c, flagChangeMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
-          <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off.</p>
+          <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off. TICKER ON / OFF puts the ticker (ssl_ticker) on its channel alone, without the scene, so it stays on under boards and lower thirds; TOP TICKER ON / OFF does the same for the top ticker (ssl_ticker_top, its versions in General graphics → Top ticker) on its own channel. The break scene's L-bar or board takes the place of the top ticker when they share a channel.</p>
         </div>
       </div>
     </Panel>
@@ -272,7 +272,7 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
   const { c, setC, dirty, save } = useConfig(data, onSaved);
   const toast = useToast();
   const origin = window.location.origin;
-  const teams = data.pages.filter((p) => p.page >= 9);
+  const teams = data.pages.filter((p) => p.page >= 9 && p.name !== 'COMPARE' && p.name !== 'PEOPLE' && !/^TEAMS/.test(p.name));
   const [url, setUrl] = useState(data.companionUrl || '');
   const [pushing, setPushing] = useState(false);
   const st = data.companion;
@@ -311,12 +311,12 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
           : 'Nothing pushed yet.'}
       </p>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-300">
-        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–6 (TEAMS, BUGS OFTEN, BUGS RARE, TICKERS), the fallback on page 8, a page per team from page 9, then COMPARE and PEOPLE ({teams.length} teams: {teams.map((p) => p.name).join(', ') || 'none yet'}).
+        <li>Download the preset (from the dashboard opened at the address Companion will call). It holds every page in one file: deck 1 on pages 1–2, deck 2 on pages 3–6 (TEAMS, BUGS OFTEN, BUGS RARE, TICKERS), the fallback on page 8, a page per place of the stage's groups on pages 9–24 in group order (A1–A4, B1…; a place with no team yet is named by the place), then COMPARE (25) and PEOPLE (26) ({teams.length} places: {teams.map((p) => p.name).join(', ') || 'none yet'}).
           <div className="mt-2"><a className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600" href={`/api/show/preset.companionconfig?base=${encodeURIComponent(origin)}`} download>Download Companion preset</a></div>
         </li>
         <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there. Then press <b>Push to Companion now</b> once.</li>
         <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page 1 and deck 2 on page 3.</li>
-        <li>After that import, changes in the key editor, teams, line-ups, announcements and tickers reach the decks by themselves: each key runs whatever is at its place now, and its text and colour are sent live. Download and import again only when the page-switching keys change or the number of teams changes.</li>
+        <li>After that import, changes in the key editor, teams, line-ups, announcements and tickers reach the decks by themselves: each key runs whatever is at its place now, and its text and colour are sent live. Putting a team into a group's place needs no new import: its page and its TEAMS key take the team at once. Download and import again only when the page-switching keys change or the stage's groups change (more places, another stage).</li>
         <li>PANIC cuts everything only on a second press within 3 seconds. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
       </ol>
     </Panel>

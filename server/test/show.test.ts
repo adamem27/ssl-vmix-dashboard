@@ -403,8 +403,8 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx));
     const f: any = await show.companionPreset('http://10.0.0.5:4310', 'http://10.0.0.5:8088');
     expect(f).toMatchObject({ version: 12, type: 'full' });
-    // deck 1: 1–2, deck 2: 3–6, fallback 8, teams (by code) 9–12
-    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14]);
+    // deck 1: 1–2, deck 2: 3–6, fallback 8, teams (by code) 9–12; 16 team pages kept, so COMPARE 25 and PEOPLE 26
+    expect(Object.keys(f.pages).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 25, 26]);
     const url = (c: any) => c.steps[0].action_sets.down[0].options.url.value;
     const text = (c: any) => c.style.layers.find((l: any) => l.type === 'text').text.value;
     const page = (c: any) => c.steps[0].action_sets.down[0].options.page.value;
@@ -423,12 +423,13 @@ describe('show control', () => {
     expect(url(esp.controls[1][2])).toBe('http://10.0.0.5:4310/api/show/key/10/1/2');
     expect(show.keyAt(10, 1, 2)?.action).toBe('sailorof:ESP/Pit');
     expect(show.keyAt(10, 0, 0)?.action).toBe('qualified:ESP');
-    // the team lower thirds sit on TEAMS, a row below each team's page key (not on the team's own page); the row
-    // between has blank keys calling their place (for a key added there later)
+    // TEAMS holds 16 teams on its top two rows; free places are blank keys calling their place (for a team later)
     expect(Object.values(f.pages[3].controls[1]).map(text)).toEqual(Array(8).fill(''));
     expect(url(f.pages[3].controls[1][3])).toBe('http://10.0.0.5:4310/api/show/key/3/1/3');
-    expect(show.keyAt(3, 2, 1)?.action).toBe('teamlt:ESP');
-    expect(show.pages().find((p) => p.page === 10)!.keys.flat().some((k) => /teamlt/.test(k?.action ?? ''))).toBe(false);
+    // the team lower thirds sit on the team's own page, none on TEAMS
+    expect(show.pages().find((p) => p.name === 'TEAMS')!.keys.flat().some((k) => /teamlt/.test(k?.action ?? ''))).toBe(false);
+    expect(show.keyAt(10, 0, 4)?.action).toBe('teamlt:ESP');
+    expect(text(esp.controls[0][4])).toBe('TEAM LT\\nESP');
     expect(page(esp.controls[3][1])).toBe(9); // ◀ BRA
     expect(page(esp.controls[3][2])).toBe(11); // ▶ GBR
     expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
@@ -474,16 +475,52 @@ describe('show control', () => {
     expect(teamKeyColours(null, 'CUB')!.normal).toEqual({ bg: '#e03a3e', fg: '#0a2a8c' });
   });
 
-  it('LAST CHANCE EXPLAINED on the BEFORE page puts the ready graphic in, nothing filled in', async () => {
+  it('no LAST CHANCE EXPLAINED key any more; a config that had one still loads', async () => {
     const { s } = race();
-    const v = fakeVmix({ ...TITLES, ssl_lcr_info: [] });
+    setSetting(s.db, 'show.config', JSON.stringify({ ...getShowConfig(s.db), inputs: { lcrinfo: 'ssl_lcr_info' }, keys: { 'A BEFORE/1/0': { action: 'show:lcrinfo', text: 'LCR' }, 'C-E AFTER / BREAK/0/0': { action: 'show:lcrinfo' } } }));
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    expect(show.graphics().some((g) => g.id === 'lcrinfo')).toBe(false);
+    const all = show.pages().flatMap((p) => p.keys.flat());
+    expect(all.some((x) => x?.action === 'show:lcrinfo')).toBe(false);
+    expect(show.keyAt(1, 1, 0)).toBeNull();
+    expect(show.keyAt(2, 0, 0)?.action).toBe('show:socials');
+  });
+
+  it('TICKER ON / OFF and TOP TICKER ON / OFF: each ticker on its own channel, without the break scene', async () => {
+    const { s, ev } = race();
+    seedGraphicSets(s.db, ev);
+    const v = fakeVmix({ ...TITLES, ssl_ticker: ['Ticker1.Text'], ssl_ticker_top: ['Ticker1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    const before = show.pages().find((p) => p.name === 'A BEFORE')!;
-    expect(before.keys.flat().some((x) => x?.action === 'show:lcrinfo')).toBe(true);
-    await show.run('show:lcrinfo');
-    expect(v.overlays[1]).toBe(v.num('ssl_lcr_info'));
-    await show.run('show:lcrinfo');
-    expect(v.overlays[1]).toBeFalsy();
+    const after = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
+    expect(after.keys[1].slice(4, 6).map((x) => x?.action)).toEqual(['show:ticker', 'show:tickertop']);
+    // the bottom ticker on the break scene's ticker channel (3), a board on OV1 leaves it on
+    await show.run('show:ticker');
+    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
+    await show.run('show:welcome');
+    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
+    expect(v.overlays[1]).toBe(v.num('ssl_welcome'));
+    // the top ticker: its first version (General graphics → Top ticker) on channel 2
+    await show.run('show:tickertop');
+    expect(v.overlays[2]).toBe(v.num('ssl_ticker_top'));
+    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_ticker_top')}&SelectedName=Ticker1.Text&Value=${repeatLoop('SSL GOLD CUP 2026 I ')}`);
+    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
+    // a top ticker version on its key (TICKERS, bottom row): a new one is on the next key at once
+    createGraphicSet(s.db, ev, 'tickertop', 'Breaking', { items: 'Live now' });
+    show.invalidate();
+    const tickers = (await show.view()).pages.find((p) => p.name === 'TICKERS')!;
+    expect(tickers.keys[2].slice(0, 2).map((x) => x?.text)).toEqual(['● TOP TICKER\\nTOP TICKER', 'TOP TICKER\\nBREAKING']);
+    v.calls.length = 0;
+    await show.run('tickertop:2');
+    expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_ticker_top')}&SelectedName=Ticker1.Text&Value=${repeatLoop('LIVE NOW I ')}`);
+    expect(v.overlays[2]).toBe(v.num('ssl_ticker_top'));
+    await show.run('tickertop:2');
+    expect(v.overlays[2] ?? '').toBe('');
+    await show.run('show:ticker');
+    expect(v.overlays[3] ?? '').toBe('');
+    // the top ticker's channel is set on Show control
+    setShowConfig(s.db, { tickerTopLayer: 4 });
+    await show.run('show:tickertop');
+    expect(v.overlays[4]).toBe(v.num('ssl_ticker_top'));
   });
 
   it("keeps the producer's PEOPLE page from Companion as it is in every preset", async () => {
@@ -519,8 +556,41 @@ describe('show control', () => {
     const stage = s.db.prepare('SELECT id FROM fleet_sets LIMIT 1').get() as { id: string };
     setCurrentStage(s.db, ev, stage.id);
     show.invalidate();
-    expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA']);
-    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'COMPARE', 'PEOPLE']);
+    expect(show.presetTeams().map((t) => t.code)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', '', '', '', '']);
+    expect(show.pages().filter((p) => p.page >= 9).map((p) => p.name)).toEqual(['ESP', 'BRA', 'GBR', 'ITA', 'FLEET2 1', 'FLEET2 2', 'FLEET2 3', 'FLEET2 4', 'COMPARE', 'PEOPLE']);
+  });
+
+  it('the next stages: 4 groups of 4 places in group order, empty places keep their pages and become the team once filled', async () => {
+    const { s, ev } = race();
+    const extra = ['POL', 'GER', 'FRA'].map((c) => seedTeam(s.db, c, []).teamId);
+    const stage = createSet(s.db, ev, '1/32', 0);
+    const groups = ['A', 'B', 'C', 'D'].map((l) => createFleet(s.db, stage, `Group ${l}`, 4));
+    setCurrentStage(s.db, ev, stage);
+    placeTeam(s.db, stage, { teamId: extra[0], fleetId: groups[0], position: 2 });
+    placeTeam(s.db, stage, { teamId: extra[1], fleetId: groups[2], position: 1 });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx));
+    const pages = show.pages();
+    const teamPages = pages.filter((p) => p.page >= 9 && p.page <= 24);
+    expect(teamPages.map((p) => p.name)).toEqual(['A1', 'POL', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4', 'GER', 'C2', 'C3', 'C4', 'D1', 'D2', 'D3', 'D4']);
+    expect(teamPages.map((p) => p.page)).toEqual(Array.from({ length: 16 }, (_, i) => 9 + i));
+    expect(pages.find((p) => p.name === 'COMPARE')!.page).toBe(25);
+    expect(pages.find((p) => p.name === 'PEOPLE')!.page).toBe(26);
+    // TEAMS: A and B on the top row, C and D below, each key opening its place's page
+    const teams = pages.find((p) => p.name === 'TEAMS')!;
+    expect(teams.keys[0].map((x) => x?.text.split('\\n')[0])).toEqual(['A1', 'POL', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4']);
+    expect(teams.keys[1].map((x) => x?.action)).toEqual([17, 18, 19, 20, 21, 22, 23, 24].map((n) => `nav:${n}`));
+    expect(teams.keys[2].every((x) => x === null)).toBe(true);
+    // an empty place: its keys are there, dark, and a press says the place has no team yet
+    expect(show.keyAt(9, 0, 4)?.action).toBe('teamlt:@A1');
+    expect((await show.keyLook(show.keyAt(9, 0, 4)!)).empty).toBe(true);
+    await expect(show.run('teamlt:@A1')).rejects.toThrow(/No team on place A1/);
+    expect(show.keyAt(10, 0, 4)?.action).toBe('teamlt:POL');
+    // the team put there: the same page and keys, now the team's (texts reach Companion live, no new import)
+    placeTeam(s.db, stage, { teamId: extra[2], fleetId: groups[0], position: 1 });
+    show.invalidate();
+    expect(show.keyAt(9, 0, 4)?.action).toBe('teamlt:FRA');
+    expect(show.pages().find((p) => p.page === 9)!.name).toBe('FRA');
+    expect(show.pages().find((p) => p.name === 'COMPARE')!.page).toBe(25);
   });
 
   it('everyone in People has a key; the COMPARE keys follow the Team comparison inputs vMix has', async () => {
