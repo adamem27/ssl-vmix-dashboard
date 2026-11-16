@@ -1,8 +1,14 @@
 {
-  "version": "1.0.200",
-  "commit": "032871b",
-  "date": "2026-11-16T16:04:36Z",
+  "version": "1.0.201",
+  "commit": "ff24344",
+  "date": "2026-11-16T16:11:24Z",
   "changes": [
+    {
+      "version": "1.0.201",
+      "commit": "ff24344",
+      "date": "2026-11-16T16:11:24Z",
+      "text": "DRAW screen: much bigger country codes and flags in both strips and the all-groups view"
+    },
     {
       "version": "1.0.200",
       "commit": "032871b",
@@ -476,12 +482,6 @@
       "commit": "c741afb",
       "date": "2026-11-10T18:00:56Z",
       "text": "Tickers repeat their loop so the scroll runs on; L-bar socials; Replay bug key uses the Replay title"
-    },
-    {
-      "version": "1.0.121",
-      "commit": "452b7db",
-      "date": "2026-11-10T17:54:38Z",
-      "text": "Lower thirds: the photo rises by its DataChange after the title is in, and flies down before it goes out"
     }
   ]
 }
