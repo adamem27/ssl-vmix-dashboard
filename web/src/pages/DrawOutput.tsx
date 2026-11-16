@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from 'react';
 import { RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
@@ -19,7 +20,7 @@ type EmptyStyle = 'bars' | 'dots' | 'text';
 interface Out {
   seq: number; fonts: number[]; caption: string; flightDelay: number; stripWidth?: number; emptyStyle?: EmptyStyle;
   board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; pool: string[];
-  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; autoSteps?: boolean; next?: string | null;
+  teams: OutTeam[]; picks: Pick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; autoSteps?: boolean; headerV?: number; next?: string | null;
 }
 
 // the LED wall at Marina da Glória: 6 × 4 m, 1536×1024 px
@@ -43,6 +44,9 @@ export function DrawOutputPage() {
   const [hidden, setHidden] = useState<string | null>(null);
   const [landed, setLanded] = useState<string | null>(null);
   const prev = useRef<Out | null>(null);
+  /** the all-groups view stays a moment after it is switched off, fading out */
+  const [ovLeaving, setOvLeaving] = useState(false);
+  const ovWas = useRef(false);
   const stage = useRef<HTMLDivElement>(null);
   const centre = useRef<HTMLElement>(null);
   const groupEls = useRef(new Map<string, HTMLDivElement>());
@@ -74,7 +78,12 @@ export function DrawOutputPage() {
   }, []);
 
   const later = (ms: number, f: () => void) => new Promise<void>((resolve) => { timers.current.push(window.setTimeout(() => { f(); resolve(); }, ms)); });
-  const stopAll = () => { timers.current.forEach(clearTimeout); timers.current = []; busy.current = false; pending.current = null; setFlag(null); setHidden(null); setLanded(null); };
+  const stopAll = () => { timers.current.forEach(clearTimeout); timers.current = []; busy.current = false; pending.current = null; fadeFlag(); setHidden(null); setLanded(null); };
+  /** the flag never just vanishes: it fades */
+  const fadeFlag = () => {
+    setFlag((f) => (f && !f.out ? { ...f, out: true } : f));
+    timers.current.push(window.setTimeout(() => setFlag((f) => (f && f.out ? null : f)), FADE_MS));
+  };
 
   /** FLAG OFF: the flag fades, the team stands in its row (the group stays where it is). */
   const reveal = () => {
@@ -82,7 +91,7 @@ export function DrawOutputPage() {
     if (!pd) return;
     pending.current = null;
     setFlag({ teamId: pd.teamId, out: true }); setHidden(null); setLanded(pd.key);
-    timers.current.push(window.setTimeout(() => setFlag(null), FADE_MS));
+    timers.current.push(window.setTimeout(() => setFlag((f) => (f && f.out ? null : f)), FADE_MS));
     timers.current.push(window.setTimeout(() => setLanded((l) => (l === pd.key ? null : l)), FADE_MS + HOLD_MS));
   };
 
@@ -118,7 +127,7 @@ export function DrawOutputPage() {
     const p = data.picks[data.picks.length - 1];
     const fresh = !!before && data.picks.length > before.picks.length && !!p;
     if (!before) return;
-    if (data.overview) { stopAll(); setSpot(null); return; }
+    if (data.overview) { stopAll(); void sendBack(); return; }
     if (data.picks.length < before.picks.length || (before.current && !data.current)) { stopAll(); if (!data.focus) void sendBack(); else void bringIn(data.focus); return; }
     if (fresh) {
       stopAll();
@@ -137,7 +146,7 @@ export function DrawOutputPage() {
         }
         setFlag({ teamId: p.teamId, out: false });
         await later(Math.max(1, data.flightDelay) * 1000, () => { setFlag({ teamId: p.teamId, out: true }); setHidden(null); setLanded(key); });
-        await later(FADE_MS, () => setFlag(null));
+        await later(FADE_MS, () => setFlag((f) => (f && f.out ? null : f)));
         await later(HOLD_MS, () => {});
         busy.current = false;
         const now = prev.current;
@@ -154,13 +163,21 @@ export function DrawOutputPage() {
     else if (!data.focus && spotRef.current) void sendBack();
   }, [data]);
 
+  // the all-groups view: fades out before the idle centre fades in
+  const ovNow = !!data && ovWanted(data, data.pool.length > 0 && data.picks.length >= data.pool.length, busy.current, !!spot);
+  useEffect(() => {
+    if (ovWas.current && !ovNow) { setOvLeaving(true); const t = window.setTimeout(() => setOvLeaving(false), 500); ovWas.current = ovNow; return () => clearTimeout(t); }
+    if (ovNow) setOvLeaving(false);
+    ovWas.current = ovNow;
+  }, [ovNow]);
+
   if (!data) return <div style={{ width: '100vw', height: '100vh', background: '#0b5ea8' }} />;
 
   const teams = new Map(data.teams.map((t) => [t.id, t]));
   const picked = new Map(data.picks.map((p) => [p.teamId, p]));
   const pool = data.pool.map((id) => teams.get(id)).filter((t): t is OutTeam => !!t);
   const done = pool.length > 0 && data.picks.length >= pool.length;
-  const overview = data.overview || (done && !busy.current && !spot && !data.focus);
+  const overview = ovWanted(data, done, busy.current, !!spot);
   const flagTeam = flag ? teams.get(flag.teamId) ?? null : null;
   const empty = data.emptyStyle ?? 'bars';
   const S = data.stripWidth ?? 300;
@@ -185,11 +202,12 @@ export function DrawOutputPage() {
                 const p = picked.get(t.id);
                 const isCur = flag?.teamId === t.id;
                 return (
-                  <div key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH, ...(isCur ? { background: t.gradient } : {}) }}>
+                  <Row key={t.id} className={`dr-row dr-pool-row${p && !isCur ? ' is-done' : ''}${isCur ? ' is-current' : ''}`} style={{ height: rowH }}
+                    content={p && !isCur ? p.group : ''} bg={t.gradient} lit={isCur}>
                     <Flag team={t} className="dr-row-flag" />
                     <span className="dr-row-code">{t.code}</span>
                     {p && !isCur && <span className="dr-tag">{p.group}</span>}
-                  </div>
+                  </Row>
                 );
               })}
               {pool.length === 0 && <div className="dr-empty-note">Add the teams to the draw pool in the dashboard (DRAW).</div>}
@@ -212,17 +230,17 @@ export function DrawOutputPage() {
 
         {/* centre */}
         <div className="dr-mid">
-          <img className="dr-header" src={`/api/draw/output/header.png?v=${data.seq}`} alt="" />
+          <img className="dr-header" src={`/api/draw/output/header.png?v=${data.headerV ?? 0}`} alt="" />
           <main ref={centre} className="dr-centre">
-            {!overview && (
+            {!overview && !ovLeaving && (
               <div className="dr-idle-wrap"><div key={`idle${data.picks.length}`} className="dr-idle">
                 <div className="dr-pill dr-pill-big">{data.caption}</div>
                 <div className="dr-idle-big">{data.picks.length === 0 ? 'The Draw' : done ? 'Draw complete' : 'Next team'}</div>
                 <div className="dr-idle-count"><b>{data.picks.length}</b> / {pool.length} teams drawn</div>
               </div></div>
             )}
-            {overview && (
-              <div key="overview" className="dr-overview">
+            {(overview || ovLeaving) && (
+              <div key="overview" className={`dr-overview${overview ? '' : ' is-out'}`}>
                 {data.board.map(({ letter: g, slots: rows }, gi) => (
                   <div key={g} className="dr-box dr-ov-col" style={{ animationDelay: `${250 + gi * 120}ms` }}>
                     <div className="dr-box-label">GROUP {g}</div>
@@ -230,10 +248,10 @@ export function DrawOutputPage() {
                       const p = data.picks.find((x) => x.group === g && x.place === i + 1);
                       const t = row.teamId ? teams.get(row.teamId) : p ? teams.get(p.teamId) : undefined;
                       return (
-                        <div key={i} className={`dr-row dr-ov-row${t ? '' : ' is-empty'}`}>
+                        <Row key={i} className={`dr-row dr-ov-row${t ? '' : ' is-empty'}`} content={t?.id ?? ''}>
                           {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span><span className="dr-ov-name">{t.name}</span></>
                             : <EmptyPlace style={empty} text={row.text} />}
-                        </div>
+                        </Row>
                       );
                     })}
                   </div>
@@ -272,11 +290,30 @@ function GroupRows({ g, rows, data, teams, hidden, landed, empty }: {
     const t = row.teamId ? teams.get(row.teamId) : p && hidden !== key ? teams.get(p.teamId) : undefined;
     const fresh = !!t && landed === key;
     return (
-      <div key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} style={fresh ? { background: t!.gradient } : undefined}>
+      <Row key={key} className={`dr-row dr-slot${t ? ' is-filled' : ' is-empty'}${fresh ? ' is-landed' : ''}`} content={t?.id ?? ''} bg={t?.gradient} lit={fresh}>
         {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span></> : <EmptyPlace style={empty} text={row.text} />}
-      </div>
+      </Row>
     );
   })}</>;
+}
+
+/** Whether the centre shows all groups (switched on, or every team drawn and nothing else on). */
+function ovWanted(d: Out, done: boolean, busy: boolean, spot: boolean) { return d.overview || (done && !busy && !spot && !d.focus); }
+
+/**
+ * A row whose content cross-fades when it changes (a team arriving, leaving, a group tag), and whose highlight
+ * (the team's gradient) fades in and out. The first content shows without a fade.
+ */
+function Row({ className, style, content, bg, lit = false, children }: { className: string; style?: CSSProperties; content: string; bg?: string; lit?: boolean; children: ReactNode }) {
+  const was = useRef(content);
+  const [n, setN] = useState(0);
+  useLayoutEffect(() => { if (was.current !== content) { was.current = content; setN((x) => x + 1); } }, [content]);
+  return (
+    <div className={className} style={style}>
+      {bg !== undefined && <span className="dr-row-bg" style={{ background: bg, opacity: lit ? 1 : 0 }} />}
+      <span key={n} className={`dr-cell${n ? ' dr-in' : ''}`}>{children}</span>
+    </div>
+  );
 }
 
 /** A place still to be drawn: soft bars where the flag and the code will be, three dots, or its text (DRAW). */
@@ -385,7 +422,14 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-pool-row { transition: opacity .6s; gap: 14px; padding: 0 12px; }
 .dr-pool-row .dr-row-flag { width: 54px; height: 36px; }
 .dr-pool-row.is-done { opacity: .42; }
-.dr-pool-row.is-current { box-shadow: 0 6px 18px rgba(0,0,0,.3); animation: dr-pulse 1.4s ease-in-out infinite; }
+.dr-pool-row.is-current { animation: dr-pulse 1.4s ease-in-out infinite; }
+.dr-row-bg { position: absolute; inset: 0; border-radius: inherit; transition: opacity .6s ease; pointer-events: none; }
+.dr-pool-row.is-current .dr-row-bg { box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+.dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
+.dr-in { animation: dr-fade-in .6s ease both; }
+.dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
+.dr-overview.is-out { animation: dr-fade-out .5s ease both; }
+.dr-tag { transition: opacity .4s; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
 
 .dr-groups { justify-content: space-between; gap: 10px; }
@@ -413,7 +457,7 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 /* the flag of the team drawn */
 .dr-cflag { position: absolute; z-index: 9; border-radius: 14px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,20,60,.45);
   animation: dr-flag-in .6s ${EASE} both; transition: opacity ${FADE_MS}ms ease, transform ${FADE_MS}ms ease; }
-.dr-cflag.is-out { opacity: 0; transform: scale(1.04); }
+.dr-cflag.is-out { animation: dr-flag-out ${FADE_MS}ms ease both; }
 .dr-cflag-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .dr-cflag-none { position: absolute; inset: 0; font-size: 140px; }
 .dr-cflag-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 20px 34px; text-align: center; font-size: 92px; font-weight: 600; line-height: 1;
@@ -433,6 +477,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 
 @keyframes dr-wave { 0%, 100% { transform: translateY(calc(var(--a) * -1)); filter: brightness(1.08); } 50% { transform: translateY(var(--a)); filter: brightness(.88); } }
 @keyframes dr-fade-up { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+@keyframes dr-flag-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(1.03); } }
+@keyframes dr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dr-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes dr-flag-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
 @keyframes dr-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
 @keyframes dr-land { 0% { filter: brightness(1.6); transform: scale(1.06); } 100% { filter: none; transform: none; } }
