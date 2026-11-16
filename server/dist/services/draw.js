@@ -34,11 +34,16 @@ export const drawConfigSchema = z.object({
     stripWidth: z.number().int().min(160).max(420),
     /** how a place still to be drawn looks: soft bars where the flag and code go, three dots, or the word DRAW */
     emptyStyle: z.enum(['bars', 'dots', 'text']),
+    /**
+     * false (default): every step on the operator's key: the flag stays until FLAG OFF, the group stays in the centre
+     * until GROUP BACK. true: the flag goes after flightDelay seconds and the group goes back by itself.
+     */
+    autoSteps: z.boolean(),
 });
 const CFG = 'draw.config';
 const STATE = 'draw.state';
-const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300, emptyStyle: 'bars' };
-const EMPTY = { picks: [], current: null, overview: false, focus: null, seq: 0 };
+const DEFAULT_CFG = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300, emptyStyle: 'bars', autoSteps: false };
+const EMPTY = { picks: [], current: null, overview: false, focus: null, flag: false, seq: 0 };
 export function getDrawConfig(db) {
     try {
         return drawConfigSchema.parse({ ...DEFAULT_CFG, ...JSON.parse(getSetting(db, CFG) || '{}') });
@@ -216,7 +221,7 @@ export class Draw {
         const video = (id) => { const f = flagVideoPath(this.ctx.assetsDir, id); return f ? `/api/draw/output/video/${id}?v=${Math.round(fs.statSync(f).mtimeMs)}` : null; };
         const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, video: video(t.id), gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
         const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, focus: st.focus ?? null, emptyStyle: cfg.emptyStyle, next: nextDrawGroup(board, st.picks) };
+        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, focus: st.focus ?? null, flag: !!st.flag, autoSteps: cfg.autoSteps, emptyStyle: cfg.emptyStyle, next: nextDrawGroup(board, st.picks) };
     }
     flagFile(teamId) {
         const t = this.allTeams().find((x) => x.id === teamId);
@@ -250,7 +255,8 @@ export class Draw {
      * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE> draws a team: it goes straight to the next
      * free place of the group with the fewest teams (nextDrawGroup). group:<A–D> moves the team just drawn to another
      * group (a correction). focus brings the group the next team goes to into the centre (focus:<A–D> a given one,
-     * focus:off sends it back). undo, clear, overview (on/off), overview:on|off, reset.
+     * focus:off sends it back). With manual steps the team's flag stays until reveal (FLAG OFF: the team shows in its
+     * group) and the group stays in the centre until back. undo, clear, overview (on/off), overview:on|off, reset.
      */
     /** The group the next team drawn goes to. */
     nextGroup() { return nextDrawGroup(this.board(), this.state.picks); }
@@ -277,7 +283,8 @@ export class Draw {
                 if (!g)
                     throw badRequest('Every group is full.');
                 const pick = { teamId: t.id, group: g, place: places(g)[groupCount(g)] };
-                next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false, focus: null };
+                const auto = this.config.autoSteps;
+                next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false, focus: auto ? null : g, flag: !auto };
                 break;
             }
             case 'group': {
@@ -299,9 +306,9 @@ export class Draw {
             case 'undo': {
                 // the last team drawn goes back to the pool
                 if (st.picks.length)
-                    next = { ...st, picks: st.picks.slice(0, -1), current: null, focus: null };
+                    next = { ...st, picks: st.picks.slice(0, -1), current: null, focus: null, flag: false };
                 else if (st.current || st.focus)
-                    next = { ...st, current: null, focus: null };
+                    next = { ...st, current: null, focus: null, flag: false };
                 break;
             }
             case 'focus': {
@@ -310,14 +317,22 @@ export class Draw {
                     throw badRequest(`Group ${arg}? Use A–D.`);
                 if (!g && arg !== 'off')
                     throw badRequest('Every group is full.');
-                next = { ...st, focus: g, overview: false };
+                next = { ...st, focus: g, overview: false, flag: false };
                 break;
             }
+            case 'reveal': // the flag goes, the team stands in its group
+                if (!st.flag)
+                    throw badRequest('No flag on the screen.');
+                next = { ...st, flag: false };
+                break;
+            case 'back':
+                next = { ...st, focus: null, flag: false };
+                break;
             case 'clear':
-                next = { ...st, current: null, focus: null };
+                next = { ...st, current: null, focus: null, flag: false };
                 break;
             case 'overview':
-                next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview, focus: null };
+                next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview, focus: null, flag: false };
                 break;
             case 'reset':
                 next = { ...EMPTY };
@@ -352,7 +367,9 @@ export class Draw {
             rows[2][i] = { action: `group:${g}`, text: `GROUP ${g}\\n${n}/${cap}${nxt ? ' NEXT' : ''}`, bg: just ? '#d97706' : full ? '#27272a' : nxt ? '#0f766e' : '#134e4a', fg: full ? '#71717a' : '#ffffff' };
         });
         const nx = nextDrawGroup(board, st.picks);
-        rows[2][4] = { action: 'focus', text: nx ? `GROUP ${nx}\\n▶ CENTRE` : 'GROUPS\\nFULL', bg: st.focus ? '#d97706' : nx ? '#1d4ed8' : '#27272a', fg: '#ffffff' };
+        rows[2][4] = { action: 'focus', text: nx ? `GROUP ${nx}\\n▶ CENTRE` : 'GROUPS\\nFULL', bg: st.focus && !st.flag && st.focus === nx ? '#d97706' : nx ? '#1d4ed8' : '#27272a', fg: '#ffffff' };
+        rows[3][1] = { action: 'reveal', text: 'FLAG OFF\\nTEAM IN', bg: st.flag ? '#d97706' : '#3f3f46', fg: st.flag ? '#ffffff' : '#a1a1aa' };
+        rows[3][2] = { action: 'back', text: st.focus ? `GROUP ${st.focus}\\nBACK` : 'GROUP\\nBACK', bg: st.focus ? '#0f766e' : '#3f3f46', fg: st.focus ? '#ffffff' : '#a1a1aa' };
         rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
         rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
         rows[2][7] = { action: 'undo', text: 'UNDO', bg: '#7c2d12', fg: '#ffffff' };
