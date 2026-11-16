@@ -304,8 +304,8 @@ function GroupRows({ g, rows, data, teams, hidden, landed, empty }: {
   })}</>;
 }
 
-/** Whether the centre shows all groups (switched on, or every team drawn and nothing else on). */
-function ovWanted(d: Out, done: boolean, busy: boolean, spot: boolean) { return d.overview || (done && !busy && !spot && !d.focus); }
+/** Whether the centre shows all groups: only when the operator switches it on (ALL GROUPS), also after the last team. */
+function ovWanted(d: Out, _done: boolean, _busy: boolean, _spot: boolean) { return d.overview; }
 
 /**
  * A row whose content cross-fades when it changes (a team arriving, leaving, a group tag), and whose highlight
