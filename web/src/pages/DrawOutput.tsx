@@ -228,7 +228,7 @@ export function DrawOutputPage() {
   const flagTeam = flag ? teams.get(flag.teamId) ?? null : null;
   const empty = data.emptyStyle ?? 'bars';
   const S = data.stripWidth ?? 300;
-  // the list stays in the upper part of the left strip: the host stands in front of its lower part
+  // the list fills the left strip to the bottom, its teams spread evenly over the height
   const rowH = Math.min(50, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
   const fontCss = data.fonts.map((w) => `@font-face { font-family: 'DrawGS'; font-weight: ${w}; font-display: block; src: url('/api/matchboard/fonts/general-sans-${w}'); }`).join('\n');
@@ -515,7 +515,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-stage.is-overview .dr-mid { left: 0; width: ${W}px; }
 .dr-stage.is-overview .dr-header { width: ${W}px; max-height: 420px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.dr-pool { flex: none; padding: 8px 2px; display: flex; flex-direction: column; gap: 6px; }
+.dr-pool { flex: 1; min-height: 0; padding: 8px 2px; display: flex; flex-direction: column; justify-content: space-evenly; }
+.dr-pool-row { flex: none; }
 .dr-pool-row { transition: opacity ${MOVE_MS}ms ${EASE}; gap: 14px; padding: 0 12px; }
 .dr-pool-row .dr-row-flag { width: 54px; height: 36px; }
 .dr-pool-row.is-done { opacity: .42; }
