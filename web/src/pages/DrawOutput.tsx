@@ -94,7 +94,7 @@ export function DrawOutputPage() {
   const done = pool.length > 0 && data.picks.length >= pool.length;
   const mode: 'overview' | 'team' | 'group' | 'idle' = data.overview || (done && !data.current) ? 'overview' : cur ? (data.current!.group ? 'group' : 'team') : 'idle';
   // the list stays in the upper part of the left strip: the host stands in front of its lower part
-  const rowH = Math.min(42, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
+  const rowH = Math.min(46, Math.floor((H - 24 - 46 - 40) / Math.max(pool.length, 1) - 6));
   // the uploaded General Sans weights (Graphics → matchboard fonts); a General Sans installed on the vMix PC comes first
   const fontCss = data.fonts.map((w) => `@font-face { font-family: 'DrawGS'; font-weight: ${w}; font-display: block; src: url('/api/matchboard/fonts/general-sans-${w}'); }`).join('\n');
 
@@ -233,28 +233,29 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-pill { height: 36px; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 20px; font-weight: 600;
   background: linear-gradient(90deg, #d3deed 0%, #f4f8fc 40%, #ffffff 50%, #f4f8fc 60%, #d3deed 100%);
   clip-path: polygon(10px 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 10px 100%, 0 50%); box-shadow: 0 2px 6px rgba(0,0,0,.15); }
-.dr-panel { border: 1.5px solid rgba(255,255,255,.75); border-radius: 22px; padding: 10px 9px; }
+.dr-panel { border: 1.5px solid rgba(255,255,255,.75); border-radius: 22px; padding: 8px 6px; }
 .dr-box { background: linear-gradient(180deg, rgba(9,70,150,.42), rgba(9,70,150,.28)); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,30,80,.18); }
-.dr-box-label { height: 30px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; letter-spacing: .02em; position: relative; }
+.dr-box-label { height: 32px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; letter-spacing: .02em; position: relative; }
 .dr-box-label::after { content: ''; position: absolute; left: 12%; right: 12%; bottom: 2px; height: 1.5px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); }
-.dr-row { display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 7px; position: relative; }
-.dr-row-flag { width: 33px; height: 22px; flex: none; }
-.dr-row-code { font-size: 22px; font-weight: 600; letter-spacing: .01em; }
+.dr-row { display: flex; align-items: center; gap: 10px; padding: 0 8px; border-radius: 7px; position: relative; }
+.dr-row-flag { width: 45px; height: 30px; flex: none; }
+.dr-row-code { font-size: 34px; font-weight: 600; letter-spacing: .01em; line-height: 1; }
 .dr-flag { display: block; object-fit: cover; border-radius: 3px; box-shadow: 0 0 0 .6px rgba(216,225,239,.9); }
 .dr-flag-none { display: grid; place-items: center; background: #33415f; color: #fff; font-weight: 700; font-size: 10px; }
 .dr-flag-slot { position: absolute; left: 12px; visibility: hidden; }
 /* an empty place reads as on the matchboard: its text (DRAW 1…) centred */
-.dr-slot-place { flex: 1; text-align: center; font-size: 18px; font-weight: 500; color: #fff; }
+.dr-slot-place { flex: 1; text-align: center; font-size: 26px; font-weight: 500; color: #fff; }
 /* the 1ST / 2ND tags of the matchboard, here the group a team went to */
-.dr-tag { margin-left: auto; height: 22px; min-width: 30px; padding: 0 10px 0 7px; display: grid; place-items: center; background: #0d4ea8; color: #fff; font-size: 15px; font-weight: 600;
+.dr-tag { margin-left: auto; flex: none; height: 28px; min-width: 28px; padding: 0 10px 0 6px; display: grid; place-items: center; background: #0d4ea8; color: #fff; font-size: 20px; font-weight: 600;
   clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 0 100%); }
 
 .dr-strip { position: absolute; top: ${PANEL_TOP}px; width: ${STRIP_W - 20}px; height: ${H - PANEL_TOP - 12}px; z-index: 3; display: flex; flex-direction: column; gap: 10px; }
 .dr-left { left: 10px; }
 .dr-right { right: 10px; }
 .dr-strip .dr-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.dr-pool { flex: none; padding: 8px 4px; display: flex; flex-direction: column; gap: 6px; }
-.dr-pool-row { transition: opacity .6s; }
+.dr-pool { flex: none; padding: 8px 2px; display: flex; flex-direction: column; gap: 6px; }
+.dr-pool-row { transition: opacity .6s; gap: 8px; padding: 0 6px; }
+.dr-pool-row .dr-row-flag { width: 42px; height: 28px; }
 .dr-pool-row.is-done { opacity: .42; }
 .dr-pool-row.is-current { box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 6px 18px rgba(0,0,0,.3); animation: dr-pulse 1.4s ease-in-out infinite; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
@@ -262,9 +263,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-groups { justify-content: space-between; gap: 10px; }
 .dr-group { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding: 2px 4px 6px; transition: box-shadow .4s; }
 .dr-group.is-target { box-shadow: 0 0 0 2px rgba(255,255,255,.95), 0 0 24px rgba(255,255,255,.35); }
-.dr-slot { height: 40px; }
-.dr-slot .dr-row-flag { width: 33px; height: 22px; }
-.dr-slot .dr-row-code { font-size: 22px; }
+.dr-slot { height: 44px; }
+.dr-slot .dr-row-flag { width: 45px; height: 30px; }
+.dr-slot .dr-row-code { font-size: 34px; }
 .dr-slot.is-landed { animation: dr-land 1.3s ease-out; }
 
 .dr-centre { position: relative; flex: 1; min-height: 0; overflow: hidden; display: grid; place-items: center; }
@@ -298,8 +299,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-ov-col { padding: 6px 6px 10px; animation: dr-fade-up .6s ease-out both; }
 .dr-ov-col .dr-box-label { height: 48px; font-size: 22px; margin-bottom: 6px; }
 .dr-ov-row { height: 64px; flex-wrap: wrap; align-content: center; column-gap: 10px; row-gap: 0; }
-.dr-ov-row .dr-row-flag { width: 36px; height: 24px; }
-.dr-ov-row .dr-row-code { font-size: 24px; }
+.dr-ov-row .dr-row-flag { width: 45px; height: 30px; }
+.dr-ov-row .dr-row-code { font-size: 32px; }
 .dr-ov-name { width: 100%; font-size: 14px; font-weight: 500; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .dr-ghost { position: absolute; z-index: 10; transform-origin: 0 0; pointer-events: none; }
