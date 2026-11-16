@@ -493,17 +493,15 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const after = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
     expect(after.keys[1].slice(4, 6).map((x) => x?.action)).toEqual(['show:ticker', 'show:tickertop']);
-    // the bottom ticker on the break scene's ticker channel (3), a board on OV1 leaves it on
+    // the bottom ticker on its own on channel 1 (channels 3 and 4 serve only with the L-bar)
     await show.run('show:ticker');
-    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
-    await show.run('show:welcome');
-    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
-    expect(v.overlays[1]).toBe(v.num('ssl_welcome'));
+    expect(v.overlays[1]).toBe(v.num('ssl_ticker'));
+    expect(v.overlays[3] ?? '').toBe('');
     // the top ticker: its first version (General graphics → Top ticker) on channel 2
     await show.run('show:tickertop');
     expect(v.overlays[2]).toBe(v.num('ssl_ticker_top'));
     expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_ticker_top')}&SelectedName=Ticker1.Text&Value=${repeatLoop('SSL GOLD CUP 2026 I ')}`);
-    expect(v.overlays[3]).toBe(v.num('ssl_ticker'));
+    expect(v.overlays[1]).toBe(v.num('ssl_ticker'));
     // a top ticker version on its key (TICKERS, bottom row): a new one is on the next key at once
     createGraphicSet(s.db, ev, 'tickertop', 'Breaking', { items: 'Live now' });
     show.invalidate();
@@ -516,7 +514,7 @@ describe('show control', () => {
     await show.run('tickertop:2');
     expect(v.overlays[2] ?? '').toBe('');
     await show.run('show:ticker');
-    expect(v.overlays[3] ?? '').toBe('');
+    expect(v.overlays[1] ?? '').toBe('');
     // the top ticker's channel is set on Show control
     setShowConfig(s.db, { tickerTopLayer: 4 });
     await show.run('show:tickertop');
@@ -597,16 +595,17 @@ describe('show control', () => {
     const { s, ev, f1, f2 } = race();
     createPerson(s.db, ev, { name: 'Ana Costa', role: 'Host commentator', title: 'Host' });
     createPerson(s.db, ev, { name: 'BEN', surname: 'lee', role: 'Guest', title: 'Olympic champion' });
-    const [, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
+    const [k1, k2] = [f1, f2].map((f) => groupLetter(f.name).replace(/[^A-Za-z0-9]+/g, '').toUpperCase());
     const v = fakeVmix({ ...TITLES, ssl_lt_comm_nophoto: ['Top text.Text', 'Bottom text.Text'], [`ssl_compare_${k2}`]: ['1 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const people = (await show.view()).pages.find((p) => p.name === 'PEOPLE')!;
     expect(people.keys[0].slice(0, 3).map((k) => k?.text)).toEqual(['ANA COSTA', 'BEN\\nLEE', '']);
     await show.run('person:2');
     expect(v.calls).toContain(`?Function=SetText&Input=k${v.num('ssl_lt_comm_nophoto')}&SelectedName=Top text.Text&Value=Ben LEE`);
-    // only the group whose input is in vMix gets a COMPARE key
+    // every group of the stage has a COMPARE key, and a RESULTS key under it, before its input is in vMix
     const compare = show.pages().find((p) => p.name === 'COMPARE')!;
-    expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k2}`]);
+    expect(compare.keys[0].filter(Boolean).map((k) => k!.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
+    expect(compare.keys[1].filter(Boolean).map((k) => k!.action)).toEqual([`results:${k1}`, `results:${k2}`]);
   });
 
   it('every group of the stage has its own Team comparison input and key', async () => {
@@ -666,8 +665,8 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, ssl_results_LCR: ['COUNTRY1.Text', 'COUNTRY2.Text'], ssl_compare_LCR: ['1 COUNTRY.Text', '2 COUNTRY.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.snapshot();
-    const after = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
-    expect(after.keys[0].map((x) => x?.action)).toContain('results:LCR');
+    const after = show.pages().find((p) => p.name === 'COMPARE')!;
+    expect(after.keys[1].map((x) => x?.action)).toContain('results:LCR');
     expect(show.pages().find((p) => p.name === 'COMPARE')!.keys[0].map((x) => x?.action)).toContain('compare:LCR');
     await show.run('results:LCR');
     expect(v.overlays[1]).toBe(v.num('ssl_results_LCR'));
@@ -723,9 +722,9 @@ describe('show control', () => {
       [`ssl_compare_${k1}`]: ['1 FLAG.Source', '2 FLAG.Source', '3 FLAG.Source', '4 FLAG.Source'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     await show.snapshot();
-    // a RESULTS key per group on the AFTER / BREAK page, each with its own input
-    const page = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
-    expect(page.keys[0].slice(4, 6).map((x) => x?.action)).toEqual([`results:${k1}`, `results:${k2}`]);
+    // a RESULTS key per group on the COMPARE page, under its comparison, each with its own input
+    const page = show.pages().find((p) => p.name === 'COMPARE')!;
+    expect(page.keys[1].slice(0, 2).map((x) => x?.action)).toEqual([`results:${k1}`, `results:${k2}`]);
     expect(await show.run(`results:${k2}`)).toMatchObject({ in: 'results' });
     expect(v.overlays[1]).toBe(v.num(`ssl_results_${k2}`));
     await show.run(`results:${k2}`);

@@ -124,7 +124,7 @@ function Show({ data }: { data: ShowData }) {
           </>}
         </div>
         <p className="mb-3 text-sm text-ink-400">
-          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end; TICKER and TOP TICKER ON / OFF on the AFTER / BREAK page); deck 2 has TEAMS (16 keys in group order, A1–A4, B1–B4…; each opens the team's page with its lower thirds TEAM LT, QUALIFIED and LINEUP LT and its places with the sailors' names and shirt numbers, PHOTO mode; a place with no team yet shows its name, A1…, until a team is put there), every announcement (BUGS OFTEN, BUGS RARE), every ticker and top ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
+          Both Stream Decks as the Companion preset has them, for testing and preview: the show runs from the decks. Deck 1 runs the programme (before, after, break, end; TICKER ON / OFF on channel 1 and TOP TICKER ON / OFF on the AFTER / BREAK page; COMPARE holds each group's Team comparison with its RESULTS, Provisional overall, under it); deck 2 has TEAMS (16 keys in group order, A1–A4, B1–B4…; each opens the team's page with its lower thirds TEAM LT, QUALIFIED and LINEUP LT and its places with the sailors' names and shirt numbers, PHOTO mode; a place with no team yet shows its name, A1…, until a team is put there), every announcement (BUGS OFTEN, BUGS RARE), every ticker and top ticker (TICKERS) and everyone in People (PEOPLE) on a key of its own, a new one at once. Pressing a key sends its General graphics data straight into the vMix title before it comes in.
           A key brings its graphic in and a second press takes it out. Team and sailor keys are in the team's national colours; on air (●) and selected (▶) show in the team's colours too. Other keys: red = on air (read from vMix), amber = selected. The bottom row is the same on every page.
         </p>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -132,10 +132,15 @@ function Show({ data }: { data: ShowData }) {
             const pages = data.pages.filter((p) => p.deck === d);
             const p = pages[deck[d] ?? 0] ?? pages[0];
             return (
-              <div key={d}>
-                <div className="mb-1 flex items-center gap-2 text-xs text-ink-400">
-                  <b className="text-ink-200">Deck {d}</b>
-                  {pages.map((x, i) => <button key={x.page} onClick={() => setDeck({ ...deck, [d]: i })} className={cx('rounded px-2 py-0.5', x === p ? 'bg-ink-700 text-ink-50' : 'hover:bg-ink-800')}>p{x.page} {x.name}</button>)}
+              <div key={d} className="min-w-0">
+                <div className="mb-1 flex min-w-0 items-center gap-1 text-xs text-ink-400">
+                  <b className="mr-1 shrink-0 text-ink-200">Deck {d}</b>
+                  {/* the deck's pages scroll sideways (16 team pages and more); ◀ ▶ step through them */}
+                  <button type="button" className="shrink-0 rounded px-1.5 py-0.5 hover:bg-ink-800 disabled:opacity-30" disabled={pages.indexOf(p) <= 0} onClick={() => setDeck({ ...deck, [d]: Math.max(0, pages.indexOf(p) - 1) })} title="Previous page">◀</button>
+                  <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:thin]">
+                    {pages.map((x, i) => <button key={x.page} ref={x === p ? keepInView : undefined} onClick={() => setDeck({ ...deck, [d]: i })} className={cx('shrink-0 rounded px-2 py-0.5', x === p ? 'bg-ink-700 text-ink-50' : 'hover:bg-ink-800')}>p{x.page} {x.name}</button>)}
+                  </div>
+                  <button type="button" className="shrink-0 rounded px-1.5 py-0.5 hover:bg-ink-800 disabled:opacity-30" disabled={pages.indexOf(p) >= pages.length - 1} onClick={() => setDeck({ ...deck, [d]: Math.min(pages.length - 1, pages.indexOf(p) + 1) })} title="Next page">▶</button>
                 </div>
                 <div className="grid grid-cols-8 gap-1.5">
                   {p.keys.flatMap((row, r) => row.map((k, c) => {
@@ -267,6 +272,15 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
 }
 
 type CompanionStatus = { enabled: boolean; labels: boolean; companionUrl: string; at?: string | null; sent?: number; unchanged?: number; missing?: number; error?: string | null };
+
+/** The picked page's tab kept in view in its sideways-scrolling row (only that row scrolls, never the page). */
+function keepInView(el: HTMLElement | null) {
+  const row = el?.parentElement;
+  if (!el || !row) return;
+  const l = el.offsetLeft - row.offsetLeft, r = l + el.offsetWidth;
+  if (l < row.scrollLeft) row.scrollLeft = l - 8;
+  else if (r > row.scrollLeft + row.clientWidth) row.scrollLeft = r - row.clientWidth + 8;
+}
 
 function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
   const { c, setC, dirty, save } = useConfig(data, onSaved);
