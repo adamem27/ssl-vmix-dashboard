@@ -120,6 +120,10 @@ export interface FleetSetDetail {
   assignedTeamIds: string[];
 }
 
+/** A team starred (through) on the matchboard in an earlier stage: its box and place there. */
+export interface StarredTeam { teamId: string; box: string; place: number; round: number | null }
+export interface PreparedStage { setId: string; name: string; created: boolean; groupsCreated: string[]; placed: number; cleared: number }
+
 export interface FieldValue { value: string; source: string | null; manual: string | null; origin: 'manual' | 'source' | 'empty' }
 export interface Member {
   id: string; origin: 'manual' | 'import'; sort: number; sourceName: string | null; inSource: boolean; hasSource: boolean;

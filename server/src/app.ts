@@ -13,6 +13,7 @@ import { OwnerType, SAILOR_SLOTS, TEAM_SLOTS } from './services/slots.js';
 import { createTeam, deleteTeam, getTeam, listTeams, updateTeam } from './services/teams.js';
 import { createSailor, setCaptain, deleteSailor, getSailor, listSailors, updateSailor } from './services/sailors.js';
 import * as fleets from './services/fleets.js';
+import { prepareFinalSeries, starredForSet } from './services/stages.js';
 import * as decl from './services/declarations.js';
 import * as ranking from './services/ranking.js';
 import * as mb from './services/matchboard/matchboard.js';
@@ -276,7 +277,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const b = z.object({ name: str(120).min(1, 'Name is required'), fleetCount: z.number().int().min(0).max(30).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
     return fleets.getSetDetail(db, fleets.createSet(db, ev().id, b.name.trim(), b.fleetCount ?? 0, b.fleetSize));
   });
+  // the 1/32 Finals … Quarterfinals, groups A–D of four places, ready to be filled (nothing existing is removed)
+  app.post('/api/fleet-sets/prepare-final-series', async (req) => {
+    const b = z.object({ fromMatchboard: z.boolean().optional(), clear: z.boolean().optional() }).parse(req.body ?? {});
+    return { stages: prepareFinalSeries(db, ev().id, b), sets: fleets.listSets(db, ev().id) };
+  });
   app.get<{ Params: { id: string } }>('/api/fleet-sets/:id', async (req) => fleets.getSetDetail(db, req.params.id));
+  // teams starred (through) on the matchboard in the stages before this one
+  app.get<{ Params: { id: string } }>('/api/fleet-sets/:id/starred', async (req) => starredForSet(db, req.params.id));
   app.patch<{ Params: { id: string } }>('/api/fleet-sets/:id', async (req) => {
     const b = z.object({ name: str(120).min(1).optional(), fleetSize: fleetSize.optional() }).parse(req.body);
     if (b.name !== undefined) fleets.renameSet(db, req.params.id, b.name.trim());

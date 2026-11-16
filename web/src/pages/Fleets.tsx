@@ -3,9 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   DndContext, DragEndEvent, DragOverlay, DragStartEvent, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors,
 } from '@dnd-kit/core';
-import { api, ApiError, FleetSetDetail, FleetSetSummary, Team } from '../api';
+import { api, ApiError, FleetSetDetail, FleetSetSummary, PreparedStage, StarredTeam, Team } from '../api';
 import { useStageTeams } from '../components/StagePicker';
 import { TeamProfileLink } from '../components/TeamProfileLink';
+import { starredWhere } from '../../../server/src/services/matchboard/rounds';
 import { Badge, Button, cx, Empty, ErrorBox, Field, Loading, Modal, useConfirm, useToast } from '../components/ui';
 
 type Occupied = { teamId: string; fleetId: string; position: number; occupantId: string; from: { fleetId: string; position: number; fleetName: string } | null; freePositions: number[] };
@@ -23,6 +24,7 @@ export function FleetsPage() {
   const [poolSearch, setPoolSearch] = useState('');
   const stage = useStageTeams();
   const [allTeams, setAllTeams] = useState(false);
+  const [prepareOpen, setPrepareOpen] = useState(false);
 
   useEffect(() => {
     if (!sets.data) return;
@@ -32,11 +34,16 @@ export function FleetsPage() {
 
   const detail = useQuery({ queryKey: ['fleet-set', setId], queryFn: () => api.get<FleetSetDetail>(`/api/fleet-sets/${setId}`), enabled: !!setId });
   const teamById = useMemo(() => new Map((teams.data ?? []).map((t) => [t.id, t])), [teams.data]);
+  // teams starred on the matchboard in earlier stages: they are through, so they come first wherever a team is picked
+  const starredQ = useQuery({ queryKey: ['fleet-set-starred', setId], queryFn: () => api.get<StarredTeam[]>(`/api/fleet-sets/${setId}/starred`), enabled: !!setId });
   const d = detail.data;
   const assigned = new Set(d?.assignedTeamIds ?? []);
+  const starred = (starredQ.data ?? []).filter((x) => teamById.has(x.teamId));
+  const starredOf = new Map(starred.map((x) => [x.teamId, x]));
+  const starredFree = starred.filter((x) => !assigned.has(x.teamId)).map((x) => teamById.get(x.teamId)!);
   // with a stage picked only its teams are offered, unless “all teams” is ticked (needed to build a stage)
   const offered = (teams.data ?? []).filter((t) => allTeams || stage.inStage(t.id) || assigned.has(t.id));
-  const pool = offered.filter((t) => !assigned.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
+  const pool = offered.filter((t) => !assigned.has(t.id) && !starredOf.has(t.id) && (!poolSearch || `${t.name} ${t.code}`.toLowerCase().includes(poolSearch.toLowerCase())));
   // a team also in the Last Chance / Qualification Race: its own group first
   const isLcr = (name: string) => /last\s*chance|\blcr\b|qualification\s*race|\bqr\b/i.test(name);
   const locate = (teamId: string) => {
@@ -53,6 +60,18 @@ export function FleetsPage() {
     else qc.invalidateQueries({ queryKey: ['fleet-set', setId] });
     qc.invalidateQueries({ queryKey: ['fleet-sets'] });
     qc.invalidateQueries({ queryKey: ['stage'] });
+  };
+
+  const prepared = (stages: PreparedStage[]) => {
+    setPrepareOpen(false);
+    qc.invalidateQueries({ queryKey: ['fleet-sets'] });
+    qc.invalidateQueries({ queryKey: ['fleet-set'] });
+    qc.invalidateQueries({ queryKey: ['fleet-set-starred'] });
+    qc.invalidateQueries({ queryKey: ['stage'] });
+    if (!stages.some((x) => x.setId === setId)) setSetId(stages[0]?.setId ?? setId);
+    const made = stages.filter((x) => x.created).length, groups = stages.filter((x) => !x.created).reduce((n, x) => n + x.groupsCreated.length, 0);
+    const placed = stages.reduce((n, x) => n + x.placed, 0), cleared = stages.reduce((n, x) => n + x.cleared, 0);
+    toast.ok([made ? `${made} stage(s) created` : 'Stages ready', groups > 0 ? `${groups} group(s) added` : '', cleared ? `${cleared} place(s) emptied` : '', placed ? `${placed} team(s) taken from the matchboard` : ''].filter(Boolean).join(' · '));
   };
 
   const place = async (teamId: string, fleetId: string, position: number | undefined, onOccupied?: 'swap') => {
@@ -152,6 +171,7 @@ export function FleetsPage() {
         )}
         {setId && <Button onClick={() => setNameModal({ mode: 'renameSet', initial: d?.set.name ?? '' })}>Rename</Button>}
         {setId && <Button variant="danger" onClick={deleteSet}>Delete set</Button>}
+        <Button onClick={() => setPrepareOpen(true)} title="1/32 Finals, 1/16 Finals, 1/8 Finals and Quarterfinals, each with groups A–D of four places">Prepare Final Series</Button>
         <Button variant="primary" onClick={() => setNameModal({ mode: 'newSet', initial: `Round ${(sets.data?.length ?? 0) + 1}` })}>+ New set</Button>
       </div>
 
@@ -173,6 +193,14 @@ export function FleetsPage() {
                 </label>
               )}
               <input className="input mt-2" type="search" placeholder="Filter…" value={poolSearch} onChange={(e) => setPoolSearch(e.target.value)} aria-label="Filter available teams" />
+              {starredFree.length > 0 && (
+                <div className="mt-2 rounded-md border border-amber-800/60 bg-amber-950/20 p-1.5">
+                  <h3 className="mb-1 text-xs font-semibold text-amber-300" title="Teams starred (through) on the matchboard in earlier stages. Drag them into a group, or pick them in a place.">★ Through from earlier stages</h3>
+                  <ul className="space-y-1">
+                    {starredFree.map((t) => <li key={t.id}><TeamChip team={t} starred={starredOf.get(t.id)} /></li>)}
+                  </ul>
+                </div>
+              )}
               <ul className="mt-2 max-h-[60vh] space-y-1 overflow-auto pr-1">
                 {pool.map((t) => (
                   <li key={t.id}><TeamChip team={t} /></li>
@@ -229,8 +257,13 @@ export function FleetsPage() {
                               <select className="input flex-1 border-dashed py-1.5 text-xs text-ink-400" value="" aria-label={`Choose a team for place ${i + 1} in ${f.name}`}
                                 onChange={(e) => { if (e.target.value) void place(e.target.value, f.id, i + 1); }}>
                                 <option value="">{f.placeholders?.[i] ? `${f.placeholders[i]}` : '—'}</option>
+                                {starredFree.length > 0 && (
+                                  <optgroup label="★ Through from earlier stages">
+                                    {starredFree.map((t) => <option key={t.id} value={t.id}>★ {t.code} – {t.name} ({starredWhere(starredOf.get(t.id)!)})</option>)}
+                                  </optgroup>
+                                )}
                                 <optgroup label="Available">
-                                  {offered.filter((t) => !assigned.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
+                                  {offered.filter((t) => !assigned.has(t.id) && !starredOf.has(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name}</option>)}
                                 </optgroup>
                                 <optgroup label={isLcr(f.name) ? 'Also from another group (stays there too)' : 'Move from another group'}>
                                   {(teams.data ?? []).filter((t) => assigned.has(t.id) && !f.positions.includes(t.id)).map((t) => <option key={t.id} value={t.id}>{t.code} – {t.name} ({locate(t.id)?.fleetName})</option>)}
@@ -250,6 +283,7 @@ export function FleetsPage() {
         </DndContext>
       )}
 
+      <PrepareModal open={prepareOpen} onClose={() => setPrepareOpen(false)} onDone={prepared} />
       <NameModal state={nameModal} onClose={() => setNameModal(null)} onSave={saveName} />
       <Modal open={!!occupied} onClose={() => setOccupied(null)} title="Place is occupied">
         {occupied && (
@@ -299,7 +333,7 @@ function Slot({ fleetId, position, children }: { fleetId: string; position: numb
   return <li ref={setNodeRef} className={cx('flex items-center gap-1 rounded-lg border border-ink-800 bg-ink-950/50 p-1', isOver && 'border-accent-400 bg-accent-500/10')}>{children}</li>;
 }
 
-function TeamChip({ team, compact, overlay }: { team?: Team; compact?: boolean; overlay?: boolean }) {
+function TeamChip({ team, compact, overlay, starred }: { team?: Team; compact?: boolean; overlay?: boolean; starred?: StarredTeam }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `team:${team?.id}`, data: { teamId: team?.id }, disabled: !team || overlay });
   if (!team) return <div className="px-2 py-1.5 text-xs text-red-300">Unknown team</div>;
   return (
@@ -313,6 +347,7 @@ function TeamChip({ team, compact, overlay }: { team?: Team; compact?: boolean; 
       <span className="w-10 shrink-0 font-mono text-xs text-ink-400">{team.code}</span>
       {!overlay && <TeamProfileLink teamId={team.id} name={team.name} className="-ml-1" />}
       <span className="truncate text-sm font-medium">{team.name}</span>
+      {starred && <span className="ml-auto shrink-0 text-[11px] text-amber-300" title={`Starred on the matchboard: ${starredWhere(starred)}`}>★ {starredWhere(starred)}</span>}
       {team.isDemo && !compact && <Badge tone="demo">Demo</Badge>}
     </div>
   );
@@ -329,6 +364,47 @@ function NameModal({ state, onClose, onSave }: { state: { mode: string; initial:
         <Field label="Name"><input className="input" value={v} onChange={(e) => setV(e.target.value)} required maxLength={120} /></Field>
         <div className="flex justify-end gap-2"><Button type="button" onClick={onClose}>Cancel</Button><Button type="submit" variant="primary" busy={busy} disabled={!v.trim()}>Save</Button></div>
       </form>
+    </Modal>
+  );
+}
+
+/**
+ * One click for the stages after the qualifiers: the 1/32 Finals, 1/16 Finals, 1/8 Finals and Quarterfinals, each with
+ * groups A–D (R1 A … QF D, the matchboard's names) of four places. Stages and teams already there are kept.
+ */
+function PrepareModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (stages: PreparedStage[]) => void }) {
+  const toast = useToast();
+  const [fromMatchboard, setFromMatchboard] = useState(false);
+  const [clear, setClear] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) { setFromMatchboard(false); setClear(false); } }, [open]);
+  const run = async () => {
+    setBusy(true);
+    try { onDone((await api.post<{ stages: PreparedStage[] }>('/api/fleet-sets/prepare-final-series', { fromMatchboard, clear })).stages); }
+    catch (e) { toast.error(e); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Prepare Final Series">
+      <div className="space-y-3 text-sm">
+        <p className="text-ink-300">
+          Makes the <b>1/32 Finals</b>, <b>1/16 Finals</b>, <b>1/8 Finals</b> and <b>Quarterfinals</b> ready to be filled in: each stage with groups
+          A–D of four places, named as on the matchboard (R1 A … R1 D, R2, EF, QF), so every graphic shows “Group A”. Empty places get the matchboard's
+          row text (DRAW 1, R1 C1 …) and show the “?” flag until a team is in.
+        </p>
+        <p className="text-xs text-ink-400">Stages and groups already there are kept with their teams; missing ones are added. The Qualifying Series is not touched. Safe to repeat.</p>
+        <label className="flex items-start gap-2 text-ink-200">
+          <input type="checkbox" className="mt-1" checked={fromMatchboard} onChange={(e) => setFromMatchboard(e.target.checked)} />
+          <span>Take the teams the matchboard shows in boxes R1 A … QF D into the empty places</span>
+        </label>
+        <label className="flex items-start gap-2 text-ink-200">
+          <input type="checkbox" className="mt-1" checked={clear} onChange={(e) => setClear(e.target.checked)} />
+          <span>Empty the team places of these four stages first <span className="text-ink-400">(teams stay in the database)</span></span>
+        </label>
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant={clear ? 'danger' : 'primary'} busy={busy} onClick={run}>{clear ? 'Empty and prepare' : 'Prepare'}</Button>
+        </div>
+      </div>
     </Modal>
   );
 }

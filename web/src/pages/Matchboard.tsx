@@ -5,6 +5,7 @@ import { TeamProfileLink } from '../components/TeamProfileLink';
 import { Button, cx, ErrorBox, fmtDateTime, Loading, useConfirm, useToast } from '../components/ui';
 import { drawMatchboard, resolveTeams, MbLayout, MbSlot, MbSlotState, MbState, MbTeam, MbText } from '../../../server/src/services/matchboard/draw';
 import { Gradient, Raster } from '../../../server/src/services/generator/render';
+import { roundOf, Starred, starredBefore, starredTeams, starredWhere } from '../../../server/src/services/matchboard/rounds';
 import { useStageTeams } from '../components/StagePicker';
 
 interface MbStatus { file: string; vmixPath: string | null; exists: boolean; lastWriteAt: string | null; error: string | null }
@@ -136,6 +137,10 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
     return m;
   }, [resolved, L, state.texts]); // eslint-disable-line react-hooks/exhaustive-deps
   const [drag, setDrag] = useState<{ group: string; index: number } | null>(null);
+  // teams starred in earlier boxes are through: a box's pickers list those of the rounds before it first, marked ★
+  const starredAll = useMemo(() => starredTeams(L, state), [L, state]);
+  const starredFor = (labelId: string) => starredBefore(starredAll, roundOf(state.texts[labelId] ?? texts.get(labelId)?.text))
+    .flatMap((x) => { const t = teamById.get(x.teamId); return t ? [{ team: t, from: x }] : []; });
 
   const pick = (id: string) => {
     const slot = slots.get(id);
@@ -184,7 +189,7 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
             <button key={k} onClick={() => setTab(k)} className={cx('px-3 py-1.5', tab === k ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{label}</button>
           ))}
         </div>
-        <span className="text-xs text-ink-500">Click any field on the preview to jump to it. Rows of a box are its standings (top = 1st): drag them or use ▲▼, and ★ a team to send it on to the row that waits for that place (e.g. “R1 C1”). {highlightTpl ? `Highlights use “${highlightTpl.name}” from the Elements tab in the team's V${highlightTpl.variant} colours.` : 'Choose a highlight element above to show highlights.'}</span>
+        <span className="text-xs text-ink-500">Click any field on the preview to jump to it. Rows of a box are its standings (top = 1st): drag them or use ▲▼, and ★ a team to send it on to the row that waits for that place (e.g. “R1 C1”). In the Final Series the team pickers list the teams starred in earlier rounds first (★ Through). {highlightTpl ? `Highlights use “${highlightTpl.name}” from the Elements tab in the team's V${highlightTpl.variant} colours.` : 'Choose a highlight element above to show highlights.'}</span>
       </div>
 
       {tab === 'titles' ? (
@@ -200,14 +205,14 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
               {secTexts.map((t) => <TextField key={t.id} t={t} value={state.texts[t.id] ?? ''} onChange={(v) => setText(t.id, v)} focus={focus === t.id} />)}
             </div>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
-              {groups.map((g) => (
+              {groups.map((g) => { const through = sec.kind === 'final' ? starredFor(g.labelId) : []; return (
                 <div key={g.id} className="rounded-lg border border-ink-800 bg-ink-950/40 p-2">
                   <div id={`mb-${g.labelId}`} className={cx('mb-2 rounded', focus === g.labelId && 'ring-2 ring-accent-400')}>
                     <input className="input py-1 text-center text-sm font-semibold" value={state.texts[g.labelId] ?? ''} onChange={(e) => setText(g.labelId, e.target.value)} aria-label="Box label" />
                   </div>
                   <ol className="space-y-1">
                     {g.slots.map((sid, i) => (
-                      <SlotRow key={sid} slot={slots.get(sid)!} value={state.slots[sid]} teams={sortedTeams} teamById={teamById} focus={focus === sid}
+                      <SlotRow key={sid} slot={slots.get(sid)!} value={state.slots[sid]} teams={sortedTeams} through={through} teamById={teamById} focus={focus === sid}
                         canHighlight={!!highlightTpl} onChange={(v) => setSlot(sid, v)} place={i + 1} last={i === g.slots.length - 1}
                         linked={resolved.get(sid)?.from ? teamById.get(resolved.get(sid)!.teamId) ?? null : null} goesTo={goesTo.get(sid) ?? []}
                         onMove={(d) => moveRow(g.id, i, i + d)}
@@ -217,7 +222,7 @@ function Editor({ data, teams, gen }: { data: MbData; teams: Team[]; gen: GenDat
                     ))}
                   </ol>
                 </div>
-              ))}
+              ); })}
             </div>
           </section>
         );
@@ -236,14 +241,17 @@ function TextField({ t, value, onChange, focus }: { t: MbText; value: string; on
   );
 }
 
-function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange, place, last, linked, goesTo, onMove, dragging, onDragStart, onDragEnd, onDrop, canDrop }: {
-  slot: MbSlot; value: MbSlotState | undefined; teams: Team[]; teamById: Map<string, Team>; focus: boolean; canHighlight: boolean; onChange: (v: MbSlotState) => void;
+function SlotRow({ slot, value, teams, through, teamById, focus, canHighlight, onChange, place, last, linked, goesTo, onMove, dragging, onDragStart, onDragEnd, onDrop, canDrop }: {
+  slot: MbSlot; value: MbSlotState | undefined; teams: Team[]; through: { team: Team; from: Starred }[]; teamById: Map<string, Team>; focus: boolean; canHighlight: boolean; onChange: (v: MbSlotState) => void;
   place: number; last: boolean; linked: Team | null; goesTo: string[]; onMove: (d: number) => void;
   dragging: boolean; onDragStart: () => void; onDragEnd: () => void; onDrop: () => void; canDrop: boolean;
 }) {
   const v = value ?? { teamId: null, text: slot.text, highlight: false };
   const picked = v.teamId ? teamById.get(v.teamId) ?? null : null;
   const team = picked ?? linked;
+  // the rest of the teams (the current stage's), with the picked one even when it is not among them
+  const throughIds = new Set(through.map((x) => x.team.id));
+  const rest = (picked && !teams.includes(picked) && !throughIds.has(picked.id) ? [picked, ...teams] : teams).filter((t) => !throughIds.has(t.id));
   const flag = team?.assets.flag_small?.previewUrl;
   const [over, setOver] = useState(false);
   return (
@@ -256,7 +264,14 @@ function SlotRow({ slot, value, teams, teamById, focus, canHighlight, onChange, 
         <select className="input w-[4.5rem] shrink-0 px-1 py-1 text-xs" value={v.teamId ?? ''} aria-label="Team or text"
           onChange={(e) => onChange({ ...v, teamId: e.target.value || null, text: e.target.value ? v.text : v.text || slot.text, highlight: e.target.value ? v.highlight : false })}>
           <option value="">Text</option>
-          {(picked && !teams.includes(picked) ? [picked, ...teams] : teams).map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
+          {through.length > 0 && (
+            <optgroup label="★ Through">
+              {through.map(({ team: t, from }) => <option key={t.id} value={t.id} title={`Starred in ${starredWhere(from)}`}>★ {t.code} {starredWhere(from)}</option>)}
+            </optgroup>
+          )}
+          {through.length > 0
+            ? <optgroup label="Teams">{rest.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}</optgroup>
+            : rest.map((t) => <option key={t.id} value={t.id}>{t.code}</option>)}
         </select>
         {picked
           ? <span className="flex min-w-0 flex-1 items-center"><TeamProfileLink teamId={picked.id} name={picked.name} /><span className="min-w-0 flex-1 truncate px-1 text-xs text-ink-300" title={picked.name}>{picked.name}</span></span>
