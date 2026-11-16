@@ -27,6 +27,8 @@ interface Out {
 const W = 1536, H = 1024, HEADER_MAX = 260;
 /** group in / out of the centre, flag fade, the team shown in its group before the group goes back (ms) */
 const MOVE_MS = 800, FADE_MS = 700, HOLD_MS = 1800;
+/** all groups going: they fade first, then the strips come back */
+const OV_OUT_MS = 700;
 /** the flag in the centre: 3:2, as wide as the centre allows */
 const FLAG_RATIO = 2 / 3;
 /** corner radius of the flags, as the static flag pictures have it (server: flagShape FLAG_RADIUS, of the height) */
@@ -168,10 +170,13 @@ export function DrawOutputPage() {
   // the all-groups view: fades out before the idle centre fades in
   const ovNow = !!data && ovWanted(data, data.pool.length > 0 && data.picks.length >= data.pool.length, busy.current, !!spot);
   useEffect(() => {
-    if (ovWas.current && !ovNow) { setOvLeaving(true); const t = window.setTimeout(() => setOvLeaving(false), 500); ovWas.current = ovNow; return () => clearTimeout(t); }
+    if (ovWas.current && !ovNow) { setOvLeaving(true); const t = window.setTimeout(() => setOvLeaving(false), OV_OUT_MS); ovWas.current = ovNow; return () => clearTimeout(t); }
     if (ovNow) setOvLeaving(false);
     ovWas.current = ovNow;
   }, [ovNow]);
+
+  // the render that switches it off already counts as leaving (the effect above sets the state one render later)
+  const leaving = !ovNow && (ovLeaving || ovWas.current);
 
   if (!data) return <div style={{ width: '100vw', height: '100vh', background: '#0b5ea8' }} />;
 
@@ -192,7 +197,7 @@ export function DrawOutputPage() {
   return (
     <div className="dr-root">
       <style>{fontCss + css(S)}</style>
-      <div ref={stage} className={`dr-stage${overview ? ' is-overview' : ''}${spot || flag ? ' is-spot' : ''}`} style={{ transform: `scale(${scale})` }}>
+      <div ref={stage} className={`dr-stage${overview || leaving ? ' is-overview' : ''}${spot || flag ? ' is-spot' : ''}`} style={{ transform: `scale(${scale})` }}>
         <div className="dr-bg" />
 
         {/* left: the pool */}
@@ -234,14 +239,14 @@ export function DrawOutputPage() {
         <div className="dr-mid">
           <img className="dr-header" src={`/api/draw/output/header.png?v=${data.headerV ?? 0}`} alt="" />
           <main ref={centre} className="dr-centre">
-            {!overview && !ovLeaving && (
+            {!overview && !leaving && (
               <div className="dr-idle-wrap"><div key={`idle${data.picks.length}`} className="dr-idle">
                 <div className="dr-pill dr-pill-big">{data.caption}</div>
                 <div className="dr-idle-big">{data.picks.length === 0 ? 'The Draw' : done ? 'Draw complete' : 'Next team'}</div>
                 <div className="dr-idle-count"><b>{data.picks.length}</b> / {pool.length} teams drawn</div>
               </div></div>
             )}
-            {(overview || ovLeaving) && (
+            {(overview || leaving) && (
               <div key="overview" className={`dr-overview${overview ? '' : ' is-out'}`}>
                 {data.board.map(({ letter: g, slots: rows }, gi) => (
                   <div key={g} className="dr-box dr-ov-col" style={{ animationDelay: `${250 + gi * 120}ms` }}>
@@ -441,7 +446,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
 .dr-in { animation: dr-fade-in .6s ease both; }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
-.dr-overview.is-out { animation: dr-fade-out .5s ease both; }
+.dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
+.dr-overview.is-out .dr-ov-col { animation: none; }
 .dr-tag { transition: opacity .4s; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
 
