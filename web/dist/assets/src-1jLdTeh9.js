@@ -94,7 +94,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-slot { height: 46px; gap: 14px; padding: 0 14px; }
 .dr-slot .dr-row-flag { width: 54px; height: 36px; }
 .dr-slot .dr-row-code { font-size: 42px; }
-.dr-slot.is-landed { animation: dr-land 1.2s ease-out; }
+/* the team in its group as the flag fades: there at once, no animation of its own (its highlight fades only when the group goes back) */
+.dr-slot.is-landed .dr-row-bg { transition: none; }
+.dr-slot.is-landed .dr-in { animation: none; }
 
 /* the group in the centre */
 .dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${Uh}ms ${ag}, box-shadow ${Uh}ms; }
