@@ -1,8 +1,14 @@
 {
-  "version": "1.0.226",
-  "commit": "0414a8a",
-  "date": "2026-11-16T21:47:35Z",
+  "version": "1.0.227",
+  "commit": "7c034c4",
+  "date": "2026-11-16T22:05:51Z",
   "changes": [
+    {
+      "version": "1.0.227",
+      "commit": "7c034c4",
+      "date": "2026-11-16T22:05:51Z",
+      "text": "Draw: header picture keeps the TEAMS/GROUPS bars' margins from the top and sides, also when it grows for all groups"
+    },
     {
       "version": "1.0.226",
       "commit": "0414a8a",
@@ -476,12 +482,6 @@
       "commit": "fbab737",
       "date": "2026-11-11T22:47:38Z",
       "text": "Schedule board: TIME on/off with centred rows, highlight of the next race; Day/Date/location fields"
-    },
-    {
-      "version": "1.0.147",
-      "commit": "c02f1da",
-      "date": "2026-11-11T22:08:13Z",
-      "text": "Declaration sync: a floater takes the first usual place nobody was declared on, with the floater's data; the Floater place only when every usual place is taken"
     }
   ]
 }
