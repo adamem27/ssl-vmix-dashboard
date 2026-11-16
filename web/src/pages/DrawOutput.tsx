@@ -451,6 +451,10 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-pool-row.is-current .dr-row-bg { box-shadow: 0 6px 18px rgba(0,0,0,.3); }
 .dr-cell { position: relative; display: flex; align-items: center; gap: inherit; flex: 1; min-width: 0; height: 100%; }
 .dr-in { animation: dr-fade-in .6s ease both; }
+/* the strips: flag and code centred in their row (the group tag sits at the right edge) */
+.dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: center; }
+.dr-pool-row .dr-cell { padding: 0 40px; }
+.dr-pool-row .dr-tag { position: absolute; right: -4px; top: 50%; margin: 0; transform: translateY(-50%); }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
