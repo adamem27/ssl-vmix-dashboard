@@ -1,8 +1,14 @@
 {
-  "version": "1.0.211",
-  "commit": "508541c",
-  "date": "2026-11-16T19:21:01Z",
+  "version": "1.0.212",
+  "commit": "71aa8fa",
+  "date": "2026-11-16T19:27:56Z",
   "changes": [
+    {
+      "version": "1.0.212",
+      "commit": "71aa8fa",
+      "date": "2026-11-16T19:27:56Z",
+      "text": "DRAW: the highlight fades in step with the group going back; the pool row no longer blinks"
+    },
     {
       "version": "1.0.211",
       "commit": "508541c",
@@ -476,12 +482,6 @@
       "commit": "c56e4b7",
       "date": "2026-11-10T21:47:17Z",
       "text": "Results: title and subtitle from the Results tab (LOCALIZATION no longer from Welcome); drop race times at marks, water temperature and PiP"
-    },
-    {
-      "version": "1.0.132",
-      "commit": "6176285",
-      "date": "2026-11-10T21:15:43Z",
-      "text": "Team comparison: an input per group (ssl_compare_A…), COMPARE page with a key per group, placeholders and live data for each"
     }
   ]
 }
