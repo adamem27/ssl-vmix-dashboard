@@ -79,7 +79,7 @@ describe('DRAW', () => {
     const board = draw.board();
     expect(board.map((g) => g.slots.filter((x) => x.draw).length)).toEqual([3, 2, 3, 3]);
     expect(board[0].slots[0]).toEqual({ teamId: fixed.COL, text: '', draw: false });
-    expect(board[2].slots.map((x) => x.text)).toEqual(['DRAW 6', 'DRAW 7', 'DRAW 8', '']);
+    expect(board[2].slots.map((x) => x.text)).toEqual(['DRAW', 'DRAW', 'DRAW', '']);
     draw.run('team:1'); draw.run('group:B');
     draw.run('team:2'); draw.run('group:B');
     expect(draw.state.picks.map((p) => p.place)).toEqual([3, 4]);

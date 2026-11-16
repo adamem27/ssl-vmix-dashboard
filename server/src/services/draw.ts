@@ -90,12 +90,12 @@ export function drawBoard(db: AssetCtx['db'], pool: Set<string>): BoardGroup[] {
   const out: BoardGroup[] = [];
   for (const letter of DRAW_GROUPS) {
     const g = layout?.groups.find((x) => /^R\s*1\s*([A-D])$/i.exec(((state!.texts[x.labelId] ?? layout!.texts.find((t) => t.id === x.labelId)?.text) ?? '').trim())?.[1]?.toUpperCase() === letter);
-    if (!g || !layout || !state) { out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, (_, i) => ({ teamId: null, text: `${letter}${i + 1}`, draw: true })) }); continue; }
+    if (!g || !layout || !state) { out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, () => ({ teamId: null, text: 'DRAW', draw: true })) }); continue; }
     const resolved = resolveTeams(layout, state);
-    out.push({ letter, slots: g.slots.map((sid, i) => {
+    out.push({ letter, slots: g.slots.map((sid) => {
       const teamId = resolved.get(sid)?.teamId ?? null;
-      const text = (state!.slots[sid]?.text ?? layout!.slots.find((x) => x.id === sid)?.text ?? '').trim() || `${letter}${i + 1}`;
-      return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text, draw: true };
+      // an empty place says just DRAW (the matchboard's DRAW 1…11 would read as an order of the draw)
+      return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text: 'DRAW', draw: true };
     }) });
   }
   return out;
