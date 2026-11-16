@@ -1,8 +1,14 @@
 {
-  "version": "1.0.212",
-  "commit": "71aa8fa",
-  "date": "2026-11-16T19:27:56Z",
+  "version": "1.0.213",
+  "commit": "79a6023",
+  "date": "2026-11-16T19:31:12Z",
   "changes": [
+    {
+      "version": "1.0.213",
+      "commit": "79a6023",
+      "date": "2026-11-16T19:31:12Z",
+      "text": "DRAW tab: the draw keys next to the preview, the groups and setup under it"
+    },
     {
       "version": "1.0.212",
       "commit": "71aa8fa",
@@ -476,12 +482,6 @@
       "commit": "34645ac",
       "date": "2026-11-10T21:54:11Z",
       "text": "Welcome bar fields (Top text, Day number, Date, City, Country) and the team name on the lineup lower third"
-    },
-    {
-      "version": "1.0.133",
-      "commit": "c56e4b7",
-      "date": "2026-11-10T21:47:17Z",
-      "text": "Results: title and subtitle from the Results tab (LOCALIZATION no longer from Welcome); drop race times at marks, water temperature and PiP"
     }
   ]
 }
