@@ -219,7 +219,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         {
             // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
             deck: 1, name: 'A BEFORE', page: p1, keys: [
-                row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'TEAM\\nCOMPARE', 'nav')),
+                row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav')),
                 row8(),
                 // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
                 row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
@@ -229,7 +229,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         {
             deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
                 // the groups' results (Provisional overall) are on COMPARE, under each group's comparison
-                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'COMPARE /\\nRESULTS', 'nav')),
+                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav')),
                 // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
                 // scene's ticker channel) and the top one (ssl_ticker_top)
                 row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
@@ -248,12 +248,12 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
         // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
         {
-            deck: 1, name: 'COMPARE', page: comparePage, keys: [
-                // the comparison of each group: the stage picked at the top first, then the other inputs vMix has
+            deck: 1, name: COMPARE_PAGE, page: comparePage, keys: [
+                // the comparison of each group of the stage picked at the top
                 row8(...groups.slice(0, 8).map((g) => k(`compare:${g.key}`, `COMPARE\\n${g.label}`, 'board'))),
                 // under it, each group's Provisional overall (its own results input ssl_results_<KEY>)
                 row8(...resultGroups.slice(0, 8).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
-                row8(k('show:compare', 'COMPARE\\nPICKED', 'board'), k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
+                row8(k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
                 nav(p1, p1, 'BEFORE', p1 + 1, 'AFTER'),
             ],
         },
@@ -310,6 +310,8 @@ export function keyActions(cfg) {
             out.set(`show:${g.id}`, { action: `show:${g.id}`, text: g.label.toUpperCase(), kind: g.kind });
     return [...out.values()];
 }
+/** The page with each group's results and Team comparison. */
+export const COMPARE_PAGE = 'RESULTS/COMPARE';
 function applyKeyEdits(cfg, pages) {
     if (!Object.keys(cfg.keys).length)
         return pages;
@@ -317,7 +319,8 @@ function applyKeyEdits(cfg, pages) {
     return pages.map((p) => ({
         ...p,
         keys: p.keys.map((row, r) => row.map((key, c) => {
-            const o = cfg.keys[`${p.name}/${r}/${c}`];
+            // the page was called COMPARE before 1.0.199
+            const o = cfg.keys[`${p.name}/${r}/${c}`] ?? (p.name === COMPARE_PAGE ? cfg.keys[`COMPARE/${r}/${c}`] : undefined);
             if (!o || REMOVED_ACTIONS.has(o.action ?? ''))
                 return key;
             let next = key;
@@ -839,13 +842,9 @@ export class Show {
             return this.groupsOf(stage ? [stage.id, ...all.filter((x) => x !== stage.id)] : all);
         });
     }
-    /** The COMPARE keys: one per group of the stage picked at the top, then one per other Team comparison input vMix has (ssl_compare_H…). */
+    /** The RESULTS/COMPARE keys: one per group of the stage picked at the top (its inputs ssl_compare_A…, ssl_results_A…). */
     deckCompareGroups() {
-        const has = (g) => this.lastInputs.some((i) => i.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(g.key).toLowerCase());
-        // every group of the stage picked at the top has its key from the start (its input ssl_compare_A…, to be added in
-        // vMix), then the other stages' groups vMix has an input for
-        const stage = this.compareGroups();
-        return [...stage, ...this.allCompareGroups().filter((g) => has(g) && !stage.some((x) => x.key === g.key))];
+        return this.compareGroups();
     }
     /** Each group's own Team comparison input (ssl_compare_A…); the shared one (ssl_compare) for the group picked at the top. */
     compareTargets(inputs) {

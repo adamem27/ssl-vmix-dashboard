@@ -1,8 +1,14 @@
 {
-  "version": "1.0.202",
-  "commit": "f32e2b6",
-  "date": "2026-11-16T16:16:27Z",
+  "version": "1.0.203",
+  "commit": "bec0302",
+  "date": "2026-11-16T17:30:20Z",
   "changes": [
+    {
+      "version": "1.0.203",
+      "commit": "bec0302",
+      "date": "2026-11-16T17:30:20Z",
+      "text": "RESULTS/COMPARE page: only the groups of the stage picked at the top, no COMPARE PICKED key"
+    },
     {
       "version": "1.0.202",
       "commit": "f32e2b6",
@@ -476,12 +482,6 @@
       "commit": "fed4bbe",
       "date": "2026-11-10T18:13:48Z",
       "text": "Standard animation, lower third: the bar fades in (0.75 s) and out (0.5 s) instead of a fast Reveal from the left"
-    },
-    {
-      "version": "1.0.123",
-      "commit": "c669540",
-      "date": "2026-11-10T18:04:43Z",
-      "text": "Companion: one preset with every page and a page per team; no live key labels"
     }
   ]
 }
