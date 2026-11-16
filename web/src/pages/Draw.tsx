@@ -10,6 +10,7 @@ interface DrawView {
   config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number; emptyStyle: 'bars' | 'dots' | 'text'; autoSteps: boolean };
   state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; seq: number };
   teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; videos: Record<string, { file: string; bytes: number } | null>; input: string; matchboardInput: string;
+  step: 'focus' | 'team' | 'reveal' | 'back' | null; locked: boolean;
   companion: { at: string; sent: number; error: string | null } | null;
 }
 
@@ -31,6 +32,9 @@ export function DrawPage() {
   const picked = new Map(st.picks.map((p) => [p.teamId, p]));
   const cur = st.current ? byId.get(st.current.teamId) : undefined;
   const count = (g: string) => st.picks.filter((p) => p.group === g).length;
+  // manual steps, locked: only the next step's key works (a key pressed by mistake does nothing)
+  const lock = (step: DrawView['step']) => d.locked && d.step !== step;
+  const other = d.locked;
 
   return (
     <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 lg:px-6">
@@ -55,14 +59,20 @@ export function DrawPage() {
                     className={cx('px-2.5 py-1', d.config.autoSteps === v ? 'bg-accent-500 text-white' : 'bg-ink-850 text-ink-300 hover:bg-ink-800')}>{label}</button>
                 ))}
               </div>
+              {!d.config.autoSteps && (
+                <button onClick={() => run.mutate(d.locked ? 'unlock' : 'lock')} title={d.locked ? 'Only the next step works now. Unlock for Undo, corrections and the other keys.' : 'Every key works now. Lock to leave only the next step.'}
+                  className={cx('rounded-md border px-2.5 py-1 text-xs font-semibold', d.locked ? 'border-emerald-600 bg-emerald-900/50 text-emerald-200 hover:bg-emerald-800/60' : 'border-amber-500 bg-amber-900/50 text-amber-100 hover:bg-amber-800/60')}>
+                  {d.locked ? '🔒 Only the next step · Unlock' : '🔓 All keys work · Lock'}
+                </button>
+              )}
             </div>
             <div className="mb-3 grid gap-2 sm:grid-cols-3">
               <StepButton n={1} label={d.next ? `Group ${d.next} to the centre` : 'Every group is full'} hint="the group the next team goes to"
-                active={!!st.focus && !st.flag && st.focus === d.next} disabled={!d.next || run.isPending || (st.focus === d.next && !st.flag)} onClick={() => run.mutate('focus')} />
+                active={!!st.focus && !st.flag && st.focus === d.next} disabled={!d.next || run.isPending || (st.focus === d.next && !st.flag) || lock('focus')} onClick={() => run.mutate('focus')} />
               <StepButton n={3} label="Flag off · team in group" hint={d.config.autoSteps ? 'automatic now' : cur && st.flag ? `${cur.code} shows in Group ${st.current!.group}` : 'after the team is drawn'}
-                active={!!st.flag} disabled={!st.flag || run.isPending} onClick={() => run.mutate('reveal')} />
+                active={!!st.flag} disabled={!st.flag || run.isPending || lock('reveal')} onClick={() => run.mutate('reveal')} />
               <StepButton n={4} label={st.focus ? `Group ${st.focus} back` : 'Group back'} hint={d.config.autoSteps ? 'automatic now' : 'to its place on the right'}
-                active={!!st.focus && !st.flag} disabled={!st.focus || run.isPending} onClick={() => run.mutate('back')} />
+                active={!!st.focus && !st.flag} disabled={!st.focus || run.isPending || lock('back')} onClick={() => run.mutate('back')} />
             </div>
             <div className="mb-2 text-xs font-bold uppercase tracking-wide text-ink-400">2 · Press the team drawn{d.next ? ` (it goes to Group ${d.next})` : ''}{!d.config.autoSteps ? ': its flag stays until step 3' : ''}</div>
             <div className="grid grid-cols-4 gap-2">
@@ -70,9 +80,9 @@ export function DrawPage() {
                 const p = picked.get(t.id);
                 const isCur = st.current?.teamId === t.id;
                 return (
-                  <button key={t.id} disabled={!!p || !d.next || run.isPending} onClick={() => run.mutate(`team:${i + 1}`)} title={t.name}
-                    className={cx('flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm font-semibold transition-colors',
-                      isCur ? 'border-amber-400 bg-amber-500/25 text-amber-100' : p ? 'border-ink-800 bg-ink-900 text-ink-500' : 'border-ink-700 bg-ink-800 text-ink-100 hover:bg-ink-700')}>
+                  <button key={t.id} disabled={!!p || !d.next || run.isPending || lock('team')} onClick={() => run.mutate(`team:${i + 1}`)} title={t.name}
+                    className={cx('flex items-center gap-2 rounded-md border px-2 py-2 text-left text-sm font-semibold transition-colors disabled:cursor-not-allowed',
+                      isCur ? 'border-amber-400 bg-amber-500/25 text-amber-100' : p ? 'border-ink-800 bg-ink-900 text-ink-500' : lock('team') ? 'border-ink-800 bg-ink-900 text-ink-400 opacity-60' : 'border-sky-600 bg-sky-900/50 text-ink-100 hover:bg-sky-800/60')}>
                     {t.flag ? <img src={t.flag} alt="" className="h-5 w-7 shrink-0 rounded-sm object-cover" /> : <span className="h-5 w-7 shrink-0 rounded-sm bg-ink-700" />}
                     <span className="truncate">{t.code}</span>
                     {p && <span className="ml-auto rounded bg-ink-700 px-1.5 text-xs text-ink-300">{p.group}</span>}
@@ -81,11 +91,11 @@ export function DrawPage() {
               })}
               {d.pool.length === 0 && <div className="col-span-4 text-sm text-ink-400">The pool is empty. Add the teams in “Draw pool” on the right.</div>}
             </div>
-            <div className="mt-3 text-xs text-ink-500">Correction only: move {cur ? cur.code : 'the team just drawn'} to another group.</div>
+            <div className="mt-3 text-xs text-ink-500">Correction only: move {cur ? cur.code : 'the team just drawn'} to another group.{other ? ' Locked: Unlock first (also for Undo, Clear, All groups and Reset).' : ''}</div>
             <div className="mt-1 grid grid-cols-4 gap-2">
               {d.board.map(({ letter: g, slots }) => {
                 const n = count(g), cap = slots.filter((x) => x.draw).length;
-                const canMove = !!st.current && st.current.group !== g && n < cap;
+                const canMove = !!st.current && st.current.group !== g && n < cap && !other;
                 return (
                   <button key={g} disabled={!canMove || run.isPending} onClick={() => run.mutate(`group:${g}`)}
                     className={cx('rounded-md border px-3 py-3 text-base font-bold transition-colors disabled:cursor-not-allowed',
@@ -97,10 +107,10 @@ export function DrawPage() {
               })}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button onClick={() => run.mutate('undo')} disabled={!st.current && !st.picks.length}>Undo</Button>
-              <Button onClick={() => run.mutate('clear')} disabled={!st.current && !st.focus}>Clear centre</Button>
-              <Button onClick={() => run.mutate('overview')} variant={st.overview ? 'primary' : 'secondary'}>All groups in the centre{st.overview ? ' (on)' : ''}</Button>
-              <Button variant="danger" className="ml-auto" onClick={async () => { if (await confirm.ask('Reset the draw?', 'Every team leaves its group and the screen starts again. The pool stays.', 'Reset')) run.mutate('reset'); }}>Reset draw</Button>
+              <Button onClick={() => run.mutate('undo')} disabled={(!st.current && !st.picks.length) || other}>Undo</Button>
+              <Button onClick={() => run.mutate('clear')} disabled={(!st.current && !st.focus) || other}>Clear centre</Button>
+              <Button onClick={() => run.mutate('overview')} disabled={other && d.step !== null} variant={st.overview ? 'primary' : 'secondary'}>All groups in the centre{st.overview ? ' (on)' : ''}</Button>
+              <Button variant="danger" className="ml-auto" disabled={other} onClick={async () => { if (await confirm.ask('Reset the draw?', 'Every team leaves its group and the screen starts again. The pool stays.', 'Reset')) run.mutate('reset'); }}>Reset draw</Button>
             </div>
           </div>
       </div>

@@ -56,6 +56,10 @@ export interface DrawState {
   focus: string | null;
   /** the flag of the team just drawn covers the centre (manual steps: until FLAG OFF) */
   flag?: boolean;
+  /** manual steps: the team is in its group, the group still in the centre (next: GROUP BACK) */
+  landed?: boolean;
+  /** manual steps: every key works, not only the next step (the dashboard's Unlock) */
+  unlocked?: boolean;
   /** goes up with every change: the output page animates what changed */
   seq: number;
 }
@@ -63,7 +67,18 @@ export interface DrawState {
 const CFG = 'draw.config';
 const STATE = 'draw.state';
 const DEFAULT_CFG: DrawConfig = { caption: '1/32 FINALS · OFFICIAL DRAW', pool: [], companionPage: 30, flightDelay: 3.5, stripWidth: 300, emptyStyle: 'bars', autoSteps: false };
-const EMPTY: DrawState = { picks: [], current: null, overview: false, focus: null, flag: false, seq: 0 };
+const EMPTY: DrawState = { picks: [], current: null, overview: false, focus: null, flag: false, landed: false, unlocked: false, seq: 0 };
+
+/** The four steps of each team with manual steps, in order. */
+export type DrawStep = 'focus' | 'team' | 'reveal' | 'back';
+/** The step that comes next with manual steps (1 focus, 2 team, 3 reveal, 4 back); null once every group is full. */
+export function nextStep(st: DrawState, next: string | null): DrawStep | null {
+  if (st.flag) return 'reveal';
+  if (st.focus && st.landed) return 'back';
+  if (!next) return st.focus ? 'back' : null;
+  if (st.focus === next) return 'team';
+  return 'focus';
+}
 
 export function getDrawConfig(db: AssetCtx['db']): DrawConfig {
   try { return drawConfigSchema.parse({ ...DEFAULT_CFG, ...JSON.parse(getSetting(db, CFG) || '{}') }); } catch { return DEFAULT_CFG; }
@@ -226,7 +241,7 @@ export class Draw {
     // the first time: the pool is the teams starred in the Qualifying Series on the matchboard
     if (!getSetting(this.ctx.db, CFG)) { const q = this.qualified(); if (q.length) this.setConfig({ pool: q.slice(0, DRAW_POOL_MAX) }); }
     const videos = Object.fromEntries(this.config.pool.map((id) => { const f = flagVideoPath(this.ctx.assetsDir, id); return [id, f ? { file: path.basename(f), bytes: fs.statSync(f).size } : null]; }));
-    return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), next: this.nextGroup(), videos, input: DRAW_INPUT, matchboardInput: DRAW_MATCHBOARD_INPUT };
+    return { config: this.config, state: this.state, teams: this.allTeams(), pool: this.poolTeams(), board: this.board(), next: this.nextGroup(), videos, input: DRAW_INPUT, matchboardInput: DRAW_MATCHBOARD_INPUT, step: this.step(), locked: !this.config.autoSteps && !this.state.unlocked };
   }
 
   /** The matchboard as it stands, with every team drawn so far in its row of R1 A–D (the DRAW rows it fills). */
@@ -252,6 +267,27 @@ export class Draw {
   /** Called when the teams in the groups change (the draw matchboard is made again). */
   onPicks: (() => void) | null = null;
 
+  /** The next step with manual steps; null once every group is full or every team in the pool is drawn. */
+  step() {
+    const st = this.state, placed = new Set(st.picks.map((p) => p.teamId));
+    const left = this.poolTeams().some((t) => !placed.has(t.id));
+    return nextStep(st, left ? nextDrawGroup(this.board(), st.picks) : null);
+  }
+
+  /** Whether a key works now: with manual steps and no Unlock only the next step (and ALL GROUPS once the draw is over). */
+  allowed(a: string) {
+    const st = this.state;
+    if (this.config.autoSteps || st.unlocked) return true;
+    const [verb, arg = ''] = a.split(':');
+    if (verb === 'lock' || verb === 'unlock') return true;
+    const nx = nextDrawGroup(this.board(), st.picks);
+    const step = this.step();
+    if (step === null) return verb === 'overview';
+    if (verb !== step) return false;
+    if (verb === 'focus') return !arg || arg === 'next' || arg.toUpperCase() === nx;
+    return true;
+  }
+
   run(a: string) {
     const [verb, arg = ''] = a.split(':');
     const st = this.state;
@@ -260,6 +296,13 @@ export class Draw {
     const groupCount = (g: string) => st.picks.filter((p) => p.group === g).length;
     const board = this.board();
     const places = (g: string) => drawPlaces(board.find((x) => x.letter === g)!);
+    // manual steps: only the next step works (a key pressed by mistake does nothing), until Unlock
+    if (verb === 'lock' || verb === 'unlock') {
+      const saved = saveState(this.ctx.db, { ...st, unlocked: verb === 'unlock' });
+      void this.pushLabels();
+      return saved;
+    }
+    if (!this.allowed(a)) throw badRequest(`Locked: the next step is ${STEP_NAME[this.step() ?? 'none']}. Unlock in the DRAW tab for other keys.`);
     let next: Omit<DrawState, 'seq'> = st;
     switch (verb) {
       case 'team': {
@@ -271,7 +314,7 @@ export class Draw {
         if (!g) throw badRequest('Every group is full.');
         const pick = { teamId: t.id, group: g, place: places(g)[groupCount(g)] };
         const auto = this.config.autoSteps;
-        next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false, focus: auto ? null : g, flag: !auto };
+        next = { ...st, picks: [...st.picks, pick], current: { teamId: t.id, group: g }, overview: false, focus: auto ? null : g, flag: !auto, landed: false };
         break;
       }
       case 'group': {
@@ -288,25 +331,25 @@ export class Draw {
       }
       case 'undo': {
         // the last team drawn goes back to the pool
-        if (st.picks.length) next = { ...st, picks: st.picks.slice(0, -1), current: null, focus: null, flag: false };
-        else if (st.current || st.focus) next = { ...st, current: null, focus: null, flag: false };
+        if (st.picks.length) next = { ...st, picks: st.picks.slice(0, -1), current: null, focus: null, flag: false, landed: false };
+        else if (st.current || st.focus) next = { ...st, current: null, focus: null, flag: false, landed: false };
         break;
       }
       case 'focus': {
         const g = !arg || arg === 'next' ? nextDrawGroup(board, st.picks) : arg === 'off' ? null : arg.toUpperCase();
         if (g && !(DRAW_GROUPS as readonly string[]).includes(g)) throw badRequest(`Group ${arg}? Use A–D.`);
         if (!g && arg !== 'off') throw badRequest('Every group is full.');
-        next = { ...st, focus: g, overview: false, flag: false };
+        next = { ...st, focus: g, overview: false, flag: false, landed: false };
         break;
       }
       case 'reveal': // the flag goes, the team stands in its group
         if (!st.flag) throw badRequest('No flag on the screen.');
-        next = { ...st, flag: false };
+        next = { ...st, flag: false, landed: !!st.focus };
         break;
-      case 'back': next = { ...st, focus: null, flag: false }; break;
-      case 'clear': next = { ...st, current: null, focus: null, flag: false }; break;
-      case 'overview': next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview, focus: null, flag: false }; break;
-      case 'reset': next = { ...EMPTY }; break;
+      case 'back': next = { ...st, focus: null, flag: false, landed: false }; break;
+      case 'clear': next = { ...st, current: null, focus: null, flag: false, landed: false }; break;
+      case 'overview': next = { ...st, overview: arg === 'on' ? true : arg === 'off' ? false : !st.overview, focus: null, flag: false, landed: false }; break;
+      case 'reset': next = { ...EMPTY, unlocked: st.unlocked }; break;
       default: throw badRequest(`Unknown draw action ${a}`);
     }
     const saved = saveState(this.ctx.db, next);
@@ -343,6 +386,10 @@ export class Draw {
     rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
     rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
     rows[2][7] = { action: 'undo', text: 'UNDO', bg: '#7c2d12', fg: '#ffffff' };
+    // manual steps, locked: a key that does nothing now is dark, the next step keeps its colours
+    for (const row of rows) for (const [c, k] of row.entries()) {
+      if (k && k.text && !this.allowed(k.action)) row[c] = { ...k, bg: '#18181b', fg: '#52525b' };
+    }
     return rows;
   }
 
@@ -411,6 +458,8 @@ function renumber(picks: DrawPick[], board: BoardGroup[]): DrawPick[] {
   const n: Record<string, number> = {};
   return picks.map((p) => { const k = (n[p.group] = (n[p.group] ?? 0) + 1); const g = board.find((x) => x.letter === p.group); return { ...p, place: (g && drawPlaces(g)[k - 1]) || k }; });
 }
+
+const STEP_NAME: Record<DrawStep | 'none', string> = { focus: '1 (group to the centre)', team: '2 (the team drawn)', reveal: '3 (FLAG OFF)', back: '4 (group back)', none: 'none: the draw is over' };
 
 // Companion 5.1 button pieces (as in show.ts; kept here so the DRAW page does not depend on the show preset)
 const hex = (c: string) => parseInt(c.replace('#', ''), 16) || 0;

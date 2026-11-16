@@ -33,6 +33,9 @@ const OV_OUT_MS = 700;
 const FLAG_RATIO = 2 / 3;
 /** corner radius of the flags, as the static flag pictures have it (server: flagShape FLAG_RADIUS, of the height) */
 const FLAG_RADIUS = 0.18;
+/** the team's full name above the centre flag: its band and largest font size */
+const NAME_BAND = 120;
+const NAME_PX = 92;
 
 interface Spot { letter: string; on: boolean; x: number; y: number; w: number; h: number; tx: number; ty: number; s: number }
 interface FlagShow { teamId: string; out: boolean }
@@ -53,6 +56,28 @@ export function DrawOutputPage() {
   const ovWas = useRef(false);
   const stage = useRef<HTMLDivElement>(null);
   const centre = useRef<HTMLElement>(null);
+  // all groups: every flag at the same place, the codes and full names starting where the flags start; the widest
+  // team (flag + code, or its name) sits in the middle of its row, the others line up with it
+  const ovBox = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ovBox.current;
+    if (!el) return;
+    const fit = () => {
+      const cells = [...el.querySelectorAll<HTMLElement>('.dr-ov-row:not(.is-empty) .dr-cell:not(.dr-out)')];
+      if (!cells.length) return;
+      const k = el.getBoundingClientRect().width / (el.offsetWidth || 1) || 1;
+      let widest = 0;
+      for (const c of cells) {
+        const flag = c.querySelector<HTMLElement>('.dr-row-flag'), code = c.querySelector<HTMLElement>('.dr-row-code'), nm = c.querySelector<HTMLElement>('.dr-ov-name');
+        if (flag && code) widest = Math.max(widest, code.offsetLeft + code.offsetWidth - flag.offsetLeft);
+        if (nm) { const r = document.createRange(); r.selectNodeContents(nm); widest = Math.max(widest, r.getBoundingClientRect().width / k); }
+      }
+      const pad = `${Math.max(0, Math.floor((cells[0].clientWidth - widest) / 2))}px`;
+      if (el.style.getPropertyValue('--ov-pad') !== pad) el.style.setProperty('--ov-pad', pad);
+    };
+    fit();
+    void document.fonts?.ready.then(fit);
+  });
   const groupEls = useRef(new Map<string, HTMLDivElement>());
   const timers = useRef<number[]>([]);
   const busy = useRef(false);
@@ -254,7 +279,7 @@ export function DrawOutputPage() {
               </div></div>
             )}
             {(overview || leaving) && (
-              <div key="overview" className={`dr-overview${overview ? '' : ' is-out'}`}>
+              <div key="overview" ref={ovBox} className={`dr-overview${overview ? '' : ' is-out'}`}>
                 {data.board.map(({ letter: g, slots: rows }, gi) => (
                   <div key={g} className="dr-box dr-ov-col" style={{ animationDelay: `${250 + gi * 120}ms` }}>
                     <div className="dr-box-label">GROUP {g}</div>
@@ -262,7 +287,7 @@ export function DrawOutputPage() {
                       const p = data.picks.find((x) => x.group === g && x.place === i + 1);
                       const t = row.teamId ? teams.get(row.teamId) : p ? teams.get(p.teamId) : undefined;
                       return (
-                        <Row key={i} className={`dr-row dr-ov-row${t ? '' : ' is-empty'}`} content={t?.id ?? ''}>
+                        <Row key={i} className={`dr-row dr-ov-row${t ? '' : ` is-empty${empty === 'bars' ? ' is-bars' : ''}`}`} content={t?.id ?? ''}>
                           {t ? <><Flag team={t} className="dr-row-flag" /><span className="dr-row-code">{t.code}</span><span className="dr-ov-name">{t.name}</span></>
                             : <EmptyPlace style={empty} text={row.text} />}
                         </Row>
@@ -280,7 +305,7 @@ export function DrawOutputPage() {
           const b = data.board.find((x) => x.letter === spot.letter);
           if (!b) return null;
           return (
-            <div className={`dr-box dr-group dr-spot${spot.on ? ' is-on' : ''}`}
+            <div className={`dr-box dr-group dr-spot${spot.on ? ' is-on' : ''}${flag && !flag.out ? ' is-under' : ''}`}
               style={{ left: spot.x, top: spot.y, width: spot.w, height: spot.h, transform: spot.on ? `translate(${spot.tx}px, ${spot.ty}px) scale(${spot.s})` : 'none' }}>
               <div className="dr-box-label">GROUP {spot.letter}</div>
               {group(spot.letter, b.slots)}
@@ -350,9 +375,10 @@ function EmptyPlace({ style, text }: { style: EmptyStyle; text: string }) {
   return <span className="dr-slot-place">{text}</span>;
 }
 
-/** The team's flag animation over the centre, its name in the lower part; a drawn waving flag without a video. */
+/** The team's flag animation over the centre, its full name above it; a drawn waving flag without a video. */
 function CentreFlag({ team, out, centre, stage }: { team: OutTeam; out: boolean; centre: RefObject<HTMLElement | null>; stage: RefObject<HTMLDivElement | null> }) {
-  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ x: number; y: number; w: number; h: number; cx: number; cw: number } | null>(null);
+  const name = useRef<HTMLDivElement>(null);
   const [videoOk, setVideoOk] = useState(true);
   const video = useRef<HTMLVideoElement>(null);
   const still = useRef<HTMLCanvasElement>(null);
@@ -369,19 +395,29 @@ function CentreFlag({ team, out, centre, stage }: { team: OutTeam; out: boolean;
     if (!st || !c) return;
     const s0 = st.getBoundingClientRect(), k = s0.width / W, b = c.getBoundingClientRect();
     const cx = (b.left - s0.left) / k, cy = (b.top - s0.top) / k, cw = b.width / k, ch = b.height / k;
-    const w = Math.min(cw - 24, (ch - 24) / FLAG_RATIO), h = w * FLAG_RATIO;
-    setBox({ x: cx + (cw - w) / 2, y: cy + (ch - h) / 2, w, h });
+    // the name's band above the flag, then the flag: both together in the middle of the centre
+    const w = Math.min(cw - 24, (ch - 24 - NAME_BAND) / FLAG_RATIO), h = w * FLAG_RATIO;
+    setBox({ x: cx + (cw - w) / 2, y: cy + (ch - h - NAME_BAND) / 2 + NAME_BAND, w, h, cx, cw });
   }, []);
+  // a long name gets smaller until it fits the width of the centre, on one line
+  useLayoutEffect(() => {
+    const el = name.current;
+    if (!el || !box) return;
+    el.style.fontSize = '';
+    const fit = () => { const full = el.scrollWidth, room = el.clientWidth; if (full > room) el.style.fontSize = `${Math.floor(NAME_PX * room / full)}px`; };
+    fit();
+    void document.fonts?.ready.then(() => { el.style.fontSize = ''; fit(); });
+  }, [box, team.name]);
   if (!box) return null;
-  return (
+  return (<>
+    <div ref={name} className={`dr-cflag-name${out ? ' is-out' : ''}`} style={{ left: box.cx + 12, top: box.y - NAME_BAND, width: box.cw - 24, height: NAME_BAND }}>{team.name}</div>
     <div className={`dr-cflag${out ? ' is-out' : ''}`} style={{ left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: FLAG_RADIUS * box.h }}>
       {team.video && videoOk
         ? <><video ref={video} className="dr-cflag-video" src={team.video} autoPlay loop muted playsInline preload="auto" onError={() => setVideoOk(false)} />
           <canvas ref={still} className="dr-cflag-video" style={{ visibility: 'hidden' }} /></>
         : team.flag ? <WavingFlag src={team.flag} w={box.w} h={box.h} /> : <span className="dr-flag dr-flag-none dr-cflag-none">{team.code}</span>}
-      <div className="dr-cflag-name">{team.name}</div>
     </div>
-  );
+  </>);
 }
 
 /** A flag waving in the wind: thin vertical slices of the picture, each rising and falling a little after the one before. */
@@ -467,6 +503,8 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
    the codes end where their letters end */
 .dr-pool-row .dr-cell, .dr-slot .dr-cell { justify-content: flex-start; padding-left: calc(50% - 84px); }
 .dr-ov-row .dr-cell { flex-wrap: wrap; align-content: center; column-gap: 16px; row-gap: 4px; }
+/* the soft bars of an empty place line up with the flags and codes */
+.dr-ov-row:not(.is-empty) .dr-cell, .dr-ov-row.is-bars .dr-cell { justify-content: flex-start; padding-left: var(--ov-pad, calc(50% - 110px)); }
 .dr-overview.is-out { animation: dr-fade-out ${OV_OUT_MS}ms ease both; }
 .dr-overview.is-out .dr-ov-col { animation: none; }
 .dr-empty-note { padding: 18px 8px; font-size: 15px; font-weight: 500; }
@@ -481,7 +519,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-slot.is-landed .dr-row-bg { transition: opacity .6s ease; }
 
 /* the group in the centre */
-.dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${MOVE_MS}ms ${EASE}, box-shadow ${MOVE_MS}ms; }
+.dr-spot { position: absolute; z-index: 7; margin: 0; transform-origin: 0 0; transition: transform ${MOVE_MS}ms ${EASE}, box-shadow ${MOVE_MS}ms, opacity ${FADE_MS}ms ease; }
+/* under the waving flag (and its name above it) the group fades away, and comes back as the flag fades */
+.dr-spot.is-under { opacity: 0; }
 .dr-spot.is-on { box-shadow: 0 10px 30px rgba(0,30,80,.35); }
 
 .dr-centre { position: relative; flex: 1; min-height: 0; width: 100%; overflow: hidden; display: grid; place-items: center; }
@@ -500,8 +540,9 @@ html, body, #root { margin: 0; height: 100%; background: #0b5ea8; overflow: hidd
 .dr-cflag.is-out { animation: dr-flag-out ${FADE_MS}ms ease both; }
 .dr-cflag-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .dr-cflag-none { position: absolute; inset: 0; font-size: 140px; }
-.dr-cflag-name { position: absolute; left: 0; right: 0; bottom: 0; padding: 70px 20px 34px; text-align: center; font-size: 92px; font-weight: 600; text-transform: uppercase; line-height: 1;
-  background: linear-gradient(180deg, transparent, rgba(0,20,60,.55)); text-shadow: 0 4px 20px rgba(0,0,0,.5); animation: dr-fade-up .7s ease-out both .5s; }
+.dr-cflag-name { position: absolute; z-index: 9; text-align: center; white-space: nowrap; overflow: hidden;
+  font-size: ${NAME_PX}px; font-weight: 600; text-transform: uppercase; line-height: ${NAME_BAND - 12}px; text-shadow: 0 4px 20px rgba(0,20,60,.45); animation: dr-fade-up .7s ease-out both .3s; }
+.dr-cflag-name.is-out { animation: dr-fade-out ${FADE_MS}ms ease both; }
 .dr-wave { position: absolute; inset: 0; overflow: hidden; }
 .dr-wave-slice { position: absolute; top: 0; height: 100%; background-repeat: no-repeat; animation: dr-wave 2.2s ease-in-out infinite; }
 

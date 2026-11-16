@@ -10,6 +10,7 @@ function withPool(n = 16) {
   const ids = codes.map((c) => createTeam(s.db, { name: `Team ${c}`, code: c }));
   const draw = new Draw(s.ctx);
   draw.setConfig({ pool: ids });
+  draw.run('unlock'); // these tests press keys out of order; the lock has its own test
   return { ...s, ids, codes, draw };
 }
 
@@ -98,12 +99,45 @@ describe('DRAW', () => {
     expect(keys[2][3]!.text).toBe('GROUP D\\n1/4');
   });
 
+  it('with manual steps lets only the next step through (1 focus, 2 team, 3 flag off, 4 back) until Unlock', () => {
+    const { draw } = withPool(4);
+    draw.run('lock');
+    expect(draw.view().locked).toBe(true);
+    expect(draw.view().step).toBe('focus');
+    expect(() => draw.run('team:1')).toThrow(/Locked/);
+    expect(() => draw.run('undo')).toThrow(/Locked/);
+    expect(() => draw.run('overview')).toThrow(/Locked/);
+    expect(() => draw.run('focus:C')).toThrow(/Locked/);
+    expect(draw.keys()[0][0]!.bg).toBe('#18181b');
+    draw.run('focus');
+    expect(draw.view().step).toBe('team');
+    expect(() => draw.run('back')).toThrow(/Locked/);
+    draw.run('team:2');
+    expect(draw.view().step).toBe('reveal');
+    expect(() => draw.run('group:B')).toThrow(/Locked/);
+    draw.run('reveal');
+    expect(draw.view().step).toBe('back');
+    expect(() => draw.run('focus')).toThrow(/Locked/);
+    draw.run('back');
+    expect(draw.view().step).toBe('focus');
+    for (const n of [1, 3, 4]) { draw.run('focus'); draw.run(`team:${n}`); draw.run('reveal'); draw.run('back'); }
+    expect(draw.view().step).toBeNull();
+    draw.run('overview');
+    expect(() => draw.run('reset')).toThrow(/Locked/);
+    draw.run('unlock');
+    draw.run('undo');
+    expect(draw.state.picks).toHaveLength(3);
+    draw.setConfig({ autoSteps: true });
+    expect(draw.view().locked).toBe(false);
+  });
+
   it('takes the groups from the matchboard: fixed teams stay, the drawn ones fill DRAW 1–11 in order', () => {
     const s = setup();
     const fixed = Object.fromEntries(['COL', 'KOR', 'GRE', 'MAS', 'SGP'].map((c) => [c, createTeam(s.db, { name: `Team ${c}`, code: c })]));
     const drawn = ['MYA', 'OMA', 'TAH', 'SEY', 'EST', 'LTU', 'UKR', 'POR', 'URU', 'ANT', 'CUB'].map((c) => createTeam(s.db, { name: `Team ${c}`, code: c }));
     const draw = new Draw(s.ctx);
     draw.setConfig({ pool: drawn });
+    draw.run('unlock');
     const board = draw.board();
     expect(board.map((g) => g.slots.filter((x) => x.draw).length)).toEqual([3, 2, 3, 3]);
     expect(board[0].slots[0]).toEqual({ teamId: fixed.COL, text: '', draw: false });
