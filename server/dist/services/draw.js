@@ -221,7 +221,7 @@ export class Draw {
         const video = (id) => { const f = flagVideoPath(this.ctx.assetsDir, id); return f ? `/api/draw/output/video/${id}?v=${Math.round(fs.statSync(f).mtimeMs)}` : null; };
         const teams = [...pool, ...all.filter((t) => fixed.has(t.id))].map((t) => ({ id: t.id, code: t.code, name: t.name, flag: t.flagAsset ? `/api/draw/output/flag/${t.id}` : null, video: video(t.id), gradient: teamGradient(this.ctx.db, t.code, grads.get(t.id) ?? null) }));
         const fonts = uploadedSansFiles(this.ctx.assetsDir).map((f) => f.weight);
-        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, focus: st.focus ?? null, flag: !!st.flag, autoSteps: cfg.autoSteps, emptyStyle: cfg.emptyStyle, next: nextDrawGroup(board, st.picks) };
+        return { seq: st.seq, fonts, caption: cfg.caption, flightDelay: cfg.flightDelay, stripWidth: cfg.stripWidth, board, pool: pool.map((t) => t.id), teams, picks: st.picks, current: st.current, overview: st.overview, headerV: Math.round(fs.statSync(headerPath(this.ctx.assetsDir)).mtimeMs), focus: st.focus ?? null, flag: !!st.flag, autoSteps: cfg.autoSteps, emptyStyle: cfg.emptyStyle, next: nextDrawGroup(board, st.picks) };
     }
     flagFile(teamId) {
         const t = this.allTeams().find((x) => x.id === teamId);
