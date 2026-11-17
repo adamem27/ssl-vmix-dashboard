@@ -1,8 +1,14 @@
 {
-  "version": "1.0.230",
-  "commit": "a80130f",
-  "date": "2026-11-17T19:39:10Z",
+  "version": "1.0.231",
+  "commit": "8ef16a0",
+  "date": "2026-11-17T20:24:53Z",
   "changes": [
+    {
+      "version": "1.0.231",
+      "commit": "8ef16a0",
+      "date": "2026-11-17T20:24:53Z",
+      "text": "Graphics editor: ssl_results_H and ssl_results_I gone (their edits removed once); an input with no edit left leaves the list; Remove for inputs not in vMix"
+    },
     {
       "version": "1.0.230",
       "commit": "a80130f",
@@ -476,12 +482,6 @@
       "commit": "26978f1",
       "date": "2026-11-12T02:54:22Z",
       "text": "Break scene: L-bar on layer 1, ticker on layer 3 (TICKERS keys change it in place), day schedule / group results switching on layer 4; AUTO SWITCH on or off, kept"
-    },
-    {
-      "version": "1.0.151",
-      "commit": "f1cf35f",
-      "date": "2026-11-12T01:12:53Z",
-      "text": "People: Other role lets you type the role"
     }
   ]
 }

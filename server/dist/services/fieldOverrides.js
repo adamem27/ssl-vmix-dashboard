@@ -52,6 +52,9 @@ export function setOverride(db, title, field, value, current) {
     if (value === null) {
         if (all[k])
             delete all[k][field];
+        // an input with no edit left is not kept (the Graphics editor listed it as "Not in vMix" with nothing to reset)
+        if (all[k] && !Object.keys(all[k]).length)
+            delete all[k];
     }
     else {
         if (!(all[k] && field in all[k]) && current !== undefined)
@@ -113,4 +116,22 @@ export function saveOverrideImage(ctx, buf, filename) {
     fs.mkdirSync(path.join(ctx.assetsDir, OVERRIDES_DIR), { recursive: true });
     fs.writeFileSync(path.join(ctx.assetsDir, ...rel.split('/')), buf);
     return rel;
+}
+/** Inputs of the Pan-American stage that vMix no longer has: their edits go once (1.0.230). */
+const RETIRED_INPUTS = ['ssl_results_h', 'ssl_results_i'];
+export function dropRetiredInputsOnStart(db) {
+    if (getSetting(db, 'inputs.overrides.retired') === '1')
+        return 0;
+    const all = getOverrides(db), before = read(db, BEFORE_KEY);
+    let n = 0;
+    for (const k of RETIRED_INPUTS) {
+        if (all[k])
+            n++;
+        delete all[k];
+        delete before[k];
+    }
+    write(db, OVERRIDES_KEY, all);
+    write(db, BEFORE_KEY, before);
+    setSetting(db, 'inputs.overrides.retired', '1');
+    return n;
 }

@@ -84,7 +84,7 @@ export function registerFieldOverrideRoutes(app, ctx, show) {
         }
         // edits of inputs vMix has not loaded now: listed so they can be seen and reset
         for (const k of Object.keys(over))
-            if (!seen.has(k))
+            if (!seen.has(k) && Object.keys(over[k] ?? {}).length)
                 rows.push(row(k, '', [], {}, false));
         rows.sort((a, b) => (order.get(a.graphic?.id ?? '') ?? 999) - (order.get(b.graphic?.id ?? '') ?? 999) || Number(a.number || 9999) - Number(b.number || 9999));
         return { inputs: rows, error };
