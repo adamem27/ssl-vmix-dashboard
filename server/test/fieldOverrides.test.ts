@@ -127,4 +127,19 @@ describe('graphics editor overrides', () => {
     expect(clearOverrides(s.db, 'ssl_course')).toEqual({});
     await a.close();
   });
+
+  it('an input whose last edit is cleared leaves the list; the Pan-Am results inputs go once', async () => {
+    const { openDb } = await import('../src/db/db.js');
+    const { setOverride, getOverrides, dropRetiredInputsOnStart } = await import('../src/services/fieldOverrides.js');
+    const db = openDb(':memory:');
+    setOverride(db, 'ssl_welcome', 'TITLE.Text', 'Hi');
+    setOverride(db, 'ssl_welcome', 'TITLE.Text', null);
+    expect(getOverrides(db)).toEqual({});
+    setOverride(db, 'ssl_results_H', 'Title.Text', 'X');
+    setOverride(db, 'ssl_results_A', 'Title.Text', 'Y');
+    expect(dropRetiredInputsOnStart(db)).toBe(1);
+    expect(Object.keys(getOverrides(db))).toEqual(['ssl_results_a']);
+    setOverride(db, 'ssl_results_I', 'Title.Text', 'Z');
+    expect(dropRetiredInputsOnStart(db)).toBe(0);
+  });
 });

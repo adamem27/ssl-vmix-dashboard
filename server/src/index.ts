@@ -14,6 +14,7 @@ import { roundStoredFlagsOnStart } from './services/flags.js';
 import { rankingOnStart } from './services/ranking.js';
 import { MatchboardExporter, seedHighlightTemplate } from './services/matchboard/matchboard.js';
 import { createTemplate } from './services/generator/generator.js';
+import { dropRetiredInputsOnStart } from './services/fieldOverrides.js';
 
 const db = openDb(config.dbPath);
 const sync = new SyncService(db);
@@ -26,6 +27,7 @@ const app = await buildApp({ liveDir: path.join(config.dataDir, 'live-feed'), si
 
 const preset = applyGoldCupOnStart({ db, assetsDir: config.assetsDir });
 if (preset) app.log.info(`SSL Gold Cup data applied: ${JSON.stringify(preset)}`);
+dropRetiredInputsOnStart(db);
 const squads = applyFinalsSquadsOnStart({ db, assetsDir: config.assetsDir });
 if (squads) app.log.info(`1/32 Finals squads applied: ${JSON.stringify(squads)}`);
 seedGenerator(db);

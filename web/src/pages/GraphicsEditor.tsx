@@ -81,7 +81,7 @@ function InputRow({ input, open, onToggle }: { input: EditorInput; open: boolean
         <span className="text-xs text-ink-500">{input.fields.length} field{input.fields.length === 1 ? '' : 's'}</span>
         {input.edited > 0 && <Badge tone="info">{input.edited} edited</Badge>}
         <span className="ml-auto flex gap-1">
-          {input.edited > 0 && <Button size="sm" variant="ghost" onClick={resetAll}>Reset all</Button>}
+          {input.edited > 0 && <Button size="sm" variant="ghost" onClick={resetAll} title={input.inVmix ? undefined : 'Its edits go and it leaves this list'}>{input.inVmix ? 'Reset all' : 'Remove'}</Button>}
           <Button size="sm" variant={open ? 'primary' : 'secondary'} onClick={onToggle} aria-expanded={open}>{open ? 'Close' : 'Edit'}</Button>
         </span>
       </div>
