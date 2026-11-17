@@ -236,14 +236,14 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
   const teamsName = (n: number) => (n ? `TEAMS ${n + 1}` : 'TEAMS');
   const teamsPageOf = (n: number): DeckPage => ({
     deck: 2, name: teamsName(n), page: teamsPage(n), keys: [
-      ...[0, 1].map((r) => row8(...Array.from({ length: 8 }, (_, c) => {
+      // groups A and B on the top row, a row free, groups C and D on the third (places in group order)
+      ...[0, null, 1].map((r) => r === null ? row8() : row8(...Array.from({ length: 8 }, (_, c) => {
         const i = n * TEAMS_PER_PAGE + r * 8 + c, t = teams[i];
         if (!t) return null;
         // an empty place: its name (A1) and what the group says goes there, until a team is put there
         if (!t.code) return k(`nav:${PRESET_PAGES.teams + i}`, `${t.place}\\n${(t.placeholder || 'TBD').toUpperCase().slice(0, 12)}`, 'team');
         return { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code };
       }))),
-      row8(),
       nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'BUGS OFTEN'),
     ],
   });

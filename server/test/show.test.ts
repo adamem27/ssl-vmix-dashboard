@@ -576,8 +576,8 @@ describe('show control', () => {
     // TEAMS: A and B on the top row, C and D below, each key opening its place's page
     const teams = pages.find((p) => p.name === 'TEAMS')!;
     expect(teams.keys[0].map((x) => x?.text.split('\\n')[0])).toEqual(['A1', 'POL', 'A3', 'A4', 'B1', 'B2', 'B3', 'B4']);
-    expect(teams.keys[1].map((x) => x?.action)).toEqual([17, 18, 19, 20, 21, 22, 23, 24].map((n) => `nav:${n}`));
-    expect(teams.keys[2].every((x) => x === null)).toBe(true);
+    expect(teams.keys[2].map((x) => x?.action)).toEqual([17, 18, 19, 20, 21, 22, 23, 24].map((n) => `nav:${n}`));
+    expect(teams.keys[1].every((x) => x === null)).toBe(true);
     // an empty place: its keys are there, dark, and a press says the place has no team yet
     expect(show.keyAt(9, 0, 4)?.action).toBe('teamlt:@A1');
     expect((await show.keyLook(show.keyAt(9, 0, 4)!)).empty).toBe(true);

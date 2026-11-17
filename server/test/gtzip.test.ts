@@ -479,8 +479,10 @@ describe('race flags', () => {
     const bundled = (f: string) => fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'race-flags', f));
     for (const f of names) expect(fs.readFileSync(path.join(dir, 'race-flags', f)).equals(bundled(f)), f).toBe(true);
     // X is the original picture again; A is not (cut as a swallowtail)
-    expect(bundled('X_individual_recall.png').equals(git('2e17950', 'X_individual_recall.png'))).toBe(true);
-    expect(bundled('A_ashore.png').equals(git('2e17950', 'A_ashore.png'))).toBe(false);
+    let x: Buffer, a: Buffer;
+    try { x = git('2e17950', 'X_individual_recall.png'); a = git('2e17950', 'A_ashore.png'); } catch { return; } // a shallow copy
+    expect(bundled('X_individual_recall.png').equals(x)).toBe(true);
+    expect(bundled('A_ashore.png').equals(a)).toBe(false);
   });
 
 });
