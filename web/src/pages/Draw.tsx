@@ -8,7 +8,7 @@ interface DrawTeam { id: string; code: string; name: string; flag: string | null
 interface DrawPick { teamId: string; group: string; place: number }
 interface DrawView {
   config: { caption: string; pool: string[]; companionPage: number; flightDelay: number; stripWidth: number; emptyStyle: 'bars' | 'dots' | 'text'; autoSteps: boolean };
-  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; seq: number };
+  state: { picks: DrawPick[]; current: { teamId: string; group: string | null } | null; overview: boolean; focus?: string | null; flag?: boolean; landed?: boolean; seq: number };
   teams: DrawTeam[]; pool: DrawTeam[]; board: { letter: string; slots: { teamId: string | null; text: string; draw: boolean }[] }[]; next: string | null; videos: Record<string, { file: string; bytes: number } | null>; input: string; matchboardInput: string;
   step: 'focus' | 'team' | 'reveal' | 'back' | null; locked: boolean;
   companion: { at: string; sent: number; error: string | null } | null;
@@ -102,6 +102,20 @@ export function DrawPage() {
                       st.current?.group === g ? 'border-amber-400 bg-amber-500/25 text-amber-100'
                         : canMove ? 'border-teal-600 bg-teal-800/60 text-white hover:bg-teal-700' : 'border-ink-800 bg-ink-900 text-ink-500')}>
                     GROUP {g} <span className="text-xs font-medium opacity-70">{n}/{cap}{d.next === g ? ' · next' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-3 text-xs text-ink-500">Show one group in the centre on its own, the lists left and right stay. Press it again to send it back.</div>
+            <div className="mt-1 grid grid-cols-4 gap-2">
+              {d.board.map(({ letter: g }) => {
+                const on = st.focus === g && !st.flag;
+                const can = !st.flag && !st.landed && !run.isPending;
+                return (
+                  <button key={g} disabled={!can} onClick={() => run.mutate(`show:${g}`)}
+                    className={cx('rounded-md border px-3 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed',
+                      on ? 'border-amber-400 bg-amber-500/25 text-amber-100' : can ? 'border-cyan-700 bg-cyan-900/50 text-white hover:bg-cyan-800/60' : 'border-ink-800 bg-ink-900 text-ink-500')}>
+                    {on ? `Group ${g} back` : `Group ${g} to the centre`}
                   </button>
                 );
               })}

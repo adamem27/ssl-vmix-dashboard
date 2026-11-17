@@ -114,12 +114,18 @@ describe('DRAW', () => {
     expect(() => draw.run('back')).toThrow(/Locked/);
     draw.run('team:2');
     expect(draw.view().step).toBe('reveal');
+    expect(() => draw.run('show:A')).toThrow(/Locked/);
     expect(() => draw.run('group:B')).toThrow(/Locked/);
     draw.run('reveal');
     expect(draw.view().step).toBe('back');
     expect(() => draw.run('focus')).toThrow(/Locked/);
     draw.run('back');
     expect(draw.view().step).toBe('focus');
+    // a group on its own to the centre and back works while locked, between the teams
+    draw.run('show:C'); expect(draw.state.focus).toBe('C');
+    draw.run('show:D'); expect(draw.state.focus).toBe('D');
+    draw.run('show:D'); expect(draw.state.focus).toBeNull();
+    expect(draw.keys()[3][6]!.action).toBe('show:C');
     for (const n of [1, 3, 4]) { draw.run('focus'); draw.run(`team:${n}`); draw.run('reveal'); draw.run('back'); }
     expect(draw.view().step).toBeNull();
     draw.run('overview');

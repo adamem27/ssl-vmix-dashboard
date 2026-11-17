@@ -259,7 +259,7 @@ export class Draw {
    * One step of the draw. team:<n> (1–16, place in the pool) or team:<CODE> draws a team: it goes straight to the next
    * free place of the group with the fewest teams (nextDrawGroup). group:<A–D> moves the team just drawn to another
    * group (a correction). focus brings the group the next team goes to into the centre (focus:<A–D> a given one,
-   * focus:off sends it back). With manual steps the team's flag stays until reveal (FLAG OFF: the team shows in its
+   * focus:off sends it back; show:<A–D> brings that group to the centre on its own, pressed again it goes back). With manual steps the team's flag stays until reveal (FLAG OFF: the team shows in its
    * group) and the group stays in the centre until back. undo, clear, overview (on/off), overview:on|off, reset.
    */
   /** The group the next team drawn goes to. */
@@ -280,6 +280,8 @@ export class Draw {
     if (this.config.autoSteps || st.unlocked) return true;
     const [verb, arg = ''] = a.split(':');
     if (verb === 'lock' || verb === 'unlock') return true;
+    // showing a group in the centre on its own: whenever no team is between its steps (no flag, no team just landed)
+    if (verb === 'show') return !st.flag && !st.landed;
     const nx = nextDrawGroup(this.board(), st.picks);
     const step = this.step();
     if (step === null) return verb === 'overview';
@@ -342,6 +344,13 @@ export class Draw {
         next = { ...st, focus: g, overview: false, flag: false, landed: false };
         break;
       }
+      case 'show': { // one group to the centre on its own (the strips stay); pressed again, it goes back
+        const g = arg.toUpperCase();
+        if (!(DRAW_GROUPS as readonly string[]).includes(g)) throw badRequest(`Group ${arg}? Use A–D.`);
+        if (st.flag || st.landed) throw badRequest('Finish the team on the screen first (FLAG OFF, GROUP BACK).');
+        next = { ...st, focus: st.focus === g ? null : g, overview: false, flag: false, landed: false };
+        break;
+      }
       case 'reveal': // the flag goes, the team stands in its group
         if (!st.flag) throw badRequest('No flag on the screen.');
         next = { ...st, flag: false, landed: !!st.focus };
@@ -382,6 +391,9 @@ export class Draw {
     const nx = nextDrawGroup(board, st.picks);
     rows[2][4] = { action: 'focus', text: nx ? `GROUP ${nx}\\n▶ CENTRE` : 'GROUPS\\nFULL', bg: st.focus && !st.flag && st.focus === nx ? '#d97706' : nx ? '#1d4ed8' : '#27272a', fg: '#ffffff' };
     rows[3][1] = { action: 'reveal', text: 'FLAG OFF\\nTEAM IN', bg: st.flag ? '#d97706' : '#3f3f46', fg: st.flag ? '#ffffff' : '#a1a1aa' };
+    DRAW_GROUPS.forEach((g, i) => {
+      rows[3][4 + i] = { action: `show:${g}`, text: st.focus === g ? `GROUP ${g}\nSHOWN` : `SHOW\nGROUP ${g}`, bg: st.focus === g ? '#d97706' : '#155e75', fg: '#ffffff' };
+    });
     rows[3][2] = { action: 'back', text: st.focus ? `GROUP ${st.focus}\\nBACK` : 'GROUP\\nBACK', bg: st.focus ? '#0f766e' : '#3f3f46', fg: st.focus ? '#ffffff' : '#a1a1aa' };
     rows[2][5] = { action: 'overview', text: st.overview ? 'ALL GROUPS\\nON' : 'ALL GROUPS', bg: st.overview ? '#4c1d95' : '#3f3f46', fg: '#ffffff' };
     rows[2][6] = { action: 'clear', text: 'CLEAR\\nCENTRE', bg: '#3f3f46', fg: '#ffffff' };
