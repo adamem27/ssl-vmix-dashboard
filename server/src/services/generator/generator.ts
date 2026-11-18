@@ -513,6 +513,8 @@ export const STARTER_GRADIENTS: Record<string, string[]> = {
 
 /** Team colours from team-gradients_ssl26.ai: the full bar (version 1) as [position, colour] stops, all at −20°. */
 export const TEAM_GRADIENTS_SSL26: Record<string, [number, string][]> = {
+  // KOR from the producer's bar (2026-11-18), not in the .ai file: given to existing installs once (TEAM_GRADIENTS_LATER)
+  KOR: [[0, '#cb2e3a'], [100, '#4271b6']],
   ARG: [[0, '#74aadd'], [100, '#ffcd40']],
   AUS: [[0, '#064f51'], [100, '#f2e632']],
   BRA: [[0, '#049240'], [100, '#fdc900']],
@@ -561,6 +563,10 @@ export const TEAM_GRADIENTS_PANAM: Record<string, [number, string][]> = {
   URU: [[0, '#1f3989'], [100, '#83bbdf']],
 };
 export const TEAM_GRADIENTS_PANAM_VERSION = 'color_panam-1';
+/** Team colours added after the SSL26 design was applied: [colours, version], each team coloured once. */
+const TEAM_GRADIENTS_LATER: Record<string, [[number, string][], string]> = {
+  KOR: [TEAM_GRADIENTS_SSL26.KOR, 'kor-1'],
+};
 
 /**
  * Panam colours replace all three versions of each of these teams once (per team, so a team added or renamed
@@ -569,15 +575,19 @@ export const TEAM_GRADIENTS_PANAM_VERSION = 'color_panam-1';
  */
 export function applyPanamColours(db: DB): number {
   let n = 0;
-  for (const [code, stops] of Object.entries(TEAM_GRADIENTS_PANAM)) {
+  const all: [string, [number, string][], string][] = [
+    ...Object.entries(TEAM_GRADIENTS_PANAM).map(([c, st]) => [c, st, TEAM_GRADIENTS_PANAM_VERSION] as [string, [number, string][], string]),
+    ...Object.entries(TEAM_GRADIENTS_LATER).map(([c, [st, v]]) => [c, st, v] as [string, [number, string][], string]),
+  ];
+  for (const [code, stops, version] of all) {
     const key = `generator.colours.${code}`;
-    if (getSetting(db, key) === TEAM_GRADIENTS_PANAM_VERSION) continue;
+    if (getSetting(db, key) === version) continue;
     const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(code) as { id: string } | undefined;
     if (!team) continue;
     const g: Gradient = { angle: -20, stops: stops.map(([pos, color]) => ({ pos, color, opacity: 100 })) };
     db.transaction(() => {
       gradientVersionsFrom(g).forEach((v, i) => setGradient(db, team.id, i + 1, v));
-      setSetting(db, key, TEAM_GRADIENTS_PANAM_VERSION);
+      setSetting(db, key, version);
     })();
     n++;
   }

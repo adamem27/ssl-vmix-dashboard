@@ -236,6 +236,17 @@ describe('PNG generator export', () => {
     expect(listGradients(db).find((x) => x.teamId === ant)!.gradients[1]!.stops.map((s) => s.color)).toEqual(['#001f57', '#e4332a', '#f8b400']);
   });
 
+  it('gives KOR its bar once (red to blue), an edit afterwards stays', async () => {
+    const { applyPanamColours } = await import('../src/services/generator/generator.js');
+    const { db } = gen();
+    const kor = createTeam(db, { name: 'Korea', code: 'KOR' });
+    expect(applyPanamColours(db)).toBe(1);
+    expect(listGradients(db).find((x) => x.teamId === kor)!.gradients[1]!.stops.map((s) => s.color)).toEqual(['#cb2e3a', '#4271b6']);
+    setGradient(db, kor, 1, redBlue);
+    expect(applyPanamColours(db)).toBe(0);
+    expect(listGradients(db).find((x) => x.teamId === kor)!.gradients[1]).toEqual(redBlue);
+  });
+
   it('fills empty team graphic places from the generated PNGs and leaves choices of the operator alone', async () => {
     const { fillTeamSlotsFromGenerator } = await import('../src/services/generatedSlots.js');
     const { listAssets, removeAsset, saveUpload } = await import('../src/services/assets.js');
