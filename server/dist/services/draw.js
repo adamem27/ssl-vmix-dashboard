@@ -147,11 +147,14 @@ export function drawBoard(db, pool) {
             continue;
         }
         const resolved = resolveTeams(layout, state);
-        out.push({ letter, slotIds: [...g.slots], slots: g.slots.map((sid) => {
-                const teamId = resolved.get(sid)?.teamId ?? null;
-                // an empty place says just DRAW (the matchboard's DRAW 1…11 would read as an order of the draw)
-                return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text: 'DRAW', draw: true };
-            }) });
+        const rows = g.slots.map((sid) => {
+            const teamId = resolved.get(sid)?.teamId ?? null;
+            // an empty place says just DRAW (the matchboard's DRAW 1…11 would read as an order of the draw)
+            return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text: 'DRAW', draw: true };
+        });
+        // the teams already in the group (MAS in C, SGP in D) come first, the places the draw fills after them
+        const order = rows.map((_, i) => i).sort((a, b) => Number(rows[a].draw) - Number(rows[b].draw) || a - b);
+        out.push({ letter, slotIds: [...g.slots], order, slots: order.map((i) => rows[i]) });
     }
     return out;
 }
@@ -256,10 +259,18 @@ export class Draw {
     matchboardState() {
         const state = getState(this.ctx.db);
         const board = this.board();
-        for (const p of this.state.picks) {
-            const sid = board.find((g) => g.letter === p.group)?.slotIds?.[p.place - 1];
-            if (sid && state.slots[sid])
-                state.slots[sid] = { ...state.slots[sid], teamId: p.teamId };
+        for (const g of board) {
+            const ids = g.slotIds ?? [], order = g.order ?? ids.map((_, i) => i);
+            if (!ids.length || ids.some((id) => !state.slots[id]))
+                continue;
+            // the group's rows top to bottom as on the screen: its fixed teams first, then the places of the draw
+            const before = ids.map((id) => state.slots[id]);
+            order.forEach((from, i) => { state.slots[ids[i]] = { ...before[from] }; });
+            for (const p of this.state.picks) {
+                const sid = p.group === g.letter ? ids[p.place - 1] : undefined;
+                if (sid)
+                    state.slots[sid] = { ...state.slots[sid], teamId: p.teamId };
+            }
         }
         return state;
     }

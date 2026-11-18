@@ -1,8 +1,14 @@
 {
-  "version": "1.0.231",
-  "commit": "8ef16a0",
-  "date": "2026-11-17T20:24:53Z",
+  "version": "1.0.232",
+  "commit": "df004cf",
+  "date": "2026-11-18T14:35:28Z",
   "changes": [
+    {
+      "version": "1.0.232",
+      "commit": "df004cf",
+      "date": "2026-11-18T14:35:28Z",
+      "text": "Draw: teams already in a group (MAS in C, SGP in D) come first, the draw fills the places after them (screen and draw matchboard)"
+    },
     {
       "version": "1.0.231",
       "commit": "8ef16a0",
@@ -476,12 +482,6 @@
       "commit": "d430942",
       "date": "2026-11-12T03:32:00Z",
       "text": "Break scene: L-bar found as L-bars.gtzip too; boards switch with their out and in animations; switch every 30 s"
-    },
-    {
-      "version": "1.0.152",
-      "commit": "26978f1",
-      "date": "2026-11-12T02:54:22Z",
-      "text": "Break scene: L-bar on layer 1, ticker on layer 3 (TICKERS keys change it in place), day schedule / group results switching on layer 4; AUTO SWITCH on or off, kept"
     }
   ]
 }
