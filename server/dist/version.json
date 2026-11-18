@@ -1,8 +1,14 @@
 {
-  "version": "1.0.232",
-  "commit": "df004cf",
-  "date": "2026-11-18T14:35:28Z",
+  "version": "1.0.233",
+  "commit": "ea28cad",
+  "date": "2026-11-18T16:03:20Z",
   "changes": [
+    {
+      "version": "1.0.233",
+      "commit": "ea28cad",
+      "date": "2026-11-18T16:03:20Z",
+      "text": "KOR team colours: red #cb2e3a to blue #4271b6 (the producer's bar), given once to existing installs"
+    },
     {
       "version": "1.0.232",
       "commit": "df004cf",
@@ -476,12 +482,6 @@
       "commit": "81b6222",
       "date": "2026-11-12T11:20:25Z",
       "text": "Break scene: its titles play their in animation when it comes in; one of them on another overlay leaves it at once, so it is not left hidden"
-    },
-    {
-      "version": "1.0.153",
-      "commit": "d430942",
-      "date": "2026-11-12T03:32:00Z",
-      "text": "Break scene: L-bar found as L-bars.gtzip too; boards switch with their out and in animations; switch every 30 s"
     }
   ]
 }
