@@ -245,6 +245,9 @@ describe('PNG generator export', () => {
     setGradient(db, kor, 1, redBlue);
     expect(applyPanamColours(db)).toBe(0);
     expect(listGradients(db).find((x) => x.teamId === kor)!.gradients[1]).toEqual(redBlue);
+    const gre = createTeam(db, { name: 'Greece', code: 'GRE' });
+    expect(applyPanamColours(db)).toBe(1);
+    expect(listGradients(db).find((x) => x.teamId === gre)!.gradients[1]!.stops.map((s) => s.color)).toEqual(['#c9b68d', '#0d5eaf']);
   });
 
   it('fills empty team graphic places from the generated PNGs and leaves choices of the operator alone', async () => {

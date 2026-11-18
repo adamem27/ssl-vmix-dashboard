@@ -515,6 +515,8 @@ export const STARTER_GRADIENTS: Record<string, string[]> = {
 export const TEAM_GRADIENTS_SSL26: Record<string, [number, string][]> = {
   // KOR from the producer's bar (2026-11-18), not in the .ai file: given to existing installs once (TEAM_GRADIENTS_LATER)
   KOR: [[0, '#cb2e3a'], [100, '#4271b6']],
+  // GRE from the producer's bar (2026-11-18), likewise
+  GRE: [[0, '#c9b68d'], [100, '#0d5eaf']],
   ARG: [[0, '#74aadd'], [100, '#ffcd40']],
   AUS: [[0, '#064f51'], [100, '#f2e632']],
   BRA: [[0, '#049240'], [100, '#fdc900']],
@@ -566,6 +568,7 @@ export const TEAM_GRADIENTS_PANAM_VERSION = 'color_panam-1';
 /** Team colours added after the SSL26 design was applied: [colours, version], each team coloured once. */
 const TEAM_GRADIENTS_LATER: Record<string, [[number, string][], string]> = {
   KOR: [TEAM_GRADIENTS_SSL26.KOR, 'kor-1'],
+  GRE: [TEAM_GRADIENTS_SSL26.GRE, 'gre-1'],
 };
 
 /**
