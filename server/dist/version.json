@@ -1,8 +1,14 @@
 {
-  "version": "1.0.233",
-  "commit": "ea28cad",
-  "date": "2026-11-18T16:03:20Z",
+  "version": "1.0.234",
+  "commit": "dc3221a",
+  "date": "2026-11-18T23:07:23Z",
   "changes": [
+    {
+      "version": "1.0.234",
+      "commit": "dc3221a",
+      "date": "2026-11-18T23:07:23Z",
+      "text": "GRE team colours: #c9b68d to #0d5eaf (the producer's bar), given once to existing installs"
+    },
     {
       "version": "1.0.233",
       "commit": "ea28cad",
@@ -476,12 +482,6 @@
       "commit": "f6ae3ca",
       "date": "2026-11-12T11:43:28Z",
       "text": "Break scene: layers set with a plain comma and the input number (each input on its own layer); NEXT TICKER key with out/in animation"
-    },
-    {
-      "version": "1.0.154",
-      "commit": "81b6222",
-      "date": "2026-11-12T11:20:25Z",
-      "text": "Break scene: its titles play their in animation when it comes in; one of them on another overlay leaves it at once, so it is not left hidden"
     }
   ]
 }
