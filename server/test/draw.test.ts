@@ -147,10 +147,13 @@ describe('DRAW', () => {
     const board = draw.board();
     expect(board.map((g) => g.slots.filter((x) => x.draw).length)).toEqual([3, 2, 3, 3]);
     expect(board[0].slots[0]).toEqual({ teamId: fixed.COL, text: '', draw: false });
-    expect(board[2].slots.map((x) => x.text)).toEqual(['DRAW', 'DRAW', 'DRAW', '']);
+    // MAS (row 4 on the matchboard) is first in C, the draw fills the places after it
+    expect(board[2].slots.map((x) => x.text)).toEqual(['', 'DRAW', 'DRAW', 'DRAW']);
+    expect(board[2].slots[0].teamId).toBe(fixed.MAS);
+    expect(board[3].slots[0].teamId).toBe(fixed.SGP);
     // fixed: A 1, B 2, C 1, D 1 → A, C, D, then A B C D, then A B (full), C, D
     for (let i = 1; i <= 11; i++) draw.run(`team:${i}`);
-    expect(draw.state.picks.map((p) => `${p.group}${p.place}`)).toEqual(['A2', 'C1', 'D1', 'A3', 'B3', 'C2', 'D2', 'A4', 'B4', 'C3', 'D3']);
+    expect(draw.state.picks.map((p) => `${p.group}${p.place}`)).toEqual(['A2', 'C2', 'D2', 'A3', 'B3', 'C3', 'D3', 'A4', 'B4', 'C4', 'D4']);
     expect(draw.nextGroup()).toBeNull();
     expect(draw.output().teams.map((t) => t.code)).toContain('MAS');
     // the matchboard after the draw: every team drawn in its DRAW row of R1 A–D
@@ -158,6 +161,8 @@ describe('DRAW', () => {
     const rows = board.map((g) => g.slotIds!.map((id) => mb.slots[id].teamId));
     expect(rows[0]).toEqual([fixed.COL, drawn[0], drawn[3], drawn[7]]);
     expect(rows[1].slice(0, 2)).toEqual([fixed.KOR, fixed.GRE]);
+    expect(rows[2]).toEqual([fixed.MAS, drawn[1], drawn[5], drawn[9]]);
+    expect(rows[3]).toEqual([fixed.SGP, drawn[2], drawn[6], drawn[10]]);
   });
 
   it('serves the output page and its data without a login, the rest still needs one', async () => {

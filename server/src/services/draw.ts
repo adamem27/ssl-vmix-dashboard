@@ -130,8 +130,9 @@ export function deleteFlagVideo(assetsDir: string, teamId: string) {
 
 /** A place of a group on the screen: a team already there (fixed on the matchboard) or a place the draw fills. */
 export interface BoardSlot { teamId: string | null; text: string; draw: boolean }
-/** slotIds: the matchboard rows of the group (empty without the matchboard) */
-export interface BoardGroup { letter: string; slots: BoardSlot[]; slotIds?: string[] }
+/** slotIds: the matchboard rows of the group, top to bottom (empty without the matchboard); order: for each place on the
+ * screen, the matchboard row (index into slotIds) it was taken from */
+export interface BoardGroup { letter: string; slots: BoardSlot[]; slotIds?: string[]; order?: number[] }
 
 /**
  * The 1/32 Finals groups as the matchboard has them (boxes R1 A–D): a row with a team not in the draw pool stays as it
@@ -146,11 +147,14 @@ export function drawBoard(db: AssetCtx['db'], pool: Set<string>): BoardGroup[] {
     const g = layout?.groups.find((x) => /^R\s*1\s*([A-D])$/i.exec(((state!.texts[x.labelId] ?? layout!.texts.find((t) => t.id === x.labelId)?.text) ?? '').trim())?.[1]?.toUpperCase() === letter);
     if (!g || !layout || !state) { out.push({ letter, slots: Array.from({ length: DRAW_GROUP_SIZE }, () => ({ teamId: null, text: 'DRAW', draw: true })), slotIds: [] }); continue; }
     const resolved = resolveTeams(layout, state);
-    out.push({ letter, slotIds: [...g.slots], slots: g.slots.map((sid) => {
+    const rows = g.slots.map((sid): BoardSlot => {
       const teamId = resolved.get(sid)?.teamId ?? null;
       // an empty place says just DRAW (the matchboard's DRAW 1…11 would read as an order of the draw)
       return teamId && !pool.has(teamId) ? { teamId, text: '', draw: false } : { teamId: null, text: 'DRAW', draw: true };
-    }) });
+    });
+    // the teams already in the group (MAS in C, SGP in D) come first, the places the draw fills after them
+    const order = rows.map((_, i) => i).sort((a, b) => Number(rows[a].draw) - Number(rows[b].draw) || a - b);
+    out.push({ letter, slotIds: [...g.slots], order, slots: order.map((i) => rows[i]) });
   }
   return out;
 }
@@ -248,9 +252,16 @@ export class Draw {
   matchboardState() {
     const state = getState(this.ctx.db);
     const board = this.board();
-    for (const p of this.state.picks) {
-      const sid = board.find((g) => g.letter === p.group)?.slotIds?.[p.place - 1];
-      if (sid && state.slots[sid]) state.slots[sid] = { ...state.slots[sid], teamId: p.teamId };
+    for (const g of board) {
+      const ids = g.slotIds ?? [], order = g.order ?? ids.map((_, i) => i);
+      if (!ids.length || ids.some((id) => !state.slots[id])) continue;
+      // the group's rows top to bottom as on the screen: its fixed teams first, then the places of the draw
+      const before = ids.map((id) => state.slots[id]);
+      order.forEach((from, i) => { state.slots[ids[i]] = { ...before[from] }; });
+      for (const p of this.state.picks) {
+        const sid = p.group === g.letter ? ids[p.place - 1] : undefined;
+        if (sid) state.slots[sid] = { ...state.slots[sid], teamId: p.teamId };
+      }
     }
     return state;
   }
