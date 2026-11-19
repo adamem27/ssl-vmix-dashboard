@@ -470,6 +470,8 @@ describe('show control', () => {
     expect(v.overlays[2]).toBe(v.num('ssl_lbar'));
     await show.run('show:break');
     expect(teamKeyColours(null, 'URU')!.normal).toEqual({ bg: '#4aa8e0', fg: '#ffffff' });
+    expect(teamKeyColours(null, 'COL')!.normal).toEqual({ bg: '#2c4a9a', fg: '#fdd116' });
+    expect(teamKeyColours(null, 'KOR')!.normal).toEqual({ bg: '#ffffff', fg: '#cd2e3a' });
     expect(teamKeyColours(null, 'PUR')!.normal).toEqual({ bg: '#ffffff', fg: '#1d4fa3' });
     expect(teamKeyColours(null, 'ANT')!.normal).toEqual({ bg: '#000000', fg: '#ffe95c' });
     expect(teamKeyColours(null, 'CUB')!.normal).toEqual({ bg: '#e03a3e', fg: '#0a2a8c' });
