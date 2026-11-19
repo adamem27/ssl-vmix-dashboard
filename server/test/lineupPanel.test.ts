@@ -11,12 +11,17 @@ import { lineupPanelFor, logoSizes, ltSponsorFor, PANEL, stripRect, TAG } from '
 const logo = (w: number, h: number) => encodePng(w + 40, h + 40, (x, y) => (x >= 20 && x < w + 20 && y >= 20 && y < h + 20 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
 
 describe('line-up panel with team partners', () => {
-  it('gives every logo the same area, capped by its slot', () => {
-    const [sq, wide, tall] = logoSizes([{ w: 300, h: 100 }, { w: 400, h: 100 }, { w: 50, h: 200 }], 400);
-    expect(sq.w * sq.h / (wide.w * wide.h)).toBeCloseTo(1, 1);
+  it('sizes the logos alike: wider ones lower, all within the row and their slots', () => {
+    const [sq, wide, tall] = logoSizes([{ w: 100, h: 100 }, { w: 400, h: 100 }, { w: 50, h: 200 }], 400, { maxH: 80 });
+    expect(sq.h).toBe(64);
+    expect(wide.h).toBeLessThan(sq.h);
+    expect(wide.w).toBeGreaterThan(sq.w);
     expect(wide.w / wide.h).toBeCloseTo(4, 0);
     expect(tall.h).toBeLessThanOrEqual(80);
-    for (const s of logoSizes([{ w: 2000, h: 50 }], 200, stripRect(9, PANEL.height))) expect(s.w).toBeLessThanOrEqual(164);
+    // one logo too wide for its slot: all shrink together first
+    const [a, b] = logoSizes([{ w: 100, h: 100 }, { w: 1000, h: 100 }], 300, { maxH: 80 });
+    expect(b.w).toBeLessThanOrEqual(264);
+    expect(a.h).toBeLessThan(64);
   });
 
   it('draws the strip with the logos for a team with sponsors and the plain panel for one without', () => {
