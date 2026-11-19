@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { hasSponsorLogos, lineupPanelFor } from './lineupPanel.js';
+import { hasSponsorLogos, lineupPanelFor, stripFor } from './lineupPanel.js';
 import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
 import { z } from 'zod';
@@ -1083,7 +1083,9 @@ export class Show {
     if (bgField) {
       const t = team as unknown as Parameters<typeof lineupPanelFor>[1];
       const had = /Line-up panels/i.test(input.values?.[bgField] ?? '') || this.partnersShown.has(input.key || String(input.number));
-      const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t) : null;
+      // Team_lineup_10 has its lowest cards further down: a lower, one-row strip
+      const kind = stripFor(input.fields.filter((x) => /SURNAM\w*\.Text$/i.test(x)).length);
+      const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t, kind) : null;
       if (bg) { f.set(bgField, bg); if (/_lineup_sponsors\.png$/i.test(bg)) this.partnersShown.add(input.key || String(input.number)); else this.partnersShown.delete(input.key || String(input.number)); }
     }
     await this.set(input, f);

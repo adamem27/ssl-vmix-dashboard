@@ -35,7 +35,7 @@ describe('line-up panel with team partners', () => {
     // white logo pixels inside the strip, none in the plain panel there
     const whiteIn = (im: ReturnType<typeof decode>) => {
       let n = 0;
-      for (let y = STRIP.y + STRIP.label + 10; y < STRIP.y + STRIP.h - 5; y++) for (let x = STRIP.x; x < STRIP.x + STRIP.w; x++) {
+      for (let y = STRIP.y + 40; y < STRIP.y + STRIP.h - 5; y++) for (let x = STRIP.x; x < STRIP.x + STRIP.w; x++) {
         const o = (y * im.width + x) * 4;
         if (im.data[o] > 240 && im.data[o + 1] > 240 && im.data[o + 2] > 240) n++;
       }
