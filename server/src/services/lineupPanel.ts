@@ -25,7 +25,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-4';
+const VERSION = 'partners-5';
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
 
 /**
@@ -167,9 +167,7 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
   }
   if (!sponsors) return cv.toBuffer('image/png');
   const s = stripRect(kind, panelH);
-  rr(s.x, s.y, s.w, s.h, s.radius);
-  g.fillStyle = 'rgba(0,0,0,0.30)'; g.fill();
-  g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 1; g.stroke();
+  // the label and the logos straight on the panel, no box of their own
   g.fillStyle = '#ffffff';
   g.font = `600 17px "General Sans", "Segoe UI", Arial, sans-serif`;
   g.textBaseline = 'middle';
@@ -224,8 +222,8 @@ export function lineupPanelFor(ctx: AssetCtx, team: { code: string; assets: Reco
 // ---------- the sailor lower third: a tab with the team’s first sponsor above the bar ----------
 /** The tab, drawn at twice its size in the title (260×58): page 20 of finals-broadcast_ssl26_v2. */
 export const TAG = { width: 520, height: 116 };
-/** The room for the logo inside the tab (its sides lean in at the top): as large as it fits, for reading. */
-export const TAG_BOX = { w: 430, h: 92 };
+const TAG_SIDE = 120;
+const TAG_MAX = { w: 380, h: 76 };
 
 function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   const { width: w, height: h } = TAG;
@@ -242,7 +240,8 @@ function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
   const box = trimBox(d);
   const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
-  const s = Math.min(TAG_BOX.w / box.w, TAG_BOX.h / box.h);
+  let s = TAG_SIDE / Math.sqrt(box.w * box.h);
+  s = Math.min(s, TAG_MAX.w / box.w, TAG_MAX.h / box.h);
   const lw = Math.round(box.w * s), lh = Math.round(box.h * s);
   g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round((w - lw) / 2), Math.round((h - lh) / 2 + 4), lw, lh);
   return cv.toBuffer('image/png');

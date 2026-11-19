@@ -812,6 +812,7 @@ describe('show control', () => {
     expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_lineup_photo_right\.png$/);
     // a team with sponsor logos: the big panel with its TEAM PARTNERS strip; without them again, the plain panel back
     const espId = show.teamRef('ESP').id;
+    v.vals.set('3|BG.Source', 'C:\\titles\\NEUTRAL_Lineup.png');
     saveUpload(s.ctx, 'team', espId, 'sponsor_1', encodePng(80, 40, (x, y) => (x > 10 && x < 70 && y > 10 && y < 30 ? [255, 255, 255, 255] : [0, 0, 0, 0])), 'sp.png');
     (show as any).memo.clear();
     v.calls.length = 0;
@@ -821,7 +822,7 @@ describe('show control', () => {
     (show as any).memo.clear();
     v.calls.length = 0;
     await show.run('lineup:ESP');
-    expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/lineup_plain\.png$/);
+    expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/NEUTRAL_Lineup\.png$/);
     // General graphics → Team comparison: what is typed there wins
     const fleetId = show.config.fleetId;
     setCompareOverride(s.ctx.db, fleetId, 1, 'nick', 'The Bulls');
