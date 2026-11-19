@@ -1121,7 +1121,7 @@ export class Show {
             const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t, kind) : null;
             if (bg) {
                 f.set(bgField, bg);
-                if (/_lineup_sponsors\.png$/i.test(bg))
+                if (/_lineup_sponsors(_10)?\.png$/i.test(bg))
                     this.partnersShown.add(input.key || String(input.number));
                 else
                     this.partnersShown.delete(input.key || String(input.number));

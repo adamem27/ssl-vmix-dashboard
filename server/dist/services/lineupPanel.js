@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { getSetting, setSetting } from '../db/db.js';
-import { listOutputs } from './generator/generator.js';
+import { listOutputs, listTemplates } from './generator/generator.js';
 import { NEUTRAL_ID } from './generator/render.js';
 import { decode, trimBox } from './logo.js';
 import { uploadedSansFiles } from './matchboard/matchboard.js';
@@ -14,23 +14,31 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
  * the same title input, only another picture in its BG field, written as <CODE>_lineup_sponsors.png. A team without
  * sponsors gets the plain panel back, so the next team never keeps someone else’s partners.
  */
-export const PANEL = { width: 1731, height: 861 };
+/**
+ * The BG field of the line-up titles (Team_lineup_8, team_lineup, Team_lineup_10) is 1731×972 at 95,53: down to 1025 on
+ * screen, as on page 43. The plain panel (861 high, the generator's “Lineup”) sits at its top with nothing below, so a
+ * team without sponsors looks as before; a team with sponsors gets the generator's taller “Lineup sponsor” panel with
+ * the partners' logos in the room under the sailor cards.
+ */
+export const PANEL = { width: 1731, height: 972 };
+export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-2';
+const VERSION = 'partners-3';
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
 /**
- * The strip, in panel pixels (the panel sits at 95,53), between the lowest sailor card and the panel's edge. The cards
- * of Team_lineup_8 / team_lineup (9) end at 774 on screen, so the strip is 120 px with the label above the logos;
- * those of Team_lineup_10 end at 828, so there it is one 66 px row with the label on its left.
- * side: every logo gets the same visible area (a square logo is side×side), capped by maxH and its slot.
+ * Where the lowest sailor card ends, in panel pixels (screen − 53): 774 on Team_lineup_8 and team_lineup (9),
+ * 828 on Team_lineup_10. The strip takes the room from there to the bottom of the sponsor panel.
  */
-export const STRIPS = {
-    9: { x: 125, y: 733, w: 1481, h: 118, radius: 22, compact: false, side: 80, maxH: 58 },
-    10: { x: 125, y: 787, w: 1481, h: 66, radius: 18, compact: true, side: 60, maxH: 40 },
-};
-export const STRIP = STRIPS[9];
-/** Which strip a line-up title takes: 10 places or more → the low one. */
+export const CARDS_END = { 9: 721, 10: 775 };
+/** Which line-up a title is: 10 places or more → the one whose cards reach lowest. */
 export const stripFor = (places) => (places >= 10 ? 10 : 9);
+/** The strip for a sponsor panel of this height (panel pixels): the label above the logos when there is room. */
+export function stripRect(kind, panelH) {
+    const y = CARDS_END[kind] + 18;
+    const h = Math.max(56, panelH - 20 - y);
+    const compact = h < 104;
+    return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, side: compact ? Math.min(64, h - 22) : Math.min(90, h - 58), maxH: compact ? h - 24 : Math.min(80, h - 56) };
+}
 const MAX_W = 300;
 let canvasMod;
 let fontKey = '';
@@ -72,11 +80,18 @@ export function sponsorLogos(ctx, assets) {
     return SPONSOR_SLOTS.map((s) => readAsset(ctx, assets[s])).filter((x) => !!x);
 }
 export const hasSponsorLogos = (ctx, team) => sponsorLogos(ctx, team.assets).length > 0;
-/** The neutral “Lineup” panel from the PNG generator (NEUTRAL_Lineup.png), when there is one. */
-function generatedPanel(ctx) {
-    const o = listOutputs(ctx.db).find((x) => x.teamId === NEUTRAL_ID && /lineup\.png$/i.test(x.rel) && !/photo/i.test(x.rel));
-    const p = o ? path.join(ctx.assetsDir, ...o.rel.split('/')) : null;
-    return p && fs.existsSync(p) ? p : null;
+/** The neutral element of the PNG generator named “Lineup” (plain) or “Lineup sponsor”, when its file exists. */
+export function generatedPanel(ctx, which) {
+    const want = which === 'sponsor' ? /^lineup[\s_-]*sponsors?$/i : /^lineup$/i;
+    const ids = new Set(listTemplates(ctx.db).filter((t) => want.test(t.name.trim()) || want.test(t.fileName)).map((t) => t.id));
+    for (const o of listOutputs(ctx.db)) {
+        if (o.teamId !== NEUTRAL_ID || !ids.has(o.templateId))
+            continue;
+        const p = path.join(ctx.assetsDir, ...o.rel.split('/'));
+        if (fs.existsSync(p))
+            return p;
+    }
+    return null;
 }
 /** Mean brightness (0–1) of a logo's visible pixels. */
 export function brightness(d) {
@@ -108,8 +123,8 @@ catch {
     return f;
 } };
 /** Logo boxes of one size by area: wide logos wider, tall ones taller, none larger than its slot. */
-export function logoSizes(boxes, slotW, kind = 9) {
-    const { side, maxH } = STRIPS[kind];
+export function logoSizes(boxes, slotW, strip = stripRect(9, 952)) {
+    const { side, maxH } = strip;
     return boxes.map(({ w, h }) => {
         let s = side / Math.sqrt(w * h);
         s = Math.min(s, maxH / h, Math.min(MAX_W, slotW - 36) / w);
@@ -128,24 +143,33 @@ function draw(ctx, c, base, logos, kind) {
         return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box: trimBox(d) };
     };
     const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
+    const sponsors = logos.length > 0;
+    // the panel: the generator's file across the full width from the top (at most the field's height), or one drawn
+    // like the title's own (#464646, 35 px corners, orange→yellow ring): 861 high, or the full field for sponsors
+    let panelH = sponsors ? PANEL.height : PLAIN_HEIGHT;
     if (base) {
-        g.drawImage(pic(fs.readFileSync(base)).im, 0, 0, PANEL.width, PANEL.height);
+        const d = decode(fs.readFileSync(base));
+        const t = c.createCanvas(d.width, d.height);
+        t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
+        const sc = Math.min(PANEL.width / d.width, PANEL.height / d.height);
+        const w = d.width * sc;
+        panelH = d.height * sc;
+        g.drawImage(t, (PANEL.width - w) / 2, 0, w, panelH);
     }
     else {
-        // the generator has no neutral Lineup panel: the plain one of the title (#464646, 35 px corners, orange→yellow ring)
-        rr(0.5, 0.5, PANEL.width - 1, PANEL.height - 1, 35);
+        rr(0.5, 0.5, PANEL.width - 1, panelH - 1, 35);
         g.fillStyle = '#464646';
         g.fill();
-        const ring = g.createLinearGradient(0, 0, PANEL.width, PANEL.height);
+        const ring = g.createLinearGradient(0, 0, PANEL.width, panelH);
         ring.addColorStop(0, '#f08a00');
         ring.addColorStop(1, '#ffd200');
         g.strokeStyle = ring;
         g.lineWidth = 1;
         g.stroke();
     }
-    if (!logos.length)
+    if (!sponsors)
         return cv.toBuffer('image/png');
-    const s = STRIPS[kind];
+    const s = stripRect(kind, panelH);
     rr(s.x, s.y, s.w, s.h, s.radius);
     g.fillStyle = 'rgba(0,0,0,0.30)';
     g.fill();
@@ -163,7 +187,7 @@ function draw(ctx, c, base, logos, kind) {
     }
     else {
         g.textAlign = 'center';
-        g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + 24);
+        g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + 26);
     }
     const imgs = logos.flatMap((b) => { try {
         return [pic(b)];
@@ -177,8 +201,8 @@ function draw(ctx, c, base, logos, kind) {
     const rowX = s.x + labelW, rowW = s.w - labelW;
     const slotW = Math.min((rowW - 80) / imgs.length, 360);
     const x0 = rowX + (rowW - slotW * imgs.length) / 2;
-    const sizes = logoSizes(imgs.map((x) => x.box), slotW, kind);
-    const cy = s.compact ? s.y + s.h / 2 : s.y + 38 + (s.h - 38) / 2;
+    const sizes = logoSizes(imgs.map((x) => x.box), slotW, s);
+    const cy = s.compact ? s.y + s.h / 2 : s.y + 44 + (s.h - 44) / 2;
     imgs.forEach(({ im, box }, i) => {
         const { w, h } = sizes[i];
         const cx = x0 + slotW * (i + 0.5);
@@ -195,7 +219,7 @@ export function lineupPanelFor(ctx, team, kind = 9) {
     if (!c)
         return null;
     const logos = sponsorLogos(ctx, team.assets);
-    const base = generatedPanel(ctx);
+    const base = generatedPanel(ctx, logos.length ? 'sponsor' : 'plain');
     const name = logos.length ? `${team.code.replace(/[^\w.-]+/g, '_')}_lineup_sponsors${kind === 10 ? '_10' : ''}.png` : 'lineup_plain.png';
     const rel = `${PANEL_DIR}/${name}`;
     const file = path.join(ctx.assetsDir, PANEL_DIR, name);

@@ -1,8 +1,14 @@
 {
-  "version": "1.0.237",
-  "commit": "1378354",
-  "date": "2026-11-19T12:29:41Z",
+  "version": "1.0.238",
+  "commit": "0f49706",
+  "date": "2026-11-19T12:38:57Z",
   "changes": [
+    {
+      "version": "1.0.238",
+      "commit": "0f49706",
+      "date": "2026-11-19T12:38:57Z",
+      "text": "Line-up BG with sponsors: the generator's Lineup sponsor panel"
+    },
     {
       "version": "1.0.237",
       "commit": "1378354",
@@ -476,12 +482,6 @@
       "commit": "69247b1",
       "date": "2026-11-12T13:23:27Z",
       "text": "AFTER / BREAK page: a key per ticker for the break scene (new tickers get the next key) instead of NEXT TICKER"
-    },
-    {
-      "version": "1.0.158",
-      "commit": "d0c969e",
-      "date": "2026-11-12T13:02:07Z",
-      "text": "Break scene: pick the groups whose results it shows (Show control); none picked = every group but the Last Chance Race"
     }
   ]
 }
