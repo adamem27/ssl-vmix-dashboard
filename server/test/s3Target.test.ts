@@ -37,4 +37,14 @@ describe('R2 settings as pasted', () => {
     saveSiteSettings(db, { mode: 's3', s3Endpoint: 'abc.r2.cloudflarestorage.com', s3Bucket: 'ssl-commentary' });
     expect(() => siteTarget(db, 'komentator-abc123', '/tmp')).toThrow(/Missing .*Access Key ID, Secret Access Key/);
   });
+
+  it('takes the bucket from an endpoint pasted with it', async () => {
+    const { setup } = await import('./helpers.js');
+    const { saveSiteSettings, siteTarget } = await import('../src/services/siteTargets.js');
+    const { db } = setup();
+    saveSiteSettings(db, { mode: 's3', s3Endpoint: 'https://abc.r2.cloudflarestorage.com/ssl-commentary', s3Bucket: '', s3AccessKey: 'k', s3Secret: 's' });
+    expect((siteTarget(db, 'komentator-abc123', '/tmp') as any).o.bucket).toBe('ssl-commentary');
+    saveSiteSettings(db, { s3Endpoint: 'https://abc.r2.cloudflarestorage.com' });
+    expect(() => siteTarget(db, 'komentator-abc123', '/tmp')).toThrow(/Missing .*Bucket/);
+  });
 });
