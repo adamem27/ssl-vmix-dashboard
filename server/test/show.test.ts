@@ -443,6 +443,12 @@ describe('show control', () => {
     for (const cs of all) expect(cs.filter((c: any) => c.steps?.[0]?.action_sets?.down?.[0]?.definitionId === 'dskAuto')).toHaveLength(1);
     expect(f.pages[1].controls[2][7].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
     expect(f.pages[8].controls[3][5].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
+    // every downstream key reads DSK, and Show control knows where it is on each page
+    const dskText = (c: any) => c.style.layers.find((l: any) => l.type === 'text').text.value;
+    for (const cs of all) expect(cs.filter((c: any) => c.steps?.[0]?.action_sets?.down?.[0]?.definitionId === 'dskAuto').map(dskText)).toEqual(['DSK']);
+    const view = await show.view();
+    for (const p of view.pages) { expect(p.dsk).toBeTruthy(); expect(f.pages[p.page].controls[p.dsk![0]][p.dsk![1]].steps[0].action_sets.down[0].definitionId).toBe('dskAuto'); }
+    expect(view.pages.find((p) => p.page === 1)?.dsk).toEqual([2, 7]);
     // no OUT key; PHOTO mode on every team page and on PEOPLE, SOCIALS on BEFORE and AFTER
     expect(show.pages().some((p) => p.keys.flat().some((k) => k?.action === 'out'))).toBe(false);
     expect(show.pages().filter((p) => p.keys[3][4]?.action === 'photo').map((p) => p.name)).toEqual(['BRA', 'ESP', 'GBR', 'ITA', 'PEOPLE']);
@@ -986,7 +992,11 @@ describe('show control', () => {
     expect(at('10/1/2')).toMatch(/text=PIT%5Cn%2312%20RUIZ/);
     const people = show.pages().find((p) => p.name === 'PEOPLE')!.page;
     expect(at(`${people}/1/0`)).toBeUndefined(); // the producer's vMix key keeps its look
-    expect(posts.length).toBe(all.filter((id) => !/^\d+\/(1\/[0-2]|2\/0|2\/7|3\/[0-3])$/.test(id) || !id.startsWith(`${people}/`)).length);
+    // …and the label DSK on the ATEM downstream key of each page (text only: Companion keeps its colours and on-air red)
+    const dsk = posts.filter((x) => /\/style\?text=DSK$/.test(x));
+    expect(dsk).toHaveLength(show.pages().length);
+    expect(at(`${people}/2/7`)).toBe(`/api/location/${people}/2/7/style?text=DSK`);
+    expect(posts.length - dsk.length).toBe(all.filter((id) => !/^\d+\/(1\/[0-2]|2\/0|2\/7|3\/[0-3])$/.test(id) || !id.startsWith(`${people}/`)).length);
     expect(st).toMatchObject({ enabled: true, sent: posts.length, error: null });
     expect(st.at).toBeTruthy();
     // nothing changed: nothing goes out

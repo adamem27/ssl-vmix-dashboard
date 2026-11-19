@@ -13,7 +13,8 @@ interface Config {
 interface KeyEdit { action?: string; text?: string; bg?: string; fg?: string }
 interface KeyDef { action: string; text: string; kind: string }
 interface KeyLook { action: string; text: string; kind: string; bg: string; fg: string; custom?: string; onAir: boolean; active: boolean; empty: boolean }
-interface Page { deck: number; name: string; page: number; keys: (KeyLook | null)[][] }
+/** dsk: where the ATEM downstream key sits on this page in Companion (not a dashboard key) */
+interface Page { deck: number; name: string; page: number; keys: (KeyLook | null)[][]; dsk?: [number, number] | null }
 interface Graphic { id: string; label: string; kind: string; overlay: number; inputs: string[]; input: string | null; onAir: boolean; fields: number }
 interface ShowData {
   config: Config;
@@ -159,6 +160,10 @@ function Show({ data }: { data: ShowData }) {
                         className={cx('aspect-square whitespace-pre-line rounded-lg px-0.5 text-center text-[10px] font-bold leading-tight shadow transition hover:brightness-125 disabled:opacity-60', k.onAir && 'ring-2 ring-red-300', k.active && !k.onAir && 'ring-2 ring-white/70', busy === k.action && 'animate-pulse', edit && 'cursor-grab', picked && 'outline outline-2 outline-offset-2 outline-sky-400')}>
                         {k.text.replace(/\\n/g, '\n')}
                       </button>
+                    ) : p.dsk && p.dsk[0] === r && p.dsk[1] === c ? (
+                      // the ATEM downstream key: it runs in Companion only (auto on / off, red while on air)
+                      <div key={id} {...dnd} onClick={() => edit && setPick(id)} title="ATEM downstream key (DSK): runs in Companion, red there while on air"
+                        className={cx('flex aspect-square items-center justify-center rounded-lg border border-ink-600 bg-black text-[10px] font-bold text-white', edit && 'cursor-pointer hover:border-ink-400', picked && 'outline outline-2 outline-offset-2 outline-sky-400')}>DSK</div>
                     ) : <div key={id} {...dnd} onClick={() => edit && setPick(id)} className={cx('aspect-square rounded-lg border border-dashed border-ink-800', edit && 'cursor-pointer hover:border-ink-500', picked && 'outline outline-2 outline-offset-2 outline-sky-400')} />;
                   }))}
                 </div>
