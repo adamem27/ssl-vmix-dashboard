@@ -487,7 +487,7 @@ function StaticPageSection() {
   const when = (iso: string | null) => (iso ? fmtDateTime(iso) : '—');
   return (
     <Section id="commentator-online" title="Commentator online"
-      desc={<>The commentator screen as a <b>static web page</b>: every 5 s this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
+      desc={<>The commentator screen as a <b>static web page</b>: every 5 minutes this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
       <form onSubmit={save} className="space-y-3">
         <div className="flex flex-wrap gap-4 text-sm">
           {(['s3', 'https', 'ftp', 'folder'] as const).map((m) => (
@@ -533,7 +533,7 @@ function StaticPageSection() {
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={d.enabled} disabled={busy !== null}
             onChange={(e) => run('toggle', async () => { const { ftpPassword, s3Secret, ...rest } = f; await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}), ...(s3Secret ? { s3Secret } : {}), enabled: e.target.checked }); setF({ ...f, ftpPassword: '', s3Secret: '' }); return e.target.checked ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
-          Publish every 5 seconds
+          Publish every 5 minutes
         </label>
         <Button size="sm" busy={busy === 'now'} onClick={() => run('now', () => api.post<StaticSiteInfo>('/api/static-site/publish'), 'Published')}>Publish now</Button>
         {st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Published {when(st.lastOkAt)}</Badge> : <Badge>{d.enabled ? 'Waiting' : 'Off'}</Badge>}

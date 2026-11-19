@@ -103,7 +103,7 @@ export class StaticSitePublisher {
   private failures = 0;
   private retryAt = 0; // kept between rounds: one FTP connection, not one every 5 s
 
-  constructor(private db: DB, private build: Build, private webDist: string | undefined, private makeTarget: MakeTarget, private everyMs = 5000) {}
+  constructor(private db: DB, private build: Build, private webDist: string | undefined, private makeTarget: MakeTarget, private everyMs = 5000, private publishEveryMs = 300_000) {}
 
   /** Random part of the address; a new one moves the page (the old address keeps its last data until removed on the host). */
   folderName(): string {
@@ -177,7 +177,8 @@ export class StaticSitePublisher {
       this.status.lastOkAt = nowIso();
       this.status.error = '';
       this.failures = 0;
-      this.retryAt = 0;
+      // the next routine round in 5 min: light on the PC during the show ('Publish now' and a settings change send at once)
+      this.retryAt = Date.now() + this.publishEveryMs;
     } catch (e: any) {
       this.failures++;
       const wait = Math.min(300_000, this.everyMs * 2 ** Math.min(this.failures - 1, 10));
