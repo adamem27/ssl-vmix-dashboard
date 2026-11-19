@@ -74,6 +74,7 @@ export class StaticSitePublisher {
     webDist;
     makeTarget;
     everyMs;
+    publishEveryMs;
     status = { lastAttemptAt: null, lastOkAt: null, lastChangeAt: null, error: '', url: '', uploadedFiles: 0, dataBytes: 0, pictures: 0, target: '' };
     sent = new Map(); // rel → sha1 already on the target
     sentTo = '';
@@ -83,12 +84,13 @@ export class StaticSitePublisher {
     target = null;
     failures = 0;
     retryAt = 0; // kept between rounds: one FTP connection, not one every 5 s
-    constructor(db, build, webDist, makeTarget, everyMs = 5000) {
+    constructor(db, build, webDist, makeTarget, everyMs = 5000, publishEveryMs = 300_000) {
         this.db = db;
         this.build = build;
         this.webDist = webDist;
         this.makeTarget = makeTarget;
         this.everyMs = everyMs;
+        this.publishEveryMs = publishEveryMs;
     }
     /** Random part of the address; a new one moves the page (the old address keeps its last data until removed on the host). */
     folderName() {
@@ -184,7 +186,8 @@ export class StaticSitePublisher {
             this.status.lastOkAt = nowIso();
             this.status.error = '';
             this.failures = 0;
-            this.retryAt = 0;
+            // the next routine round in 5 min: light on the PC during the show ('Publish now' and a settings change send at once)
+            this.retryAt = Date.now() + this.publishEveryMs;
         }
         catch (e) {
             this.failures++;

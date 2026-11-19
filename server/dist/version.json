@@ -1,8 +1,14 @@
 {
-  "version": "1.0.244",
-  "commit": "1850796",
-  "date": "2026-11-19T14:22:33Z",
+  "version": "1.0.245",
+  "commit": "b56e214",
+  "date": "2026-11-19T20:30:52Z",
   "changes": [
+    {
+      "version": "1.0.245",
+      "commit": "b56e214",
+      "date": "2026-11-19T20:30:52Z",
+      "text": "Commentator online: publish every 5 minutes instead of every 5 seconds"
+    },
     {
       "version": "1.0.244",
       "commit": "1850796",
@@ -476,12 +482,6 @@
       "commit": "59ab026",
       "date": "2026-11-12T23:46:42Z",
       "text": "Static commentator page: upload over HTTPS to upload.php (works where FTP is blocked) (#19)"
-    },
-    {
-      "version": "1.0.165",
-      "commit": "1d5326c",
-      "date": "2026-11-12T23:33:26Z",
-      "text": "Commentator screen as a static page (FTP) + link button in the top bar (#18)"
     }
   ]
 }
