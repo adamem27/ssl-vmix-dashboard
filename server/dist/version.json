@@ -1,8 +1,14 @@
 {
-  "version": "1.0.239",
-  "commit": "db187ae",
-  "date": "2026-11-19T12:43:04Z",
+  "version": "1.0.240",
+  "commit": "0d9f581",
+  "date": "2026-11-19T13:01:42Z",
   "changes": [
+    {
+      "version": "1.0.240",
+      "commit": "0d9f581",
+      "date": "2026-11-19T13:01:42Z",
+      "text": "Line-up: only teams with sponsors get the Lineup sponsor BG; logos straight on the panel"
+    },
     {
       "version": "1.0.239",
       "commit": "db187ae",
@@ -476,12 +482,6 @@
       "commit": "3045294",
       "date": "2026-11-12T21:03:48Z",
       "text": "Team comparison: team weight always with two decimals"
-    },
-    {
-      "version": "1.0.160",
-      "commit": "06d49df",
-      "date": "2026-11-12T20:59:16Z",
-      "text": "Own results input per group, day schedule toggle in the break scene, flag 4 first in Team comparison, no commentator LT keys"
     }
   ]
 }

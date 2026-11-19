@@ -1110,21 +1110,32 @@ export class Show {
             for (const x of input.fields)
                 if (/^\w+BG\.Source$/i.test(x) && !/^BG\.Source$/i.test(x))
                     f.set(x, square);
-        // the big panel (BG): with a TEAM PARTNERS strip for a team with sponsor logos; the next team without sponsors
-        // gets the plain panel back, a title that never had partners keeps its own
+        // the big panel (BG): only a team with sponsor logos gets the generator's Lineup sponsor panel with their logos;
+        // every other team keeps the title's own BG. What the BG held before our first change is remembered (per title)
+        // and put back for the next team without sponsors.
         const bgField = input.fields.find((x) => /^BG\.Source$/i.test(x));
         if (bgField) {
             const t = team;
-            const had = /Line-up panels/i.test(input.values?.[bgField] ?? '') || this.partnersShown.has(input.key || String(input.number));
-            // Team_lineup_10 has its lowest cards further down: a lower, one-row strip
-            const kind = stripFor(input.fields.filter((x) => /SURNAM\w*\.Text$/i.test(x)).length);
-            const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t, kind) : null;
-            if (bg) {
-                f.set(bgField, bg);
-                if (/_lineup_sponsors(_10)?\.png$/i.test(bg))
-                    this.partnersShown.add(input.key || String(input.number));
-                else
-                    this.partnersShown.delete(input.key || String(input.number));
+            const cur = input.values?.[bgField] ?? '';
+            const ours = (v) => /Line-up panels/i.test(v);
+            const origKey = `lineupPanel.original.${input.title}`;
+            const id = input.key || String(input.number);
+            if (hasSponsorLogos(this.ctx, t)) {
+                if (cur && !ours(cur))
+                    setSetting(this.ctx.db, origKey, cur);
+                // Team_lineup_10 has its lowest cards further down
+                const kind = stripFor(input.fields.filter((x) => /SURNAM\w*\.Text$/i.test(x)).length);
+                const bg = lineupPanelFor(this.ctx, t, kind);
+                if (bg) {
+                    f.set(bgField, bg);
+                    this.partnersShown.add(id);
+                }
+            }
+            else if (ours(cur) || this.partnersShown.has(id)) {
+                const back = getSetting(this.ctx.db, origKey) || lineupPanelFor(this.ctx, { code: '', assets: {} });
+                if (back)
+                    f.set(bgField, back);
+                this.partnersShown.delete(id);
             }
         }
         await this.set(input, f);
