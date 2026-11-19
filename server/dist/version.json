@@ -1,8 +1,14 @@
 {
-  "version": "1.0.236",
-  "commit": "cf3236c",
-  "date": "2026-11-19T12:13:14Z",
+  "version": "1.0.237",
+  "commit": "1378354",
+  "date": "2026-11-19T12:29:41Z",
   "changes": [
+    {
+      "version": "1.0.237",
+      "commit": "1378354",
+      "date": "2026-11-19T12:29:41Z",
+      "text": "Line-up partners strip fits each line-up title"
+    },
     {
       "version": "1.0.236",
       "commit": "cf3236c",
@@ -476,12 +482,6 @@
       "commit": "d0c969e",
       "date": "2026-11-12T13:02:07Z",
       "text": "Break scene: pick the groups whose results it shows (Show control); none picked = every group but the Last Chance Race"
-    },
-    {
-      "version": "1.0.157",
-      "commit": "f093c85",
-      "date": "2026-11-12T12:23:29Z",
-      "text": "Break scene: the results title of two groups switches cleanly (out, then the next group's data, then in; the data sync follows the group on the board); 1.5 s for the out animation"
     }
   ]
 }

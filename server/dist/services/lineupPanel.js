@@ -16,13 +16,21 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
  */
 export const PANEL = { width: 1731, height: 861 };
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-1';
+const VERSION = 'partners-2';
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
-/** The strip, in panel pixels: under the lowest sailor card (its name bar ends at 671 on the panel). */
-export const STRIP = { x: 125, y: 688, w: 1481, h: 152, radius: 24, label: 30 };
-/** Every logo gets the same visible area (a square logo is SIDE×SIDE), capped by its slot. */
-const SIDE = 90;
-const MAX_H = 80;
+/**
+ * The strip, in panel pixels (the panel sits at 95,53), between the lowest sailor card and the panel's edge. The cards
+ * of Team_lineup_8 / team_lineup (9) end at 774 on screen, so the strip is 120 px with the label above the logos;
+ * those of Team_lineup_10 end at 828, so there it is one 66 px row with the label on its left.
+ * side: every logo gets the same visible area (a square logo is side×side), capped by maxH and its slot.
+ */
+export const STRIPS = {
+    9: { x: 125, y: 733, w: 1481, h: 118, radius: 22, compact: false, side: 80, maxH: 58 },
+    10: { x: 125, y: 787, w: 1481, h: 66, radius: 18, compact: true, side: 60, maxH: 40 },
+};
+export const STRIP = STRIPS[9];
+/** Which strip a line-up title takes: 10 places or more → the low one. */
+export const stripFor = (places) => (places >= 10 ? 10 : 9);
 const MAX_W = 300;
 let canvasMod;
 let fontKey = '';
@@ -100,14 +108,15 @@ catch {
     return f;
 } };
 /** Logo boxes of one size by area: wide logos wider, tall ones taller, none larger than its slot. */
-export function logoSizes(boxes, slotW) {
+export function logoSizes(boxes, slotW, kind = 9) {
+    const { side, maxH } = STRIPS[kind];
     return boxes.map(({ w, h }) => {
-        let s = SIDE / Math.sqrt(w * h);
-        s = Math.min(s, MAX_H / h, Math.min(MAX_W, slotW - 36) / w);
+        let s = side / Math.sqrt(w * h);
+        s = Math.min(s, maxH / h, Math.min(MAX_W, slotW - 36) / w);
         return { w: Math.round(w * s), h: Math.round(h * s) };
     });
 }
-function draw(ctx, c, base, logos) {
+function draw(ctx, c, base, logos, kind) {
     const cv = c.createCanvas(PANEL.width, PANEL.height);
     const g = cv.getContext('2d');
     // decoded here (pngjs / jpeg-js) and drawn from a canvas: an Image fed a buffer decodes later, after the draw
@@ -136,7 +145,7 @@ function draw(ctx, c, base, logos) {
     }
     if (!logos.length)
         return cv.toBuffer('image/png');
-    const s = STRIP;
+    const s = STRIPS[kind];
     rr(s.x, s.y, s.w, s.h, s.radius);
     g.fillStyle = 'rgba(0,0,0,0.30)';
     g.fill();
@@ -145,9 +154,17 @@ function draw(ctx, c, base, logos) {
     g.stroke();
     g.fillStyle = '#ffffff';
     g.font = `600 17px "General Sans", "Segoe UI", Arial, sans-serif`;
-    g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + s.label);
+    // the label above the logos, or (low strip) on the left with the logos beside it
+    const labelW = s.compact ? 190 : 0;
+    if (s.compact) {
+        g.textAlign = 'left';
+        g.fillText('TEAM PARTNERS', s.x + 34, s.y + s.h / 2);
+    }
+    else {
+        g.textAlign = 'center';
+        g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + 24);
+    }
     const imgs = logos.flatMap((b) => { try {
         return [pic(b)];
     }
@@ -157,10 +174,11 @@ function draw(ctx, c, base, logos) {
     if (!imgs.length)
         return cv.toBuffer('image/png');
     // up to 360 px a logo, the row centred: two partners sit together, five fill the strip
-    const slotW = Math.min((s.w - 80) / imgs.length, 360);
-    const x0 = s.x + (s.w - slotW * imgs.length) / 2;
-    const sizes = logoSizes(imgs.map((x) => x.box), slotW);
-    const cy = s.y + s.label + (s.h - s.label) / 2 + 2;
+    const rowX = s.x + labelW, rowW = s.w - labelW;
+    const slotW = Math.min((rowW - 80) / imgs.length, 360);
+    const x0 = rowX + (rowW - slotW * imgs.length) / 2;
+    const sizes = logoSizes(imgs.map((x) => x.box), slotW, kind);
+    const cy = s.compact ? s.y + s.h / 2 : s.y + 38 + (s.h - 38) / 2;
     imgs.forEach(({ im, box }, i) => {
         const { w, h } = sizes[i];
         const cx = x0 + slotW * (i + 0.5);
@@ -172,20 +190,20 @@ function draw(ctx, c, base, logos) {
  * The picture for the line-up’s BG field: <CODE>_lineup_sponsors.png for a team with sponsor logos, otherwise the plain
  * panel. Written again only when the logos or the panel change. Null when nothing can be drawn here.
  */
-export function lineupPanelFor(ctx, team) {
+export function lineupPanelFor(ctx, team, kind = 9) {
     const c = canvas(ctx.assetsDir);
     if (!c)
         return null;
     const logos = sponsorLogos(ctx, team.assets);
     const base = generatedPanel(ctx);
-    const name = logos.length ? `${team.code.replace(/[^\w.-]+/g, '_')}_lineup_sponsors.png` : 'lineup_plain.png';
+    const name = logos.length ? `${team.code.replace(/[^\w.-]+/g, '_')}_lineup_sponsors${kind === 10 ? '_10' : ''}.png` : 'lineup_plain.png';
     const rel = `${PANEL_DIR}/${name}`;
     const file = path.join(ctx.assetsDir, PANEL_DIR, name);
     const hash = createHash('sha1').update(JSON.stringify([VERSION, base && stamp(base), logos.map((l) => stamp(l.file))])).digest('hex');
     const key = `lineupPanel.${name}`;
     if (getSetting(ctx.db, key) !== hash || !fs.existsSync(file)) {
         try {
-            const buf = draw(ctx, c, base, logos.map((l) => l.buf));
+            const buf = draw(ctx, c, base, logos.map((l) => l.buf), kind);
             fs.mkdirSync(path.dirname(file), { recursive: true });
             fs.writeFileSync(`${file}.tmp`, buf);
             fs.renameSync(`${file}.tmp`, file);
