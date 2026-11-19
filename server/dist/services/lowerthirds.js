@@ -208,10 +208,10 @@ export class LowerThirds {
             throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
         const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
         const fitted = this.fitToTitle(input, fields, next.teamId);
-        // titles with a Sponsor picture (the tab above the bar): the team's first sponsor for a sailor, nothing for a team
+        // titles with a Sponsor picture (the tab above the bar): the team's chosen sponsor, for a sailor and for the team
         const sponsorField = input.fields.find((f) => /^Sponsor\.Source$/i.test(f));
         if (sponsorField) {
-            const team = next.kind === 'sailor' && next.teamId ? listTeams(this.ctx).find((t) => t.id === next.teamId) ?? null : null;
+            const team = next.teamId ? listTeams(this.ctx).find((t) => t.id === next.teamId) ?? null : null;
             const pic = ltSponsorFor(this.ctx, team);
             if (pic)
                 fitted.set(sponsorField, pic);

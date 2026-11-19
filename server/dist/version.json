@@ -1,8 +1,14 @@
 {
-  "version": "1.0.243",
-  "commit": "af4c4f3",
-  "date": "2026-11-19T13:41:49Z",
+  "version": "1.0.244",
+  "commit": "1850796",
+  "date": "2026-11-19T14:22:33Z",
   "changes": [
+    {
+      "version": "1.0.244",
+      "commit": "1850796",
+      "date": "2026-11-19T14:22:33Z",
+      "text": "Team lower third shows the team's sponsor tab too"
+    },
     {
       "version": "1.0.243",
       "commit": "af4c4f3",
@@ -476,12 +482,6 @@
       "commit": "1d5326c",
       "date": "2026-11-12T23:33:26Z",
       "text": "Commentator screen as a static page (FTP) + link button in the top bar (#18)"
-    },
-    {
-      "version": "1.0.164",
-      "commit": "5781c43",
-      "date": "2026-11-12T23:07:55Z",
-      "text": "GTZIP quick form finds every row of the day schedule (rows alike in any order); added schedule rows get their group text"
     }
   ]
 }
