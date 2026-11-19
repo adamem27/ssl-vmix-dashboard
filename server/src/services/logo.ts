@@ -33,7 +33,7 @@ const px = (img: Rgba, x: number, y: number) => (y * img.width + x) * 4;
  * Logos without transparency (JPG, or a PNG on a solid colour): the colour around the edge is the
  * background. It is cut away where it touches the edge, so letters with the same colour inside stay.
  */
-function clearSolidBackground(img: Rgba) {
+export function clearSolidBackground(img: Rgba) {
   const { width: w, height: h, data: d } = img;
   const corners = [px(img, 0, 0), px(img, w - 1, 0), px(img, 0, h - 1), px(img, w - 1, h - 1)];
   if (corners.some((o) => d[o + 3] < 250)) return; // already transparent around the edge
@@ -60,11 +60,11 @@ function clearSolidBackground(img: Rgba) {
   }
 }
 
-export function trimBox(img: Rgba) {
+export function trimBox(img: Rgba, minAlpha = 12) {
   let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
-      if (img.data[px(img, x, y) + 3] > 12) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (img.data[px(img, x, y) + 3] > minAlpha) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
     }
   }
   if (x1 < 0) throw badRequest('This logo is empty (fully transparent or a single colour).');
