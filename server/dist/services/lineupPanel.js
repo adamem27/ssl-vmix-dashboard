@@ -23,7 +23,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-3';
+const VERSION = 'partners-4';
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
 /**
  * Where the lowest sailor card ends, in panel pixels (screen − 53): 774 on Team_lineup_8 and team_lineup (9),
@@ -37,7 +37,9 @@ export function stripRect(kind, panelH) {
     const y = CARDS_END[kind] + 18;
     const h = Math.max(56, panelH - 20 - y);
     const compact = h < 104;
-    return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, side: compact ? Math.min(64, h - 22) : Math.min(90, h - 58), maxH: compact ? h - 24 : Math.min(80, h - 56) };
+    // label row on top (smaller on a low strip), the logos in the rest
+    const label = compact ? 22 : 44;
+    return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, label, maxH: Math.max(26, Math.min(100, h - label - 14)) };
 }
 const MAX_W = 300;
 let canvasMod;
@@ -122,13 +124,23 @@ const stamp = (f) => { try {
 catch {
     return f;
 } };
-/** Logo boxes of one size by area: wide logos wider, tall ones taller, none larger than its slot. */
+/**
+ * Logos that read as one size: the height falls with the width-to-height ratio (ratio^-0.35, between one height for all
+ * and one area for all), a square logo 80% of the row's height. When a logo is too wide for its slot, all of them
+ * shrink together (down to 75%) so they stay alike; only past that is the wide one capped on its own.
+ */
 export function logoSizes(boxes, slotW, strip = stripRect(9, 952)) {
-    const { side, maxH } = strip;
-    return boxes.map(({ w, h }) => {
-        let s = side / Math.sqrt(w * h);
-        s = Math.min(s, maxH / h, Math.min(MAX_W, slotW - 36) / w);
-        return { w: Math.round(w * s), h: Math.round(h * s) };
+    const { maxH } = strip;
+    const room = Math.min(MAX_W, slotW - 36);
+    const want = boxes.map(({ w, h }) => {
+        const ratio = w / h;
+        const th = Math.min(maxH, maxH * 0.8 * Math.pow(ratio, -0.35));
+        return { w: th * ratio, h: th };
+    });
+    const common = Math.max(0.75, Math.min(1, ...want.map((x) => room / x.w)));
+    return want.map((x) => {
+        const s = Math.min(common, room / x.w);
+        return { w: Math.round(x.w * s), h: Math.round(x.h * s) };
     });
 }
 function draw(ctx, c, base, logos, kind) {
@@ -179,16 +191,11 @@ function draw(ctx, c, base, logos, kind) {
     g.fillStyle = '#ffffff';
     g.font = `600 17px "General Sans", "Segoe UI", Arial, sans-serif`;
     g.textBaseline = 'middle';
-    // the label above the logos, or (low strip) on the left with the logos beside it
-    const labelW = s.compact ? 190 : 0;
-    if (s.compact) {
-        g.textAlign = 'left';
-        g.fillText('TEAM PARTNERS', s.x + 34, s.y + s.h / 2);
-    }
-    else {
-        g.textAlign = 'center';
-        g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + 26);
-    }
+    // the label centred above the logos
+    g.textAlign = 'center';
+    if (s.compact)
+        g.font = `600 14px "General Sans", "Segoe UI", Arial, sans-serif`;
+    g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + (s.compact ? 13 : 26));
     const imgs = logos.flatMap((b) => { try {
         return [pic(b)];
     }
@@ -198,11 +205,12 @@ function draw(ctx, c, base, logos, kind) {
     if (!imgs.length)
         return cv.toBuffer('image/png');
     // up to 360 px a logo, the row centred: two partners sit together, five fill the strip
-    const rowX = s.x + labelW, rowW = s.w - labelW;
+    const rowX = s.x, rowW = s.w;
     const slotW = Math.min((rowW - 80) / imgs.length, 360);
     const x0 = rowX + (rowW - slotW * imgs.length) / 2;
     const sizes = logoSizes(imgs.map((x) => x.box), slotW, s);
-    const cy = s.compact ? s.y + s.h / 2 : s.y + 44 + (s.h - 44) / 2;
+    // one centre line for the row, each logo centred on its slot
+    const cy = s.y + s.label + (s.h - s.label) / 2;
     imgs.forEach(({ im, box }, i) => {
         const { w, h } = sizes[i];
         const cx = x0 + slotW * (i + 0.5);
@@ -244,8 +252,8 @@ export function lineupPanelFor(ctx, team, kind = 9) {
 // ---------- the sailor lower third: a tab with the team’s first sponsor above the bar ----------
 /** The tab, drawn at twice its size in the title (260×58): page 20 of finals-broadcast_ssl26_v2. */
 export const TAG = { width: 520, height: 116 };
-const TAG_SIDE = 120;
-const TAG_MAX = { w: 380, h: 76 };
+/** The room for the logo inside the tab (its sides lean in at the top): as large as it fits, for reading. */
+export const TAG_BOX = { w: 430, h: 92 };
 function drawTag(c, logo) {
     const { width: w, height: h } = TAG;
     const cv = c.createCanvas(w, h);
@@ -268,8 +276,7 @@ function drawTag(c, logo) {
     t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
     const box = trimBox(d);
     const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
-    let s = TAG_SIDE / Math.sqrt(box.w * box.h);
-    s = Math.min(s, TAG_MAX.w / box.w, TAG_MAX.h / box.h);
+    const s = Math.min(TAG_BOX.w / box.w, TAG_BOX.h / box.h);
     const lw = Math.round(box.w * s), lh = Math.round(box.h * s);
     g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round((w - lw) / 2), Math.round((h - lh) / 2 + 4), lw, lh);
     return cv.toBuffer('image/png');
