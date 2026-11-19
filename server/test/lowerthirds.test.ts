@@ -8,6 +8,7 @@ import { LINEUP_SLOTS, saveLineup } from '../src/services/lineups.js';
 import { activeEvent } from '../src/db/db.js';
 import { updateSailor } from '../src/services/sailors.js';
 import { updateTeam } from '../src/services/teams.js';
+import { saveUpload } from '../src/services/assets.js';
 import { setSetting } from '../src/db/db.js';
 import { companionPageExport, getLtConfig, LowerThirds, setLtConfig } from '../src/services/lowerthirds.js';
 
@@ -83,6 +84,24 @@ describe('lower thirds', () => {
     await lt.out();
     expect(v.calls.at(-1)).toBe('?Function=OverlayInput1Out');
     expect(lt.state.onAir).toBe(false);
+  });
+
+  it('puts the team\'s sponsor on the Sponsor tab for a sailor and for the team lower third', async () => {
+    fields.push('Sponsor.Source');
+    try {
+      const s = setup();
+      const { teamId, sailorIds } = seedTeam(s.db, 'BRA', ['Martine Grael']);
+      saveUpload(s.ctx, 'team', teamId, 'sponsor_1', encodePng(80, 40, (x, y) => (x > 10 && x < 70 && y > 10 && y < 30 ? [200, 0, 0, 255] : [0, 0, 0, 0])), 'sp.png');
+      saveLineup(s.ctx, activeEvent(s.db).id, teamId, { rows: [{ slot: 'Pit', sailorId: sailorIds[0], firstName: 'Martine', lastName: 'Grael', number: '9' }] });
+      const v = fakeVmix();
+      const lt = new LowerThirds(s.ctx, v.fetcher);
+      await lt.showSailor('BRA', 'pit');
+      expect(v.calls.find((c) => c.includes('SelectedName=Sponsor.Source'))).toMatch(/BRA_lt_sponsor\.png$/);
+      await lt.out();
+      v.calls.length = 0;
+      await lt.showTeam('BRA');
+      expect(held.get('k2/Sponsor.Source')).toMatch(/BRA_lt_sponsor\.png$/);
+    } finally { fields.pop(); }
   });
 
   it('fills a title with its own field names and puts in the team bar made like the title\'s (no squeezed bar)', async () => {
