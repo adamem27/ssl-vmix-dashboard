@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance, FastifyReply } from 'fastify';
+import { getLtSponsorSlot, LT_SPONSOR_CHOICES, setLtSponsorSlot } from './services/lineupPanel.js';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { createHash } from 'node:crypto';
@@ -218,6 +219,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return getTeam(ctx, req.params.id);
   });
   app.delete<{ Params: { id: string } }>('/api/teams/:id', async (req) => { deleteTeam(ctx, req.params.id); return { ok: true }; });
+  // which sponsor logo the team's sailor lower third shows
+  app.get<{ Params: { id: string } }>('/api/teams/:id/lt-sponsor', async (req) => { getTeam(ctx, req.params.id); return { slot: getLtSponsorSlot(ctx, req.params.id) }; });
+  app.put<{ Params: { id: string } }>('/api/teams/:id/lt-sponsor', async (req) => {
+    getTeam(ctx, req.params.id);
+    setLtSponsorSlot(ctx, req.params.id, z.object({ slot: z.enum(LT_SPONSOR_CHOICES) }).parse(req.body).slot);
+    return { slot: getLtSponsorSlot(ctx, req.params.id) };
+  });
   app.get('/api/ranking', async () => ({ url: ranking.RANKING_URL, last: ranking.lastRankingResult(db) }));
   app.post('/api/ranking/refresh', async () => ranking.refreshRanking(db));
   app.get<{ Params: { id: string } }>('/api/teams/:id/sailors', async (req) => { getTeam(ctx, req.params.id); return listSailors(ctx, req.params.id); });

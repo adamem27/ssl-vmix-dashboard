@@ -261,15 +261,30 @@ function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   return cv.toBuffer('image/png');
 }
 
+/** Which of the team's sponsor logos the sailor lower third shows: sponsor_1 … sponsor_5, or none. */
+export const LT_SPONSOR_CHOICES = [...SPONSOR_SLOTS, 'none'] as const;
+export type LtSponsorChoice = (typeof LT_SPONSOR_CHOICES)[number];
+const ltSponsorKey = (teamId: string) => `lt.sponsorSlot.${teamId}`;
+export function getLtSponsorSlot(ctx: AssetCtx, teamId: string): LtSponsorChoice {
+  const v = getSetting(ctx.db, ltSponsorKey(teamId));
+  return (LT_SPONSOR_CHOICES as readonly string[]).includes(v) ? (v as LtSponsorChoice) : 'sponsor_1';
+}
+export function setLtSponsorSlot(ctx: AssetCtx, teamId: string, slot: LtSponsorChoice) { setSetting(ctx.db, ltSponsorKey(teamId), slot); }
+
 /**
  * The picture for the Sponsor field of the sailor lower third: the team’s Sponsor logo 1 on the tab
  * (<CODE>_lt_sponsor.png), or an empty picture for a team without one (and for the team lower third).
  */
-export function ltSponsorFor(ctx: AssetCtx, team: { code: string; assets: Record<string, Asset> } | null): string | null {
+export function ltSponsorFor(ctx: AssetCtx, team: { id?: string; code: string; assets: Record<string, Asset> } | null): string | null {
   const c = canvas(ctx.assetsDir);
   if (!c) return null;
-  const logo = team ? readAsset(ctx, team.assets.sponsor_1) : null;
-  const name = logo && team ? `${team.code.replace(/[^\w.-]+/g, '_')}_lt_sponsor.png` : 'lt_sponsor_none.png';
+  const pick = team?.id ? getLtSponsorSlot(ctx, team.id) : 'sponsor_1';
+  // the chosen logo; when its place is empty, Sponsor logo 1, then the first one there is
+  const logo = !team || pick === 'none' ? null
+    : readAsset(ctx, team.assets[pick]) ?? readAsset(ctx, team.assets.sponsor_1) ?? SPONSOR_SLOTS.map((x) => readAsset(ctx, team.assets[x])).find(Boolean) ?? null;
+  // the logo's own name in the file: vMix reloads a picture only when its path changes
+  const n = logo && team ? (SPONSOR_SLOTS.find((x) => readAsset(ctx, team.assets[x])?.file === logo.file) ?? 'sponsor_1').replace('sponsor_', '') : '';
+  const name = logo && team ? `${team.code.replace(/[^\w.-]+/g, '_')}_lt_sponsor${n === '1' ? '' : `_${n}`}.png` : 'lt_sponsor_none.png';
   const file = path.join(ctx.assetsDir, PANEL_DIR, name);
   const hash = createHash('sha1').update(JSON.stringify([VERSION, logo && stamp(logo.file)])).digest('hex');
   const key = `ltSponsor.${name}`;

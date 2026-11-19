@@ -72,6 +72,7 @@ export function TeamDetailPage() {
               {...(s.key.startsWith('sponsor_') ? { accept: 'png+jpg' as const, aspect: 'aspect-[2/1]' } : {})} />
           ))}
         </div>
+        <LtSponsorPicker team={t} />
       </section>
 
       <section aria-labelledby="sailors-h">
@@ -158,5 +159,41 @@ export function RankingBox({ team, onChanged }: { team: Team; onChanged: () => v
       </span>
       <Button size="sm" className="ml-auto" busy={busy} onClick={refreshAll}>Update ranking now</Button>
     </section>
+  );
+}
+
+/** Which of the team's sponsor logos the sailor lower third shows (the tab above the bar). */
+function LtSponsorPicker({ team }: { team: Team }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const cur = useQuery({ queryKey: ['lt-sponsor', team.id], queryFn: () => api.get<{ slot: string }>(`/api/teams/${team.id}/lt-sponsor`) });
+  const slots = [1, 2, 3, 4, 5].map((n) => ({ key: `sponsor_${n}`, n, asset: team.assets[`sponsor_${n}`] })).filter((x) => x.asset);
+  if (!slots.length) return null;
+  const chosen = cur.data?.slot ?? 'sponsor_1';
+  // an empty chosen place falls back to logo 1 (or the first one there is), as the lower third does
+  const shown = chosen === 'none' ? 'none' : slots.some((x) => x.key === chosen) ? chosen : (slots.find((x) => x.key === 'sponsor_1') ?? slots[0]).key;
+  const pick = async (slot: string) => {
+    try { await api.put(`/api/teams/${team.id}/lt-sponsor`, { slot }); qc.invalidateQueries({ queryKey: ['lt-sponsor', team.id] }); toast.ok(slot === 'none' ? 'No sponsor on the sailor lower third' : `Sponsor logo ${slot.replace('sponsor_', '')} on the sailor lower third`); } catch (e) { toast.error(e); }
+  };
+  return (
+    <div className="card mt-3 p-3">
+      <p className="mb-2 text-sm font-semibold">Sponsor on the sailor lower third</p>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Sponsor on the sailor lower third">
+        {slots.map((x) => (
+          <button key={x.key} role="radio" aria-checked={shown === x.key} onClick={() => pick(x.key)}
+            className={cx('flex w-36 flex-col items-center gap-1 rounded border p-2 text-xs', shown === x.key ? 'border-accent-500 bg-ink-800 text-ink-50' : 'border-ink-700 text-ink-400 hover:border-ink-500')}>
+            <span className="flex h-12 w-full items-center justify-center rounded bg-[#dfe5ef]">
+              {x.asset?.previewUrl ? <img src={x.asset.previewUrl} alt="" className="max-h-10 max-w-full object-contain" /> : <span className="text-ink-600">no preview</span>}
+            </span>
+            Sponsor logo {x.n}
+          </button>
+        ))}
+        <button role="radio" aria-checked={shown === 'none'} onClick={() => pick('none')}
+          className={cx('flex w-36 flex-col items-center justify-center gap-1 rounded border p-2 text-xs', shown === 'none' ? 'border-accent-500 bg-ink-800 text-ink-50' : 'border-ink-700 text-ink-400 hover:border-ink-500')}>
+          <span className="flex h-12 w-full items-center justify-center rounded bg-ink-900 text-ink-500">—</span>
+          None
+        </button>
+      </div>
+    </div>
   );
 }

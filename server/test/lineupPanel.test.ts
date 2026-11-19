@@ -5,7 +5,7 @@ import { createTeam, listTeams } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
 import { encodePng } from '../src/services/png.js';
 import { decode } from '../src/services/logo.js';
-import { lineupPanelFor, logoSizes, ltSponsorFor, PANEL, stripRect, TAG } from '../src/services/lineupPanel.js';
+import { lineupPanelFor, logoSizes, ltSponsorFor, setLtSponsorSlot, PANEL, stripRect, TAG } from '../src/services/lineupPanel.js';
 
 // a logo: a solid block w×h on a transparent canvas
 const logo = (w: number, h: number) => encodePng(w + 40, h + 40, (x, y) => (x >= 20 && x < w + 20 && y >= 20 && y < h + 20 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
@@ -71,5 +71,20 @@ describe('line-up panel with team partners', () => {
       expect(p).toMatch(/lt_sponsor_none\.png$/);
       expect(decode(fs.readFileSync(p)).data.every((v, i) => i % 4 !== 3 || v === 0)).toBe(true);
     }
+  });
+
+  it('shows the sponsor picked for the lower third, logo 1 when that place is empty, nothing for none', () => {
+    const { db, ctx } = setup();
+    const a = createTeam(db, { name: 'Alpha', code: 'AAA' });
+    saveUpload(ctx, 'team', a, 'sponsor_1', logo(300, 60), 's1.png');
+    saveUpload(ctx, 'team', a, 'sponsor_3', logo(200, 200), 's3.png');
+    const t = () => listTeams(ctx)[0] as never;
+    expect(ltSponsorFor(ctx, t())).toMatch(/AAA_lt_sponsor\.png$/);
+    setLtSponsorSlot(ctx, a, 'sponsor_3');
+    expect(ltSponsorFor(ctx, t())).toMatch(/AAA_lt_sponsor_3\.png$/);
+    setLtSponsorSlot(ctx, a, 'sponsor_2');
+    expect(ltSponsorFor(ctx, t())).toMatch(/AAA_lt_sponsor\.png$/);
+    setLtSponsorSlot(ctx, a, 'none');
+    expect(ltSponsorFor(ctx, t())).toMatch(/lt_sponsor_none\.png$/);
   });
 });
