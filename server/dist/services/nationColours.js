@@ -76,6 +76,20 @@ const SHIRTS = {
     VEN: { bg: '#7b1e2e', fg: '#ffffff' }, // maroon, white text
     ANT: { bg: '#000000', fg: '#ffe95c' }, // black, light yellow text
     CUB: { bg: '#e03a3e', fg: '#0a2a8c' }, // red, blue text
+    // the 1/32 Finals teams (2026-11-19), shades after their shirts and team colours
+    COL: { bg: '#2c4a9a', fg: '#fdd116' }, // light navy, yellow text
+    UKR: { bg: '#ffe066', fg: '#0057b7' }, // light yellow, blue text
+    POR: { bg: '#d52b1e', fg: '#0b5d1e' }, // red, green text
+    KOR: { bg: '#ffffff', fg: '#cd2e3a' }, // white, red text
+    GRE: { bg: '#4a90d9', fg: '#ffffff' }, // light blue, white text
+    TAH: { bg: '#e30520', fg: '#ffffff' }, // red, white text
+    LTU: { bg: '#006a44', fg: '#fdb913' }, // green, yellow text
+    SEY: { bg: '#4aa3e0', fg: '#ffffff' }, // light blue, white text
+    EST: { bg: '#1e96e0', fg: '#000000' }, // blue, black text
+    MAS: { bg: '#fbbc0b', fg: '#000000' }, // yellow, black text
+    MYA: { bg: '#193d72', fg: '#ee3b43' }, // navy, red text
+    OMA: { bg: '#c82a31', fg: '#ffffff' }, // red, white text
+    SGP: { bg: '#ffffff', fg: '#c8102e' }, // white, red text
 };
 /** The look of a key in the team's colours, with a marker in the text when it is selected (▶) or on air (●). */
 export function teamKeyLook(c, text, state) {
