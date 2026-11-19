@@ -8,6 +8,7 @@ import { listOutputs, listTemplates, outputRel } from './generator/generator.js'
 import { GRAPHIC_KINDS, imagePath, listGraphicSets, tickerMessages, tickerText } from './graphicSets.js';
 import { currentGroup, groupLabel, nextRace, tickerAuto } from './groups.js';
 import { loadLineup, slotDefs } from './lineups.js';
+import { lineupPanelFor } from './lineupPanel.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
 import { overview } from './overview.js';
 import { joinVmixPath } from './paths.js';
@@ -164,7 +165,7 @@ export function lineupSheet(ctx, eventId) {
         Object.assign(row, {
             Code: t.code, Team: (lu.data.teamName || t.name).toUpperCase(), Title: lu.data.title,
             'Flag big': img(a.flag_big), 'Flag small': img(a.flag_small), 'Emblem light': img(a.emblem_light), 'Emblem dark': img(a.emblem_dark),
-            'Line-up background': img(a.background_2),
+            'Line-up background': img(a.background_2), 'Line-up panel': lineupPanelFor(ctx, t) ?? '',
             'Sponsor 1': img(a.sponsor_1), 'Sponsor 2': img(a.sponsor_2), 'Sponsor 3': img(a.sponsor_3), 'Sponsor 4': img(a.sponsor_4), 'Sponsor 5': img(a.sponsor_5),
         });
         for (let n = 1; n <= places; n++) {

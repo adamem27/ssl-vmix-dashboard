@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { hasSponsorLogos, lineupPanelFor } from './lineupPanel.js';
 import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
 import { z } from 'zod';
@@ -346,6 +347,8 @@ export class Show {
     /** a board of the break scene is switching (its data must not be overwritten meanwhile) */
     switching = false;
     labels = new Map();
+    /** line-up titles whose BG holds a team's partners panel (the next team without sponsors gets the plain one) */
+    partnersShown = new Set();
     /** vMix's inputs as last read (the COMPARE keys follow the Team comparison inputs there). */
     lastInputs = [];
     /**
@@ -1107,6 +1110,21 @@ export class Show {
             for (const x of input.fields)
                 if (/^\w+BG\.Source$/i.test(x) && !/^BG\.Source$/i.test(x))
                     f.set(x, square);
+        // the big panel (BG): with a TEAM PARTNERS strip for a team with sponsor logos; the next team without sponsors
+        // gets the plain panel back, a title that never had partners keeps its own
+        const bgField = input.fields.find((x) => /^BG\.Source$/i.test(x));
+        if (bgField) {
+            const t = team;
+            const had = /Line-up panels/i.test(input.values?.[bgField] ?? '') || this.partnersShown.has(input.key || String(input.number));
+            const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t) : null;
+            if (bg) {
+                f.set(bgField, bg);
+                if (/_lineup_sponsors\.png$/i.test(bg))
+                    this.partnersShown.add(input.key || String(input.number));
+                else
+                    this.partnersShown.delete(input.key || String(input.number));
+            }
+        }
         await this.set(input, f);
         await this.bringIn(g, input, snap);
         return { in: 'lineup', team: b.code, input: input.title };
