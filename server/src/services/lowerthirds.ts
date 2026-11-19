@@ -9,6 +9,7 @@ import { TEAM_SLOTS } from './slots.js';
 import { listTeams } from './teams.js';
 import { findInput, parseVmixXml, VmixInput, vmixUrl } from './vmixResults.js';
 import { withOverrides } from './fieldOverrides.js';
+import { ltSponsorFor } from './lineupPanel.js';
 import { keyOf, LtRole, ltRoles, ltTitleInfo, teamPictureFor } from './ltTitle.js';
 import { stageTeamIds } from './workbookSheets.js';
 
@@ -201,7 +202,15 @@ export class LowerThirds {
     const input: VmixInput | undefined = findInput(all, inputName);
     if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
     const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
-    fields = withOverrides(this.ctx, input, this.fitToTitle(input, fields, next.teamId)); // Graphics editor edits win
+    const fitted = this.fitToTitle(input, fields, next.teamId);
+    // titles with a Sponsor picture (the tab above the bar): the team's first sponsor for a sailor, nothing for a team
+    const sponsorField = input.fields.find((f) => /^Sponsor\.Source$/i.test(f));
+    if (sponsorField) {
+      const team = next.kind === 'sailor' && next.teamId ? listTeams(this.ctx).find((t) => t.id === next.teamId) ?? null : null;
+      const pic = ltSponsorFor(this.ctx, team as never);
+      if (pic) fitted.set(sponsorField, pic);
+    }
+    fields = withOverrides(this.ctx, input, fitted); // Graphics editor edits win
     const has = new Set(input.fields);
     const id = input.key || input.number;
     this.cancelClear(id); // its photo is still in: emptied below, before it comes in

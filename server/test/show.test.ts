@@ -8,6 +8,7 @@ import { setup, seedTeam } from './helpers.js';
 import { activeEvent, setSetting } from '../src/db/db.js';
 import { createFleet, createSet, getSetDetail, placeTeam, renameFleet } from '../src/services/fleets.js';
 import { saveLineup } from '../src/services/lineups.js';
+import { removeAsset, saveUpload } from '../src/services/assets.js';
 import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
@@ -809,6 +810,18 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.run('lineup:ESP');
     expect(v.calls.find((c) => c.includes('SelectedName=HelmBG.Source'))).toMatch(/ESP_lineup_photo_right\.png$/);
+    // a team with sponsor logos: the big panel with its TEAM PARTNERS strip; without them again, the plain panel back
+    const espId = show.teamRef('ESP').id;
+    saveUpload(s.ctx, 'team', espId, 'sponsor_1', encodePng(80, 40, (x, y) => (x > 10 && x < 70 && y > 10 && y < 30 ? [255, 255, 255, 255] : [0, 0, 0, 0])), 'sp.png');
+    (show as any).memo.clear();
+    v.calls.length = 0;
+    await show.run('lineup:ESP');
+    expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/ESP_lineup_sponsors\.png$/);
+    removeAsset(s.ctx, 'team', espId, 'sponsor_1');
+    (show as any).memo.clear();
+    v.calls.length = 0;
+    await show.run('lineup:ESP');
+    expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/lineup_plain\.png$/);
     // General graphics → Team comparison: what is typed there wins
     const fleetId = show.config.fleetId;
     setCompareOverride(s.ctx.db, fleetId, 1, 'nick', 'The Bulls');
