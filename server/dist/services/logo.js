@@ -27,7 +27,7 @@ const px = (img, x, y) => (y * img.width + x) * 4;
  * Logos without transparency (JPG, or a PNG on a solid colour): the colour around the edge is the
  * background. It is cut away where it touches the edge, so letters with the same colour inside stay.
  */
-function clearSolidBackground(img) {
+export function clearSolidBackground(img) {
     const { width: w, height: h, data: d } = img;
     const corners = [px(img, 0, 0), px(img, w - 1, 0), px(img, 0, h - 1), px(img, w - 1, h - 1)];
     if (corners.some((o) => d[o + 3] < 250))
@@ -69,11 +69,11 @@ function clearSolidBackground(img) {
             push(x, y + 1);
     }
 }
-export function trimBox(img) {
+export function trimBox(img, minAlpha = 12) {
     let x0 = img.width, y0 = img.height, x1 = -1, y1 = -1;
     for (let y = 0; y < img.height; y++) {
         for (let x = 0; x < img.width; x++) {
-            if (img.data[px(img, x, y) + 3] > 12) {
+            if (img.data[px(img, x, y) + 3] > minAlpha) {
                 if (x < x0)
                     x0 = x;
                 if (x > x1)

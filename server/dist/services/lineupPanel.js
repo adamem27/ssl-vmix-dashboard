@@ -5,7 +5,7 @@ import path from 'node:path';
 import { getSetting, setSetting } from '../db/db.js';
 import { listOutputs, listTemplates } from './generator/generator.js';
 import { NEUTRAL_ID } from './generator/render.js';
-import { decode, trimBox } from './logo.js';
+import { clearSolidBackground, decode, trimBox } from './logo.js';
 import { uploadedSansFiles } from './matchboard/matchboard.js';
 import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 /**
@@ -23,7 +23,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-5';
+const VERSION = 'partners-6';
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
 /**
  * Where the lowest sailor card ends, in panel pixels (screen − 53): 774 on Team_lineup_8 and team_lineup (9),
@@ -42,6 +42,23 @@ export function stripRect(kind, panelH) {
     return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, label, maxH: Math.max(26, Math.min(100, h - label - 14)) };
 }
 const MAX_W = 300;
+/** Between the ink edges of two logos (the row is centred), and from the label to the logos. */
+const MIN_GAP = 60;
+const MAX_GAP = 150;
+const LABEL_GAP = 18;
+/** A logo as it shows: the solid colour around a JPG / flat PNG cleared, like an upload is. */
+function visible(buf) {
+    const d = decode(buf);
+    clearSolidBackground(d);
+    return d;
+}
+/** Where the logo's ink is: faint glow, shadows and stray pixels around it do not count. */
+const inkBox = (d) => { try {
+    return trimBox(d, 64);
+}
+catch {
+    return trimBox(d);
+} };
 let canvasMod;
 let fontKey = '';
 function canvas(assetsDir) {
@@ -148,11 +165,11 @@ function draw(ctx, c, base, logos, kind) {
     const g = cv.getContext('2d');
     // decoded here (pngjs / jpeg-js) and drawn from a canvas: an Image fed a buffer decodes later, after the draw
     const pic = (buf) => {
-        const d = decode(buf);
+        const d = visible(buf);
         const t = c.createCanvas(d.width, d.height);
         t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
         // dark logos turn white on the dark strip (as on the design), every other logo keeps its colours
-        return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box: trimBox(d) };
+        return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box: inkBox(d) };
     };
     const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
     const sponsors = logos.length > 0;
@@ -182,15 +199,6 @@ function draw(ctx, c, base, logos, kind) {
     if (!sponsors)
         return cv.toBuffer('image/png');
     const s = stripRect(kind, panelH);
-    // the label and the logos straight on the panel, no box of their own
-    g.fillStyle = '#ffffff';
-    g.font = `600 17px "General Sans", "Segoe UI", Arial, sans-serif`;
-    g.textBaseline = 'middle';
-    // the label centred above the logos
-    g.textAlign = 'center';
-    if (s.compact)
-        g.font = `600 14px "General Sans", "Segoe UI", Arial, sans-serif`;
-    g.fillText('TEAM PARTNERS', s.x + s.w / 2, s.y + (s.compact ? 13 : 26));
     const imgs = logos.flatMap((b) => { try {
         return [pic(b)];
     }
@@ -199,17 +207,27 @@ function draw(ctx, c, base, logos, kind) {
     } }); // an empty logo is left out
     if (!imgs.length)
         return cv.toBuffer('image/png');
-    // up to 360 px a logo, the row centred: two partners sit together, five fill the strip
-    const rowX = s.x, rowW = s.w;
-    const slotW = Math.min((rowW - 80) / imgs.length, 360);
-    const x0 = rowX + (rowW - slotW * imgs.length) / 2;
-    const sizes = logoSizes(imgs.map((x) => x.box), slotW, s);
-    // one centre line for the row, each logo centred on its slot
-    const cy = s.y + s.label + (s.h - s.label) / 2;
+    // sizes from what each logo really shows (its ink, not its picture), then equal gaps between the ink edges
+    const n = imgs.length;
+    const sizes = logoSizes(imgs.map((x) => x.box), Math.min((s.w - 80 - MIN_GAP * (n - 1)) / n + 36, MAX_W + 36), s);
+    const sum = sizes.reduce((t, x) => t + x.w, 0);
+    const gap = n > 1 ? Math.max(MIN_GAP, Math.min(MAX_GAP, (s.w - 80 - sum) / (n - 1))) : 0;
+    const rowH = Math.max(...sizes.map((x) => x.h));
+    // the label sits just above the row and belongs to it: label + 18 px + logos, the block centred in the room
+    const labelSize = s.compact ? 14 : 17;
+    const block = labelSize + LABEL_GAP + rowH;
+    const top = s.y + (s.h - block) / 2;
+    g.fillStyle = '#ffffff';
+    g.font = `600 ${labelSize}px "General Sans", "Segoe UI", Arial, sans-serif`;
+    g.textBaseline = 'middle';
+    g.textAlign = 'center';
+    g.fillText('TEAM PARTNERS', s.x + s.w / 2, top + labelSize / 2);
+    const cy = top + labelSize + LABEL_GAP + rowH / 2;
+    let x = s.x + (s.w - sum - gap * (n - 1)) / 2;
     imgs.forEach(({ im, box }, i) => {
         const { w, h } = sizes[i];
-        const cx = x0 + slotW * (i + 0.5);
-        g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(cx - w / 2), Math.round(cy - h / 2), w, h);
+        g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(cy - h / 2), w, h);
+        x += w + gap;
     });
     return cv.toBuffer('image/png');
 }
@@ -266,10 +284,10 @@ function drawTag(c, logo) {
     g.closePath();
     g.fillStyle = '#dfe5ef';
     g.fill();
-    const d = decode(logo);
+    const d = visible(logo);
     const t = c.createCanvas(d.width, d.height);
     t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
-    const box = trimBox(d);
+    const box = inkBox(d);
     const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
     let s = TAG_SIDE / Math.sqrt(box.w * box.h);
     s = Math.min(s, TAG_MAX.w / box.w, TAG_MAX.h / box.h);

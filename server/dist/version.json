@@ -1,8 +1,14 @@
 {
-  "version": "1.0.240",
-  "commit": "0d9f581",
-  "date": "2026-11-19T13:01:42Z",
+  "version": "1.0.241",
+  "commit": "7872758",
+  "date": "2026-11-19T13:18:11Z",
   "changes": [
+    {
+      "version": "1.0.241",
+      "commit": "7872758",
+      "date": "2026-11-19T13:18:11Z",
+      "text": "Sponsor logos placed by their ink: equal gaps on the line-up, label just above them"
+    },
     {
       "version": "1.0.240",
       "commit": "0d9f581",
@@ -476,12 +482,6 @@
       "commit": "c69e458",
       "date": "2026-11-12T21:17:21Z",
       "text": "Companion preset in Companion 5.1's format; the producer's PEOPLE page kept as it is in every preset"
-    },
-    {
-      "version": "1.0.161",
-      "commit": "3045294",
-      "date": "2026-11-12T21:03:48Z",
-      "text": "Team comparison: team weight always with two decimals"
     }
   ]
 }
