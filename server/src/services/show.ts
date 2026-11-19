@@ -1086,7 +1086,7 @@ export class Show {
       // Team_lineup_10 has its lowest cards further down: a lower, one-row strip
       const kind = stripFor(input.fields.filter((x) => /SURNAM\w*\.Text$/i.test(x)).length);
       const bg = hasSponsorLogos(this.ctx, t) || had ? lineupPanelFor(this.ctx, t, kind) : null;
-      if (bg) { f.set(bgField, bg); if (/_lineup_sponsors\.png$/i.test(bg)) this.partnersShown.add(input.key || String(input.number)); else this.partnersShown.delete(input.key || String(input.number)); }
+      if (bg) { f.set(bgField, bg); if (/_lineup_sponsors(_10)?\.png$/i.test(bg)) this.partnersShown.add(input.key || String(input.number)); else this.partnersShown.delete(input.key || String(input.number)); }
     }
     await this.set(input, f);
     await this.bringIn(g, input, snap);

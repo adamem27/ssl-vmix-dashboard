@@ -5,7 +5,7 @@ import { createTeam, listTeams } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
 import { encodePng } from '../src/services/png.js';
 import { decode } from '../src/services/logo.js';
-import { lineupPanelFor, logoSizes, ltSponsorFor, PANEL, STRIP, TAG } from '../src/services/lineupPanel.js';
+import { lineupPanelFor, logoSizes, ltSponsorFor, PANEL, stripRect, TAG } from '../src/services/lineupPanel.js';
 
 // a logo: a solid block w×h on a transparent canvas
 const logo = (w: number, h: number) => encodePng(w + 40, h + 40, (x, y) => (x >= 20 && x < w + 20 && y >= 20 && y < h + 20 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
@@ -16,7 +16,7 @@ describe('line-up panel with team partners', () => {
     expect(sq.w * sq.h / (wide.w * wide.h)).toBeCloseTo(1, 1);
     expect(wide.w / wide.h).toBeCloseTo(4, 0);
     expect(tall.h).toBeLessThanOrEqual(80);
-    for (const s of logoSizes([{ w: 2000, h: 50 }], 200)) expect(s.w).toBeLessThanOrEqual(164);
+    for (const s of logoSizes([{ w: 2000, h: 50 }], 200, stripRect(9, PANEL.height))) expect(s.w).toBeLessThanOrEqual(164);
   });
 
   it('draws the strip with the logos for a team with sponsors and the plain panel for one without', () => {
@@ -33,6 +33,7 @@ describe('line-up panel with team partners', () => {
     const img = decode(fs.readFileSync(pa));
     expect([img.width, img.height]).toEqual([PANEL.width, PANEL.height]);
     // white logo pixels inside the strip, none in the plain panel there
+    const STRIP = stripRect(9, PANEL.height);
     const whiteIn = (im: ReturnType<typeof decode>) => {
       let n = 0;
       for (let y = STRIP.y + 40; y < STRIP.y + STRIP.h - 5; y++) for (let x = STRIP.x; x < STRIP.x + STRIP.w; x++) {
