@@ -1755,7 +1755,8 @@ export class Show {
         const snap = await this.snapshot().catch(() => null);
         const cfg = this.config;
         const pages = this.pages();
-        const looks = await Promise.all(pages.map(async (p) => ({ ...p, keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (k) => (k ? { ...k, ...(await this.keyLook(k, snap ?? undefined)) } : null))))) })));
+        // where the ATEM downstream key sits on each page in Companion (Show control shows it as DSK there)
+        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (k) => (k ? { ...k, ...(await this.keyLook(k, snap ?? undefined)) } : null))))) })));
         return {
             config: cfg, state: { ...this.state, undo: undefined, undoDepth: this.state.undo.length },
             vmix: snap ? { ok: true, overlays: snap.overlays } : { ok: false, overlays: {} },
@@ -1862,6 +1863,15 @@ export class Show {
                     }
                 }
             }
+            // the ATEM downstream key's label (text only: its colours and on-air red stay Companion's)
+            for (const p of this.pages()) {
+                const at = p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]);
+                if (!at)
+                    continue;
+                const id = `${p.page}/${at[0]}/${at[1]}`;
+                seen.add(id);
+                await send(id, `text=${encodeURIComponent(DSK_TEXT)}`);
+            }
             // a key taken away since the last push: its place goes dark (only places this dashboard wrote, never the ATEM key)
             const dark = style('', '#000000', '#ffffff');
             for (const id of [...this.labels.keys()]) {
@@ -1885,7 +1895,8 @@ export class Show {
     async companionPreset(base, vmixBase) {
         await this.snapshot().catch(() => null);
         const pages = this.pages();
-        const looks = await Promise.all(pages.map(async (p) => ({ ...p, keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
+        // where the ATEM downstream key sits on each page in Companion (Show control shows it as DSK there)
+        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
         return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
     }
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
@@ -2102,16 +2113,27 @@ function addDsk(controls, page, used) {
     const dsk = KEPT_PEOPLE_PAGE.controls[DSK_AT[0]]?.[DSK_AT[1]];
     if (!dsk)
         return;
-    const free = (r, c) => !used(r, c) && !controls[r]?.[c];
-    const order = [DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c]))];
-    const at = order.find(([r, c]) => free(r, c));
+    const at = dskPlace((r, c) => used(r, c) || !!controls[r]?.[c]);
     if (!at)
         return;
     const ctl = JSON.parse(JSON.stringify(dsk).replace(/"id":"([A-Za-z0-9_-]{21})"/g, `"id":"$1p${page}"`));
-    (controls[at[0]] ??= {})[at[1]] = ctl;
+    (controls[at[0]] ??= {})[at[1]] = withDskText(ctl);
+}
+/** Where the downstream key goes on a page: its PEOPLE place (row 3, last key), else the first free one of the bottom rows. */
+export function dskPlace(used) {
+    const order = [DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c]))];
+    return order.find(([r, c]) => !used(r, c)) ?? null;
+}
+/** The label on the ATEM downstream key (the producer's key has none). */
+export const DSK_TEXT = 'DSK';
+function withDskText(ctl) {
+    for (const l of ctl?.style?.layers ?? [])
+        if (l.type === 'text' && l.text && !String(l.text.value ?? '').trim())
+            l.text = { ...l.text, value: DSK_TEXT };
+    return ctl;
 }
 /** Where the downstream key is on the producer's PEOPLE page (row 2, last column). */
-const DSK_AT = [2, 7];
+export const DSK_AT = [2, 7];
 /** The kept page's keys without UNDO (no UNDO key on any page); its dashboard keys call their place (keyUrl). */
 function keptControls(b, page) {
     const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
@@ -2125,6 +2147,8 @@ function keptControls(b, page) {
             const get = ctl?.steps?.[0]?.action_sets?.down?.find((a) => a.definitionId === 'get' && /\/api\/show\/do\?a=/.test(a.options?.url?.value ?? ''));
             if (get)
                 get.options.url.value = keyUrl(b, page, Number(r), Number(c));
+            if (/"definitionId":"dsk/.test(JSON.stringify(ctl)))
+                withDskText(ctl);
         }
     return out;
 }
