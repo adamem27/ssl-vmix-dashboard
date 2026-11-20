@@ -1050,4 +1050,29 @@ describe('show control', () => {
     const keys = new LowerThirds(s.ctx).layout().flat();
     expect(keys.find((k) => k.action === 'team:BRA')!.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
   });
+
+  it('L-bar switch: on air, the Swap picture flips between its own look and an empty one', async () => {
+    const s = setup();
+    const v = fakeVmix({ 'L-bar_switch': ['L-bar.Source', 'Swap.Source'] });
+    v.vals.set('1|Swap.Source', 'C:\\gt\\Swap.png');
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    setShowConfig(s.ctx.db, { ...getShowConfig(s.ctx.db), lbarSwapSeconds: 4 });
+    const realNow = Date.now; let now = 1_000_000; Date.now = () => now;
+    try {
+      const sets = () => v.calls.filter((c) => c.includes('SelectedName=Swap.Source'));
+      await show.lbarSwap(); now += 10_000; await show.lbarSwap();
+      expect(sets()).toHaveLength(0); // off air: nothing changes
+      v.overlays[1] = '1'; (show as any).memo.clear();
+      await show.lbarSwap(); now += 2_000; (show as any).memo.clear(); await show.lbarSwap();
+      expect(sets()).toHaveLength(0); // not yet
+      now += 3_000; (show as any).memo.clear(); await show.lbarSwap();
+      expect(sets().at(-1)).toMatch(/lbar_swap_empty\.png$/);
+      now += 5_000; (show as any).memo.clear(); await show.lbarSwap();
+      expect(sets().at(-1)).toMatch(/Value=C:\\gt\\Swap\.png$/);
+      setShowConfig(s.ctx.db, { ...getShowConfig(s.ctx.db), lbarSwapSeconds: 0 });
+      now += 50_000; (show as any).memo.clear(); await show.lbarSwap();
+      expect(sets()).toHaveLength(2);
+    } finally { Date.now = realNow; }
+  });
 });
+
