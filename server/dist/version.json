@@ -1,8 +1,14 @@
 {
-  "version": "1.0.245",
-  "commit": "b56e214",
-  "date": "2026-11-19T20:30:52Z",
+  "version": "1.0.246",
+  "commit": "b87f47b",
+  "date": "2026-11-20T13:15:09Z",
   "changes": [
+    {
+      "version": "1.0.246",
+      "commit": "b87f47b",
+      "date": "2026-11-20T13:15:09Z",
+      "text": "L-bar switch: an L-bar title with a Swap picture cross-fades its second look every few seconds on air"
+    },
     {
       "version": "1.0.245",
       "commit": "b56e214",
@@ -476,12 +482,6 @@
       "commit": "5a533d6",
       "date": "2026-11-13T13:10:28Z",
       "text": "vMix data: a picture whose file changed (PNG remade in the generator) goes again into every input that shows it"
-    },
-    {
-      "version": "1.0.166",
-      "commit": "59ab026",
-      "date": "2026-11-12T23:46:42Z",
-      "text": "Static commentator page: upload over HTTPS to upload.php (works where FTP is blocked) (#19)"
     }
   ]
 }
