@@ -19,6 +19,7 @@ import { compareTab, scheduleRows, setCompareOverride } from '../src/services/sh
 import { createPerson, createScheduleItem, personName, setWeather } from '../src/services/general.js';
 import { groupLabel, groupLetter } from '../src/services/groupNames.js';
 import { buildApp } from '../src/app.js';
+import { lbarFiles, saveLook, status as lbarStatus } from '../src/services/lbarSwap.js';
 
 /** A fake vMix with named inputs and four overlay channels. */
 function fakeVmix(titles: Record<string, string[]>) {
@@ -1051,27 +1052,45 @@ describe('show control', () => {
     expect(keys.find((k) => k.action === 'team:BRA')!.bg).toBe(teamKeyColours(s.db, 'BRA')!.normal.bg);
   });
 
-  it('L-bar switch: on air, the Swap picture flips between its own look and an empty one', async () => {
+  it('L-bar switch: the dashboard pictures; on air the Swap flips between the second look parts and an empty one', async () => {
     const s = setup();
-    const v = fakeVmix({ 'L-bar_switch': ['L-bar.Source', 'Swap.Source'] });
+    const v = fakeVmix({ ssl_lbar: ['L-bar.Source', 'Swap.Source'] });
     v.vals.set('1|Swap.Source', 'C:\\gt\\Swap.png');
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     setShowConfig(s.ctx.db, { ...getShowConfig(s.ctx.db), lbarSwapSeconds: 4 });
     const realNow = Date.now; let now = 1_000_000; Date.now = () => now;
+    const tick = async (ms: number) => { now += ms; (show as any).memo.clear(); await show.lbarSwap(); };
     try {
+      await tick(0);
+      expect(show.swapStatus[0].error).toMatch(/upload both/);
+      // look 2 differs from look 1 only in its left half
+      saveLook(s.ctx, 1, encodePng(8, 4, () => [10, 20, 30, 255]));
+      expect(lbarStatus(s.ctx).ready).toBe(false);
+      saveLook(s.ctx, 2, encodePng(8, 4, (x) => (x < 2 ? [200, 0, 0, 255] : [10, 20, 30, 255])));
+      const f = lbarFiles(s.ctx)!;
+      const swap = PNG.sync.read(fs.readFileSync(path.join(s.ctx.assetsDir, 'L-bar switch', path.basename(f.swap))));
+      expect([...swap.data.subarray(0, 4)]).toEqual([200, 0, 0, 255]);
+      expect(swap.data[7 * 4 + 3]).toBe(0); // the same part stays transparent
       const sets = () => v.calls.filter((c) => c.includes('SelectedName=Swap.Source'));
-      await show.lbarSwap(); now += 10_000; await show.lbarSwap();
-      expect(sets()).toHaveLength(0); // off air: nothing changes
-      v.overlays[1] = '1'; (show as any).memo.clear();
-      await show.lbarSwap(); now += 2_000; (show as any).memo.clear(); await show.lbarSwap();
-      expect(sets()).toHaveLength(0); // not yet
-      now += 3_000; (show as any).memo.clear(); await show.lbarSwap();
+      await tick(0);
+      expect(v.calls.some((c) => c.includes('SelectedName=L-bar.Source') && c.includes('lbar_look1_'))).toBe(true);
       expect(sets().at(-1)).toMatch(/lbar_swap_empty\.png$/);
-      now += 5_000; (show as any).memo.clear(); await show.lbarSwap();
-      expect(sets().at(-1)).toMatch(/Value=C:\\gt\\Swap\.png$/);
+      await tick(10_000);
+      expect(sets()).toHaveLength(1); // off air: nothing changes
+      v.overlays[1] = '1';
+      await tick(0); await tick(2_000);
+      expect(sets()).toHaveLength(1);
+      await tick(3_000);
+      expect(sets().at(-1)).toMatch(/lbar_swap_[0-9a-f]{8}\.png$/);
+      expect(show.swapStatus[0].error).toBe('');
+      await tick(5_000);
+      expect(show.swapStatus[0].look).toBe('second');
+      await tick(0);
+      expect(sets().at(-1)).toMatch(/lbar_swap_empty\.png$/);
       setShowConfig(s.ctx.db, { ...getShowConfig(s.ctx.db), lbarSwapSeconds: 0 });
-      now += 50_000; (show as any).memo.clear(); await show.lbarSwap();
-      expect(sets()).toHaveLength(2);
+      const n = sets().length;
+      await tick(50_000);
+      expect(sets()).toHaveLength(n);
     } finally { Date.now = realNow; }
   });
 });

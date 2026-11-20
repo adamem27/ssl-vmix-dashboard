@@ -23,7 +23,8 @@ interface ShowData {
   graphics: Graphic[]; boats: { id: string; code: string; name: string }[];
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
   pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; companion?: CompanionStatus; breakGroups: { id: string; name: string }[]; breakShown: string[];
-  lbarSwap?: { title: string; onAir: boolean; look: 'first' | 'second'; picture: string; field: string; changedAt: string | null; error: string }[];
+  lbarSwap?: { title: string; onAir: boolean; look: 'first' | 'second'; field: string; changedAt: string | null; error: string }[];
+  lbarLooks?: { look1: boolean; look2: boolean; ready: boolean; size: string; changed: number };
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
@@ -237,6 +238,31 @@ function useConfig(data: ShowData, onSaved: () => void) {
   return { c, setC, dirty, save };
 }
 
+/** L-bar switch: the two looks of the L-bar, uploaded here; the dashboard makes the pictures for vMix from them. */
+function LbarLooks({ looks }: { looks?: ShowData['lbarLooks'] }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const up = async (n: 1 | 2, f?: File) => {
+    if (!f) return;
+    try { await api.upload(`/api/show/lbar-look/${n}`, f); toast.ok(`Look ${n} saved`); qc.invalidateQueries({ queryKey: ['show'] }); }
+    catch (e) { toast.error(e); }
+  };
+  return (
+    <div className="flex flex-wrap gap-3 text-xs text-ink-400">
+      {([1, 2] as const).map((n) => (
+        <label key={n} className="block cursor-pointer">
+          <span>L-bar look {n} (whole-frame PNG){n === 1 ? ': shown first' : ': only what differs fades in'}</span>
+          <div className="mt-1 flex h-[72px] w-[128px] items-center justify-center rounded border border-ink-700 bg-ink-950 [background-image:repeating-conic-gradient(#222_0_25%,#333_0_50%)] [background-size:12px_12px]">
+            {looks?.[n === 1 ? 'look1' : 'look2'] ? <img src={`/api/show/lbar-look/${n}?v=${looks.changed}`} className="max-h-full max-w-full" alt="" /> : <span>Upload</span>}
+          </div>
+          <input type="file" accept="image/png" className="hidden" onChange={(e) => { void up(n, e.target.files?.[0]); e.target.value = ''; }} />
+        </label>
+      ))}
+      <span className="self-end">{looks?.ready ? `Ready (${looks.size})` : 'Upload both looks'}</span>
+    </div>
+  );
+}
+
 function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
   const { c, setC, dirty, save } = useConfig(data, onSaved);
   return (
@@ -275,12 +301,13 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
             {!data.lbarSwap?.length ? <span>L-bar switch: no title with a Swap picture in vMix (load L-bar_switch.gtzip).</span>
               : data.lbarSwap.map((x, i) => (
                 <div key={i} className={x.error ? 'text-red-300' : ''}>
-                  {x.title ? <>L-bar switch: <b>{x.title}</b> · {x.onAir ? 'on air' : 'not on air'} · showing the {x.look} look{x.changedAt ? ` · last change ${new Date(x.changedAt).toLocaleTimeString()}` : ''}{x.picture ? '' : ' · second look not known yet'}</> : 'L-bar switch:'}
+                  {x.title ? <>L-bar switch: <b>{x.title}</b> · {x.onAir ? 'on air' : 'not on air'} · showing the {x.look} look{x.changedAt ? ` · last change ${new Date(x.changedAt).toLocaleTimeString()}` : ''}</> : 'L-bar switch:'}
                   {x.error ? ` · ${x.error}` : ''}
                   {x.field ? <div className="truncate text-ink-500" title={x.field}>Swap now: {x.field}</div> : null}
                 </div>
               ))}
           </div>
+          <LbarLooks looks={data.lbarLooks} />
           <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off. TICKER ON / OFF puts the ticker (ssl_ticker) on its channel alone, without the scene, so it stays on under boards and lower thirds; TOP TICKER ON / OFF does the same for the top ticker (ssl_ticker_top, its versions in General graphics → Top ticker) on its own channel. The break scene's L-bar or board takes the place of the top ticker when they share a channel.</p>
         </div>
       </div>
