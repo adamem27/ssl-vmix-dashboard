@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { hasSponsorLogos, lineupPanelFor, stripFor } from './lineupPanel.js';
+import { lbarFiles, samePicture, status as lbarLooks } from './lbarSwap.js';
 import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
 import { z } from 'zod';
@@ -152,18 +153,7 @@ export function getShowState(db) {
 const saveShowState = (db, s) => setSetting(db, STATE, JSON.stringify(s));
 const img = (a) => (a ? a.vmixPath ?? a.storedPath ?? a.enteredPath ?? '' : '');
 const SWAP_FIELD = 'Swap.Source';
-const SWAP_EMPTY = 'lbar_swap_empty.png';
-const SWAP_EMPTY_RE = /lbar_swap_empty\.png$/i;
-/** An empty picture for the Swap field (the L-bar's first look), in the assets folder as vMix sees it. */
-export function swapEmptyPicture(ctx) {
-    const file = path.join(ctx.assetsDir, SWAP_EMPTY);
-    if (!fs.existsSync(file)) {
-        fs.mkdirSync(ctx.assetsDir, { recursive: true });
-        fs.writeFileSync(file, encodePng(8, 8, () => [0, 0, 0, 0]));
-    }
-    const root = getSetting(ctx.db, 'paths.vmixAssetsRoot');
-    return root ? joinVmixPath(root, SWAP_EMPTY) : file;
-}
+const BASE_FIELD = 'L-bar.Source';
 export const overlayOf = (xml, n) => xml.match(new RegExp(`<overlay number="${n}"[^>]*>(\\d+)</overlay>`))?.[1] ?? '';
 const k = (action, text, kind) => ({ action, text, kind });
 const row8 = (...keys) => Array.from({ length: 8 }, (_, i) => keys[i] ?? null);
@@ -1780,7 +1770,7 @@ export class Show {
                 return { ...g, input: i?.title ?? null, onAir: !!(i && snap.overlays[g.overlay] === i.number), fields: i?.fields.length ?? 0 };
             }),
             boats: this.boats(), sailors: this.sailors().map((s) => ({ slot: s.slot, number: s.number, name: `${s.firstName} ${s.lastName}`.trim(), position: s.position, photo: !!s.photo })),
-            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS, lbarSwap: this.swapStatus,
+            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS, lbarSwap: this.swapStatus, lbarLooks: lbarLooks(this.ctx),
         };
     }
     /**
@@ -1917,10 +1907,10 @@ export class Show {
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
     start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); void this.lbarSwap(); }, ms); this.timer.unref?.(); }
     /**
-     * L-BAR SWITCH: a title with a Swap picture (L-bar_switch.gtzip: the L-bar, and over it only what differs in the
-     * second look) changes look every few seconds while it is on air (an overlay channel or the program). The Swap
-     * picture switches between its own (remembered from vMix) and an empty one, and the title's DataChange fades it
-     * out and in, so the L-bar stays and only the differing parts cross-fade.
+     * L-BAR SWITCH: a title with a Swap picture (L-bar_switch.gtzip) changes look every few seconds while it is on air
+     * (an overlay channel or the program). Its L-bar picture is the first look uploaded on Show control; the Swap picture
+     * switches between an empty one and the second look's differing parts, and the title's DataChange fades it out and
+     * in, so the L-bar stays and only those parts cross-fade. The pictures are the dashboard's own (lbarSwap.ts).
      */
     swapAt = new Map();
     swapChanged = new Map();
@@ -1940,47 +1930,55 @@ export class Show {
             if (!titles.length)
                 return;
             const live = new Set([...Object.values(snap.overlays), snap.xml.match(/<active>(\d+)<\/active>/)?.[1] ?? ''].filter(Boolean));
-            const empty = swapEmptyPicture(this.ctx);
+            const files = lbarFiles(this.ctx);
+            const set = (i, field, value) => this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(field)}&Value=${encodeURIComponent(value)}`);
             for (const i of titles) {
+                const id = i.key || i.number;
                 const cur = i.values?.[SWAP_FIELD] ?? '';
-                const isEmpty = !cur.trim() || SWAP_EMPTY_RE.test(cur);
-                const key = `lbarSwap.${i.title}`;
-                // the title's own second look: learnt from vMix whenever the field holds it (a reload gives it a new path)
-                if (!isEmpty && getSetting(this.ctx.db, key) !== cur)
-                    setSetting(this.ctx.db, key, cur);
-                const st = { title: i.title, onAir: live.has(i.number), look: isEmpty ? 'first' : 'second', picture: getSetting(this.ctx.db, key), field: cur, changedAt: this.swapChanged.get(i.key || i.number) ?? null, error: '' };
+                const second = !!files && samePicture(cur, files.swap);
+                const st = { title: i.title, onAir: live.has(i.number), look: second ? 'second' : 'first', field: cur, changedAt: this.swapChanged.get(id) ?? null, error: '' };
                 status.push(st);
-                if (!live.has(i.number)) {
-                    this.swapAt.delete(i.key || i.number);
-                    continue;
-                }
-                const at = this.swapAt.get(i.key || i.number);
-                if (at === undefined) {
-                    this.swapAt.set(i.key || i.number, Date.now());
-                    continue;
-                }
-                if (Date.now() - at < secs * 1000)
-                    continue;
-                const next = isEmpty ? getSetting(this.ctx.db, key) : empty;
-                if (!next) {
-                    st.error = 'vMix has not shown the Swap picture yet: load the title again in vMix';
+                if (!files) {
+                    st.error = 'upload both L-bar looks below';
                     continue;
                 }
                 try {
-                    await this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(SWAP_FIELD)}&Value=${encodeURIComponent(next)}`);
+                    // the title's own pictures (packed in it) give way to the dashboard's: the first look at once, the Swap empty
+                    if (i.fields.includes(BASE_FIELD) && !samePicture(i.values?.[BASE_FIELD] ?? '', files.base)) {
+                        await set(i, BASE_FIELD, files.base);
+                        this.memo.delete('snapshot');
+                    }
+                    if (!second && !samePicture(cur, files.empty)) {
+                        await set(i, SWAP_FIELD, files.empty);
+                        this.memo.delete('snapshot');
+                        this.swapAt.set(id, Date.now());
+                        continue;
+                    }
+                    if (!live.has(i.number)) {
+                        this.swapAt.delete(id);
+                        continue;
+                    }
+                    const at = this.swapAt.get(id);
+                    if (at === undefined) {
+                        this.swapAt.set(id, Date.now());
+                        continue;
+                    }
+                    if (Date.now() - at < secs * 1000)
+                        continue;
+                    await set(i, SWAP_FIELD, second ? files.empty : files.swap);
                 }
                 catch (e) {
                     st.error = String(e?.message ?? e);
                     this.log(`L-bar switch: ${st.error}`);
                     continue;
                 }
-                this.swapAt.set(i.key || i.number, Date.now());
-                this.swapChanged.set(i.key || i.number, new Date().toISOString());
+                this.swapAt.set(id, Date.now());
+                this.swapChanged.set(id, new Date().toISOString());
                 this.memo.delete('snapshot');
             }
         }
         catch (e) {
-            this.swapStatus = [{ title: '', onAir: false, look: 'first', picture: '', field: '', changedAt: null, error: String(e?.message ?? e) }];
+            this.swapStatus = [{ title: '', onAir: false, look: 'first', field: '', changedAt: null, error: String(e?.message ?? e) }];
         }
         finally {
             this.swapBusy = false;

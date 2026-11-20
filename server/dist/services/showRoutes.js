@@ -4,6 +4,7 @@ import { COMPARE_DIR } from './compareImages.js';
 import { badRequest } from './errors.js';
 import { companionFiles, setShowConfig, showConfigSchema } from './show.js';
 import { vmixUrl } from './vmixResults.js';
+import { lookPicture, saveLook } from './lbarSwap.js';
 import { getSetting } from '../db/db.js';
 import { listSets, getSetDetail } from './fleets.js';
 import { activeEvent } from '../db/db.js';
@@ -66,6 +67,23 @@ export function registerShowRoutes(app, ctx, show) {
         fs.mkdirSync(path.join(ctx.assetsDir, COMPARE_DIR, 'uploads'), { recursive: true });
         fs.writeFileSync(path.join(ctx.assetsDir, ...rel.split('/')), buf);
         return { path: rel };
+    });
+    // L-bar switch: the two looks of the L-bar (whole-frame PNGs); the dashboard makes the pictures for vMix from them
+    app.post('/api/show/lbar-look/:n', async (req) => {
+        const n = Number(req.params.n);
+        if (n !== 1 && n !== 2)
+            throw badRequest('Use /api/show/lbar-look/1 or /2.');
+        const file = await req.file();
+        if (!file)
+            throw badRequest('No file was uploaded.');
+        return saveLook(ctx, n, await file.toBuffer());
+    });
+    app.get('/api/show/lbar-look/:n', async (req, reply) => {
+        const n = Number(req.params.n);
+        const buf = n === 1 || n === 2 ? lookPicture(ctx, n) : null;
+        if (!buf)
+            return reply.code(404).send();
+        return reply.header('Cache-Control', 'no-store').type('image/png').send(buf);
     });
     app.get('/api/show/do', act);
     app.post('/api/show/do', act);
