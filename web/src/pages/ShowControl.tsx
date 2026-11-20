@@ -23,6 +23,7 @@ interface ShowData {
   graphics: Graphic[]; boats: { id: string; code: string; name: string }[];
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
   pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; companion?: CompanionStatus; breakGroups: { id: string; name: string }[]; breakShown: string[];
+  lbarSwap?: { title: string; onAir: boolean; look: 'first' | 'second'; picture: string; field: string; changedAt: string | null; error: string }[];
 }
 
 function Panel({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
@@ -270,6 +271,16 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="block text-xs text-ink-400">Team comparison: wait for the flags' out animation (ms)<input type="number" min={0} max={3000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.flagChangeMs ?? 500} onChange={(e) => setC({ ...c, flagChangeMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="block text-xs text-ink-400" title="An L-bar title with a Swap picture (L-bar_switch.gtzip) changes look while it is on air: only the parts that differ cross-fade. 0 = off.">L-bar switch: change look every (s, 0 = off)<input type="number" min={0} max={300} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.lbarSwapSeconds ?? 8} onChange={(e) => setC({ ...c, lbarSwapSeconds: Math.max(0, Math.min(300, Number(e.target.value) || 0)) })} /></label>
+          <div className="text-xs text-ink-400">
+            {!data.lbarSwap?.length ? <span>L-bar switch: no title with a Swap picture in vMix (load L-bar_switch.gtzip).</span>
+              : data.lbarSwap.map((x, i) => (
+                <div key={i} className={x.error ? 'text-red-300' : ''}>
+                  {x.title ? <>L-bar switch: <b>{x.title}</b> · {x.onAir ? 'on air' : 'not on air'} · showing the {x.look} look{x.changedAt ? ` · last change ${new Date(x.changedAt).toLocaleTimeString()}` : ''}{x.picture ? '' : ' · second look not known yet'}</> : 'L-bar switch:'}
+                  {x.error ? ` · ${x.error}` : ''}
+                  {x.field ? <div className="truncate text-ink-500" title={x.field}>Swap now: {x.field}</div> : null}
+                </div>
+              ))}
+          </div>
           <p className="text-xs text-ink-500">BREAK SCENE brings in three inputs, each on its own overlay channel with its own animations: the L-bar (ssl_lbar), the ticker (ssl_ticker: the one picked last, else the automatic one) and the day schedule (if ticked), which then switches with the results of the groups picked. Each group can have its own results input, ssl_results_H, ssl_results_I…, with its own RESULTS key on the AFTER / BREAK page. NEXT SLIDE switches the board by hand, a TICKER key (one per ticker, on the AFTER / BREAK page) puts that ticker on; AUTO SWITCH turns the timed switching on or off. TICKER ON / OFF puts the ticker (ssl_ticker) on its channel alone, without the scene, so it stays on under boards and lower thirds; TOP TICKER ON / OFF does the same for the top ticker (ssl_ticker_top, its versions in General graphics → Top ticker) on its own channel. The break scene's L-bar or board takes the place of the top ticker when they share a channel.</p>
         </div>
       </div>
