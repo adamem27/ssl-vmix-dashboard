@@ -1780,7 +1780,7 @@ export class Show {
                 return { ...g, input: i?.title ?? null, onAir: !!(i && snap.overlays[g.overlay] === i.number), fields: i?.fields.length ?? 0 };
             }),
             boats: this.boats(), sailors: this.sailors().map((s) => ({ slot: s.slot, number: s.number, name: `${s.firstName} ${s.lastName}`.trim(), position: s.position, photo: !!s.photo })),
-            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS,
+            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS, lbarSwap: this.swapStatus,
         };
     }
     /**
@@ -1923,15 +1923,20 @@ export class Show {
      * out and in, so the L-bar stays and only the differing parts cross-fade.
      */
     swapAt = new Map();
+    swapChanged = new Map();
+    /** what the L-bar switch found on its last round, for Show control */
+    swapStatus = [];
     swapBusy = false;
     async lbarSwap() {
         const secs = this.config.lbarSwapSeconds;
         if (!secs || this.swapBusy)
             return;
         this.swapBusy = true;
+        const status = [];
         try {
             const snap = await this.snapshot();
             const titles = snap.inputs.filter((i) => i.fields.includes(SWAP_FIELD));
+            this.swapStatus = status;
             if (!titles.length)
                 return;
             const live = new Set([...Object.values(snap.overlays), snap.xml.match(/<active>(\d+)<\/active>/)?.[1] ?? ''].filter(Boolean));
@@ -1943,6 +1948,8 @@ export class Show {
                 // the title's own second look: learnt from vMix whenever the field holds it (a reload gives it a new path)
                 if (!isEmpty && getSetting(this.ctx.db, key) !== cur)
                     setSetting(this.ctx.db, key, cur);
+                const st = { title: i.title, onAir: live.has(i.number), look: isEmpty ? 'first' : 'second', picture: getSetting(this.ctx.db, key), field: cur, changedAt: this.swapChanged.get(i.key || i.number) ?? null, error: '' };
+                status.push(st);
                 if (!live.has(i.number)) {
                     this.swapAt.delete(i.key || i.number);
                     continue;
@@ -1955,14 +1962,26 @@ export class Show {
                 if (Date.now() - at < secs * 1000)
                     continue;
                 const next = isEmpty ? getSetting(this.ctx.db, key) : empty;
-                if (!next)
+                if (!next) {
+                    st.error = 'vMix has not shown the Swap picture yet: load the title again in vMix';
                     continue;
-                await this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(SWAP_FIELD)}&Value=${encodeURIComponent(next)}`);
+                }
+                try {
+                    await this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(SWAP_FIELD)}&Value=${encodeURIComponent(next)}`);
+                }
+                catch (e) {
+                    st.error = String(e?.message ?? e);
+                    this.log(`L-bar switch: ${st.error}`);
+                    continue;
+                }
                 this.swapAt.set(i.key || i.number, Date.now());
+                this.swapChanged.set(i.key || i.number, new Date().toISOString());
                 this.memo.delete('snapshot');
             }
         }
-        catch { /* vMix away: next tick */ }
+        catch (e) {
+            this.swapStatus = [{ title: '', onAir: false, look: 'first', picture: '', field: '', changedAt: null, error: String(e?.message ?? e) }];
+        }
         finally {
             this.swapBusy = false;
         }

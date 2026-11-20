@@ -1,8 +1,14 @@
 {
-  "version": "1.0.246",
-  "commit": "b87f47b",
-  "date": "2026-11-20T13:15:09Z",
+  "version": "1.0.247",
+  "commit": "a885aa6",
+  "date": "2026-11-20T13:25:33Z",
   "changes": [
+    {
+      "version": "1.0.247",
+      "commit": "a885aa6",
+      "date": "2026-11-20T13:25:33Z",
+      "text": "L-bar switch: show in Show control what it found in vMix and why it does not change"
+    },
     {
       "version": "1.0.246",
       "commit": "b87f47b",
@@ -476,12 +482,6 @@
       "commit": "ce1314e",
       "date": "2026-11-13T13:30:09Z",
       "text": "Faster keys: a press sends only the fields the title does not show yet (and pictures whose file changed), a few vMix calls at a time"
-    },
-    {
-      "version": "1.0.167",
-      "commit": "5a533d6",
-      "date": "2026-11-13T13:10:28Z",
-      "text": "vMix data: a picture whose file changed (PNG remade in the generator) goes again into every input that shows it"
     }
   ]
 }
