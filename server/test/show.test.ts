@@ -34,7 +34,7 @@ function fakeVmix(titles: Record<string, string[]>) {
     const q = decodeURIComponent(url.split('/api/')[1] ?? '');
     if (q === '') {
       const inputs = names.map((n, i) => `<input key="k${i + 1}" number="${i + 1}" type="${titles[n][0] === '#Image' ? 'Image' : 'GT'}" title="${n}">${titles[n].filter((f) => !f.startsWith('#')).map((f) => (f.endsWith('.Source') ? `<image index="0" name="${f}">${esc(vals.get(`${i + 1}|${f}`) ?? '')}</image>` : `<text index="0" name="${f}">${esc(vals.get(`${i + 1}|${f}`) ?? 'x')}</text>`)).join('')}</input>`).join('');
-      const ov = [1, 2, 3, 4].map((n) => `<overlay number="${n}">${overlays[n] ?? ''}</overlay>`).join('');
+      const ov = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<overlay number="${n}">${overlays[n] ?? ''}</overlay>`).join('');
       return { ok: true, status: 200, text: async () => `<vmix><inputs>${inputs}</inputs><overlays>${ov}</overlays></vmix>` };
     }
     calls.push(q);
@@ -663,6 +663,20 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.run('show:schedule');
     expect(v.calls).toEqual([`?Function=OverlayInput1In&Input=k${v.num('ssl_schedule')}`]);
+  });
+
+  it('TITLES brings the rolling titles in at once, held on their first frame, and plays them 3 seconds later', async () => {
+    const s = setup();
+    const v = fakeVmix({ Rolling_Titles: ['#Image'] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    show.titlesDelayMs = 50;
+    expect(await show.toggle('titles')).toMatchObject({ in: 'titles', playInMs: 50 });
+    expect(v.calls).toEqual(['?Function=Pause&Input=k1', '?Function=Restart&Input=k1', '?Function=OverlayInput8In&Input=k1', '?Function=Pause&Input=k1']);
+    await new Promise((r) => setTimeout(r, 80));
+    expect(v.calls.at(-1)).toBe('?Function=Play&Input=k1');
+    show.invalidate();
+    expect(await show.toggle('titles')).toEqual({ out: 'titles' });
+    expect(v.calls.at(-1)).toBe('?Function=OverlayInput8Out');
   });
 
   it('a new Matchboard PNG goes again into the titles showing it (ssl_matchboard\'s image field, any field holding matchboard.png)', async () => {
