@@ -45,7 +45,7 @@ import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwo
 import { siteSettings, saveSiteSettings, siteTarget, uploadKey } from './services/siteTargets.js';
 import { uploadPhp } from './services/httpsTarget.js';
 import { StaticSitePublisher } from './services/staticSite.js';
-import { importSailorDetails } from './services/sailorDetails.js';
+import { assignDetails, ignoreDetails, importSailorDetails, unmatchedDetails } from './services/sailorDetails.js';
 import { Feed, FEED_TYPE, feedKey, INTERNAL_KEY, LiveFeedPusher, LiveFeedStore, viewerMayRead } from './services/liveFeed.js';
 
 export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter; matchboard?: mb.MatchboardExporter; lowerThirds?: LowerThirds; show?: Show; draw?: Draw; liveDir?: string; liveFetch?: typeof fetch; siteDir?: string }
@@ -244,6 +244,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (!file) throw badRequest('No file was uploaded.');
     return importSailorDetails(db, await file.toBuffer(), String(file.filename ?? ''));
   });
+  app.get('/api/sailor-details/unmatched', async () => unmatchedDetails(db, todayIn(activeEvent(db)?.timezone || 'UTC')));
+  app.post<{ Params: { id: string } }>('/api/sailor-details/unmatched/:id/assign', async (req) => assignDetails(db, req.params.id, z.object({ sailorId: str(100) }).parse(req.body).sailorId));
+  app.post<{ Params: { id: string } }>('/api/sailor-details/unmatched/:id/ignore', async (req) => ignoreDetails(db, req.params.id));
   app.post<{ Params: { kind: string; id: string; slot: string } }>('/api/:kind/:id/assets/:slot/upload', async (req) => {
     const owner = ownerOf(req.params.kind);
     const file = await req.file();

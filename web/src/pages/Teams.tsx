@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, Team } from '../api';
-import { Badge, Button, cx, Empty, ErrorBox, Loading, useToast } from '../components/ui';
+import { Badge, Button, cx, Empty, ErrorBox, Loading, Modal, useToast } from '../components/ui';
 import { TeamFormModal } from '../components/TeamForm';
 import { StageNote, useStageTeams } from '../components/StagePicker';
 
@@ -119,8 +119,15 @@ export function DetailsImport() {
     toast.ok(`Age & height: ${n} sailors matched`);
     qc.invalidateQueries();
   };
+  const unmatched = useQuery({ queryKey: ['details-unmatched'], queryFn: () => api.get<DetailsRow[]>('/api/sailor-details/unmatched') });
+  const [matching, setMatching] = useState(false);
   return (
-    <div className="relative">
+    <div className="relative flex gap-2">
+      {!!unmatched.data?.length && (
+        <button onClick={() => setMatching(true)} className="rounded-md border border-amber-800 bg-amber-950/40 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-900/40"
+          title="People from the squad sheets the import could not match to a sailor">⚠ {unmatched.data.length} age &amp; height to match</button>
+      )}
+      <DetailsMatch open={matching} rows={unmatched.data ?? []} onClose={() => setMatching(false)} />
       <label className={cx('btn inline-flex cursor-pointer items-center rounded-md border border-ink-700 px-2.5 py-1 text-xs font-medium hover:bg-ink-800', busy && 'opacity-60')}
         title="The teams' squad sheets (.xlsx; TEAM SQUAD forms, or one sheet with Code, Family name, First name, Date of birth, Height). Only the date of birth and height are kept; the commentator screens show the age.">
         {busy ? 'Importing…' : 'Import age & height'}
@@ -144,5 +151,45 @@ export function DetailsImport() {
         </div>
       )}
     </div>
+  );
+}
+
+interface DetailsRow { id: string; team: string; teamName: string; first: string; last: string; age: number | null; heightCm: number | null; sailors: { id: string; name: string; hasData: boolean }[] }
+
+/** Rows of the squad sheets not matched to a sailor: pick the sailor by hand (remembered for the next import) or ignore. */
+function DetailsMatch({ open, rows, onClose }: { open: boolean; rows: DetailsRow[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState('');
+  const act = async (id: string, url: string, body?: unknown) => {
+    setBusy(id);
+    try { await api.post(url, body); } catch (e) { toast.error(e); } finally { setBusy(''); qc.invalidateQueries(); }
+  };
+  return (
+    <Modal open={open} onClose={onClose} title="Age & height not matched to a sailor" wide>
+      <p className="mb-3 text-sm text-ink-400">Pick the sailor each person is (the match is remembered for the next import), or Ignore people who are not sailors (coaches, staff).</p>
+      {!rows.length ? <p className="text-sm text-ink-500">Everything is matched.</p> : (
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs text-ink-500"><tr><th className="py-1">Team</th><th>In the sheet</th><th>Age</th><th>Height</th><th>Sailor</th><th /></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className={cx('border-t border-ink-800', busy === r.id && 'opacity-50')}>
+                <td className="py-1.5 pr-2 font-mono font-bold">{r.team}</td>
+                <td className="pr-2">{r.first} <b className="uppercase">{r.last}</b></td>
+                <td className="pr-2 tabular-nums text-ink-400">{r.age ?? '—'}</td>
+                <td className="pr-2 tabular-nums text-ink-400">{r.heightCm ? `${(r.heightCm / 100).toFixed(2)} m` : '—'}</td>
+                <td className="pr-2">
+                  <select className="input w-56 py-1 text-sm" value="" disabled={busy === r.id} onChange={(e) => e.target.value && void act(r.id, `/api/sailor-details/unmatched/${r.id}/assign`, { sailorId: e.target.value })}>
+                    <option value="">{r.sailors.length ? 'Pick the sailor…' : 'No sailors in this team'}</option>
+                    {[...r.sailors].sort((a, b) => Number(a.hasData) - Number(b.hasData)).map((s) => <option key={s.id} value={s.id}>{s.name}{s.hasData ? ' (has data)' : ''}</option>)}
+                  </select>
+                </td>
+                <td className="text-right"><Button size="sm" variant="ghost" disabled={busy === r.id} onClick={() => void act(r.id, `/api/sailor-details/unmatched/${r.id}/ignore`)}>Ignore</Button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Modal>
   );
 }

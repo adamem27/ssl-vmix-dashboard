@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { buildXlsx } from '../src/services/xlsx.js';
-import { ageOn, birthDate, heightCm, importSailorDetails } from '../src/services/sailorDetails.js';
+import { ageOn, assignDetails, birthDate, heightCm, ignoreDetails, importSailorDetails, unmatchedDetails } from '../src/services/sailorDetails.js';
 import { listSailors } from '../src/services/sailors.js';
 
 describe('sailor age and height', () => {
@@ -52,5 +52,28 @@ describe('sailor age and height', () => {
     expect(r2).toMatchObject({ matched: 1, teams: ['POR'], unknownTeams: ['XXX'] });
     const r3 = importSailorDetails(s.db, Buffer.from(',,,COUNTRY : REPUBLIC OF KOREA\n,,,ATHLETES FAMILY NAME,FIRSTNAME,Date of Birth,HEIGHT\n,,1,DEMO,Min,03/04/1999,178'), 'kor.csv');
     expect(r3).toMatchObject({ matched: 1, teams: ['KOR'] });
+  });
+
+  it('unmatched rows: matched by hand (remembered on the next import) or ignored', () => {
+    const s = setup();
+    const t = seedTeam(s.db, 'MEX', ['Ana Test', 'Bruno Sample']);
+    const sheet = [',,,COUNTRY : MEX', ',,,FAMILY NAME,FIRST NAME,Date of Birth,HEIGHT',
+      ',,1,Test-Probe,Anita,02/20/1991,1.70', ',,2,Coach,Some,01/01/1970,1.80'].join('\n');
+    const r = importSailorDetails(s.db, Buffer.from(sheet), 'a.csv');
+    expect(r.matched).toBe(0);
+    let open = unmatchedDetails(s.db, '2026-11-21');
+    expect(open.map((x) => x.last)).toEqual(['Coach', 'Test-Probe']);
+    expect(open[1]).toMatchObject({ team: 'MEX', age: 35, heightCm: 170 });
+    expect(open[1].sailors.map((x) => x.name)).toEqual(['Bruno Sample', 'Ana Test']);
+    expect(JSON.stringify(open)).not.toContain('1991');
+    assignDetails(s.db, open[1].id, t.sailorIds[0]);
+    ignoreDetails(s.db, open[0].id);
+    expect(unmatchedDetails(s.db, '2026-11-21')).toEqual([]);
+    expect(listSailors(s.ctx, t.teamId).find((x) => x.firstName === 'Ana')!.heightCm).toBe(170);
+    // the next import: Anita goes to Ana again (new height), the coach stays ignored
+    const r2 = importSailorDetails(s.db, Buffer.from(sheet.replace('1.70', '1.72')), 'a.csv');
+    expect(r2).toMatchObject({ matched: 1, unmatched: [] });
+    expect(listSailors(s.ctx, t.teamId).find((x) => x.firstName === 'Ana')!.heightCm).toBe(172);
+    expect(unmatchedDetails(s.db, '2026-11-21')).toEqual([]);
   });
 });
