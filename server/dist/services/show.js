@@ -776,6 +776,10 @@ export class Show {
         const snap = await this.snapshot();
         const input = this.resultsFor(grp.fleetId, snap.inputs);
         if (snap.overlays[g.overlay] === input.number) {
+            if (this.titlesTimer) {
+                clearTimeout(this.titlesTimer);
+                this.titlesTimer = null;
+            }
             this.pushUndo(snap.overlays);
             await this.overlayOut(g.overlay, snap.overlays);
             return { out: 'results', group: grp.label };
@@ -890,6 +894,10 @@ export class Show {
         const own = snap.inputs.find((x) => x.title.toLowerCase().replace(/\.gtzip$/, '') === compareInput(grp.key).toLowerCase());
         const input = own ?? this.need(g, snap.inputs);
         if (snap.overlays[g.overlay] === input.number) {
+            if (this.titlesTimer) {
+                clearTimeout(this.titlesTimer);
+                this.titlesTimer = null;
+            }
             this.pushUndo(snap.overlays);
             await this.overlayOut(g.overlay, snap.overlays);
             return { out: 'compare', group: grp.label };
@@ -1024,6 +1032,9 @@ export class Show {
         return s ? tickerText(s.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : '';
     }
     // ---------- actions ----------
+    /** The rolling titles (a video) come in at once, held on their first frame, and play this long after the TITLES key. */
+    titlesDelayMs = 3000;
+    titlesTimer = null;
     async toggle(id) {
         if (id === 'break')
             return this.toggleBreak();
@@ -1036,11 +1047,30 @@ export class Show {
         const snap = await this.snapshot();
         const input = this.need(g, snap.inputs);
         if (snap.overlays[g.overlay] === input.number) {
+            if (this.titlesTimer) {
+                clearTimeout(this.titlesTimer);
+                this.titlesTimer = null;
+            }
             this.pushUndo(snap.overlays);
             await this.overlayOut(g.overlay, snap.overlays);
             return { out: g.id };
         }
         await this.fill(g, input);
+        if (id === 'titles' && this.titlesDelayMs > 0) {
+            // the transition in at once; the video waits on its first frame (vMix may start it as it comes in)
+            const at = encodeURIComponent(input.key || input.number);
+            await this.vmix(`?Function=Pause&Input=${at}`);
+            await this.vmix(`?Function=Restart&Input=${at}`);
+            await this.bringIn(g, input, snap);
+            await this.vmix(`?Function=Pause&Input=${at}`);
+            if (this.titlesTimer)
+                clearTimeout(this.titlesTimer);
+            this.titlesTimer = setTimeout(() => {
+                this.titlesTimer = null;
+                this.vmix(`?Function=Play&Input=${at}`).catch(() => { });
+            }, this.titlesDelayMs);
+            return { in: g.id, input: input.title, playInMs: this.titlesDelayMs };
+        }
         await this.bringIn(g, input, snap);
         return { in: g.id, input: input.title };
     }
