@@ -1,8 +1,14 @@
 {
-  "version": "1.0.251",
-  "commit": "47ed535",
-  "date": "2026-11-21T13:26:18Z",
+  "version": "1.0.252",
+  "commit": "cb1626e",
+  "date": "2026-11-21T14:07:12Z",
   "changes": [
+    {
+      "version": "1.0.252",
+      "commit": "cb1626e",
+      "date": "2026-11-21T14:07:12Z",
+      "text": "Sailor profile: date of birth and height can be edited"
+    },
     {
       "version": "1.0.251",
       "commit": "47ed535",
@@ -476,12 +482,6 @@
       "commit": "213964d",
       "date": "2026-11-14T12:14:11Z",
       "text": "Commentator: declared position, number, name in large type; best results always; Group H names; points only; schedule after the next race"
-    },
-    {
-      "version": "1.0.172",
-      "commit": "8df23a3",
-      "date": "2026-11-13T19:38:49Z",
-      "text": "Last Chance Race takes teams of the stage's other groups (they stay in their own); its own results and comparison inputs ssl_results_LCR / ssl_compare_LCR with keys"
     }
   ]
 }

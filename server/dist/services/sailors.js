@@ -25,6 +25,10 @@ export function updateSailor(db, id, input) {
     const last = input.lastName !== undefined ? input.lastName.trim() : s.last_name;
     db.prepare(`UPDATE sailors SET first_name = ?, last_name = ?, name_key = ?, default_position = ?, default_number = ?, best_result_1 = ?, best_result_2 = ?, best_result_3 = ?, source_ref = ?, updated_at = ? WHERE id = ?`)
         .run(first, last, nameKey(`${first} ${last}`), input.defaultPosition !== undefined ? input.defaultPosition.trim() : s.default_position, input.defaultNumber !== undefined ? input.defaultNumber.trim() : s.default_number, input.bestResult1 ?? s.best_result_1, input.bestResult2 ?? s.best_result_2, input.bestResult3 ?? s.best_result_3, input.sourceRef !== undefined ? input.sourceRef : s.source_ref, nowIso(), id);
+    if (input.birthDate !== undefined || input.heightCm !== undefined) {
+        db.prepare('UPDATE sailors SET birth_date = ?, height_cm = ? WHERE id = ?')
+            .run(input.birthDate !== undefined ? input.birthDate : s.birth_date, input.heightCm !== undefined ? input.heightCm : s.height_cm, id);
+    }
 }
 /** One captain per team: marking a sailor clears the mark on teammates. */
 export function setCaptain(db, id, value) {
@@ -79,5 +83,6 @@ export function getSailor(ctx, id) {
       (m.ovr_position IS NOT NULL OR m.ovr_number IS NOT NULL) AS hasOverride, d.origin
     FROM declaration_members m JOIN declarations d ON d.id = m.declaration_id WHERE m.sailor_id = ? ORDER BY d.declaration_date DESC`).all(id);
     const aliases = ctx.db.prepare('SELECT name_key AS nameKey FROM sailor_source_aliases WHERE sailor_id = ?').all(id);
-    return { ...sailorDto(ctx, s), history, sourceAliases: aliases };
+    // the date of birth only on the sailor's own page (editing); lists and the commentators get the age
+    return { ...sailorDto(ctx, s), birthDate: s.birth_date ?? '', history, sourceAliases: aliases };
 }

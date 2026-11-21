@@ -292,12 +292,16 @@ export async function buildApp(deps) {
     const sailorBody = z.object({
         firstName: str(80), lastName: str(80), defaultPosition: str(80), defaultNumber: str(10),
         bestResult1: str(500), bestResult2: str(500), bestResult3: str(500), sourceRef: str(200).nullable(),
+        birthDate: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/, 'Date of birth as yyyy-mm-dd'), heightCm: z.number().int().min(100, 'Height in cm').max(240, 'Height in cm').nullable(),
     }).partial();
     app.post('/api/teams/:id/sailors', async (req) => {
         const body = sailorBody.parse(req.body);
         if (!body.firstName?.trim() && !body.lastName?.trim())
             throw badRequest('Enter a first or last name.');
-        return getSailor(ctx, createSailor(db, req.params.id, body));
+        const id = createSailor(db, req.params.id, body);
+        if (body.birthDate !== undefined || body.heightCm !== undefined)
+            updateSailor(db, id, { birthDate: body.birthDate, heightCm: body.heightCm });
+        return getSailor(ctx, id);
     });
     app.get('/api/sailors/:id', async (req) => getSailor(ctx, req.params.id));
     app.patch('/api/sailors/:id', async (req) => {
