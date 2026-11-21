@@ -295,6 +295,7 @@ function TeamCard({ team, colour, lineup, points, onOpen }: { team: OverviewTeam
                 </span>
                 {best.length > 0 && <span className="block truncate text-[0.5em] leading-tight text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
               </span>
+              {ageHeight(l.sailor) && <span className="shrink-0 text-[0.5em] tabular-nums text-ink-400">{ageHeight(l.sailor)}</span>}
             </li>
           );
         })}
@@ -303,6 +304,10 @@ function TeamCard({ team, colour, lineup, points, onOpen }: { team: OverviewTeam
     </button>
   );
 }
+
+/** Age and height of a sailor (from the squad sheets), as the crew lists show them. */
+const metres = (cm: number) => `${(cm / 100).toFixed(2)} m`;
+const ageHeight = (x?: { age?: number | null; heightCm?: number | null }) => [x?.age != null ? `${x.age} yrs` : '', x?.heightCm ? metres(x.heightCm) : ''].filter(Boolean).join(' · ');
 
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
@@ -351,6 +356,18 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
   if (sw.length > 1) {
     facts.push(`Average sailor: ${Math.round((sw.reduce((a, x) => a + x.w, 0) / sw.length) * 10) / 10} kg`);
     facts.push(`Heaviest: ${sw[0].l.first} ${sw[0].l.last} (${sw[0].w} kg) · lightest: ${sw[sw.length - 1].l.first} ${sw[sw.length - 1].l.last} (${sw[sw.length - 1].w} kg)`);
+  }
+  // age and height of the crew on the boat (squad sheets)
+  const name = (l: Line) => `${l.first} ${l.last}`.trim();
+  const ages = lines.filter((l) => l.sailor?.age != null).map((l) => ({ l, v: l.sailor!.age! })).sort((a, b) => b.v - a.v);
+  if (ages.length > 1) {
+    const avg = Math.round((ages.reduce((a, x) => a + x.v, 0) / ages.length) * 10) / 10;
+    facts.push(`Average age on board: ${avg} · oldest: ${name(ages[0].l)} (${ages[0].v}) · youngest: ${name(ages[ages.length - 1].l)} (${ages[ages.length - 1].v})`);
+  }
+  const hs = lines.filter((l) => l.sailor?.heightCm).map((l) => ({ l, v: l.sailor!.heightCm! })).sort((a, b) => b.v - a.v);
+  if (hs.length > 1) {
+    const avg = Math.round(hs.reduce((a, x) => a + x.v, 0) / hs.length);
+    facts.push(`Average height: ${metres(avg)} · tallest: ${name(hs[0].l)} (${metres(hs[0].v)}) · shortest: ${name(hs[hs.length - 1].l)} (${metres(hs[hs.length - 1].v)})`);
   }
   const decorated = lines.filter((l) => l.sailor?.bestResult1).length;
   if (decorated) facts.push(`${decorated} of ${lines.length} sailors with notable results`);
@@ -417,7 +434,7 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
                   </span>
                   {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
                 </span>
-                {l.weight && <span className="shrink-0 text-[0.45em] tabular-nums text-ink-400">{l.weight} kg</span>}
+                {(l.weight || ageHeight(l.sailor)) && <span className="shrink-0 text-[0.45em] tabular-nums text-ink-400">{[ageHeight(l.sailor), l.weight ? `${l.weight} kg` : ''].filter(Boolean).join(' · ')}</span>}
               </li>
             );
           })}

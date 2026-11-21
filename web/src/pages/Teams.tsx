@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, Team } from '../api';
-import { Badge, Button, cx, Empty, ErrorBox, Loading } from '../components/ui';
+import { Badge, Button, cx, Empty, ErrorBox, Loading, useToast } from '../components/ui';
 import { TeamFormModal } from '../components/TeamForm';
 import { StageNote, useStageTeams } from '../components/StagePicker';
 
@@ -46,6 +46,7 @@ export function TeamsPage() {
               className={cx('rounded px-3 py-1.5 text-xs font-medium', filter === v ? 'bg-ink-700 text-ink-50' : 'text-ink-400 hover:text-ink-100')}>{l}</button>
           ))}
         </div>
+        <DetailsImport />
         <Button variant="primary" onClick={() => setAdding(true)}>+ Add team</Button>
       </div>
 
@@ -94,5 +95,54 @@ function TeamCard({ t }: { t: Team }) {
         </div>
       </Link>
     </li>
+  );
+}
+
+interface DetailsSummary { rows: number; matched: number; updated: number; teams: string[]; unknownTeams: string[]; unmatched: string[] }
+
+/** Age and height of the sailors from the teams' squad sheets (TEAM SQUAD forms or one combined sheet). */
+function DetailsImport() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<{ file: string; r?: DetailsSummary; error?: string }[] | null>(null);
+  const run = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setBusy(true);
+    const out: { file: string; r?: DetailsSummary; error?: string }[] = [];
+    for (const f of Array.from(files)) {
+      try { out.push({ file: f.name, r: await api.upload<DetailsSummary>('/api/sailor-details/import', f) }); }
+      catch (e) { out.push({ file: f.name, error: (e as Error).message }); }
+    }
+    setRes(out); setBusy(false);
+    const n = out.reduce((a, x) => a + (x.r?.matched ?? 0), 0);
+    toast.ok(`Age & height: ${n} sailors matched`);
+    qc.invalidateQueries();
+  };
+  return (
+    <div className="relative">
+      <label className={cx('btn inline-flex cursor-pointer items-center rounded-md border border-ink-700 px-3 py-2 text-sm hover:bg-ink-800', busy && 'opacity-60')}
+        title="The teams' squad sheets (.xlsx; TEAM SQUAD forms, or one sheet with Code, Family name, First name, Date of birth, Height). Only the date of birth and height are kept; the commentator screens show the age.">
+        {busy ? 'Importing…' : 'Import age & height'}
+        <input type="file" multiple accept=".xlsx,.csv" className="hidden" disabled={busy} onChange={(e) => { void run(e.target.files); e.target.value = ''; }} />
+      </label>
+      {res && (
+        <div className="absolute right-0 z-20 mt-2 max-h-96 w-[28rem] overflow-y-auto rounded-md border border-ink-700 bg-ink-900 p-3 text-xs text-ink-300 shadow-xl">
+          <div className="mb-2 flex items-center"><b className="text-ink-100">Age &amp; height import</b><button className="ml-auto text-ink-500 hover:text-ink-200" onClick={() => setRes(null)}>Close</button></div>
+          {res.map((x, i) => (
+            <div key={i} className="mb-2 border-b border-ink-800 pb-2 last:border-0">
+              <div className="truncate text-ink-200">{x.file}</div>
+              {x.error ? <div className="text-red-300">{x.error}</div> : x.r && (
+                <>
+                  <div>{x.r.matched} of {x.r.rows} people matched to sailors{x.r.teams.length ? ` (${x.r.teams.join(', ')})` : ''} · {x.r.updated} changed</div>
+                  {x.r.unknownTeams.length > 0 && <div className="text-amber-300">No team for: {x.r.unknownTeams.join(', ')}</div>}
+                  {x.r.unmatched.length > 0 && <div className="text-ink-500" title={x.r.unmatched.join('\n')}>Not in the dashboard ({x.r.unmatched.length}): {x.r.unmatched.slice(0, 8).join(', ')}{x.r.unmatched.length > 8 ? '…' : ''}</div>}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

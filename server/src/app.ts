@@ -45,6 +45,7 @@ import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwo
 import { siteSettings, saveSiteSettings, siteTarget, uploadKey } from './services/siteTargets.js';
 import { uploadPhp } from './services/httpsTarget.js';
 import { StaticSitePublisher } from './services/staticSite.js';
+import { importSailorDetails } from './services/sailorDetails.js';
 import { Feed, FEED_TYPE, feedKey, INTERNAL_KEY, LiveFeedPusher, LiveFeedStore, viewerMayRead } from './services/liveFeed.js';
 
 export interface AppDeps { db: DB; assetsDir: string; sync: SyncService; workbook?: WorkbookWriter; webDist?: string; dbPath?: string; maxUploadBytes?: number; password?: string; generator?: pngGen.GeneratorExporter; matchboard?: mb.MatchboardExporter; lowerThirds?: LowerThirds; show?: Show; draw?: Draw; liveDir?: string; liveFetch?: typeof fetch; siteDir?: string }
@@ -237,6 +238,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (kind === 'people') return 'person';
     throw notFound('Asset');
   };
+  // age and height of the sailors from the teams' squad sheets (one .xlsx or .csv per request)
+  app.post('/api/sailor-details/import', async (req: any) => {
+    const file = await req.file();
+    if (!file) throw badRequest('No file was uploaded.');
+    return importSailorDetails(db, await file.toBuffer(), String(file.filename ?? ''));
+  });
   app.post<{ Params: { kind: string; id: string; slot: string } }>('/api/:kind/:id/assets/:slot/upload', async (req) => {
     const owner = ownerOf(req.params.kind);
     const file = await req.file();
