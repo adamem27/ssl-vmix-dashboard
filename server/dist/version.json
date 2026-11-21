@@ -1,8 +1,14 @@
 {
-  "version": "1.0.254",
-  "commit": "dbe489d",
-  "date": "2026-11-21T20:27:10Z",
+  "version": "1.0.255",
+  "commit": "87e6dbb",
+  "date": "2026-11-21T20:36:18Z",
   "changes": [
+    {
+      "version": "1.0.255",
+      "commit": "87e6dbb",
+      "date": "2026-11-21T20:36:18Z",
+      "text": "Companion navigation: no HOME key on the home pages (BEFORE, TEAMS)"
+    },
     {
       "version": "1.0.254",
       "commit": "dbe489d",
@@ -476,12 +482,6 @@
       "commit": "285a04d",
       "date": "2026-11-14T12:55:38Z",
       "text": "Commentator page: Publish now always sends fresh data, rounds 20x cheaper, no red stale badge when published by hand"
-    },
-    {
-      "version": "1.0.175",
-      "commit": "c540364",
-      "date": "2026-11-14T12:32:08Z",
-      "text": "Commentator: calmer layout - one header line, group tabs, plain team cards that open on click, back and next-team buttons"
     }
   ]
 }

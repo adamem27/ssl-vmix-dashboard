@@ -212,7 +212,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         [p2 + 1, 'BUGS\\nOFTEN'], [p2 + 2, 'BUGS\\nRARE'], [p2 + 3, 'TICKERS'], [peoplePage, 'PEOPLE']];
     const nav = (self) => {
         const deck = deck1.some(([pg]) => pg === self) ? deck1 : deck2, home = deck[0][0];
-        const keys = [k(`nav:${home}`, 'HOME', 'nav'), ...deck.filter(([pg]) => pg !== self && pg !== home).map(([pg, name]) => k(`nav:${pg}`, name, 'nav'))].slice(0, 5);
+        const keys = [...(self === home ? [] : [k(`nav:${home}`, 'HOME', 'nav')]), ...deck.filter(([pg]) => pg !== self && pg !== home).map(([pg, name]) => k(`nav:${pg}`, name, 'nav'))].slice(0, 5);
         return navRow(...keys, ...Array(5 - keys.length).fill(null), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'));
     };
     const teamsPageOf = (n) => ({
