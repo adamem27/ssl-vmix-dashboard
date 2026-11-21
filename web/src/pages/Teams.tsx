@@ -101,7 +101,7 @@ function TeamCard({ t }: { t: Team }) {
 interface DetailsSummary { rows: number; matched: number; updated: number; teams: string[]; unknownTeams: string[]; unmatched: string[] }
 
 /** Age and height of the sailors from the teams' squad sheets (TEAM SQUAD forms or one combined sheet). */
-function DetailsImport() {
+export function DetailsImport() {
   const qc = useQueryClient();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -121,7 +121,7 @@ function DetailsImport() {
   };
   return (
     <div className="relative">
-      <label className={cx('btn inline-flex cursor-pointer items-center rounded-md border border-ink-700 px-3 py-2 text-sm hover:bg-ink-800', busy && 'opacity-60')}
+      <label className={cx('btn inline-flex cursor-pointer items-center rounded-md border border-ink-700 px-2.5 py-1 text-xs font-medium hover:bg-ink-800', busy && 'opacity-60')}
         title="The teams' squad sheets (.xlsx; TEAM SQUAD forms, or one sheet with Code, Family name, First name, Date of birth, Height). Only the date of birth and height are kept; the commentator screens show the age.">
         {busy ? 'Importing…' : 'Import age & height'}
         <input type="file" multiple accept=".xlsx,.csv" className="hidden" disabled={busy} onChange={(e) => { void run(e.target.files); e.target.value = ''; }} />

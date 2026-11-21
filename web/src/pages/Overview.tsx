@@ -7,6 +7,7 @@ import { Badge, Button, cx, ErrorBox, Loading, todayIn, useToast } from '../comp
 import { Cell, ImgCell } from '../components/cells';
 import { TeamProfileLink } from '../components/TeamProfileLink';
 import { StageNote, useStageTeams } from '../components/StagePicker';
+import { DetailsImport } from './Teams';
 
 const SHORT: Record<string, string> = {
   background_1: 'BG1', background_2: 'BG2', emblem_dark: 'EM D', emblem_light: 'EM L', flag_small: 'FL S', flag_big: 'FL B',
@@ -87,6 +88,7 @@ export function OverviewPage() {
         <div className="ml-auto flex gap-2">
           <Button size="sm" onClick={() => setOpen(allOpen ? new Set() : new Set(rows.map((r) => r.t.id)))}>{allOpen ? 'Collapse all' : 'Expand all'}</Button>
           <Button size="sm" onClick={() => navigate('/vmix/json')}>JSON</Button>
+          <DetailsImport />
         </div>
       </div>
 
