@@ -437,19 +437,24 @@ describe('show control', () => {
     expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action ?? null)).toEqual([null, 'allout', 'panic']);
+    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action ?? null)).toEqual([null, 'allout', null]);
+    // no PANIC key: the downstream key in its place on every page
+    expect(JSON.stringify(f)).not.toMatch(/a=panic|PANIC/);
+    for (const pg of Object.values(f.pages) as any[]) expect(JSON.stringify(pg.controls[3]?.[7] ?? {})).toMatch(/"definitionId":"dsk/);
+    // TITLES on AFTER / BREAK: Rolling_Titles on overlay channel 8
+    expect(show.pages().find((p) => /AFTER/.test(p.name))!.keys.flat().some((k) => k?.action === 'show:titles')).toBe(true);
     // no UNDO key anywhere; the ATEM downstream key (from the PEOPLE page) on every page, in a free place
     const all = Object.values(f.pages).map((pg: any) => Object.values(pg.controls).flatMap((r: any) => Object.values(r)));
     expect(all.flat().some((c: any) => /a=undo/.test(JSON.stringify(c)))).toBe(false);
     for (const cs of all) expect(cs.filter((c: any) => c.steps?.[0]?.action_sets?.down?.[0]?.definitionId === 'dskAuto')).toHaveLength(1);
-    expect(f.pages[1].controls[2][7].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
-    expect(f.pages[8].controls[3][5].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
+    expect(f.pages[1].controls[3][7].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
+    expect(f.pages[8].controls[3][7].steps[0].action_sets.down[0].definitionId).toBe('dskAuto');
     // every downstream key reads DSK, and Show control knows where it is on each page
     const dskText = (c: any) => c.style.layers.find((l: any) => l.type === 'text').text.value;
     for (const cs of all) expect(cs.filter((c: any) => c.steps?.[0]?.action_sets?.down?.[0]?.definitionId === 'dskAuto').map(dskText)).toEqual(['DSK']);
     const view = await show.view();
     for (const p of view.pages) { expect(p.dsk).toBeTruthy(); expect(f.pages[p.page].controls[p.dsk![0]][p.dsk![1]].steps[0].action_sets.down[0].definitionId).toBe('dskAuto'); }
-    expect(view.pages.find((p) => p.page === 1)?.dsk).toEqual([2, 7]);
+    expect(view.pages.find((p) => p.page === 1)?.dsk).toEqual([3, 7]);
     // no OUT key; PHOTO mode on every team page and on PEOPLE, SOCIALS on BEFORE and AFTER
     expect(show.pages().some((p) => p.keys.flat().some((k) => k?.action === 'out'))).toBe(false);
     expect(show.pages().filter((p) => p.keys[3][4]?.action === 'photo').map((p) => p.name)).toEqual(['BRA', 'ESP', 'GBR', 'ITA', 'PEOPLE']);
@@ -547,9 +552,9 @@ describe('show control', () => {
     expect(show.keyAt(people.page, 0, 0)?.action).toBe('person:1');
     // the vMix and ATEM keys exactly as they were, with their connections in the file (matched by name on import)
     expect(act(1, 0)).toMatchObject({ definitionId: 'overlayFunctions', options: { input: { value: '15' } } });
-    expect(act(2, 7)).toMatchObject({ definitionId: 'dskAuto' });
+    expect(act(3, 7)).toMatchObject({ definitionId: 'dskAuto' });
     expect(f.instances[act(1, 0).connectionId]).toMatchObject({ moduleId: 'studiocoast-vmix', label: 'vmix_stream1' });
-    expect(f.instances[act(2, 7).connectionId]).toMatchObject({ moduleId: 'bmd-atem', label: 'atem' });
+    expect(f.instances[act(3, 7).connectionId]).toMatchObject({ moduleId: 'bmd-atem', label: 'atem' });
     expect(Object.values(f.instances).filter((x: any) => x.moduleId === 'generic-http')).toHaveLength(1);
     // a free place: a blank key calling its place
     expect(pg.controls[0][3].style.layers.find((l: any) => l.type === 'text').text.value).toBe('');
@@ -989,14 +994,14 @@ describe('show control', () => {
     expect(posts.length).toBeGreaterThan(100);
     const at = (id: string) => posts.find((x) => x.startsWith(`/api/location/${id}/style?`));
     expect(at('1/0/0')).toBe(`/api/location/1/0/0/style?text=WELCOME&bgcolor=${encodeURIComponent('#1e3a8a')}&color=${encodeURIComponent('#ffffff')}&size=auto`);
-    expect(at('1/3/7')).toMatch(/text=PANIC/);
+    expect(at('1/3/7')).toBe('/api/location/1/3/7/style?text=DSK');
     expect(at('10/1/2')).toMatch(/text=PIT%5Cn%2312%20RUIZ/);
     const people = show.pages().find((p) => p.name === 'PEOPLE')!.page;
     expect(at(`${people}/1/0`)).toBeUndefined(); // the producer's vMix key keeps its look
     // …and the label DSK on the ATEM downstream key of each page (text only: Companion keeps its colours and on-air red)
     const dsk = posts.filter((x) => /\/style\?text=DSK$/.test(x));
     expect(dsk).toHaveLength(show.pages().length);
-    expect(at(`${people}/2/7`)).toBe(`/api/location/${people}/2/7/style?text=DSK`);
+    expect(at(`${people}/3/7`)).toBe(`/api/location/${people}/3/7/style?text=DSK`);
     expect(posts.length - dsk.length).toBe(all.filter((id) => !/^\d+\/(1\/[0-2]|2\/0|2\/7|3\/[0-3])$/.test(id) || !id.startsWith(`${people}/`)).length);
     expect(st).toMatchObject({ enabled: true, sent: posts.length, error: null });
     expect(st.at).toBeTruthy();

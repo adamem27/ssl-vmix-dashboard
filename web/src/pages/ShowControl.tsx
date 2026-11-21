@@ -375,7 +375,7 @@ function CompanionSetup({ data, onSaved }: { data: ShowData; onSaved: () => void
         <li>In Companion: <b>Import / Export → Import</b>, pick the file and import it as a full configuration (buttons and connections). It replaces the pages that were there. Then press <b>Push to Companion now</b> once.</li>
         <li>In Companion → Surfaces, put each Stream Deck XL in its own group, with deck 1 starting on page 1 and deck 2 on page 3.</li>
         <li>After that import, changes in the key editor, teams, line-ups, announcements and tickers reach the decks by themselves: each key runs whatever is at its place now, and its text and colour are sent live. Putting a team into a group's place needs no new import: its page and its TEAMS key take the team at once. Download and import again only when the page-switching keys change or the stage's groups change (more places, another stage).</li>
-        <li>PANIC cuts everything only on a second press within 3 seconds. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
+        <li>The last key of the bottom row is the ATEM downstream key (DSK) on every page. TITLES (AFTER / BREAK) puts Rolling_Titles on overlay channel 8 and takes it off. The fallback page works without the dashboard: it toggles the graphics straight in vMix with the data they last had.</li>
       </ol>
     </Panel>
   );
