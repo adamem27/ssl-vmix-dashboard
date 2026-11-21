@@ -1,8 +1,14 @@
 {
-  "version": "1.0.249",
-  "commit": "498944a",
-  "date": "2026-11-21T12:53:52Z",
+  "version": "1.0.250",
+  "commit": "fc46910",
+  "date": "2026-11-21T13:15:37Z",
   "changes": [
+    {
+      "version": "1.0.250",
+      "commit": "fc46910",
+      "date": "2026-11-21T13:15:37Z",
+      "text": "Import age & height on the Overview page (Teams opens Overview)"
+    },
     {
       "version": "1.0.249",
       "commit": "498944a",
@@ -476,12 +482,6 @@
       "commit": "bcd6858",
       "date": "2026-11-13T13:45:28Z",
       "text": "Commentator page publishing: say which setting is missing; accept the R2 endpoint as pasted; the on/off switch saves the form too (#21)"
-    },
-    {
-      "version": "1.0.170",
-      "commit": "630bb3d",
-      "date": "2026-11-13T13:40:26Z",
-      "text": "PNG refresh only on the REFRESH PNG key (A BEFORE page): no file checks in the data sync or on key presses"
     }
   ]
 }
