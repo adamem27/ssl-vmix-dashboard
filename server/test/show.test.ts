@@ -412,7 +412,7 @@ describe('show control', () => {
     const page = (c: any) => c.steps[0].action_sets.down[0].options.page.value;
     // every key but navigation calls its place: the dashboard runs what the key has there now
     expect(url(f.pages[1].controls[0][0])).toBe('http://10.0.0.5:4310/api/show/key/1/0/0');
-    expect(f.pages[1].controls[3][2].steps[0].action_sets.down[0]).toMatchObject({ definitionId: 'set_page', connectionId: 'internal', options: { surfaceId: { value: 'self' }, page: { value: 2 } } });
+    expect(f.pages[1].controls[3][1].steps[0].action_sets.down[0]).toMatchObject({ definitionId: 'set_page', connectionId: 'internal', options: { surfaceId: { value: 'self' }, page: { value: 2 } } });
     // TEAMS: a key per team opens its page; ESP is the second by code
     expect(f.pages[3].name).toBe('SSL TEAMS');
     expect(text(f.pages[3].controls[0][1])).toBe('ESP\\nTEAM ESP');
@@ -432,12 +432,19 @@ describe('show control', () => {
     expect(show.pages().find((p) => p.name === 'TEAMS')!.keys.flat().some((k) => /teamlt/.test(k?.action ?? ''))).toBe(false);
     expect(show.keyAt(10, 0, 4)?.action).toBe('teamlt:ESP');
     expect(text(esp.controls[0][4])).toBe('TEAM LT\\nESP');
-    expect(page(esp.controls[3][1])).toBe(9); // ◀ BRA
-    expect(page(esp.controls[3][2])).toBe(11); // ▶ GBR
-    expect(page(f.pages[12].controls[3][2])).toBe(9); // after the last team: the first
+    // a team page goes HOME, then straight to the other teams of its group
+    expect([0, 1, 2, 3].map((c) => page(esp.controls[3][c]))).toEqual([3, 9, 11, 12]);
+    expect([0, 1, 2, 3].map((c) => page(f.pages[12].controls[3][c]))).toEqual([3, 9, 10, 11]);
+    // the other pages go straight to each other page of their deck, FALLBACK last
+    const go = (c: any) => c?.steps?.[0]?.action_sets?.down?.[0]?.options?.page?.value ?? null;
+    expect([0, 1, 2].map((c) => go(f.pages[1].controls[3][c]))).toEqual([1, 2, 25]);
+    expect([0, 1, 2].map((c) => go(f.pages[2].controls[3][c]))).toEqual([1, 25, null]);
+    expect([0, 1, 2, 3, 4].map((c) => go(f.pages[3].controls[3][c]))).toEqual([3, 4, 5, 6, 26]);
+    expect([0, 1, 2, 3, 4].map((c) => go(f.pages[5].controls[3][c]))).toEqual([3, 4, 6, 26, null]);
+    expect(page(f.pages[1].controls[3][5])).toBe(8);
     expect(url(f.pages[8].controls[0][0])).toBe('http://10.0.0.5:8088/api/?Function=OverlayInput1&Input=ssl_welcome');
     // every page keeps the safety row in the same place
-    for (const p of show.pages()) expect(p.keys[3].slice(5).map((k) => k?.action ?? null)).toEqual([null, 'allout', null]);
+    for (const p of show.pages()) expect(p.keys[3].slice(6).map((k) => k?.action ?? null)).toEqual(['allout', null]);
     // no PANIC key: the downstream key in its place on every page
     expect(JSON.stringify(f)).not.toMatch(/a=panic|PANIC/);
     for (const pg of Object.values(f.pages) as any[]) expect(JSON.stringify(pg.controls[3]?.[7] ?? {})).toMatch(/"definitionId":"dsk/);
@@ -632,7 +639,7 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const page = show.pages().find((p) => p.name === 'RESULTS/COMPARE')!;
     expect(page.keys[0].slice(0, 2).map((x) => x?.action)).toEqual([`compare:${k1}`, `compare:${k2}`]);
-    expect(show.pages()[0].keys[0][7]?.action).toBe(`nav:${page.page}`);
+    expect(show.pages()[0].keys[3][2]?.action).toBe(`nav:${page.page}`);
     // the group's data into its own input, then in; the same key again takes it out
     const n1 = v.num(`ssl_compare_${k1}`);
     expect(await show.run(`compare:${k1}`)).toMatchObject({ in: 'compare' });
@@ -959,7 +966,7 @@ describe('show control', () => {
     setShowConfig(s.ctx.db, { keys: { 'A BEFORE/0/0': { action: '' } } });
     expect(await show.runKey(1, 0, 0)).toEqual({ empty: true });
     expect(await show.runKey(1, 1, 7)).toEqual({ empty: true });
-    expect(await show.runKey(1, 3, 2)).toEqual({ nav: 2 });
+    expect(await show.runKey(1, 3, 1)).toEqual({ nav: 2 });
     // older presets keep calling the action itself
     v.calls.length = 0;
     await show.run('show:welcome');
@@ -969,7 +976,7 @@ describe('show control', () => {
   it('serves the key routes: by place, the push status', async () => {
     const { s } = race();
     const app = await buildApp({ db: s.db, assetsDir: s.ctx.assetsDir });
-    const nav = await app.inject({ url: '/api/show/key/1/3/2' });
+    const nav = await app.inject({ url: '/api/show/key/1/3/1' });
     expect(nav.json()).toEqual({ nav: 2 });
     expect((await app.inject({ method: 'POST', url: '/api/show/key/1/1/7' })).json()).toEqual({ empty: true });
     expect((await app.inject({ url: '/api/show/key/x/0/0' })).statusCode).toBe(400);
