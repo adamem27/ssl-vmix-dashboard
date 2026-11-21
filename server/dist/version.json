@@ -1,8 +1,14 @@
 {
-  "version": "1.0.252",
-  "commit": "cb1626e",
-  "date": "2026-11-21T14:07:12Z",
+  "version": "1.0.253",
+  "commit": "8d40707",
+  "date": "2026-11-21T20:08:59Z",
   "changes": [
+    {
+      "version": "1.0.253",
+      "commit": "8d40707",
+      "date": "2026-11-21T20:08:59Z",
+      "text": "Show control / Companion: PANIC key replaced by the ATEM DSK key on every page; TITLES key (Rolling_Titles on overlay 8) on AFTER / BREAK"
+    },
     {
       "version": "1.0.252",
       "commit": "cb1626e",
@@ -476,12 +482,6 @@
       "commit": "0ef79fb",
       "date": "2026-11-14T12:19:59Z",
       "text": "Commentator: light/dark switch, text size, one team in large type with talking points and country facts"
-    },
-    {
-      "version": "1.0.173",
-      "commit": "213964d",
-      "date": "2026-11-14T12:14:11Z",
-      "text": "Commentator: declared position, number, name in large type; best results always; Group H names; points only; schedule after the next race"
     }
   ]
 }

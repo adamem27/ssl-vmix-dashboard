@@ -32,7 +32,7 @@ import { parseVmixXml, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmi
  *  - every graphic on OV1 (one replaces the other), only the break scene on OV4
  *  - a board coming in takes the break scene off; the break scene takes OV1 off
  *  - UNDO puts every overlay back as it was before the last action; ALL OUT takes everything out with its
- *    animation; PANIC (pressed twice) cuts everything at once
+ *    animation; the last key of the bottom row is the ATEM downstream key (DSK), no PANIC key
  * State (what is on air) is always read from vMix, never remembered from key presses.
  */
 /** The lineup lower third's order: from the bow to the stern. */
@@ -65,9 +65,11 @@ export const DEFAULT_GRAPHICS = [
     { id: 'lbar', label: 'L-bar', kind: 'scene', overlay: 1, inputs: ['ssl_lbar'], aliases: ['L-bars', 'L-bar', 'Lbar'] },
     // the second L-bar (ranking): a key of its own, never part of the break scene
     { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
+    // the rolling titles (credits) on overlay channel 8, on and off by the TITLES key (AFTER / BREAK)
+    { id: 'titles', label: 'Rolling titles', kind: 'bug', overlay: 8, inputs: ['Rolling_Titles'] },
 ];
 /** Actions of keys taken off the decks: a key edit that set one is left out (the key keeps its built-in action). */
-const REMOVED_ACTIONS = new Set(['show:lcrinfo']);
+const REMOVED_ACTIONS = new Set(['show:lcrinfo', 'panic']);
 export const showConfigSchema = z.object({
     /** input names per graphic id (comma separated alternatives), overriding the defaults */
     inputs: z.record(z.string(), z.string()).default({}),
@@ -187,7 +189,7 @@ function keptPeople(p) {
                 const a = keptPeopleAction(r, c);
                 if (key?.action.startsWith('nav:'))
                     return key;
-                if (!a || a === 'undo')
+                if (!a || a === 'undo' || a === 'panic')
                     return null;
                 return key?.action === a ? key : (a.startsWith('person:') ? k(a, '—', 'bug') : { action: a, text: a.toUpperCase(), kind: 'mode' });
             }
@@ -235,7 +237,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         {
             deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
                 // the groups' results (Provisional overall) are on COMPARE, under each group's comparison
-                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav')),
+                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav'), k('show:titles', 'TITLES', 'scene')),
                 // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
                 // scene's ticker channel) and the top one (ssl_ticker_top)
                 row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
@@ -269,9 +271,9 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
     ];
 }
 const TEAMS_PER_PAGE = 16;
-/** The bottom row of every page: its way around, then OUT (OV1), UNDO, ALL OUT and PANIC. */
+/** The bottom row of every page: its way around, then OUT (OV1) and ALL OUT; the ATEM downstream key (DSK) in the last place. */
 // no UNDO key (the producer's ask); its place takes the ATEM downstream key in Companion where 2/7 is taken
-const navRow = (...keys) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), k('panic', 'PANIC\\n(press 2×)', 'safety'));
+const navRow = (...keys) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), null);
 /** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
 const withPhoto = (row) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
 /**
@@ -576,7 +578,7 @@ export class Show {
         const inputs = parseVmixXml(xml);
         this.lastInputs = inputs;
         const overlays = {};
-        for (let n = 1; n <= 4; n++)
+        for (let n = 1; n <= 8; n++)
             overlays[n] = overlayOf(xml, n);
         return { xml, inputs, overlays };
     }
@@ -1304,7 +1306,7 @@ export class Show {
         if (!prev)
             throw badRequest('Nothing to undo.');
         const snap = await this.snapshot();
-        for (let n = 1; n <= 4; n++) {
+        for (let n = 1; n <= 8; n++) {
             const want = prev[n] ?? '';
             if (want === (snap.overlays[n] ?? ''))
                 continue;
@@ -1336,7 +1338,7 @@ export class Show {
         this.stopRotation();
         const snap = await this.snapshot();
         this.pushUndo(snap.overlays);
-        for (let n = 1; n <= 4; n++)
+        for (let n = 1; n <= 8; n++)
             await this.overlayOut(n, snap.overlays);
         return { allOut: true };
     }
@@ -1761,7 +1763,7 @@ export class Show {
         const cfg = this.config;
         const pages = this.pages();
         // where the ATEM downstream key sits on each page in Companion (Show control shows it as DSK there)
-        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (k) => (k ? { ...k, ...(await this.keyLook(k, snap ?? undefined)) } : null))))) })));
+        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? PEOPLE_DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (k) => (k ? { ...k, ...(await this.keyLook(k, snap ?? undefined)) } : null))))) })));
         return {
             config: cfg, state: { ...this.state, undo: undefined, undoDepth: this.state.undo.length },
             vmix: snap ? { ok: true, overlays: snap.overlays } : { ok: false, overlays: {} },
@@ -1870,7 +1872,7 @@ export class Show {
             }
             // the ATEM downstream key's label (text only: its colours and on-air red stay Companion's)
             for (const p of this.pages()) {
-                const at = p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]);
+                const at = p.name === 'PEOPLE' ? PEOPLE_DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]);
                 if (!at)
                     continue;
                 const id = `${p.page}/${at[0]}/${at[1]}`;
@@ -1901,7 +1903,7 @@ export class Show {
         await this.snapshot().catch(() => null);
         const pages = this.pages();
         // where the ATEM downstream key sits on each page in Companion (Show control shows it as DSK there)
-        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
+        const looks = await Promise.all(pages.map(async (p) => ({ ...p, dsk: p.name === 'PEOPLE' ? PEOPLE_DSK_AT : dskPlace((r, c) => !!p.keys[r]?.[c]), keys: await Promise.all(p.keys.map((r) => Promise.all(r.map(async (key) => (key ? { key, look: await this.keyLook(key, undefined, true) } : null))))) })));
         return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
     }
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
@@ -2202,9 +2204,9 @@ function addDsk(controls, page, used) {
     const ctl = JSON.parse(JSON.stringify(dsk).replace(/"id":"([A-Za-z0-9_-]{21})"/g, `"id":"$1p${page}"`));
     (controls[at[0]] ??= {})[at[1]] = withDskText(ctl);
 }
-/** Where the downstream key goes on a page: its PEOPLE place (row 3, last key), else the first free one of the bottom rows. */
+/** Where the downstream key goes on a page: PANIC's old place (bottom row, last key), else the first free one of the rows above. */
 export function dskPlace(used) {
-    const order = [DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c]))];
+    const order = [PANIC_AT, DSK_AT, [3, 5], [3, 4], ...[2, 1, 0].flatMap((r) => [7, 6, 5, 4, 3, 2, 1, 0].map((c) => [r, c]))];
     return order.find(([r, c]) => !used(r, c)) ?? null;
 }
 /** The label on the ATEM downstream key (the producer's key has none). */
@@ -2217,13 +2219,18 @@ function withDskText(ctl) {
 }
 /** Where the downstream key is on the producer's PEOPLE page (row 2, last column). */
 export const DSK_AT = [2, 7];
+/** PANIC's old place (bottom row, last key): the downstream key there on every page. */
+export const PANIC_AT = [3, 7];
+/** The producer's PANIC key on its PEOPLE page, if it has one: the downstream key moves there. */
+const KEPT_PANIC = Object.entries(KEPT_PEOPLE_PAGE.controls).flatMap(([r, row]) => Object.entries(row).filter(([, ctl]) => /api\/show\/do\?a=panic"/.test(JSON.stringify(ctl))).map(([c]) => [Number(r), Number(c)]))[0] ?? null;
+export const PEOPLE_DSK_AT = KEPT_PANIC ?? DSK_AT;
 /** The kept page's keys without UNDO (no UNDO key on any page); its dashboard keys call their place (keyUrl). */
 function keptControls(b, page) {
     const json = JSON.stringify(KEPT_PEOPLE_PAGE.controls).split(`"${KEPT_HTTP}"`).join(`"${CONN}"`).replace(/https?:\/\/[^"/]+\/api\/show\/do/g, `${b}/api/show/do`);
     const out = JSON.parse(json);
     for (const [r, row] of Object.entries(out))
         for (const [c, ctl] of Object.entries(row)) {
-            if (/api\/show\/do\?a=undo"/.test(JSON.stringify(ctl))) {
+            if (/api\/show\/do\?a=(undo|panic)"/.test(JSON.stringify(ctl))) {
                 delete row[Number(c)];
                 continue;
             }
@@ -2233,6 +2240,12 @@ function keptControls(b, page) {
             if (/"definitionId":"dsk/.test(JSON.stringify(ctl)))
                 withDskText(ctl);
         }
+    // the downstream key takes PANIC's place (no PANIC key on any page)
+    const dsk = out[DSK_AT[0]]?.[DSK_AT[1]];
+    if (dsk && KEPT_PANIC) {
+        delete out[DSK_AT[0]][DSK_AT[1]];
+        (out[KEPT_PANIC[0]] ??= {})[KEPT_PANIC[1]] = dsk;
+    }
     return out;
 }
 /** The places of the producer's PEOPLE page that have a key ("row/col"). */
