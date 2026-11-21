@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, SailorDetail, Team } from '../api';
 import { AssetSlot } from '../components/AssetSlot';
-import { SailorFields, sailorToForm } from '../components/SailorForm';
+import { formToBody, SailorFields, sailorToForm } from '../components/SailorForm';
 import { Badge, Button, ErrorBox, fmtDate, Loading, useConfirm, useToast } from '../components/ui';
 
 export function SailorPage() {
@@ -26,7 +26,7 @@ export function SailorPage() {
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    try { await api.patch(`/api/sailors/${id}`, form); toast.ok('Sailor profile saved'); refresh(); } catch (err) { toast.error(err); } finally { setBusy(false); }
+    try { await api.patch(`/api/sailors/${id}`, formToBody(form, true)); toast.ok('Sailor profile saved'); refresh(); } catch (err) { toast.error(err); } finally { setBusy(false); }
   };
   const del = async () => {
     if (!(await ask('Delete sailor?', <>The profile of <b>{s.firstName} {s.lastName}</b> and the photo will be deleted. Entries in past declarations remain but lose the link to the profile.</>, 'Delete sailor'))) return;

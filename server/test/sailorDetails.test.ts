@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { setup, seedTeam } from './helpers.js';
 import { buildXlsx } from '../src/services/xlsx.js';
 import { ageOn, assignDetails, birthDate, heightCm, ignoreDetails, importSailorDetails, unmatchedDetails } from '../src/services/sailorDetails.js';
-import { listSailors } from '../src/services/sailors.js';
+import { getSailor, listSailors, updateSailor } from '../src/services/sailors.js';
 
 describe('sailor age and height', () => {
   it('reads dates and heights the way the squad sheets write them', () => {
@@ -75,5 +75,15 @@ describe('sailor age and height', () => {
     expect(r2).toMatchObject({ matched: 1, unmatched: [] });
     expect(listSailors(s.ctx, t.teamId).find((x) => x.firstName === 'Ana')!.heightCm).toBe(172);
     expect(unmatchedDetails(s.db, '2026-11-21')).toEqual([]);
+  });
+
+  it('edited on the profile: the date of birth on the sailor page only, the age everywhere else', () => {
+    const s = setup();
+    const t = seedTeam(s.db, 'MEX', ['Ana Test']);
+    updateSailor(s.db, t.sailorIds[0], { birthDate: '2000-01-02', heightCm: 177 });
+    expect(getSailor(s.ctx, t.sailorIds[0])).toMatchObject({ birthDate: '2000-01-02', heightCm: 177 });
+    expect(JSON.stringify(listSailors(s.ctx, t.teamId))).not.toContain('2000-01-02');
+    updateSailor(s.db, t.sailorIds[0], { heightCm: null });
+    expect(getSailor(s.ctx, t.sailorIds[0])).toMatchObject({ birthDate: '2000-01-02', heightCm: null });
   });
 });

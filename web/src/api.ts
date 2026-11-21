@@ -109,6 +109,7 @@ export interface Sailor {
   bestResult1: string; bestResult2: string; bestResult3: string; age?: number | null; heightCm?: number | null; sourceRef: string | null; isDemo: boolean; isCaptain: boolean; updatedAt: string; photo: Asset | null;
 }
 export interface SailorDetail extends Sailor {
+  birthDate?: string;
   history: { date: string; teamId: string; memberId: string; position: string; number: string; hasOverride: number; origin: string }[];
   sourceAliases: { nameKey: string }[];
 }
