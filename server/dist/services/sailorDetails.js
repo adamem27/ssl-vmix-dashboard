@@ -1,5 +1,5 @@
-import { nowIso } from '../db/db.js';
-import { badRequest } from './errors.js';
+import { newId, nowIso } from '../db/db.js';
+import { badRequest, notFound } from './errors.js';
 import { readZip } from './matchboard/matchboard.js';
 import { codeKey, nameKey } from './normalize.js';
 /** Country names the squad forms use that differ from the teams' names. */
@@ -178,6 +178,29 @@ export function importSailorDetails(db, buf, filename = '') {
         byTeam.set(s.team_id, [...(byTeam.get(s.team_id) ?? []), s]);
     const sum = { rows: 0, matched: 0, updated: 0, teams: [], unknownTeams: [], unmatched: [] };
     const upd = db.prepare('UPDATE sailors SET birth_date = ?, height_cm = ?, updated_at = ? WHERE id = ?');
+    const rowsByKey = new Map(db.prepare('SELECT * FROM sailor_details_rows').all().map((r) => [r.row_key, r]));
+    const apply = (hit, birth, height, code) => {
+        sum.matched++;
+        if (!sum.teams.includes(code))
+            sum.teams.push(code);
+        const nb = birth || hit.birth_date || '', nh = height ?? hit.height_cm ?? null;
+        if (nb !== (hit.birth_date || '') || nh !== (hit.height_cm ?? null)) {
+            upd.run(nb, nh, nowIso(), hit.id);
+            sum.updated++;
+            hit.birth_date = nb;
+            hit.height_cm = nh;
+        }
+    };
+    const keepRow = (key, teamId, code, first, last, birth, height) => {
+        const t = nowIso(), kept = rowsByKey.get(key);
+        if (kept)
+            db.prepare('UPDATE sailor_details_rows SET team_id = ?, team_label = ?, first_name = ?, last_name = ?, birth_date = ?, height_cm = ?, updated_at = ? WHERE id = ?').run(teamId, code, first, last, birth, height, t, kept.id);
+        else {
+            const id = newId();
+            db.prepare('INSERT INTO sailor_details_rows (id, team_id, team_label, first_name, last_name, row_key, birth_date, height_cm, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, teamId, code, first, last, key, birth, height, t, t);
+            rowsByKey.set(key, { id, team_id: teamId, team_label: code, first_name: first, last_name: last, row_key: key, birth_date: birth, height_cm: height, status: 'open', sailor_id: null });
+        }
+    };
     db.transaction(() => {
         for (const row of grid.slice(h + 1)) {
             const last = (row[cLast] ?? '').trim(), first = (row[cFirst] ?? '').trim();
@@ -203,21 +226,64 @@ export function importSailorDetails(db, buf, filename = '') {
                 ?? (() => { const c = crew.filter((s) => nameKey(s.last_name) === lk); return c.length === 1 ? c[0] : c.find((s) => nameKey(s.first_name) === fk); })()
                 ?? crew.find((s) => nameKey(s.first_name) === fk && (lk.split(' ').includes(nameKey(s.last_name)) || nameKey(s.last_name).split(' ').includes(lk.split(' ')[0])));
             const code = teams.find((t) => t.id === teamId).code;
+            const key = rowKey(code, first, last);
+            const kept = rowsByKey.get(key);
+            // a row matched by hand before: to that sailor again; an ignored one stays ignored
+            if (!hit && kept?.status === 'assigned' && kept.sailor_id) {
+                const s2 = crew.find((x) => x.id === kept.sailor_id);
+                if (s2) {
+                    apply(s2, birth, height, code);
+                    keepRow(key, teamId, code, first, last, birth, height);
+                    continue;
+                }
+            }
             if (!hit) {
-                sum.unmatched.push(`${code} ${first} ${last}`);
+                if (kept?.status !== 'ignored')
+                    sum.unmatched.push(`${code} ${first} ${last}`);
+                keepRow(key, teamId, code, first, last, birth, height);
                 continue;
             }
-            sum.matched++;
-            if (!sum.teams.includes(code))
-                sum.teams.push(code);
-            const nb = birth || hit.birth_date || '', nh = height ?? hit.height_cm ?? null;
-            if (nb !== (hit.birth_date || '') || nh !== (hit.height_cm ?? null)) {
-                upd.run(nb, nh, nowIso(), hit.id);
-                sum.updated++;
-                hit.birth_date = nb;
-                hit.height_cm = nh;
-            }
+            if (kept && kept.status === 'open')
+                db.prepare('DELETE FROM sailor_details_rows WHERE id = ?').run(kept.id);
+            apply(hit, birth, height, code);
         }
     })();
     return sum;
+}
+const rowKey = (code, first, last) => `${codeKey(code)}|${nameKey(`${first} ${last}`)}`;
+/** Rows the import could not match, with their team's sailors to pick from (the age only, never the date). */
+export function unmatchedDetails(db, day) {
+    const rows = db.prepare(`SELECT r.*, t.code AS code, t.name AS team_name FROM sailor_details_rows r LEFT JOIN teams t ON t.id = r.team_id
+    WHERE r.status = 'open' ORDER BY r.team_label, r.last_name COLLATE NOCASE`).all();
+    const crews = new Map();
+    for (const id of new Set(rows.map((r) => r.team_id).filter(Boolean))) {
+        crews.set(id, db.prepare(`SELECT id, first_name, last_name, birth_date, height_cm FROM sailors WHERE team_id = ? ORDER BY last_name COLLATE NOCASE, first_name COLLATE NOCASE`).all(id)
+            .map((s) => ({ id: s.id, name: `${s.first_name} ${s.last_name}`.trim(), hasData: !!(s.birth_date || s.height_cm) })));
+    }
+    return rows.map((r) => ({
+        id: r.id, team: r.code ?? r.team_label, teamName: r.team_name ?? '', first: r.first_name, last: r.last_name,
+        age: r.birth_date ? ageOn(r.birth_date, day) : null, heightCm: r.height_cm, sailors: r.team_id ? crews.get(r.team_id) ?? [] : [],
+    }));
+}
+/** A row matched by hand: its date of birth and height go to that sailor, and the next import remembers the match. */
+export function assignDetails(db, rowId, sailorId) {
+    const r = db.prepare('SELECT * FROM sailor_details_rows WHERE id = ?').get(rowId);
+    if (!r)
+        throw notFound('Row');
+    const s = db.prepare('SELECT id, team_id, birth_date, height_cm FROM sailors WHERE id = ?').get(sailorId);
+    if (!s)
+        throw notFound('Sailor');
+    const t = nowIso();
+    db.transaction(() => {
+        db.prepare('UPDATE sailors SET birth_date = ?, height_cm = ?, updated_at = ? WHERE id = ?').run(r.birth_date || s.birth_date || '', r.height_cm ?? s.height_cm ?? null, t, s.id);
+        db.prepare("UPDATE sailor_details_rows SET status = 'assigned', sailor_id = ?, updated_at = ? WHERE id = ?").run(s.id, t, r.id);
+    })();
+    return { ok: true };
+}
+/** A row that is no sailor (a coach, the media manager): not shown again, also after the next import. */
+export function ignoreDetails(db, rowId) {
+    const r = db.prepare("UPDATE sailor_details_rows SET status = 'ignored', updated_at = ? WHERE id = ?").run(nowIso(), rowId);
+    if (!r.changes)
+        throw notFound('Row');
+    return { ok: true };
 }

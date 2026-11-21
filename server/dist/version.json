@@ -1,8 +1,14 @@
 {
-  "version": "1.0.250",
-  "commit": "fc46910",
-  "date": "2026-11-21T13:15:37Z",
+  "version": "1.0.251",
+  "commit": "47ed535",
+  "date": "2026-11-21T13:26:18Z",
   "changes": [
+    {
+      "version": "1.0.251",
+      "commit": "47ed535",
+      "date": "2026-11-21T13:26:18Z",
+      "text": "Age & height: people the import could not match are matched to a sailor by hand (remembered) or ignored"
+    },
     {
       "version": "1.0.250",
       "commit": "fc46910",
@@ -476,12 +482,6 @@
       "commit": "8df23a3",
       "date": "2026-11-13T19:38:49Z",
       "text": "Last Chance Race takes teams of the stage's other groups (they stay in their own); its own results and comparison inputs ssl_results_LCR / ssl_compare_LCR with keys"
-    },
-    {
-      "version": "1.0.171",
-      "commit": "bcd6858",
-      "date": "2026-11-13T13:45:28Z",
-      "text": "Commentator page publishing: say which setting is missing; accept the R2 endpoint as pasted; the on/off switch saves the form too (#21)"
     }
   ]
 }

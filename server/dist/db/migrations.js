@@ -388,4 +388,26 @@ ALTER TABLE sailors ADD COLUMN birth_date TEXT NOT NULL DEFAULT '';
 ALTER TABLE sailors ADD COLUMN height_cm INTEGER;
 `,
     },
+    {
+        version: 12,
+        name: 'age and height rows not matched to a sailor',
+        sql: `
+-- Rows of the squad sheets the import could not match: matched by hand (remembered for the next import) or ignored.
+CREATE TABLE sailor_details_rows (
+  id TEXT PRIMARY KEY,
+  team_id TEXT REFERENCES teams(id) ON DELETE CASCADE,
+  team_label TEXT NOT NULL DEFAULT '',
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  row_key TEXT NOT NULL,
+  birth_date TEXT NOT NULL DEFAULT '',
+  height_cm INTEGER,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','assigned','ignored')),
+  sailor_id TEXT REFERENCES sailors(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (row_key)
+);
+`,
+    },
 ];
