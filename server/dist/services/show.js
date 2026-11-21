@@ -205,8 +205,16 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
     const teamsPages = Math.max(1, Math.ceil(teams.length / TEAMS_PER_PAGE));
     const teamsPage = (n) => (n === 0 ? p2 : comparePage + n);
     const peoplePage = comparePage + teamsPages;
-    const nav = (home, prev, prevName, next, nextName) => navRow(k(`nav:${home}`, 'HOME', 'nav'), k(`nav:${prev}`, `◀\\n${prevName}`, 'nav'), k(`nav:${next}`, `▶\\n${nextName}`, 'nav'), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'));
     const teamsName = (n) => (n ? `TEAMS ${n + 1}` : 'TEAMS');
+    // each deck's pages: the bottom row of a page goes straight to every other page of its deck (HOME first), then FALLBACK
+    const deck1 = [[p1, 'BEFORE'], [p1 + 1, 'AFTER /\\nBREAK'], [comparePage, 'RESULTS /\\nCOMPARE']];
+    const deck2 = [[p2, 'TEAMS'], ...Array.from({ length: teamsPages - 1 }, (_, n) => [teamsPage(n + 1), teamsName(n + 1)]),
+        [p2 + 1, 'BUGS\\nOFTEN'], [p2 + 2, 'BUGS\\nRARE'], [p2 + 3, 'TICKERS'], [peoplePage, 'PEOPLE']];
+    const nav = (self) => {
+        const deck = deck1.some(([pg]) => pg === self) ? deck1 : deck2, home = deck[0][0];
+        const keys = [k(`nav:${home}`, 'HOME', 'nav'), ...deck.filter(([pg]) => pg !== self && pg !== home).map(([pg, name]) => k(`nav:${pg}`, name, 'nav'))].slice(0, 5);
+        return navRow(...keys, ...Array(5 - keys.length).fill(null), k(`nav:${cfg.fallbackPage}`, 'FALL-\\nBACK', 'nav'));
+    };
     const teamsPageOf = (n) => ({
         deck: 2, name: teamsName(n), page: teamsPage(n), keys: [
             // groups A and B on the top row, a row free, groups C and D on the third (places in group order)
@@ -219,40 +227,39 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
                     return k(`nav:${PRESET_PAGES.teams + i}`, `${t.place}\\n${(t.placeholder || 'TBD').toUpperCase().slice(0, 12)}`, 'team');
                 return { ...k(`nav:${PRESET_PAGES.teams + i}`, `${t.code}\\n${t.name.toUpperCase().slice(0, 12)}`, 'team'), team: t.code };
             }))),
-            nav(p2, n ? teamsPage(n - 1) : peoplePage, n ? teamsName(n - 1) : 'PEOPLE', n + 1 < teamsPages ? teamsPage(n + 1) : p2 + 1, n + 1 < teamsPages ? teamsName(n + 1) : 'BUGS OFTEN'),
+            nav(teamsPage(n)),
         ],
     });
-    const lastTeams = teamsPages - 1;
     return [
         {
             // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
             deck: 1, name: 'A BEFORE', page: p1, keys: [
-                row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav')),
+                row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug')),
                 row8(),
                 // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
                 row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
-                nav(p1, p1 + 1, 'AFTER', p1 + 1, 'AFTER'),
+                nav(p1),
             ],
         },
         {
             deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
                 // the groups' results (Provisional overall) are on COMPARE, under each group's comparison
-                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k(`nav:${comparePage}`, 'RESULTS /\\nCOMPARE', 'nav'), k('show:titles', 'TITLES', 'scene')),
+                row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:titles', 'TITLES', 'scene')),
                 // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
                 // scene's ticker channel) and the top one (ssl_ticker_top)
                 row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
                 // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
                 row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
-                nav(p1, p1, 'BEFORE', p1, 'BEFORE'),
+                nav(p1 + 1),
             ],
         },
         teamsPageOf(0),
         // every announcement and every ticker on a key of its own, by position: a version added in General graphics is
         // on the next free key at once (Companion keys too, they call the position)
-        slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2, teamsPage(lastTeams), teamsName(lastTeams), p2 + 2, 'BUGS RARE')),
-        slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2, p2 + 1, 'BUGS OFTEN', p2 + 3, 'TICKERS')),
+        slotPage(p2 + 1, 'BUGS OFTEN', (n) => `bug:o${n}`, 3, nav(p2 + 1)),
+        slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2 + 2)),
         // the ticker input: its versions (two rows); the top ticker's versions on the row under them
-        slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2, p2 + 2, 'BUGS RARE', peoplePage, 'PEOPLE'), row8(...Array.from({ length: 8 }, (_, n) => k(`tickertop:${n + 1}`, '—', 'bug')))),
+        slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2 + 3), row8(...Array.from({ length: 8 }, (_, n) => k(`tickertop:${n + 1}`, '—', 'bug')))),
         ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
         // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
         {
@@ -262,18 +269,18 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
                 // under it, each group's Provisional overall (its own results input ssl_results_<KEY>)
                 row8(...resultGroups.slice(0, 8).map((g) => k(`results:${g.key}`, `RESULTS\\n${g.label.toUpperCase().slice(0, 12)}`, 'board'))),
                 row8(k('comparemark', 'COMPARE:\\nFLAG ⇄ EMBLEM', 'mode')),
-                nav(p1, p1, 'BEFORE', p1 + 1, 'AFTER'),
+                nav(comparePage),
             ],
         },
         ...Array.from({ length: teamsPages - 1 }, (_, n) => teamsPageOf(n + 1)),
         // everyone in People (General graphics) on a key of their own, by position: a person added is on the next free key
-        slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, withPhoto(nav(p2, p2 + 3, 'TICKERS', p2, 'TEAMS'))),
+        slotPage(peoplePage, 'PEOPLE', (n) => `person:${n}`, 3, withPhoto(nav(peoplePage))),
     ];
 }
 const TEAMS_PER_PAGE = 16;
 /** The bottom row of every page: its way around, then OUT (OV1) and ALL OUT; the ATEM downstream key (DSK) in the last place. */
 // no UNDO key (the producer's ask); its place takes the ATEM downstream key in Companion where 2/7 is taken
-const navRow = (...keys) => row8(...keys.slice(0, 4), keys[4] ?? null, null, k('allout', 'ALL\\nOUT', 'safety'), null);
+const navRow = (...keys) => row8(...Array.from({ length: 6 }, (_, i) => keys[i] ?? null), k('allout', 'ALL\\nOUT', 'safety'), null);
 /** The nav row with PHOTO AUTO / ON / OFF in its free place (team pages, PEOPLE). */
 const withPhoto = (row) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE', 'mode') : x));
 /**
@@ -282,7 +289,9 @@ const withPhoto = (row) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE
  */
 function teamPage(t, i, teams, teamsPage) {
     const page = PRESET_PAGES.teams + i;
-    const other = (d) => teams[(i + d + teams.length) % teams.length];
+    // the other teams of its group (the place's letter: A1–A4), else of its four in the list
+    const group = (x, n) => (x.place ?? '').replace(/\d+$/, '') || `#${Math.floor(n / 4)}`;
+    const peers = teams.filter((x, n) => n !== i && group(x, n) === group(t, i)).slice(0, 3);
     const arg = teamArg(t), label = pageName(t);
     const tk = (action, text, kind) => (t.code ? { ...k(action, text, kind), team: t.code } : k(action, text, kind));
     const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${arg}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
@@ -291,7 +300,8 @@ function teamPage(t, i, teams, teamsPage) {
             row8(tk(`qualified:${arg}`, `QUALIFIED\\n${label}`, 'lt'), tk(`lineup:${arg}`, `LINEUP\\n${label}`, 'board'), tk(`lult:${arg}`, `LINEUP LT\\n${label}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), tk(`teamlt:${arg}`, `TEAM LT\\n${label}`, 'lt'), null, null, k('next', 'NEXT\\nRESULT', 'lt')),
             row8(...places.slice(0, 8)),
             row8(...places.slice(8, 16)),
-            withPhoto(navRow(k(`nav:${teamsPage}`, 'TEAMS', 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(-1))}`, `◀\\n${pageName(other(-1))}`, 'nav'), k(`nav:${PRESET_PAGES.teams + teams.indexOf(other(1))}`, `▶\\n${pageName(other(1))}`, 'nav'), k(`nav:${PRESET_PAGES.deck2 + 1}`, 'BUGS\\nOFTEN', 'nav'))),
+            // HOME (TEAMS), then straight to the other teams of its group
+            withPhoto(navRow(k(`nav:${PRESET_PAGES.deck2}`, 'HOME', 'nav'), ...peers.map((o) => (o.code ? { ...k(`nav:${PRESET_PAGES.teams + teams.indexOf(o)}`, pageName(o), 'nav'), team: o.code } : k(`nav:${PRESET_PAGES.teams + teams.indexOf(o)}`, pageName(o), 'nav'))))),
         ],
     };
 }

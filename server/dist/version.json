@@ -1,8 +1,14 @@
 {
-  "version": "1.0.253",
-  "commit": "8d40707",
-  "date": "2026-11-21T20:08:59Z",
+  "version": "1.0.254",
+  "commit": "dbe489d",
+  "date": "2026-11-21T20:27:10Z",
   "changes": [
+    {
+      "version": "1.0.254",
+      "commit": "dbe489d",
+      "date": "2026-11-21T20:27:10Z",
+      "text": "Companion navigation: each page goes straight to the other pages of its deck; team pages to the other teams of their group"
+    },
     {
       "version": "1.0.253",
       "commit": "8d40707",
@@ -476,12 +482,6 @@
       "commit": "c540364",
       "date": "2026-11-14T12:32:08Z",
       "text": "Commentator: calmer layout - one header line, group tabs, plain team cards that open on click, back and next-team buttons"
-    },
-    {
-      "version": "1.0.174",
-      "commit": "0ef79fb",
-      "date": "2026-11-14T12:19:59Z",
-      "text": "Commentator: light/dark switch, text size, one team in large type with talking points and country facts"
     }
   ]
 }
