@@ -379,4 +379,13 @@ DROP TABLE fleet_slots;
 ALTER TABLE fleet_slots_v10 RENAME TO fleet_slots;
 `,
     },
+    {
+        version: 11,
+        name: 'sailors: date of birth and height',
+        sql: `
+-- From the teams' squad sheets (Teams → Import age & height); the commentator screens show the age, not the date.
+ALTER TABLE sailors ADD COLUMN birth_date TEXT NOT NULL DEFAULT '';
+ALTER TABLE sailors ADD COLUMN height_cm INTEGER;
+`,
+    },
 ];

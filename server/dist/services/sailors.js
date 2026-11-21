@@ -2,6 +2,9 @@ import { newId, nowIso } from '../db/db.js';
 import { listAssets, removeAllForOwner } from './assets.js';
 import { notFound } from './errors.js';
 import { nameKey } from './normalize.js';
+import { activeEvent } from '../db/db.js';
+import { todayIn } from './dates.js';
+import { ageOn } from './sailorDetails.js';
 export function createSailor(db, teamId, input, isDemo = false) {
     if (!db.prepare('SELECT 1 FROM teams WHERE id = ?').get(teamId))
         throw notFound('Team');
@@ -40,8 +43,23 @@ export function deleteSailor(ctx, id) {
         throw notFound('Sailor');
     removeAllForOwner(ctx, 'sailor', id);
 }
+/** Today at the event (for the sailors' age), read once a minute. */
+let today = { at: 0, day: '' };
+function eventToday(db) {
+    if (Date.now() - today.at > 60_000) {
+        let tz = 'UTC';
+        try {
+            tz = activeEvent(db)?.timezone || 'UTC';
+        }
+        catch { /* no event */ }
+        today = { at: Date.now(), day: todayIn(tz) };
+    }
+    return today.day;
+}
 export function sailorDto(ctx, s) {
     return {
+        // the age only (never the date of birth: it goes to the commentators' pages) and the height, from the squad sheets
+        age: s.birth_date ? ageOn(s.birth_date, eventToday(ctx.db)) : null, heightCm: s.height_cm ?? null,
         id: s.id, teamId: s.team_id, firstName: s.first_name, lastName: s.last_name, defaultPosition: s.default_position, defaultNumber: s.default_number,
         bestResult1: s.best_result_1, bestResult2: s.best_result_2, bestResult3: s.best_result_3 ?? '', sourceRef: s.source_ref, isDemo: !!s.is_demo, isCaptain: !!s.is_captain, updatedAt: s.updated_at,
         photo: listAssets(ctx, 'sailor', s.id).photo ?? null,
