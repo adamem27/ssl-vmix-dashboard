@@ -38,10 +38,11 @@ export function listSchedule(db, eventId, date) {
 export function getScheduleOptions(db) {
     try {
         const o = JSON.parse(getSetting(db, 'schedule.options') || '{}');
-        return { showTime: o.showTime !== false, next: o.next && typeof o.next === 'object' ? o.next : {} };
+        const obj = (v) => (v && typeof v === 'object' ? v : {});
+        return { showTime: o.showTime !== false, next: obj(o.next), double: obj(o.double) };
     }
     catch {
-        return { showTime: true, next: {} };
+        return { showTime: true, next: {}, double: {} };
     }
 }
 export function setScheduleOptions(db, patch) {
@@ -54,6 +55,13 @@ export function setScheduleOptions(db, patch) {
             o.next[patch.date] = patch.next;
         else
             delete o.next[patch.date];
+    }
+    if (patch.date !== undefined && patch.double !== undefined) {
+        assertDate(patch.date);
+        if (patch.double)
+            o.double[patch.date] = true;
+        else
+            delete o.double[patch.date];
     }
     setSetting(db, 'schedule.options', JSON.stringify(o));
     return o;

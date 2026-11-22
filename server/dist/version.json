@@ -1,8 +1,14 @@
 {
-  "version": "1.0.256",
-  "commit": "27b5150",
-  "date": "2026-11-21T21:17:34Z",
+  "version": "1.0.257",
+  "commit": "e3d82b1",
+  "date": "2026-11-22T12:53:30Z",
   "changes": [
+    {
+      "version": "1.0.257",
+      "commit": "e3d82b1",
+      "date": "2026-11-22T12:53:30Z",
+      "text": "Day schedule: DOUBLE PTS label, ticked per day in General graphics → Schedule"
+    },
     {
       "version": "1.0.256",
       "commit": "27b5150",
@@ -476,12 +482,6 @@
       "commit": "ae49004",
       "date": "2026-11-14T19:25:30Z",
       "text": "vMix texts exactly as typed (no forced capitals); day schedule leaves the flags of unknown group places untouched"
-    },
-    {
-      "version": "1.0.177",
-      "commit": "9a9d0e0",
-      "date": "2026-11-14T13:48:20Z",
-      "text": "Show control: LAST CHANCE EXPLAINED key on the BEFORE page (input ssl_lcr_info)"
     }
   ]
 }
