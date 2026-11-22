@@ -1,8 +1,14 @@
 {
-  "version": "1.0.257",
-  "commit": "e3d82b1",
-  "date": "2026-11-22T12:53:30Z",
+  "version": "1.0.258",
+  "commit": "5af9888",
+  "date": "2026-11-22T14:14:06Z",
   "changes": [
+    {
+      "version": "1.0.258",
+      "commit": "5af9888",
+      "date": "2026-11-22T14:14:06Z",
+      "text": "Team LT qualified: the team's sponsor on the Sponsor tab, as on the team lower third"
+    },
     {
       "version": "1.0.257",
       "commit": "e3d82b1",
@@ -476,12 +482,6 @@
       "commit": "e77df03",
       "date": "2026-11-14T20:02:50Z",
       "text": "Team comparison for the Qualification Race: texts fit themselves (ssl_compare_QR)"
-    },
-    {
-      "version": "1.0.178",
-      "commit": "ae49004",
-      "date": "2026-11-14T19:25:30Z",
-      "text": "vMix texts exactly as typed (no forced capitals); day schedule leaves the flags of unknown group places untouched"
     }
   ]
 }
