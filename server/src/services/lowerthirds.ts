@@ -203,13 +203,7 @@ export class LowerThirds {
     if (!input) throw badRequest(`vMix has no input “${inputName}”. Add the lower third GTZIP to vMix or fix the name in Show control → Lower thirds.`);
     const onAir = LowerThirds.onOverlay(xml, cfg.overlay) === input.number;
     const fitted = this.fitToTitle(input, fields, next.teamId);
-    // titles with a Sponsor picture (the tab above the bar): the team's chosen sponsor, for a sailor and for the team
-    const sponsorField = input.fields.find((f) => /^Sponsor\.Source$/i.test(f));
-    if (sponsorField) {
-      const team = next.teamId ? listTeams(this.ctx).find((t) => t.id === next.teamId) ?? null : null;
-      const pic = ltSponsorFor(this.ctx, team as never);
-      if (pic) fitted.set(sponsorField, pic);
-    }
+    this.withSponsor(input, fitted, next.teamId);
     fields = withOverrides(this.ctx, input, fitted); // Graphics editor edits win
     const has = new Set(input.fields);
     const id = input.key || input.number;
@@ -272,6 +266,16 @@ export class LowerThirds {
       if (pic) return pic;
     }
     return null;
+  }
+
+  /** Titles with a Sponsor picture (the tab above the bar): the team's chosen sponsor, for a sailor and for the team. */
+  withSponsor(input: VmixInput, fields: Map<string, string>, teamId: string | null) {
+    const sponsorField = input.fields.find((f) => /^Sponsor\.Source$/i.test(f));
+    if (!sponsorField) return fields;
+    const team = teamId ? listTeams(this.ctx).find((t) => t.id === teamId) ?? null : null;
+    const pic = ltSponsorFor(this.ctx, team as never);
+    if (pic) fields.set(sponsorField, pic);
+    return fields;
   }
 
   fitToTitle(input: VmixInput, fields: Map<string, string>, teamId: string | null) {

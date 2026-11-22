@@ -977,6 +977,8 @@ export class Show {
     const barField = ltRoles(lt.fields, input.fields).bar;
     const bar = this.lt.standardBar(b.id);
     if (barField && bar) out.set(barField, bar);
+    // the team's sponsor on the tab above the bar, as on the team lower third with no photo
+    this.lt.withSponsor(input, out, b.id);
     // titles with a field of their own for the line (QualifiedText, Qualified…) get it too
     for (const x of input.fields) if (/qualif/i.test(x) && x.endsWith('.Text') && !out.has(x)) out.set(x, QUALIFIED_TEXT);
     await this.set(input, out);

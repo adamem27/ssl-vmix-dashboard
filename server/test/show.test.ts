@@ -61,7 +61,7 @@ const TITLES = {
   lowerthird_photo: ['Top text.Text', 'Bottom text.Text', 'PHOTO.Source', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
   lowerthird_no_photo: ['Top text.Text', 'Bottom text.Text', 'Bar.Source', 'Flag.Source', 'Emblem.Source'],
   ssl_lt_lineup5: [...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`NAME ${n}.Text`, `POSITION ${n}.Text`, `PHOTO ${n}.Source`]), 'Bar.Source'],
-  ssl_lt_team_q: ['Top text.Text', 'Bottom text.Text', 'Bar.Source'],
+  ssl_lt_team_q: ['Top text.Text', 'Bottom text.Text', 'Bar.Source', 'Sponsor.Source'],
 };
 
 function race() {
@@ -296,6 +296,8 @@ describe('show control', () => {
     await show.run('qualified:2');
     expect(v.calls).toContain('?Function=SetText&Input=k10&SelectedName=Bottom text.Text&Value=QUALIFIED FOR THE FINAL SERIES');
     expect(v.calls.find((c) => c.includes('SelectedName=Bar.Source'))).toMatch(new RegExp(`${code}_lowerthird\\.png$`));
+    // the sponsor tab, as on the team lower third with no photo
+    expect(v.calls.find((c) => c.includes('Input=k10&SelectedName=Sponsor.Source'))).toMatch(/lt_sponsor\w*\.png$/);
     expect(v.overlays[1]).toBe('10');
   });
 
