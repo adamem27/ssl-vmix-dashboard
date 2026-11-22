@@ -36,20 +36,25 @@ export function listSchedule(db: DB, eventId: string, date?: string) {
     .all(...(date ? [eventId, date] : [eventId])) as Record<string, string>[];
 }
 
-/** Day-schedule board options: TIME on or off, and the row marked as the next race (by schedule item, per day). */
-export interface ScheduleOptions { showTime: boolean; next: Record<string, string> }
+/** Day-schedule board options: TIME on or off, the row marked as the next race and the DOUBLE PTS label (both per day). */
+export interface ScheduleOptions { showTime: boolean; next: Record<string, string>; double: Record<string, boolean> }
 export function getScheduleOptions(db: DB): ScheduleOptions {
   try {
     const o = JSON.parse(getSetting(db, 'schedule.options') || '{}');
-    return { showTime: o.showTime !== false, next: o.next && typeof o.next === 'object' ? o.next : {} };
-  } catch { return { showTime: true, next: {} }; }
+    const obj = (v: unknown) => (v && typeof v === 'object' ? v : {});
+    return { showTime: o.showTime !== false, next: obj(o.next) as Record<string, string>, double: obj(o.double) as Record<string, boolean> };
+  } catch { return { showTime: true, next: {}, double: {} }; }
 }
-export function setScheduleOptions(db: DB, patch: { showTime?: boolean; date?: string; next?: string | null }) {
+export function setScheduleOptions(db: DB, patch: { showTime?: boolean; date?: string; next?: string | null; double?: boolean }) {
   const o = getScheduleOptions(db);
   if (patch.showTime !== undefined) o.showTime = patch.showTime;
   if (patch.date !== undefined && patch.next !== undefined) {
     assertDate(patch.date);
     if (patch.next) o.next[patch.date] = patch.next; else delete o.next[patch.date];
+  }
+  if (patch.date !== undefined && patch.double !== undefined) {
+    assertDate(patch.date);
+    if (patch.double) o.double[patch.date] = true; else delete o.double[patch.date];
   }
   setSetting(db, 'schedule.options', JSON.stringify(o));
   return o;

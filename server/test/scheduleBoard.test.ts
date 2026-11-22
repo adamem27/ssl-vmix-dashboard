@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { setup } from './helpers.js';
 import { activeEvent } from '../src/db/db.js';
 import { createScheduleItem, getScheduleOptions, setScheduleOptions } from '../src/services/general.js';
-import { scheduleHighlightPath, showDataFields, unknownFlagPath } from '../src/services/showData.js';
+import { scheduleDoublePath, scheduleHighlightPath, showDataFields, unknownFlagPath } from '../src/services/showData.js';
 import { createFleet, createSet, placeTeam } from '../src/services/fleets.js';
 import { createTeam } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
@@ -31,6 +31,20 @@ describe('day schedule board', () => {
     expect(f.get('Date.Text')).toBe('11.11.2026');
     expect(f.get('location.Text')).toBe('RIO DE JANEIRO, BRAZIL');
     for (let i = 1; i <= 4; i++) expect(f.get(`HIGHLIGHT ${i}.Source`)).toBe('');
+  });
+
+  it('shows the DOUBLE PTS label only on a day ticked for it', () => {
+    const { s, fields } = board();
+    expect(fields().get('DOUBLE PTS.Text')).toBe('');
+    expect(fields().get('DOUBLE PTS BG.Source')).toBe('');
+    setScheduleOptions(s.db, { date: day, double: true });
+    expect(getScheduleOptions(s.db).double).toEqual({ [day]: true });
+    expect(fields().get('DOUBLE PTS.Text')).toBe('DOUBLE PTS');
+    expect(fields().get('DOUBLE PTS BG.Source')).toBe(scheduleDoublePath(s.ctx));
+    expect(fs.existsSync(`${s.ctx.assetsDir}/icons/schedule_double_pts.png`)).toBe(true);
+    setScheduleOptions(s.db, { date: '2026-11-12', double: true });
+    setScheduleOptions(s.db, { date: day, double: false });
+    expect(fields().get('DOUBLE PTS.Text')).toBe('');
   });
 
   it('with TIME off fills the centred copies and empties the row fields and TIME', () => {

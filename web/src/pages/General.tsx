@@ -130,8 +130,8 @@ function SchedulePanel() {
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter') void add(); };
 
   // the board's options: TIME on or off (the rest of each row is centred then) and the row marked as the next race
-  const opts = useQuery({ queryKey: ['schedule-options'], queryFn: () => api.get<{ showTime: boolean; next: Record<string, string> }>('/api/schedule/options') });
-  const setOpts = async (body: { showTime?: boolean; date?: string; next?: string | null }) => {
+  const opts = useQuery({ queryKey: ['schedule-options'], queryFn: () => api.get<{ showTime: boolean; next: Record<string, string>; double?: Record<string, boolean> }>('/api/schedule/options') });
+  const setOpts = async (body: { showTime?: boolean; date?: string; next?: string | null; double?: boolean }) => {
     try { await api.put('/api/schedule/options', body); void qc.invalidateQueries({ queryKey: ['schedule-options'] }); } catch (e) { toast.error(e); }
   };
   const showTime = opts.data?.showTime ?? true;
@@ -144,6 +144,9 @@ function SchedulePanel() {
       <div className="flex items-center gap-3">
       <label className="flex items-center gap-1.5 text-xs text-ink-300" title="Off: the board leaves TIME out and centres the rest of each row">
         <input type="checkbox" checked={showTime} onChange={(e) => void setOpts({ showTime: e.target.checked })} /> Show time
+      </label>
+      <label className="flex items-center gap-1.5 text-xs text-ink-300" title="The DOUBLE PTS label on the day-schedule board, for this day">
+        <input type="checkbox" checked={!!opts.data?.double?.[day]} onChange={(e) => void setOpts({ date: day, double: e.target.checked })} /> Double points
       </label>
       <div className="flex items-center" role="group" aria-label="Schedule day">
         <Button size="sm" variant="ghost" onClick={() => setDate(shiftDate(day, -1))} aria-label="Previous day">‹</Button>

@@ -89,6 +89,29 @@ export function scheduleHighlightPath(ctx: AssetCtx) {
   return imagePath(ctx.db, ctx.assetsDir, SCHEDULE_HIGHLIGHT);
 }
 
+/** The DOUBLE PTS label behind its text on the day-schedule board (DOUBLE PTS BG): a light pill with a soft border. */
+export const SCHEDULE_DOUBLE = 'icons/schedule_double_pts.png';
+export function doublePng() {
+  const W = 150, H = 36, R = 9, B = 2;
+  const fill = [230, 234, 245], line = [169, 180, 208];
+  return encodePng(W, H, (x, y) => {
+    const cx = Math.min(Math.max(x + 0.5, R), W - R), cy = Math.min(Math.max(y + 0.5, R), H - R);
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) - R; // < 0 inside
+    const a = Math.max(0, Math.min(1, 0.5 - d));
+    if (a <= 0) return [0, 0, 0, 0];
+    const e = Math.max(0, Math.min(1, d + B + 0.5)); // 1 on the border
+    const c = [0, 1, 2].map((i) => Math.round(fill[i] * (1 - e) + line[i] * e));
+    return [c[0], c[1], c[2], Math.round(255 * a)];
+  });
+}
+export function scheduleDoublePath(ctx: AssetCtx) {
+  if (ctx.assetsDir) {
+    const file = path.join(ctx.assetsDir, ...SCHEDULE_DOUBLE.split('/'));
+    try { if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, doublePng()); } } catch { /* read-only folder: the path is still sent */ }
+  }
+  return imagePath(ctx.db, ctx.assetsDir, SCHEDULE_DOUBLE);
+}
+
 /** The neutral “?” flag of a place with no team yet (day schedule). */
 export const UNKNOWN_FLAG = 'icons/flag_unknown.png';
 export function unknownFlagPath(ctx: AssetCtx) {
@@ -182,6 +205,11 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       f.set('Date.Text', (welcome.date ?? '').trim() || dotted(today));
       f.set('location.Text', EVENT_LOCATION);
       sched(true);
+      { // the DOUBLE PTS label (ticked for the day in General graphics → Schedule)
+        const dbl = !!getScheduleOptions(ctx.db).double[today];
+        f.set('DOUBLE PTS.Text', dbl ? 'DOUBLE PTS' : '');
+        f.set('DOUBLE PTS BG.Source', dbl ? scheduleDoublePath(ctx) : '');
+      }
       return f;
     case 'lbar': case 'break':
       f.set('TITLE.Text', 'TODAY');
