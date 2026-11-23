@@ -30,10 +30,12 @@ export function siteTarget(db, folder, defaultDir) {
     const s = siteSettings(db, defaultDir);
     if (s.mode === 's3') {
         const secret = getSetting(db, 'static.s3Secret');
-        const missing = [!s.s3Endpoint && 'S3 endpoint', !s.s3Bucket && 'Bucket', !s.s3AccessKey && 'Access Key ID', !secret && 'Secret Access Key'].filter(Boolean);
+        // Cloudflare shows the endpoint as https://<id>.r2.cloudflarestorage.com/<bucket>: the bucket can come from there
+        const bucket = (s.s3Bucket || s3PathBucket(s.s3Endpoint)).replace(/^\/+|\/+$/g, '');
+        const missing = [!s.s3Endpoint && 'S3 endpoint', !bucket && 'Bucket', !s.s3AccessKey && 'Access Key ID', !secret && 'Secret Access Key'].filter(Boolean);
         if (missing.length)
             throw new Error(`Missing in Settings → Commentator online (click Save after typing): ${missing.join(', ')}.`);
-        return new S3Target({ endpoint: s3Origin(s.s3Endpoint), bucket: s.s3Bucket.replace(/^\/+|\/+$/g, ''), accessKey: s.s3AccessKey, secret, region: s.s3Region || 'auto', folder });
+        return new S3Target({ endpoint: s3Origin(s.s3Endpoint), bucket, accessKey: s.s3AccessKey, secret, region: s.s3Region || 'auto', folder });
     }
     if (s.mode === 'https') {
         const base = s.publicUrl.replace(/\/+$/, '');
@@ -56,6 +58,16 @@ export function uploadKey(db) {
         setSetting(db, 'static.uploadKey', k);
     }
     return k;
+}
+/** The first path part of an endpoint pasted with the bucket on the end. */
+export function s3PathBucket(endpoint) {
+    try {
+        const e = endpoint.trim();
+        return new URL(/^[a-z]+:\/\//i.test(e) ? e : `https://${e}`).pathname.split('/').filter(Boolean)[0] ?? '';
+    }
+    catch {
+        return '';
+    }
 }
 /** Endpoint as pasted from the Cloudflare dashboard: with or without https://, with or without /bucket at the end. */
 export function s3Origin(endpoint) {

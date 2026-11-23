@@ -1,8 +1,14 @@
 {
-  "version": "1.0.258",
-  "commit": "5af9888",
-  "date": "2026-11-22T14:14:06Z",
+  "version": "1.0.259",
+  "commit": "33b8516",
+  "date": "2026-11-23T22:02:00Z",
   "changes": [
+    {
+      "version": "1.0.259",
+      "commit": "33b8516",
+      "date": "2026-11-23T22:02:00Z",
+      "text": "Commentator page on R2: take the bucket from an endpoint pasted with /bucket; Save clears an old error (#22)"
+    },
     {
       "version": "1.0.258",
       "commit": "5af9888",
@@ -476,12 +482,6 @@
       "commit": "ccedd5e",
       "date": "2026-11-14T20:19:27Z",
       "text": "Groups: the Qualification Race takes teams of the stage's groups, which stay in their own group too"
-    },
-    {
-      "version": "1.0.179",
-      "commit": "e77df03",
-      "date": "2026-11-14T20:02:50Z",
-      "text": "Team comparison for the Qualification Race: texts fit themselves (ssl_compare_QR)"
     }
   ]
 }
