@@ -21,6 +21,10 @@ export function useCommentatorLink() {
   return { url: push.data?.status.viewerUrl ?? '', sending: push.data ?? null };
 }
 
+/** HTML that puts the commentator screen inside another page (the page fills the frame; 16:9 by default). */
+export const iframeCode = (url: string) =>
+  `<iframe src="${url.replace(/"/g, '&quot;')}" title="Commentator screen" style="width:100%;aspect-ratio:16/9;border:0" allow="fullscreen" allowfullscreen></iframe>`;
+
 export function CommentatorLinkButton() {
   const { url, sending } = useCommentatorLink();
   const [open, setOpen] = useState(false);
@@ -35,6 +39,11 @@ export function CommentatorLinkButton() {
   const copy = async () => {
     try { await navigator.clipboard.writeText(url); toast.ok('Commentator link copied'); }
     catch { window.prompt('Copy the commentator link', url); }
+  };
+  const copyIframe = async () => {
+    const code = iframeCode(url);
+    try { await navigator.clipboard.writeText(code); toast.ok('Iframe code copied'); }
+    catch { window.prompt('Copy the iframe code', code); }
   };
   const problem = !url ? (sending?.enabled ? (sending.status.error || 'Waiting for the first send…') : 'Publishing of the commentator page is off.') : sending?.status.error || '';
   return (
@@ -52,6 +61,7 @@ export function CommentatorLinkButton() {
               <div className="mt-2 flex gap-2">
                 <Button size="sm" variant="primary" onClick={copy}>Copy</Button>
                 <Button size="sm" onClick={() => window.open(url, "_blank", "noopener")}>Open</Button>
+                <Button size="sm" onClick={copyIframe} title="HTML to put the commentator screen inside another web page">Copy iframe</Button>
               </div>
             </>
           ) : null}
