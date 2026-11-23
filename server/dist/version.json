@@ -1,8 +1,14 @@
 {
-  "version": "1.0.259",
-  "commit": "33b8516",
-  "date": "2026-11-23T22:02:00Z",
+  "version": "1.0.260",
+  "commit": "51f228c",
+  "date": "2026-11-23T22:02:19Z",
   "changes": [
+    {
+      "version": "1.0.260",
+      "commit": "51f228c",
+      "date": "2026-11-23T22:02:19Z",
+      "text": "Commentator screen: Results tab with every group, notes and messages for the commentators, iframe code (#24)"
+    },
     {
       "version": "1.0.259",
       "commit": "33b8516",
@@ -476,12 +482,6 @@
       "commit": "a9a3776",
       "date": "2026-11-14T20:33:27Z",
       "text": "Day schedule: places of a group with no team yet get the neutral ? flag, known teams their flags"
-    },
-    {
-      "version": "1.0.180",
-      "commit": "ccedd5e",
-      "date": "2026-11-14T20:19:27Z",
-      "text": "Groups: the Qualification Race takes teams of the stage's groups, which stay in their own group too"
     }
   ]
 }
