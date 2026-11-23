@@ -1,8 +1,8 @@
 import React, { ReactNode, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMeta } from '../App';
 import { api, FleetSetDetail, FleetSetSummary, Overview, OverviewSailor, OverviewTeam } from '../api';
-import { cx, Empty, ErrorBox, fmtDate, Loading, todayIn } from '../components/ui';
+import { cx, Empty, ErrorBox, fmtDate, Loading, todayIn, useToast } from '../components/ui';
 import { useStage } from '../components/StagePicker';
 import { groupTitle } from '../../../server/src/services/groupNames';
 import { COUNTRY_FACTS } from '../countryFacts';
@@ -30,7 +30,12 @@ interface CommentatorData {
   history?: Record<string, { stage: string; group: string; rank: number; of: number; total: string }[]>;
   officials?: { role: string; names: string[] }[]; people?: { name: string; role: string }[];
   socials?: { website: string; hashtag: string; handles: string[] };
+  messages?: Msg[];
 }
+/** A note typed at the venue: a message for the commentators (no group), about a group's results, or about one team in it. */
+interface Msg { id: string; text: string; fleetId: string; teamId: string; important: boolean; at: string }
+/** The tab with every group's results (instead of a group's crews). */
+const RESULTS = '__results';
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 const hexRgb = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -47,6 +52,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const prefs = useMemo(loadPrefs, []);
   const [setId, setSetId] = useState(''); // picked on this page; otherwise the current stage, then the last one used
   const [fleetId, setFleetId] = useState(prefs.fleetId ?? '');
+  const editable = !live; // the venue dashboard writes notes; the commentator link only reads them
   const [info, setInfo] = useState(false);
   const [focus, setFocus] = useState<string | null>(null); // a team opened on its own, in very large type
   const [light, setLight] = useState(() => readLs('commentator.light') === '1');
@@ -62,8 +68,9 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const data = useQuery({ queryKey: ['overview', day, activeSet], queryFn: () => api.get<Overview>(`/api/overview?date=${day}&set=${activeSet}`), enabled: !!activeSet && !!meta.data, refetchInterval: 30_000 });
   const extra = useQuery({ queryKey: ['commentator', activeSet, day], queryFn: () => api.get<CommentatorData>(`/api/commentator?set=${activeSet}&date=${day}`), enabled: !!activeSet, refetchInterval: 15_000 });
   const fleets = detail.data?.fleets ?? [];
+  const showResults = fleetId === RESULTS;
   const fleet = fleets.find((f) => f.id === fleetId) ?? fleets[0];
-  useEffect(() => savePrefs({ setId: activeSet, fleetId: fleet?.id }), [activeSet, fleet?.id]);
+  useEffect(() => savePrefs({ setId: activeSet, fleetId: showResults ? RESULTS : fleet?.id }), [activeSet, fleet?.id, showResults]);
 
   // Number keys 1–9 switch groups.
   useEffect(() => {
@@ -72,6 +79,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'i' || e.key === 'I') { setInfo((v) => !v); return; }
       if (e.key === 'l' || e.key === 'L') { setLight((v) => !v); return; }
+      if (e.key === 'r' || e.key === 'R') { setFleetId((v) => (v === RESULTS ? '' : RESULTS)); setFocus(null); return; }
       if (e.key === '+' || e.key === '=') { zoom(0.1); return; }
       if (e.key === '-' || e.key === '_') { zoom(-0.1); return; }
       if (e.key === '0') { setScale(1); return; }
@@ -94,6 +102,9 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const standing = x?.results.find((g) => g.fleetId === fleet?.id);
   const pointsOf = new Map((standing?.rows ?? []).map((r) => [r.teamId, r.total]));
   const hasScores = !!standing?.rows.some((r) => r.total !== '');
+  const messages = x?.messages ?? [];
+  const general = messages.filter((m) => !m.fleetId).sort((a, b) => Number(b.important) - Number(a.important));
+  const teamNotes = (fid: string | undefined, tid: string) => messages.filter((m) => m.fleetId === fid && m.teamId === tid);
 
   const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
   const focused = focus ? groupTeams.find((t) => t.id === focus) : undefined;
@@ -105,7 +116,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
         <div className="flex min-w-0 items-end gap-3 border-b border-ink-800">
           <nav className="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Groups">
             {fleets.map((f, i) => {
-              const on = f.id === fleet?.id;
+              const on = !showResults && f.id === fleet?.id;
               return (
                 <button key={f.id} onClick={() => { setFleetId(f.id); setFocus(null); }} title={`Key ${i + 1}`} aria-current={on ? 'page' : undefined}
                   className={cx('-mb-px shrink-0 rounded-t-lg border border-b-0 px-4 py-2 text-lg font-black tracking-wide transition-colors',
@@ -115,6 +126,13 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
               );
             })}
           </nav>
+          {fleets.length > 0 && (
+            <button onClick={() => { setFleetId(RESULTS); setFocus(null); }} title="Every group's results and the notes (key R)" aria-current={showResults ? 'page' : undefined}
+              className={cx('-mb-px shrink-0 rounded-t-lg border border-b-0 px-4 py-2 text-lg font-black tracking-wide transition-colors',
+                showResults ? 'border-ink-700 bg-ink-900 text-ink-50 shadow-[inset_0_3px_0_0_rgb(245_158_11)]' : 'border-transparent text-amber-300/80 hover:text-amber-200')}>
+              Results
+            </button>
+          )}
           <div className="mb-1.5 ml-auto flex shrink-0 items-center gap-2 text-sm">
             <select className="input w-auto py-1 text-sm" value={activeSet} onChange={(e) => { setSetId(e.target.value); setFleetId(''); setFocus(null); }} aria-label="Stage" title="Stage">
               {(sets.data ?? []).map((st) => <option key={st.id} value={st.id}>{st.name}{x?.stage?.id === st.id ? ' (current)' : ''}</option>)}
@@ -128,10 +146,15 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
             <button onClick={() => setInfo((v) => !v)} title="Officials, commentators, socials, all groups (key I)" className="rounded-md border border-ink-700 px-2.5 py-1 font-semibold text-ink-200 hover:bg-ink-800">Info</button>
           </div>
         </div>
+        {general.length > 0 && !(showResults && editable) && <MessageStrip messages={general} />}
       </div>
 
       {sets.isLoading || detail.isLoading || data.isLoading ? <Loading /> : sets.error || detail.error || data.error ? <ErrorBox error={sets.error ?? detail.error ?? data.error} /> : !fleet ? (
         <Empty title="No groups in this stage" />
+      ) : showResults ? (
+        <div className="min-h-0 flex-1 overflow-y-auto" style={{ zoom: scale }}>
+          <ResultsView x={x} teamById={teamById} fleets={fleets} editable={editable} onGroup={(id) => setFleetId(id)} />
+        </div>
       ) : (
         <>
           {focused ? (
@@ -144,7 +167,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
             {fleet.positions.map((tid, i) => {
               const team = tid ? teamById.get(tid) : undefined;
               return team
-                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} points={hasScores ? pointsOf.get(team.id) : undefined} onOpen={() => setFocus(team.id)} />
+                ? <TeamCard key={i} team={team} colour={x?.colours[team.id]} lineup={x?.lineups[team.id]} points={hasScores ? pointsOf.get(team.id) : undefined} remarks={teamNotes(fleet.id, team.id)} onOpen={() => setFocus(team.id)} />
                 : <EmptyCard key={i} place={i + 1} label={fleet.placeholders?.[i] ?? null} />;
             })}
           </div>
@@ -251,7 +274,7 @@ function crewOf(team: OverviewTeam, lineup?: LineupPlace[]): { lines: Line[]; so
   return { lines, source };
 }
 
-function TeamCard({ team, colour, lineup, points, onOpen }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; onOpen: () => void }) {
+function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; remarks?: Msg[]; onOpen: () => void }) {
   const flag = flagOf(team);
   const { lines } = crewOf(team, lineup);
   const hasPos = lines.some((l) => l.position); // no declaration yet: no empty position column
@@ -281,6 +304,9 @@ function TeamCard({ team, colour, lineup, points, onOpen }: { team: OverviewTeam
           <span className="shrink-0 text-2xl leading-none text-white/50 transition-colors group-hover:text-white" aria-hidden>›</span>
         </div>
       </header>
+      {remarks.map((m) => (
+        <p key={m.id} className={cx('w-full shrink-0 whitespace-pre-line border-b border-amber-500/30 px-3 py-1 text-sm leading-snug', m.important ? 'bg-amber-500/25 font-semibold text-amber-100' : 'bg-amber-500/10 text-amber-200')}>✎ {m.text}</p>
+      ))}
       <ol className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto" style={{ fontSize: font }}>
         {lines.map((l) => {
           const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
@@ -576,6 +602,167 @@ function PeopleList({ title, people }: { title: string; people: { name: string; 
     <div>
       <h3 className="mb-1 text-xs font-bold uppercase text-ink-400">{title}</h3>
       <ul>{people.map((p, i) => <li key={i} className="text-ink-100">{p.name}{p.role && <span className="text-xs text-ink-500"> · {p.role}</span>}</li>)}</ul>
+    </div>
+  );
+}
+
+// ---------- notes for the commentators ----------
+/** Messages for the commentators (not tied to a group), under the group tabs on every view. */
+function MessageStrip({ messages }: { messages: Msg[] }) {
+  return (
+    <div className="flex flex-col gap-1" aria-label="Messages for the commentators">
+      {messages.map((m) => (
+        <p key={m.id} className={cx('whitespace-pre-line rounded-md border px-3 py-1.5 text-base leading-snug',
+          m.important ? 'border-amber-400 bg-amber-500/25 font-bold text-amber-50' : 'border-amber-500/40 bg-amber-500/10 text-amber-100')}>
+          <span className="mr-2 text-xs font-black uppercase tracking-wide text-amber-300">{m.important ? '⚠ Message' : 'Message'}</span>{m.text}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+const useNotes = () => {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const done = () => qc.invalidateQueries({ queryKey: ['commentator'] });
+  return {
+    add: (m: Omit<Msg, 'id' | 'at'>) => api.post('/api/commentator/messages', m).then(done).catch((e) => { toast.error(e); throw e; }),
+    edit: (id: string, m: Partial<Msg>) => api.patch(`/api/commentator/messages/${id}`, m).then(done).catch((e) => { toast.error(e); throw e; }),
+    remove: (id: string) => api.del(`/api/commentator/messages/${id}`).then(done).catch((e) => toast.error(e)),
+  };
+};
+
+/** Type a note; Enter saves, Shift+Enter makes a new line, Esc cancels. */
+function NoteForm({ initial, placeholder, onSave, onCancel }: { initial?: Msg; placeholder: string; onSave: (text: string, important: boolean) => Promise<unknown>; onCancel: () => void }) {
+  const [text, setText] = useState(initial?.text ?? '');
+  const [important, setImportant] = useState(initial?.important ?? false);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (!text.trim()) return;
+    setBusy(true);
+    try { await onSave(text, important); } catch { setBusy(false); }
+  };
+  return (
+    <div className="mt-1 flex flex-col gap-1 rounded-md border border-amber-500/40 bg-ink-950/60 p-2" onClick={(e) => e.stopPropagation()}>
+      <textarea autoFocus rows={2} className="input text-sm" value={text} placeholder={placeholder} onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void save(); } if (e.key === 'Escape') { e.stopPropagation(); onCancel(); } }} />
+      <div className="flex items-center gap-2 text-xs">
+        <label className="flex items-center gap-1 text-ink-300"><input type="checkbox" checked={important} onChange={(e) => setImportant(e.target.checked)} className="accent-amber-500" />Important</label>
+        <button onClick={onCancel} className="ml-auto rounded px-2 py-1 text-ink-400 hover:text-ink-100">Cancel</button>
+        <button onClick={() => void save()} disabled={busy || !text.trim()} className="rounded bg-amber-500 px-3 py-1 font-bold text-ink-950 hover:bg-amber-400 disabled:opacity-50">Save</button>
+      </div>
+    </div>
+  );
+}
+
+/** One note, with edit and delete on the venue dashboard. */
+function Note({ m, editable }: { m: Msg; editable: boolean }) {
+  const notes = useNotes();
+  const [editing, setEditing] = useState(false);
+  if (editing) return <NoteForm initial={m} placeholder="Note" onCancel={() => setEditing(false)} onSave={(text, important) => notes.edit(m.id, { text, important }).then(() => setEditing(false))} />;
+  return (
+    <div className={cx('group/note flex items-start gap-2 whitespace-pre-line rounded px-2 py-1 text-sm leading-snug', m.important ? 'bg-amber-500/25 font-semibold text-amber-50' : 'bg-amber-500/10 text-amber-100')}>
+      <span className="flex-1">✎ {m.text}</span>
+      {editable && (
+        <span className="flex shrink-0 gap-1 text-xs opacity-60 group-hover/note:opacity-100">
+          <button onClick={() => setEditing(true)} className="rounded px-1 hover:bg-ink-800" title="Edit the note">Edit</button>
+          <button onClick={() => void notes.remove(m.id)} className="rounded px-1 text-red-300 hover:bg-ink-800" title="Delete the note">✕</button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Results tab (key R): every group of the stage with its race scores, and the notes on the groups and teams. */
+function ResultsView({ x, teamById, fleets, editable, onGroup }: { x?: CommentatorData; teamById: Map<string, OverviewTeam>; fleets: FleetSetDetail['fleets']; editable: boolean; onGroup: (id: string) => void }) {
+  const notes = useNotes();
+  const [adding, setAdding] = useState<string | null>(null); // 'general' | fleetId | fleetId:teamId
+  if (!x) return <Loading />;
+  const messages = x.messages ?? [];
+  const general = messages.filter((m) => !m.fleetId);
+  const add = (fleetId: string, teamId: string) => (text: string, important: boolean) => notes.add({ text, fleetId, teamId, important }).then(() => setAdding(null));
+  return (
+    <div className="flex flex-col gap-3 pb-4">
+      {editable && (
+        <section className="card p-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-black uppercase tracking-wide text-amber-300">Messages for the commentators</h2>
+            <span className="text-xs text-ink-500">Shown at the top of the commentator screen and on the online link. Notes on a group or a team: ✎ in the tables below.</span>
+            {adding !== 'general' && <button onClick={() => setAdding('general')} className="ml-auto rounded bg-amber-500/20 px-3 py-1 text-sm font-bold text-amber-200 hover:bg-amber-500/30">+ Message</button>}
+          </div>
+          <div className="mt-2 flex flex-col gap-1">
+            {general.map((m) => <Note key={m.id} m={m} editable />)}
+            {!general.length && adding !== 'general' && <p className="text-sm text-ink-500">No messages.</p>}
+            {adding === 'general' && <NoteForm placeholder="Message for the commentators, e.g. Race 4 postponed 15 min" onCancel={() => setAdding(null)} onSave={add('', '')} />}
+          </div>
+        </section>
+      )}
+      <div className="grid gap-3 xl:grid-cols-2">
+        {x.results.map((g) => {
+          const f = fleets.find((ff) => ff.id === g.fleetId);
+          const groupNotes = messages.filter((m) => m.fleetId === g.fleetId && !m.teamId);
+          const races = Math.max(g.races, ...g.rows.map((r) => r.races.length));
+          const scored = g.rows.some((r) => r.total !== '');
+          return (
+            <section key={g.fleetId} className="card overflow-hidden">
+              <header className="flex items-center gap-3 border-b border-ink-800 px-3 py-2">
+                <button onClick={() => f && onGroup(f.id)} className="text-left text-xl font-black text-ink-50 hover:text-accent-200" title="Open this group's crews">{groupTitle(g.title || g.fleetName)}</button>
+                {g.subtitle && <span className="truncate text-sm text-ink-400">{g.subtitle}</span>}
+                {editable && adding !== g.fleetId && <button onClick={() => setAdding(g.fleetId)} className="ml-auto shrink-0 rounded px-2 py-0.5 text-sm text-amber-300 hover:bg-ink-800" title="Add a note on this group">✎ Note</button>}
+              </header>
+              <table className="w-full text-base">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase text-ink-500">
+                    <th className="w-8 px-2 py-1 text-right">#</th>
+                    <th className="px-1 py-1" colSpan={2}>Team</th>
+                    {Array.from({ length: races }, (_, i) => <th key={i} className="w-10 px-1 py-1 text-center">R{i + 1}</th>)}
+                    <th className="w-14 px-2 py-1 text-right">Pts</th>
+                    {editable && <th className="w-8" />}
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.rows.map((r, i) => {
+                    const t = teamById.get(r.teamId);
+                    const fl = t && flagOf(t);
+                    const mine = messages.filter((m) => m.fleetId === g.fleetId && m.teamId === r.teamId);
+                    const key = `${g.fleetId}:${r.teamId}`;
+                    return (
+                      <React.Fragment key={r.teamId}>
+                        <tr className="border-t border-ink-800/60">
+                          <td className="px-2 py-1 text-right font-bold tabular-nums text-ink-400">{scored ? i + 1 : ''}</td>
+                          <td className="w-8 py-1 pl-1">{fl && <img src={fl} alt="" className="h-4 w-6 rounded-[2px] object-cover" />}</td>
+                          <td className="py-1 pr-1"><span className="font-mono font-black text-ink-50">{t?.code ?? '?'}</span> <span className="text-sm text-ink-400">{t?.name}</span></td>
+                          {Array.from({ length: races }, (_, k) => <td key={k} className="px-1 py-1 text-center font-mono tabular-nums text-ink-200">{r.races[k] ?? ''}</td>)}
+                          <td className="px-2 py-1 text-right text-lg font-black tabular-nums text-accent-200">{r.total}</td>
+                          {editable && <td className="pr-1 text-right">{adding !== key && <button onClick={() => setAdding(key)} className="rounded px-1 text-amber-300/70 hover:bg-ink-800 hover:text-amber-200" title={`Add a note on ${t?.code ?? 'this team'}`}>✎</button>}</td>}
+                        </tr>
+                        {(mine.length > 0 || adding === key) && (
+                          <tr>
+                            <td />
+                            <td colSpan={races + 3 + (editable ? 1 : 0)} className="pb-1 pr-2">
+                              <div className="flex flex-col gap-1">
+                                {mine.map((m) => <Note key={m.id} m={m} editable={editable} />)}
+                                {adding === key && <NoteForm placeholder={`Note on ${t?.code ?? 'the team'}`} onCancel={() => setAdding(null)} onSave={add(g.fleetId, r.teamId)} />}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {(groupNotes.length > 0 || adding === g.fleetId) && (
+                <div className="flex flex-col gap-1 border-t border-ink-800 p-2">
+                  {groupNotes.map((m) => <Note key={m.id} m={m} editable={editable} />)}
+                  {adding === g.fleetId && <NoteForm placeholder="Note on this group's results" onCancel={() => setAdding(null)} onSave={add(g.fleetId, '')} />}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+      {!x.results.length && <Empty title="No results in this stage yet" />}
     </div>
   );
 }

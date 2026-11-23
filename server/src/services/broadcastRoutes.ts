@@ -17,6 +17,7 @@ import { listSets } from './fleets.js';
 import { listTeams } from './teams.js';
 import { listGradients } from './generator/generator.js';
 import * as vx from './vmixResults.js';
+import * as cm from './commentatorMessages.js';
 
 /** General graphics versions, team line-ups (Declarations and line-ups) and group results (Results tab). */
 export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
@@ -131,6 +132,13 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
     return stageInfo();
   });
 
+  // ---------- notes for the commentators (shown on the commentator screen) ----------
+  const msgBody = z.object({ text: z.string().trim().min(1, 'Type the note.').max(1000), fleetId: z.string().max(64), teamId: z.string().max(64), important: z.boolean() });
+  app.get('/api/commentator/messages', async () => cm.listMessages(db, ev().id));
+  app.post('/api/commentator/messages', async (req) => cm.addMessage(db, ev().id, msgBody.partial({ fleetId: true, teamId: true, important: true }).parse(req.body)));
+  app.patch<{ Params: { id: string } }>('/api/commentator/messages/:id', async (req) => cm.updateMessage(db, ev().id, req.params.id, msgBody.partial().parse(req.body)));
+  app.delete<{ Params: { id: string } }>('/api/commentator/messages/:id', async (req) => { cm.deleteMessage(db, ev().id, req.params.id); return { ok: true }; });
+
   // ---------- commentator: everything around one fleet set in one call ----------
   app.get<{ Querystring: { set?: string; date?: string } }>('/api/commentator', async (req) => {
     const e = ev();
@@ -178,6 +186,8 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
       // the team's notes, without the line an import leaves (From the … matchboard / workbook)
       notes: Object.fromEntries(listTeams(ctx).filter((t) => teamIds.has(t.id)).map((t) => [t.id, (t.notes ?? '').split(/\r?\n/).filter((l: string) => !/^\s*(imported )?from the .*(matchboard|workbook|import|sheet)\.?\s*$/i.test(l)).join('\n').trim()]).filter(([, n]) => n)),
       history,
+      // notes typed for the commentators: general ones and those about this stage's groups
+      messages: cm.listMessages(db, e.id).filter((m) => !m.fleetId || results.some((g) => g.fleetId === m.fleetId)),
       officials: officials(),
       people: listPeople(ctx, e.id).map((p) => ({ name: [p.name, p.surname].filter(Boolean).join(' '), role: p.role })).filter((p) => p.name),
       socials: (() => { const x = first('socials'); return { website: x.website ?? '', hashtag: x.hashtag ?? '', handles: [x.instagram, x.facebook, x.youtube, x.tiktok, x.x].map((v) => (v ?? '').trim()).filter((v, i, a) => v && a.indexOf(v) === i) }; })(),

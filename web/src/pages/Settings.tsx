@@ -1,3 +1,4 @@
+import { iframeCode } from '../components/CommentatorLink';
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
@@ -542,7 +543,7 @@ function StaticPageSection() {
       {st.lastOkAt && <p className="mt-2 text-xs text-ink-400">Data last changed {when(st.lastChangeAt)} · data.json {Math.round(st.dataBytes / 1024)} KB · {st.pictures} pictures · last round sent {st.uploadedFiles} file{st.uploadedFiles === 1 ? '' : 's'} · {st.target}</p>}
       <div className="mt-3">
         <p className="mb-1 text-xs text-ink-400">Link for commentators (any network, any browser; read-only):</p>
-        {d.url ? <CopyLink url={d.url} /> : <p className="text-sm text-ink-400">Fill in the web address above. Folder name: <code>{d.folderName}</code></p>}
+        {d.url ? <><CopyLink url={d.url} /><p className="mb-1 mt-3 text-xs text-ink-400">Iframe, to put the screen inside another web page:</p><CopyLink url={iframeCode(d.url)} /></> : <p className="text-sm text-ink-400">Fill in the web address above. Folder name: <code>{d.folderName}</code></p>}
       </div>
       <Button className="mt-3" size="sm" variant="danger" busy={busy === 'addr'} onClick={async () => {
         if (!(await ask('Move the page to a new address?', 'The page is published under a new random folder name, so the old link stops getting new data. Delete the old folder on the host by hand (FTP) so it disappears completely.', 'New address'))) return;
