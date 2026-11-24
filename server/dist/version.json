@@ -1,8 +1,14 @@
 {
-  "version": "1.0.260",
-  "commit": "51f228c",
-  "date": "2026-11-23T22:02:19Z",
+  "version": "1.0.261",
+  "commit": "2682937",
+  "date": "2026-11-24T23:07:54Z",
   "changes": [
+    {
+      "version": "1.0.261",
+      "commit": "2682937",
+      "date": "2026-11-24T23:07:54Z",
+      "text": "Static commentator page: new data shows within ~3 s (watches status.json, ?refresh=<s> sets how often) (#25)"
+    },
     {
       "version": "1.0.260",
       "commit": "51f228c",
@@ -476,12 +482,6 @@
       "commit": "868cc14",
       "date": "2026-11-14T20:50:04Z",
       "text": "Day schedule: a row typed QR / LCR finds the Qualification / Last Chance Race group; test that rows follow the day picked at the top"
-    },
-    {
-      "version": "1.0.181",
-      "commit": "a9a3776",
-      "date": "2026-11-14T20:33:27Z",
-      "text": "Day schedule: places of a group with no team yet get the neutral ? flag, known teams their flags"
     }
   ]
 }
