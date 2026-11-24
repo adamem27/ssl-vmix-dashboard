@@ -27,6 +27,18 @@ function loadStatus(): Promise<StaticStatus> {
   p.catch(() => { statusLoad = null; });
   return p;
 }
+/**
+ * Static page: read status.json every few seconds and call onChange as soon as the venue sends new data,
+ * so the screen (also inside an iframe) shows it at once instead of on its own slower timers.
+ */
+export function watchStaticData(everyMs: number, onChange: () => void): () => void {
+  let last = '';
+  const tick = () => loadStatus().then((st) => { if (st.version && st.version !== last) { const first = !last; last = st.version; if (!first) onChange(); } }, () => undefined);
+  void tick();
+  const t = setInterval(tick, everyMs);
+  return () => clearInterval(t);
+}
+
 async function loadFeed(): Promise<StaticFeed> {
   const st = await loadStatus().catch(() => null);
   if (!feedCache || (st && st.version !== feedVersion)) {
