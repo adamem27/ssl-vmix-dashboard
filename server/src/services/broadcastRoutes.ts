@@ -139,6 +139,9 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
   app.patch<{ Params: { id: string } }>('/api/commentator/messages/:id', async (req) => cm.updateMessage(db, ev().id, req.params.id, msgBody.partial().parse(req.body)));
   app.delete<{ Params: { id: string } }>('/api/commentator/messages/:id', async (req) => { cm.deleteMessage(db, ev().id, req.params.id); return { ok: true }; });
 
+  app.get('/api/commentator/tracking', async () => ({ url: cm.trackingUrl(db) }));
+  app.put('/api/commentator/tracking', async (req) => ({ url: cm.setTrackingUrl(db, z.object({ url: z.string().max(4000) }).parse(req.body).url) }));
+
   // ---------- commentator: everything around one fleet set in one call ----------
   app.get<{ Querystring: { set?: string; date?: string } }>('/api/commentator', async (req) => {
     const e = ev();
@@ -187,6 +190,8 @@ export function registerBroadcastRoutes(app: FastifyInstance, ctx: AssetCtx) {
       notes: Object.fromEntries(listTeams(ctx).filter((t) => teamIds.has(t.id)).map((t) => [t.id, (t.notes ?? '').split(/\r?\n/).filter((l: string) => !/^\s*(imported )?from the .*(matchboard|workbook|import|sheet)\.?\s*$/i.test(l)).join('\n').trim()]).filter(([, n]) => n)),
       history,
       // notes typed for the commentators: general ones and those about this stage's groups
+      // the Tracking tab's page ('' = no tab)
+      tracking: cm.trackingUrl(db),
       messages: cm.listMessages(db, e.id).filter((m) => !m.fleetId || results.some((g) => g.fleetId === m.fleetId)),
       officials: officials(),
       people: listPeople(ctx, e.id).map((p) => ({ name: [p.name, p.surname].filter(Boolean).join(' '), role: p.role })).filter((p) => p.name),

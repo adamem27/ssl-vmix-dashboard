@@ -31,6 +31,8 @@ interface CommentatorData {
   officials?: { role: string; names: string[] }[]; people?: { name: string; role: string }[];
   socials?: { website: string; hashtag: string; handles: string[] };
   messages?: Msg[];
+  /** the Tracking tab's page ('' = no tab) */
+  tracking?: string;
 }
 /** A note typed at the venue: a message for the commentators (no group), about a group's results, or about one team in it. */
 interface Msg { id: string; text: string; fleetId: string; teamId: string; important: boolean; at: string }
@@ -54,6 +56,9 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const [fleetId, setFleetId] = useState(prefs.fleetId ?? '');
   const editable = !live; // the venue dashboard writes notes; the commentator link only reads them
   const [info, setInfo] = useState(false);
+  const [view, setView] = useState<'dashboard' | 'tracking'>(() => (readLs('commentator.view') === 'tracking' ? 'tracking' : 'dashboard'));
+  const [trackingSeen, setTrackingSeen] = useState(false); // the tracking page loads once and stays loaded behind the dashboard
+  useEffect(() => { writeLs('commentator.view', view); if (view === 'tracking') setTrackingSeen(true); }, [view]);
   const [focus, setFocus] = useState<string | null>(null); // a team opened on its own, in very large type
   const [light, setLight] = useState(() => readLs('commentator.light') === '1');
   const [scale, setScale] = useState(() => { const v = Number(readLs('commentator.scale')); return v >= 0.6 && v <= 2 ? v : 1; });
@@ -75,9 +80,11 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   // Number keys 1–9 switch groups.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'i' || e.key === 'I') { setInfo((v) => !v); return; }
+      if (e.key === 't' || e.key === 'T') { setView((v) => (v === 'tracking' ? 'dashboard' : 'tracking')); return; }
+      if (e.key === 'd' || e.key === 'D') { setView('dashboard'); return; }
       if (e.key === 'l' || e.key === 'L') { setLight((v) => !v); return; }
       if (e.key === 'r' || e.key === 'R') { setFleetId((v) => (v === RESULTS ? '' : RESULTS)); setFocus(null); return; }
       if (e.key === '+' || e.key === '=') { zoom(0.1); return; }
@@ -109,10 +116,29 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const groupTeams = fleet ? fleet.positions.map((tid) => (tid ? teamById.get(tid) : undefined)).filter((t): t is OverviewTeam => !!t) : [];
   const focused = focus ? groupTeams.find((t) => t.id === focus) : undefined;
   // Sized for a 1920×1080 screen with the browser bars: everything fits the window; a long crew list scrolls inside its card.
+  const tracking = x?.tracking ?? '';
+  const onTracking = view === 'tracking' && !!tracking;
   return (
     <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')} style={{ ['--cs' as string]: scale }}>
+      {tracking && (
+        <nav className="flex shrink-0 items-center gap-1" aria-label="Screen">
+          {([['dashboard', 'Dashboard', 'D'], ['tracking', 'Tracking', 'T']] as const).map(([k, label, key]) => (
+            <button key={k} onClick={() => setView(k)} title={`Key ${key}`} aria-current={(k === 'tracking') === onTracking ? 'page' : undefined}
+              className={cx('rounded-md px-4 py-1.5 text-sm font-black uppercase tracking-wider transition-colors',
+                (k === 'tracking') === onTracking ? 'bg-accent-500 text-white' : 'bg-ink-900 text-ink-300 hover:bg-ink-800 hover:text-ink-50')}>
+              {label}
+            </button>
+          ))}
+          {live && <span className="ml-auto"><FreshnessBadge /></span>}
+        </nav>
+      )}
+      {tracking && (trackingSeen || onTracking) && (
+        <iframe src={tracking} title="Tracking" allow="fullscreen; autoplay; geolocation" allowFullScreen
+          className={cx('min-h-0 w-full flex-1 rounded-md border-0 bg-black', !onTracking && 'hidden')} />
+      )}
+      <div className={cx('flex min-h-0 flex-1 flex-col gap-2', onTracking && 'hidden')}>
       <div className="flex shrink-0 flex-col gap-2" style={{ zoom: scale }}>
-        <TopStrip x={x} tz={tz} teamById={teamById} current={fleet?.name ?? ''} badge={live ? <FreshnessBadge /> : undefined} />
+        <TopStrip x={x} tz={tz} teamById={teamById} current={fleet?.name ?? ''} badge={live && !tracking ? <FreshnessBadge /> : undefined} />
         <div className="flex min-w-0 items-end gap-3 border-b border-ink-800">
           <nav className="flex min-w-0 gap-0.5 overflow-x-auto" aria-label="Groups">
             {fleets.map((f, i) => {
@@ -175,6 +201,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
         </>
       )}
       {info && x && <InfoPanel x={x} teamById={teamById} onClose={() => setInfo(false)} onGroup={(id) => { setFleetId(id); setInfo(false); }} fleets={fleets} />}
+      </div>
     </div>
   );
 }
