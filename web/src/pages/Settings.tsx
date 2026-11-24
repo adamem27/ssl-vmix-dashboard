@@ -34,12 +34,13 @@ export function SettingsPage() {
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">Settings</h1>
       <nav className="flex flex-wrap gap-2 text-xs">
-        {[['event', 'Event'], ['commentator-online', 'Commentator online'], ['presets', 'Matchboard'], ['sync', 'Declaration sync'], ['paths', 'Files & vMix paths'], ['demo', 'Demo data'], ['backup', 'Backup']].map(([id, l]) => (
+        {[['event', 'Event'], ['commentator-online', 'Commentator online'], ['commentator-tracking', 'Tracking tab'], ['presets', 'Matchboard'], ['sync', 'Declaration sync'], ['paths', 'Files & vMix paths'], ['demo', 'Demo data'], ['backup', 'Backup']].map(([id, l]) => (
           <a key={id} href={`#${id}`} className="rounded-md border border-ink-700 px-2.5 py-1 text-ink-300 hover:bg-ink-800">{l}</a>
         ))}
       </nav>
       <EventSection event={q.data!.event} />
       <StaticPageSection />
+      <TrackingSection />
       <CommentatorOnlineSection />
       <PresetSection />
       <SyncSection />
@@ -460,6 +461,40 @@ interface StaticSiteInfo {
   status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
 }
 type SiteForm = Omit<StaticSiteInfo, 'enabled' | 'url' | 'folderName' | 'status' | 'hasFtpPassword' | 'hasS3Secret'> & { ftpPassword: string; s3Secret: string };
+
+/** The Tracking tab of the commentator screen: a live tracking page (e.g. GeoRacing) in a frame. */
+function TrackingSection() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const q = useQuery({ queryKey: ['commentator-tracking'], queryFn: () => api.get<{ url: string }>('/api/commentator/tracking') });
+  const [v, setV] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const value = v ?? q.data?.url ?? '';
+  const save = async (url: string) => {
+    setBusy(true);
+    try {
+      const r = await api.put<{ url: string }>('/api/commentator/tracking', { url });
+      qc.setQueryData(['commentator-tracking'], r);
+      qc.invalidateQueries({ queryKey: ['commentator'] });
+      setV(null);
+      toast.ok(r.url ? 'Tracking tab saved' : 'Tracking tab switched off');
+    } catch (e) { toast.error(e); } finally { setBusy(false); }
+  };
+  return (
+    <Section id="commentator-tracking" title="Commentator tracking tab"
+      desc={<>A second tab on the commentator screen (also on the online link and inside its iframe) showing the live tracking. Paste the tracking address or the whole <code>&lt;iframe&gt;</code> code from the tracking provider; leave it empty to hide the tab.</>}>
+      <form onSubmit={(e) => { e.preventDefault(); void save(value); }} className="space-y-2">
+        <textarea className="input font-mono text-xs" rows={3} value={value} onChange={(e) => setV(e.target.value)}
+          placeholder='<iframe src="https://iframe.georacing.com?event_id=…&autoload=1&player_in_iframe=1" …></iframe>' />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="submit" variant="primary" busy={busy}>Save</Button>
+          {q.data?.url && <Button type="button" onClick={() => void save('')} disabled={busy}>Remove the tab</Button>}
+          {q.data?.url && <a href={q.data.url} target="_blank" rel="noopener noreferrer" className="break-all text-xs text-accent-300 underline">{q.data.url}</a>}
+        </div>
+      </form>
+    </Section>
+  );
+}
 
 /** The PC at the venue writes the commentator screen as a static web page and uploads it (FTP) or saves it to a folder. */
 function StaticPageSection() {

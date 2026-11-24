@@ -31,3 +31,18 @@ describe('notes for the commentators', () => {
     expect((await screen()).messages.map((m: { text: string }) => m.text)).not.toContain('Race 4 at 15:30');
   });
 });
+
+describe('tracking tab', () => {
+  it('takes the address from a pasted iframe code and shows it on the commentator screen', async () => {
+    const t = setup();
+    const app = await buildApp({ db: t.db, assetsDir: t.ctx.assetsDir, sync: t.sync });
+    const code = '<iframe src="https://iframe.georacing.com?event_id=102235&amp;autoload=1&amp;player_in_iframe=1" style="width:100%;height:100%;" allowfullscreen></iframe>';
+    const r = await app.inject({ method: 'PUT', url: '/api/commentator/tracking', payload: { url: code } });
+    expect(r.json().url).toBe('https://iframe.georacing.com/?event_id=102235&autoload=1&player_in_iframe=1');
+    expect((await app.inject({ url: '/api/commentator' })).json().tracking).toBe('https://iframe.georacing.com/?event_id=102235&autoload=1&player_in_iframe=1');
+    expect((await app.inject({ method: 'PUT', url: '/api/commentator/tracking', payload: { url: 'javascript:alert(1)' } })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'PUT', url: '/api/commentator/tracking', payload: { url: 'not a link' } })).statusCode).toBe(400);
+    expect((await app.inject({ method: 'PUT', url: '/api/commentator/tracking', payload: { url: '' } })).json().url).toBe('');
+    expect((await app.inject({ url: '/api/commentator' })).json().tracking).toBe('');
+  });
+});

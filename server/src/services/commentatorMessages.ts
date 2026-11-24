@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { DB, getSetting, nowIso, setSetting } from '../db/db.js';
-import { notFound } from './errors.js';
+import { badRequest, notFound } from './errors.js';
 
 /**
  * Notes for the commentators, typed at the venue and shown on the commentator screen (also the static page online).
@@ -49,4 +49,29 @@ export function updateMessage(db: DB, eventId: string, id: string, patch: Partia
 
 export function deleteMessage(db: DB, eventId: string, id: string) {
   save(db, eventId, listMessages(db, eventId).filter((m) => m.id !== id));
+}
+
+// ---------- Tracking tab: a live tracking page (e.g. GeoRacing) shown in a frame on the commentator screen ----------
+const TRACKING = 'commentator.trackingUrl';
+
+/**
+ * The address of the tracking page, from either the address or a whole <iframe …> code as the tracking provider gives it.
+ * Only http(s) addresses; '' switches the tab off.
+ */
+export function parseTrackingUrl(input: string): string {
+  const v = input.trim();
+  if (!v) return '';
+  const src = /<iframe\b[^>]*\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(v);
+  const raw = (src ? src[2] ?? src[3] ?? src[4] ?? '' : v).trim().replace(/&amp;/g, '&');
+  let u: URL;
+  try { u = new URL(raw); } catch { throw badRequest('Paste the tracking address (https://…) or its whole <iframe> code.'); }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw badRequest('The tracking address must start with https://.');
+  return u.toString();
+}
+
+export const trackingUrl = (db: DB) => getSetting(db, TRACKING);
+export function setTrackingUrl(db: DB, input: string): string {
+  const url = parseTrackingUrl(input);
+  setSetting(db, TRACKING, url);
+  return url;
 }
