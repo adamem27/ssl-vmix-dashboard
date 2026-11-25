@@ -1,0 +1,909 @@
+[
+ {
+  "code": "CHI",
+  "crew": [
+   {
+    "firstName": "Sebastián",
+    "lastName": "Prieto",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "Chiloé Race 2018 winner"
+    ]
+   },
+   {
+    "firstName": "Pedro",
+    "lastName": "Vera",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "J70 South American Champion 2021",
+     "3rd at Lightning Junior Worlds 2014"
+    ]
+   },
+   {
+    "firstName": "Nicholas",
+    "lastName": "Robertson",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Rolex Swan Cup 2024 winner (Mini Maxi)",
+     "National champion in Snipe, Lightning, J24, J70, J105, Soto 40"
+    ]
+   },
+   {
+    "firstName": "Paula",
+    "lastName": "Herman",
+    "position": "Trimmer",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "Lightning World Champion 2025"
+    ]
+   },
+   {
+    "firstName": "Andrés",
+    "lastName": "Ducasse",
+    "position": "Grinder",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Bronze at Pan American Games",
+     "Olympian (Rio 2016)",
+     "J70 Corinthian World Champion"
+    ]
+   },
+   {
+    "firstName": "Rodrigo",
+    "lastName": "Robles",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "ILCA Junior South American Champion"
+    ]
+   },
+   {
+    "firstName": "Rodrigo",
+    "lastName": "Amunátegui",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "J70 South American Champion 2017"
+    ]
+   },
+   {
+    "firstName": "Pedro Felipe",
+    "lastName": "Robles",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Lightning World Champion 2025"
+    ]
+   },
+   {
+    "firstName": "Benjamín",
+    "lastName": "Grez",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "2x Olympian (470 London 2012, 49er Rio 2016)",
+     "2nd at Optimist Worlds 2007",
+     "4x South American Champion"
+    ]
+   },
+   {
+    "firstName": "Pablo",
+    "lastName": "Lorca",
+    "position": "",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "2x Silver at South American Games (Lightning)"
+    ]
+   },
+   {
+    "firstName": "Rafaela",
+    "lastName": "Salvatore",
+    "position": "Trimmer",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "2nd at Lightning Youth Championship"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "CZE",
+  "crew": [
+   {
+    "firstName": "David",
+    "lastName": "Kovařík",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "2nd at ORC Worlds 2019",
+     "2nd at Rolex Middle Sea Race 2017"
+    ]
+   },
+   {
+    "firstName": "Zofia",
+    "lastName": "Burska",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Olympian (49erFX Paris 2024)",
+     "7th at 49erFX Europeans 2025"
+    ]
+   },
+   {
+    "firstName": "Tomas",
+    "lastName": "Vika",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "Silver at Finn Junior Worlds & Europeans"
+    ]
+   },
+   {
+    "firstName": "Sara",
+    "lastName": "Tkadlecova",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "7th at 49erFX Europeans 2025"
+    ]
+   },
+   {
+    "firstName": "Jan",
+    "lastName": "Danek",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "2nd at Fireball Worlds 2001"
+    ]
+   },
+   {
+    "firstName": "Martin",
+    "lastName": "Trcka",
+    "position": "Main Trimmer",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "2x Olympian (2004, 2008)",
+     "Silver at ORC Worlds",
+     "D-One World Champion"
+    ]
+   },
+   {
+    "firstName": "Petr",
+    "lastName": "Fiala",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "European Champion"
+    ]
+   },
+   {
+    "firstName": "Ondrej",
+    "lastName": "Teply",
+    "position": "Tactician",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "Finn U23 World Champion"
+    ]
+   },
+   {
+    "firstName": "Ondrej",
+    "lastName": "Bastar",
+    "position": "Floater",
+    "number": "",
+    "captain": false,
+    "best": [
+     "3rd at 49erFX Open Junior Worlds",
+     "14th at 29er Worlds 2024"
+    ]
+   },
+   {
+    "firstName": "Pavel",
+    "lastName": "Bobek",
+    "position": "Floater",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "Silver at Melges 24 Europeans 2013"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "ECU",
+  "crew": [
+   {
+    "firstName": "Samuel Eduardo",
+    "lastName": "Herrera",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "National Champion"
+    ]
+   },
+   {
+    "firstName": "Tadas",
+    "lastName": "Koreiva",
+    "position": "Bow",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "ISCA Youth World Champion 2025"
+    ]
+   },
+   {
+    "firstName": "Irene",
+    "lastName": "Suárez",
+    "position": "Mid-Bow",
+    "number": "12",
+    "captain": false,
+    "best": [
+     "Lightning South American Champion 2019",
+     "2nd at Lightning South Americans 2017"
+    ]
+   },
+   {
+    "firstName": "Juan Andrés",
+    "lastName": "Santos",
+    "position": "Pit",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Lightning South American Champion & runner-up"
+    ]
+   },
+   {
+    "firstName": "John",
+    "lastName": "Birkett",
+    "position": "Grinder",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Lightning South American Champion & runner-up"
+    ]
+   },
+   {
+    "firstName": "Sebastian",
+    "lastName": "Herrera",
+    "position": "Trimmer",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Sunfish National Champion"
+    ]
+   },
+   {
+    "firstName": "Alfredo",
+    "lastName": "Ochoa",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Gold at Continental Games",
+     "Lightning South American Champion 2019"
+    ]
+   },
+   {
+    "firstName": "Julio",
+    "lastName": "Velez",
+    "position": "Trimmer",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "Lightning South American Champion & runner-up"
+    ]
+   },
+   {
+    "firstName": "Jonathan",
+    "lastName": "Martinetti",
+    "position": "Tactician",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "4x World Champion (2009, 2010, 2022, 2023)"
+    ]
+   },
+   {
+    "firstName": "María Daniela",
+    "lastName": "Rodríguez",
+    "position": "Floater",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "2x Sunfish Youth World Champion",
+     "Silver & bronze at Bolivarian Games 2014"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "HUN",
+  "crew": [
+   {
+    "firstName": "Zsombor",
+    "lastName": "Berecz",
+    "position": "Bow",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "Olympic silver medal (Tokyo 2020)"
+    ]
+   },
+   {
+    "firstName": "Elizabet Virág",
+    "lastName": "Tóth",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "Hungarian National Champion"
+    ]
+   },
+   {
+    "firstName": "Levente",
+    "lastName": "Takácsy",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "SSL Gold Cup winner"
+    ]
+   },
+   {
+    "firstName": "Marcell",
+    "lastName": "Goszleth",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "World Champion"
+    ]
+   },
+   {
+    "firstName": "Róbert",
+    "lastName": "Bakóczy",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "SSL World Champion"
+    ]
+   },
+   {
+    "firstName": "Zsombor Zsolt",
+    "lastName": "Gyapjas",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2nd at 470 Junior Europeans"
+    ]
+   },
+   {
+    "firstName": "Aron",
+    "lastName": "Nemeth",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "SSL winner"
+    ]
+   },
+   {
+    "firstName": "Zsófia",
+    "lastName": "Deák",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "No. 1 in the national ranking"
+    ]
+   },
+   {
+    "firstName": "Csaba",
+    "lastName": "Adorján",
+    "position": "Floater",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "SSL World Championship 2023"
+    ]
+   },
+   {
+    "firstName": "Szabolcs",
+    "lastName": "Majthényi",
+    "position": "Floater",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "15x Flying Dutchman World Champion"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "JPN",
+  "crew": [
+   {
+    "firstName": "Norio",
+    "lastName": "Igei",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "TP52 World Champion 2021"
+    ]
+   },
+   {
+    "firstName": "Ryumon",
+    "lastName": "Mizuta",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "ILCA 6 Youth Worlds 2017 & 2018"
+    ]
+   },
+   {
+    "firstName": "Shintaro",
+    "lastName": "Kamisonoda",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "49er, Asian Games 2026"
+    ]
+   },
+   {
+    "firstName": "Hideki",
+    "lastName": "Wakayama",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "TP52 World Champion 2021 & 2026"
+    ]
+   },
+   {
+    "firstName": "Naoya",
+    "lastName": "Kimura",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "3x 49er National Champion (2016–2018)"
+    ]
+   },
+   {
+    "firstName": "Einosuke",
+    "lastName": "Morita",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "470 Junior World Champion 2016",
+     "3rd at 470 Worlds 2019"
+    ]
+   },
+   {
+    "firstName": "Shingen",
+    "lastName": "Furuya",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "Gold at Asian Games (Jakarta)"
+    ]
+   },
+   {
+    "firstName": "Keijyu",
+    "lastName": "Okada",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "Olympic silver medal (470, Paris 2024)",
+     "470 World Champion 2023",
+     "Gold at Asian Games (Guangzhou)"
+    ]
+   },
+   {
+    "firstName": "Ai",
+    "lastName": "Yoshida",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "470 World Champion 2018",
+     "3x Asian Games gold",
+     "Snipe Women’s World Champion"
+    ]
+   },
+   {
+    "firstName": "Misaki",
+    "lastName": "Tanaka",
+    "position": "Floater",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "Olympian (49erFX Paris 2024)",
+     "Silver at Asian Games 2023",
+     "Bronze at 420 Women’s Worlds 2015"
+    ]
+   },
+   {
+    "firstName": "Eiichiro",
+    "lastName": "Hamazaki",
+    "position": "",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "Olympian (470 Sydney 2000)",
+     "Silver at Asian Games 1998",
+     "Melges 24 Corinthian World Champion"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "PER",
+  "crew": [
+   {
+    "firstName": "Anthonny Martin",
+    "lastName": "Garay",
+    "position": "Bow",
+    "number": "13",
+    "captain": false,
+    "best": [
+     "Silver at Galápagos International ORC Regatta"
+    ]
+   },
+   {
+    "firstName": "Adriana",
+    "lastName": "Barrón",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "3rd at Nacra 17 Junior Worlds"
+    ]
+   },
+   {
+    "firstName": "Miranda",
+    "lastName": "Paz",
+    "position": "Mid-Bow",
+    "number": "12",
+    "captain": false,
+    "best": [
+     "Sunfish Youth World Champion (women)",
+     "Snipe Western Hemisphere & Asia youth champion"
+    ]
+   },
+   {
+    "firstName": "Eduardo",
+    "lastName": "Cano",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "J70 Nationals winner (mixed)"
+    ]
+   },
+   {
+    "firstName": "Augusto",
+    "lastName": "Nicolini",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "Olympian (ILCA 7 Athens 2004)",
+     "4th at ILCA 7 South Americans"
+    ]
+   },
+   {
+    "firstName": "Christian",
+    "lastName": "Sas",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "2nd at J24 Worlds 2011"
+    ]
+   },
+   {
+    "firstName": "Luis Alberto",
+    "lastName": "Olcese",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "Silver at J24 Worlds",
+     "3x South American Champion"
+    ]
+   },
+   {
+    "firstName": "Javier",
+    "lastName": "Arribas",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "3rd at Optimist Worlds 2011"
+    ]
+   },
+   {
+    "firstName": "Fernando",
+    "lastName": "Alegre",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "Coach of 2x Youth Olympic gold medallists"
+    ]
+   },
+   {
+    "firstName": "Stefano",
+    "lastName": "Peschiera",
+    "position": "Helm",
+    "number": "10",
+    "captain": true,
+    "best": [
+     "Olympic bronze medal (ILCA 7, Paris 2024)",
+     "Pan American Games gold"
+    ]
+   },
+   {
+    "firstName": "Alonso",
+    "lastName": "Collantes",
+    "position": "",
+    "number": "",
+    "captain": false,
+    "best": [
+     "2x Sunfish World Champion"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "RSA",
+  "crew": [
+   {
+    "firstName": "Joweal",
+    "lastName": "Klaase",
+    "position": "Bow",
+    "number": "1",
+    "captain": false,
+    "best": [
+     "Lipton Cup winner"
+    ]
+   },
+   {
+    "firstName": "Jordyn",
+    "lastName": "Soldin",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "3rd at Cape Doctor Series 2025/26 (Cape 31)"
+    ]
+   },
+   {
+    "firstName": "Marco",
+    "lastName": "Tobin",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "National Champion"
+    ]
+   },
+   {
+    "firstName": "Theo",
+    "lastName": "Yon",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Lipton Cup winner",
+     "2nd at 505 Nationals"
+    ]
+   },
+   {
+    "firstName": "Theo",
+    "lastName": "Scheder-Bieschin",
+    "position": "Trimmer",
+    "number": "6",
+    "captain": false,
+    "best": [
+     "29er National Champion"
+    ]
+   },
+   {
+    "firstName": "Calvin",
+    "lastName": "Gibbs",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "4th at Youth Worlds 2017 (ILCA)"
+    ]
+   },
+   {
+    "firstName": "David",
+    "lastName": "Rae",
+    "position": "Helm",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "2x J22 World Champion"
+    ]
+   },
+   {
+    "firstName": "Mark",
+    "lastName": "Sadler",
+    "position": "Tactician",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "America's Cup 32 (2007)"
+    ]
+   },
+   {
+    "firstName": "Ian",
+    "lastName": "Ainslie",
+    "position": "",
+    "number": "",
+    "captain": true,
+    "best": [
+     "8th at the Olympic Games"
+    ]
+   },
+   {
+    "firstName": "Olivia",
+    "lastName": "Purchase",
+    "position": "Floater",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "ILCA 4 Youth National Champion 2023"
+    ]
+   },
+   {
+    "firstName": "Georgeo",
+    "lastName": "Davaris",
+    "position": "Floater",
+    "number": "12",
+    "captain": false,
+    "best": [
+     "RS Tera World Champion"
+    ]
+   }
+  ]
+ },
+ {
+  "code": "THA",
+  "crew": [
+   {
+    "firstName": "Phiriyaporn",
+    "lastName": "Kala",
+    "position": "Bow",
+    "number": "6",
+    "captain": false,
+    "best": []
+   },
+   {
+    "firstName": "Alexander Amarit",
+    "lastName": "Frefel",
+    "position": "Mid-Bow",
+    "number": "2",
+    "captain": false,
+    "best": [
+     "Gold at SEA Games 2025 (SSL47)"
+    ]
+   },
+   {
+    "firstName": "Nichapa",
+    "lastName": "Waiwai",
+    "position": "Pit",
+    "number": "3",
+    "captain": false,
+    "best": [
+     "26th at 470 Worlds 2026"
+    ]
+   },
+   {
+    "firstName": "Chusitt",
+    "lastName": "Punjamala",
+    "position": "Grinder",
+    "number": "4",
+    "captain": false,
+    "best": [
+     "Bronze at SEA Games 2017"
+    ]
+   },
+   {
+    "firstName": "Nut",
+    "lastName": "Butmarasri",
+    "position": "Trimmer",
+    "number": "5",
+    "captain": false,
+    "best": [
+     "Gold at SEA Games 2025"
+    ]
+   },
+   {
+    "firstName": "Dylan",
+    "lastName": "Whitcraft",
+    "position": "Trimmer",
+    "number": "10",
+    "captain": false,
+    "best": [
+     "3rd at Junior Worlds"
+    ]
+   },
+   {
+    "firstName": "Navee",
+    "lastName": "Thamsoonthorn",
+    "position": "Main Trimmer",
+    "number": "7",
+    "captain": false,
+    "best": [
+     "2nd at 470 Asian Championships 2019"
+    ]
+   },
+   {
+    "firstName": "Kan",
+    "lastName": "Kachachuen",
+    "position": "Helm",
+    "number": "9",
+    "captain": false,
+    "best": [
+     "2nd in teams at Optimist Worlds 2021",
+     "2nd at 29er Asian Championships 2025"
+    ]
+   },
+   {
+    "firstName": "Don",
+    "lastName": "Whitcraft",
+    "position": "Tactician",
+    "number": "8",
+    "captain": false,
+    "best": [
+     "3rd at World Championships"
+    ]
+   },
+   {
+    "firstName": "Darin",
+    "lastName": "Meesaart",
+    "position": "Floater",
+    "number": "11",
+    "captain": false,
+    "best": [
+     "Hong Kong Open Windsurfing Championships 2018"
+    ]
+   }
+  ]
+ }
+]

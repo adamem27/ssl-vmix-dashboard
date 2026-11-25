@@ -181,6 +181,15 @@ export function loadRooming() {
     }
     return [];
 }
+/** Two names that differ by one letter (changed, added or left out). */
+function oneOff(a, b) {
+    if (a === b || Math.abs(a.length - b.length) > 1)
+        return false;
+    let i = 0;
+    while (i < a.length && a[i] === b[i])
+        i++;
+    return a.slice(i + 1) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i) || a.slice(i) === b.slice(i + 1);
+}
 /**
  * Makes each listed team's roster match the rooming list: matching sailors stay (an empty position or
  * number is filled in), missing ones are added, the rest are removed unless they carry operator work
@@ -188,7 +197,7 @@ export function loadRooming() {
  */
 export function applyRooming(ctx, teams = loadRooming(), opts = {}) {
     const { db } = ctx;
-    const r = { teams: 0, added: 0, updated: 0, removed: 0, kept: [], captains: 0, missingTeams: [] };
+    const r = { teams: 0, added: 0, updated: 0, removed: 0, renamed: 0, kept: [], captains: 0, missingTeams: [] };
     db.transaction(() => {
         for (const t of teams) {
             const team = db.prepare('SELECT id FROM teams WHERE code = ? COLLATE NOCASE').get(t.code);
@@ -210,10 +219,28 @@ export function applyRooming(ctx, teams = loadRooming(), opts = {}) {
                     const byLast = free.filter((c) => lastKey(c.last_name).join(' ') === last || lastKey(`${c.first_name} ${c.last_name}`).includes(last));
                     if (byLast.length === 1 && nameKey(byLast[0].first_name)[0] === first[0])
                         hit = byLast[0];
+                    // two of the same family name: the one whose first names hold this one's (Felipe → Pedro Felipe)
+                    if (!hit && byLast.length > 1) {
+                        const firsts = nameKey(m.firstName).split(' ').filter(Boolean);
+                        const h = byLast.filter((c) => nameKey(c.first_name).split(' ').filter((w) => firsts.includes(w)).length === firsts.length);
+                        if (h.length === 1)
+                            hit = h[0];
+                    }
+                }
+                // a one-letter slip in the family name (Divaris / Davaris), same first name
+                if (!hit && last.length >= 5) {
+                    const h = free.filter((c) => nameKey(c.first_name).split(' ')[0] === first && oneOff(nameKey(c.last_name), last));
+                    if (h.length === 1)
+                        hit = h[0];
                 }
                 let id;
                 if (hit) {
                     id = hit.id;
+                    // the team's own sheet spells the name (checked against the other lists); the dashboard takes it
+                    if (opts.rename && (hit.first_name !== m.firstName || hit.last_name !== m.lastName)) {
+                        db.prepare('UPDATE sailors SET first_name = ?, last_name = ?, name_key = ?, updated_at = ? WHERE id = ?').run(m.firstName, m.lastName, full, nowIso(), id);
+                        r.renamed++;
+                    }
                     // the team's own squad sheet (official) gives position and shirt number; otherwise only empty ones are filled
                     const pos = opts.official ? m.position || hit.default_position : hit.default_position || m.position;
                     const num = opts.official ? m.number || hit.default_number : hit.default_number || m.number;
@@ -277,21 +304,33 @@ export const FINALS_SQUADS_VERSION = '2026-11-16';
  * and best results from each team's squad sheet. Teams that came through the Pan-American qualifiers are not in it:
  * they keep what the dashboard has.
  */
-export function loadFinalsSquads() {
+export function loadFinalsSquads(file = 'goldcup-finals-squads.json') {
     const here = path.dirname(fileURLToPath(import.meta.url));
-    for (const p of [path.join(here, '..', '..', 'fixtures', 'goldcup-finals-squads.json'), path.join(here, '..', 'fixtures', 'goldcup-finals-squads.json')]) {
+    for (const p of [path.join(here, '..', '..', 'fixtures', file), path.join(here, '..', 'fixtures', file)]) {
         if (fs.existsSync(p))
             return JSON.parse(fs.readFileSync(p, 'utf8'));
     }
     return [];
 }
+/**
+ * The second batch of squad sheets (CHI, CZE, ECU, HUN, JPN, PER, RSA, THA): the racing crew of each sheet, names
+ * checked against the hotel list and the team pages (the sheet's spelling wins, the hotel list's fuller or accented one
+ * where the sheet only shortens it), and the best results in short English. Its own version, so the first batch is not
+ * applied again over the operator's edits.
+ */
+export const FINALS_SQUADS_2_VERSION = '2026-11-25';
 /** Applies the 1/32 squads once per version at server start, so later edits in the panel stay. */
 export function applyFinalsSquadsOnStart(ctx) {
-    if (getSetting(ctx.db, 'preset.finals-squads.version') === FINALS_SQUADS_VERSION)
-        return null;
-    const r = applyRooming(ctx, loadFinalsSquads(), { official: true });
-    setSetting(ctx.db, 'preset.finals-squads.version', FINALS_SQUADS_VERSION);
-    return r;
+    let out = null;
+    if (getSetting(ctx.db, 'preset.finals-squads.version') !== FINALS_SQUADS_VERSION) {
+        (out ??= {}).first = applyRooming(ctx, loadFinalsSquads(), { official: true });
+        setSetting(ctx.db, 'preset.finals-squads.version', FINALS_SQUADS_VERSION);
+    }
+    if (getSetting(ctx.db, 'preset.finals-squads-2.version') !== FINALS_SQUADS_2_VERSION) {
+        (out ??= {}).second = applyRooming(ctx, loadFinalsSquads('goldcup-finals-squads-2.json'), { official: true, rename: true });
+        setSetting(ctx.db, 'preset.finals-squads-2.version', FINALS_SQUADS_2_VERSION);
+    }
+    return out;
 }
 /** Runs once per data version at server start. */
 export function applyGoldCupOnStart(ctx) {

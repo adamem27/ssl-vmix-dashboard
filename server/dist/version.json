@@ -1,8 +1,14 @@
 {
-  "version": "1.0.262",
-  "commit": "69c00ef",
-  "date": "2026-11-24T23:08:08Z",
+  "version": "1.0.263",
+  "commit": "fb40f64",
+  "date": "2026-11-25T13:50:01Z",
   "changes": [
+    {
+      "version": "1.0.263",
+      "commit": "fb40f64",
+      "date": "2026-11-25T13:50:01Z",
+      "text": "Squads of CHI, CZE, ECU, HUN, JPN, PER, RSA, THA from their squad sheets: crews, positions, numbers, names, best results"
+    },
     {
       "version": "1.0.262",
       "commit": "69c00ef",
@@ -476,12 +482,6 @@
       "commit": "8525f9c",
       "date": "2026-11-14T22:11:36Z",
       "text": "Tickers: the text on air is always in capitals, however it was typed"
-    },
-    {
-      "version": "1.0.183",
-      "commit": "a8ab23f",
-      "date": "2026-11-14T21:15:23Z",
-      "text": "Matchboard: each new PNG goes straight into the vMix titles showing it (ssl_matchboard's image field, any field holding matchboard.png)"
     }
   ]
 }
