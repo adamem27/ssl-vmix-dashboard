@@ -1,8 +1,14 @@
 {
-  "version": "1.0.263",
-  "commit": "fb40f64",
-  "date": "2026-11-25T13:50:01Z",
+  "version": "1.0.264",
+  "commit": "508d2cd",
+  "date": "2026-11-25T19:10:05Z",
   "changes": [
+    {
+      "version": "1.0.264",
+      "commit": "508d2cd",
+      "date": "2026-11-25T19:10:05Z",
+      "text": "vMix copies of a title (virtual input, same name) get the same data: day schedule, results and every other filled title"
+    },
     {
       "version": "1.0.263",
       "commit": "fb40f64",
@@ -476,12 +482,6 @@
       "commit": "4d878e9",
       "date": "2026-11-15T12:15:18Z",
       "text": "Team LT qualified: bottom line QUALIFIED FOR THE FINAL SERIES"
-    },
-    {
-      "version": "1.0.184",
-      "commit": "8525f9c",
-      "date": "2026-11-14T22:11:36Z",
-      "text": "Tickers: the text on air is always in capitals, however it was typed"
     }
   ]
 }
