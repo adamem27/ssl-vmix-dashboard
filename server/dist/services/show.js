@@ -9,7 +9,7 @@ import { badRequest, notFound } from './errors.js';
 import { getSetDetail, isExtraGroup, listSets } from './fleets.js';
 import { listPeople, personName } from './general.js';
 import { MATCHBOARD_REL } from './matchboard/matchboard.js';
-import { imagePath, isOften, listGraphicSets, tickerText } from './graphicSets.js';
+import { imagePath, isOften, listGraphicSets, repeatLoop, tickerMessages, tickerText } from './graphicSets.js';
 import { tickerAuto } from './groups.js';
 import { BOARD_BOW_TO_STERN, BOW_TO_STERN, loadLineup, slotDefs } from './lineups.js';
 import { crewOf, getLtConfig, getLtState, ltFields, ltTeams } from './lowerthirds.js';
@@ -23,6 +23,7 @@ import { todayIn } from './dates.js';
 import { groupLabel, groupLetter } from './groupNames.js';
 import { currentStage } from './workbookSheets.js';
 import { getOverrides, inputKey, isTitleInput, withOverrides } from './fieldOverrides.js';
+import { TickerLangs } from './tickerLangs.js';
 import { parseVmixXml, resultFieldsFor, titleFieldMatcher, vmixUrl } from './vmixResults.js';
 /**
  * Show control: every graphic of the broadcast as one entry of a registry (vMix input names, overlay channel),
@@ -406,6 +407,9 @@ export class Show {
         this.fetcher = fetcher;
         this.log = log;
     }
+    /** the bottom ticker translated onto the streaming PCs (Show control → Ticker languages) */
+    langsV;
+    get langs() { return (this.langsV ??= new TickerLangs(this.ctx.db, () => this.tickerSource(), undefined, undefined, this.log)); }
     // the config and state are read by every key of a view (hundreds): parsed again only when the stored text changes
     cfgCache = { raw: '\u0000', v: null };
     stCache = { raw: '\u0000', v: null };
@@ -1057,6 +1061,28 @@ export class Show {
         const preset = this.state.tickerMode === 'end' ? 'thanks' : 'warning';
         const s = sets.find((x) => x.id === id) ?? sets.find((x) => x.data.preset === preset) ?? sets[0];
         return s ? tickerText(s.data, tickerAuto(this.ctx.db, activeEvent(this.ctx.db))) : '';
+    }
+    /**
+     * What the bottom ticker in vMix shows now, as its messages (for the translated tickers): the version whose text it
+     * is, else the text itself (one loop of it), so a text typed in vMix is translated too.
+     */
+    async tickerSource() {
+        const { inputs } = await this.snapshot();
+        const t = this.resolve(this.graphic('ticker'), inputs);
+        const f = t && this.textField(t, /ticker|text/i);
+        if (!t || !f)
+            return null;
+        const v = t.values?.[f] ?? '';
+        if (!v.trim())
+            return { messages: [], sep: '' };
+        const auto = tickerAuto(this.ctx.db, activeEvent(this.ctx.db));
+        for (const x of this.tickers())
+            if (tickerText(x.data, auto) === v)
+                return { messages: tickerMessages(x.data, auto), sep: x.data.separator || ' I ' };
+        for (let n = 1; n <= v.length; n++)
+            if (repeatLoop(v.slice(0, n)) === v)
+                return { messages: [v.slice(0, n).trim()], sep: ' ' };
+        return { messages: [v.trim()], sep: ' ' };
     }
     // ---------- actions ----------
     /** The rolling titles (a video) come in at once, held on their first frame, and play this long after the TITLES key. */
@@ -2072,7 +2098,7 @@ export class Show {
         return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
     }
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
-    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); void this.lbarSwap(); void this.mixLoop(); }, ms); this.timer.unref?.(); }
+    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); void this.lbarSwap(); void this.mixLoop(); void this.langs.tick(); }, ms); this.timer.unref?.(); }
     /**
      * L-BAR SWITCH: a title with a Swap picture (L-bar_switch.gtzip) changes look every few seconds while it is on air
      * (an overlay channel or the program). Its L-bar picture is the first look uploaded on Show control; the Swap picture

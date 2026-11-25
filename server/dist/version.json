@@ -1,8 +1,14 @@
 {
-  "version": "1.0.267",
-  "commit": "b02cd08",
-  "date": "2026-11-25T20:05:47Z",
+  "version": "1.0.268",
+  "commit": "9109180",
+  "date": "2026-11-25T23:44:09Z",
   "changes": [
+    {
+      "version": "1.0.268",
+      "commit": "9109180",
+      "date": "2026-11-25T23:44:09Z",
+      "text": "Ticker languages: the bottom ticker translated by DeepL onto the streaming vMix ticker inputs (5 slots, Portuguese first), diff-only, corrections by hand win"
+    },
     {
       "version": "1.0.267",
       "commit": "b02cd08",
@@ -476,12 +482,6 @@
       "commit": "1f3a36f",
       "date": "2026-11-15T19:08:58Z",
       "text": "Companion keys call their place; texts and colours of every key go live"
-    },
-    {
-      "version": "1.0.188",
-      "commit": "cce2e2e",
-      "date": "2026-11-15T19:07:58Z",
-      "text": "Foldable sections; Show control keeps only Break scene; GTZIP without Scenes; scrollable sync history"
     }
   ]
 }
