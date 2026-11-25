@@ -1471,28 +1471,49 @@ export class Show {
         }
         await this.fillSlide(this.slides()[0], board);
         await this.overlayIn(cfg.breakBoardLayer, board, snap.overlays);
-        await this.mixBoard(board, snap.inputs);
         this.patchState({ slide: 0 });
         if (cfg.breakAuto)
             this.startRotation();
         return { in: 'break', lbar: lbar?.title ?? null, ticker: tk?.title ?? null, board: board.title };
     }
     /**
-     * The break scene without the ticker, on its own vMix Mix (Show control → Break scene): the board shown now fades in
-     * there, as its copy (a virtual input of it, which gets the same data) so the board's animations on the program do
-     * not play in the Mix too; the L-bar is a layer of the Mix input in vMix.
+     * The break scene without the ticker on its own vMix Mix (Show control → Break scene), all the time, whether the break
+     * scene is on air or not (the ATEM takes it when it wants): the day schedule and each group's results in turn, every
+     * board switch time, as a copy of the board (a virtual input of it, which gets the same data) so the program's own
+     * animations do not play there. The L-bar is a layer of the Mix input in vMix. Each group's results take its own
+     * input (ssl_results_H…): the shared one shows whatever group it holds, so it goes in once.
      */
-    async mixBoard(board, inputs) {
+    mixAt = 0;
+    mixIndex = -1;
+    mixBusy = false;
+    async mixLoop(now = Date.now()) {
         const mix = this.config.breakMix;
-        if (mix < 2)
-            return; // Mix 1 is the program itself
-        const copies = copiesOf(board, inputs);
-        const use = copies.find((c) => /virtual|mix|clean/i.test(c.title)) ?? copies[0] ?? board;
+        if (mix < 2 || this.mixBusy || now - this.mixAt < this.config.rotateSeconds * 1000)
+            return; // Mix 1 is the program
+        this.mixBusy = true;
         try {
+            const { inputs } = await this.snapshot();
+            const boards = [];
+            for (const sl of this.slides()) {
+                const i = sl.kind === 'results' && sl.fleetId ? this.ownResults(sl.fleetId, inputs) ?? this.resolve(this.graphic('results'), inputs) : this.resolve(this.graphic('schedule'), inputs);
+                if (i && !boards.includes(i))
+                    boards.push(i);
+            }
+            if (!boards.length)
+                return;
+            this.mixIndex = (this.mixIndex + 1) % boards.length;
+            const board = boards[this.mixIndex];
+            const copies = copiesOf(board, inputs);
+            const use = copies.find((c) => /virtual|mix|clean/i.test(c.title)) ?? copies[0] ?? board;
             await this.vmix(`?Function=Fade&Duration=500&Input=${encodeURIComponent(use.key || use.number)}&Mix=${mix - 1}`);
+            this.mixAt = now;
         }
         catch (e) {
             this.log(`Break scene Mix ${mix}: ${e?.message ?? e}`);
+            this.mixAt = now;
+        }
+        finally {
+            this.mixBusy = false;
         }
     }
     slideInput(s, inputs) {
@@ -1529,8 +1550,6 @@ export class Show {
             await this.fillSlide(s, input);
             if (onAir)
                 await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
-            if (onAir)
-                await this.mixBoard(input, snap.inputs);
         }
         finally {
             this.switching = false;
@@ -1992,7 +2011,7 @@ export class Show {
         return companionPresetFile(this.config, looks, base, vmixBase, this.graphics());
     }
     /** Keeps the keys in step with vMix and line-up changes made elsewhere. */
-    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); void this.lbarSwap(); }, ms); this.timer.unref?.(); }
+    start(ms = 2000) { this.timer = setInterval(() => { void this.pushLabels(); void this.syncData(); void this.lbarSwap(); void this.mixLoop(); }, ms); this.timer.unref?.(); }
     /**
      * L-BAR SWITCH: a title with a Swap picture (L-bar_switch.gtzip) changes look every few seconds while it is on air
      * (an overlay channel or the program). Its L-bar picture is the first look uploaded on Show control; the Swap picture
@@ -2097,6 +2116,10 @@ export class Show {
             const wel = this.resolve(this.graphic('welcome'), inputs);
             if (wel)
                 jobs.push({ input: wel, f: () => showDataFields(this.ctx, 'welcome', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
+            // the L-bar (its copy is the clean break Mix's layer) without its ticker line: that one only by the break scene
+            const lbarIn = this.resolve(this.graphic('lbar'), inputs);
+            if (lbarIn)
+                jobs.push({ input: lbarIn, f: () => { const m = showDataFields(this.ctx, 'lbar', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev) }); m?.delete('Ticker1.Text'); return m; } });
             const sched = this.resolve(this.graphic('schedule'), inputs);
             if (sched)
                 jobs.push({ input: sched, f: () => showDataFields(this.ctx, 'schedule', { eventId: ev.id, today, auto: tickerAuto(this.ctx.db, ev), tickerText: this.tickerText() }) });
