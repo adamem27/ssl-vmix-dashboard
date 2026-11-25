@@ -1,8 +1,14 @@
 {
-  "version": "1.0.266",
-  "commit": "ce49899",
-  "date": "2026-11-25T19:44:03Z",
+  "version": "1.0.267",
+  "commit": "b02cd08",
+  "date": "2026-11-25T20:05:47Z",
   "changes": [
+    {
+      "version": "1.0.267",
+      "commit": "b02cd08",
+      "date": "2026-11-25T20:05:47Z",
+      "text": "Clean break Mix on overlay channels 5 and 6 with Mix=1: board copies named 2 loop with their animations, L-bar copy changes look; UNDO/ALL OUT leave them"
+    },
     {
       "version": "1.0.266",
       "commit": "ce49899",
@@ -476,12 +482,6 @@
       "commit": "cce2e2e",
       "date": "2026-11-15T19:07:58Z",
       "text": "Foldable sections; Show control keeps only Break scene; GTZIP without Scenes; scrollable sync history"
-    },
-    {
-      "version": "1.0.187",
-      "commit": "e561f38",
-      "date": "2026-11-15T14:07:27Z",
-      "text": "Day schedule: Qualification Race as written, like Group H"
     }
   ]
 }

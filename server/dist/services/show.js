@@ -108,8 +108,11 @@ export const showConfigSchema = z.object({
     flagChangeMs: z.number().int().min(0).max(3000).default(500),
     /** s between the two looks of an L-bar title with a Swap picture (L-bar_switch.gtzip) while it is on air; 0 = off */
     lbarSwapSeconds: z.number().int().min(0).max(300).default(8),
-    /** a vMix Mix (2–16) that follows the break scene's boards without the ticker: a copy of each board fades in there; 0 = off */
+    /** a vMix Mix (2–16) with the break scene without the ticker, all the time (for the ATEM): 0 = off */
     breakMix: z.number().int().min(0).max(16).default(0),
+    /** its overlay channels (shown on that Mix only): the copies of the boards in turn, and the copy of the L-bar */
+    mixBoardLayer: z.number().int().min(5).max(8).default(6),
+    mixLbarLayer: z.number().int().min(0).max(8).default(5),
     /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
     cfgVersion: z.number().int().default(4),
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
@@ -1370,7 +1373,10 @@ export class Show {
         if (!prev)
             throw badRequest('Nothing to undo.');
         const snap = await this.snapshot();
+        const keep = this.mixChannels();
         for (let n = 1; n <= 8; n++) {
+            if (keep.includes(n))
+                continue; // the clean break Mix's channels: never back onto the program
             const want = prev[n] ?? '';
             if (want === (snap.overlays[n] ?? ''))
                 continue;
@@ -1402,8 +1408,10 @@ export class Show {
         this.stopRotation();
         const snap = await this.snapshot();
         this.pushUndo(snap.overlays);
+        const keep = this.mixChannels(); // the clean break Mix runs on for the ATEM
         for (let n = 1; n <= 8; n++)
-            await this.overlayOut(n, snap.overlays);
+            if (!keep.includes(n))
+                await this.overlayOut(n, snap.overlays);
         return { allOut: true };
     }
     /** First press arms, a second within 3 s cuts every overlay at once (no animation). */
@@ -1478,37 +1486,90 @@ export class Show {
     }
     /**
      * The break scene without the ticker on its own vMix Mix (Show control → Break scene), all the time, whether the break
-     * scene is on air or not (the ATEM takes it when it wants): the day schedule and each group's results in turn, every
-     * board switch time, as a copy of the board (a virtual input of it, which gets the same data) so the program's own
-     * animations do not play there. The L-bar is a layer of the Mix input in vMix. Each group's results take its own
-     * input (ssl_results_H…): the shared one shows whatever group it holds, so it goes in once.
+     * scene is on air or not (the ATEM takes it when it wants). The copies of the boards (ssl_schedule 2, ssl_results_H 2…:
+     * a virtual input of each, which gets the same data) take turns on their overlay channel (6) shown on that Mix only,
+     * with their own in and out animations, every board switch time; the copy of the L-bar (ssl_lbar 2) stays on its
+     * channel (5) and changes look like the L-bar. Each group's results take its own input (ssl_results_H…): the shared
+     * one shows whatever group it holds, so it goes in once. A board with no copy is left out (never the original: the
+     * program's animations would play on the Mix); the status says which.
      */
     mixAt = 0;
+    mixOn = {};
+    mixFor = '';
     mixIndex = -1;
     mixBusy = false;
+    mixStatus = { board: '', lbar: '', missing: [], error: '' };
+    /** The copy of a title for the clean break Mix: ssl_schedule 2 (or a virtual input of it). */
+    mixCopy(input, inputs) {
+        if (!input)
+            return undefined;
+        const copies = copiesOf(input, inputs).filter((c) => inputKey(c.title) !== inputKey(input.title));
+        return copies.find((c) => /\s2$/.test(inputKey(c.title))) ?? copies.find((c) => /virtual|mix|clean/i.test(c.title)) ?? copies[0];
+    }
+    /** The channels the clean break Mix holds (UNDO and ALL OUT leave them alone). */
+    mixChannels() {
+        const c = this.config;
+        return c.breakMix >= 2 ? [c.mixBoardLayer, c.mixLbarLayer].filter((n) => n > 0) : [];
+    }
     async mixLoop(now = Date.now()) {
-        const mix = this.config.breakMix;
-        if (mix < 2 || this.mixBusy || now - this.mixAt < this.config.rotateSeconds * 1000)
+        const cfg = this.config;
+        const mix = cfg.breakMix;
+        if (mix < 2 || this.mixBusy)
             return; // Mix 1 is the program
         this.mixBusy = true;
+        const at = `&Mix=${mix - 1}`;
+        // what this loop put on the Mix's channels: vMix's XML may show only the program's overlays, so a channel is
+        // sent again only when it should change (never every 2 s, which would replay the animation)
+        if (this.mixFor !== `${mix}|${cfg.mixBoardLayer}|${cfg.mixLbarLayer}`) {
+            this.mixOn = {};
+            this.mixFor = `${mix}|${cfg.mixBoardLayer}|${cfg.mixLbarLayer}`;
+        }
         try {
             const { inputs } = await this.snapshot();
+            const missing = [];
+            // the L-bar's copy stays in
+            const lbar = this.resolve(this.graphic('lbar'), inputs);
+            const lc = cfg.mixLbarLayer > 0 ? this.mixCopy(lbar, inputs) : undefined;
+            if (cfg.mixLbarLayer > 0 && lbar && !lc)
+                missing.push(`${lbar.title} 2`);
+            if (lc && this.mixOn[cfg.mixLbarLayer] !== lc.number) {
+                await this.vmix(`?Function=OverlayInput${cfg.mixLbarLayer}In&Input=${encodeURIComponent(lc.key || lc.number)}${at}`);
+                this.mixOn[cfg.mixLbarLayer] = lc.number;
+            }
+            this.mixStatus = { ...this.mixStatus, lbar: lc?.title ?? '', missing, error: '' };
+            // the boards in turn, every switch time
             const boards = [];
+            const seen = new Set();
             for (const sl of this.slides()) {
                 const i = sl.kind === 'results' && sl.fleetId ? this.ownResults(sl.fleetId, inputs) ?? this.resolve(this.graphic('results'), inputs) : this.resolve(this.graphic('schedule'), inputs);
-                if (i && !boards.includes(i))
-                    boards.push(i);
+                if (!i || seen.has(i))
+                    continue;
+                seen.add(i);
+                const c = this.mixCopy(i, inputs);
+                if (c)
+                    boards.push(c);
+                else
+                    missing.push(`${i.title} 2`);
             }
-            if (!boards.length)
+            if (!boards.length || now - this.mixAt < cfg.rotateSeconds * 1000)
                 return;
             this.mixIndex = (this.mixIndex + 1) % boards.length;
             const board = boards[this.mixIndex];
-            const copies = copiesOf(board, inputs);
-            const use = copies.find((c) => /virtual|mix|clean/i.test(c.title)) ?? copies[0] ?? board;
-            await this.vmix(`?Function=Fade&Duration=500&Input=${encodeURIComponent(use.key || use.number)}&Mix=${mix - 1}`);
+            const n = cfg.mixBoardLayer;
+            if (this.mixOn[n] !== board.number) {
+                if (this.mixOn[n]) {
+                    await this.vmix(`?Function=OverlayInput${n}Out${at}`);
+                    await this.wait(cfg.breakOutMs);
+                }
+                await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(board.key || board.number)}${at}`);
+                this.mixOn[n] = board.number;
+            }
             this.mixAt = now;
+            this.mixStatus = { ...this.mixStatus, board: board.title };
         }
         catch (e) {
+            this.mixOn = {};
+            this.mixStatus = { ...this.mixStatus, error: String(e?.message ?? e) };
             this.log(`Break scene Mix ${mix}: ${e?.message ?? e}`);
             this.mixAt = now;
         }
@@ -1876,7 +1937,7 @@ export class Show {
                 return { ...g, input: i?.title ?? null, onAir: !!(i && snap.overlays[g.overlay] === i.number), fields: i?.fields.length ?? 0 };
             }),
             boats: this.boats(), sailors: this.sailors().map((s) => ({ slot: s.slot, number: s.number, name: `${s.firstName} ${s.lastName}`.trim(), position: s.position, photo: !!s.photo })),
-            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS, lbarSwap: this.swapStatus, lbarLooks: lbarLooks(this.ctx),
+            pages: looks, actions: keyActions(cfg), kindColours: KEY_COLOURS, lbarSwap: this.swapStatus, lbarLooks: lbarLooks(this.ctx), mixStatus: this.mixStatus,
         };
     }
     /**
@@ -2037,7 +2098,11 @@ export class Show {
                 return;
             const live = new Set([...Object.values(snap.overlays), snap.xml.match(/<active>(\d+)<\/active>/)?.[1] ?? ''].filter(Boolean));
             const files = lbarFiles(this.ctx);
-            const set = (i, field, value) => this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(field)}&Value=${encodeURIComponent(value)}`);
+            const one = (i, field, value) => this.vmix(`?Function=SetImage&Input=${encodeURIComponent(i.key || i.number)}&SelectedName=${encodeURIComponent(field)}&Value=${encodeURIComponent(value)}`);
+            // a copy that lists no fields (a virtual input: ssl_lbar 2 on the clean break Mix) changes look with its title
+            const set = async (i, field, value) => { await one(i, field, value); for (const c of copiesOf(i, snap.inputs))
+                if (!c.fields.length)
+                    await one(c, field, value); };
             for (const i of titles) {
                 const id = i.key || i.number;
                 const cur = i.values?.[SWAP_FIELD] ?? '';
