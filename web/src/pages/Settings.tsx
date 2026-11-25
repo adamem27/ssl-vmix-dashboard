@@ -41,7 +41,6 @@ export function SettingsPage() {
       <EventSection event={q.data!.event} />
       <StaticPageSection />
       <TrackingSection />
-      <CommentatorOnlineSection />
       <PresetSection />
       <SyncSection />
       <PathsSection info={q.data!} />
@@ -344,123 +343,91 @@ function BackupSection({ info }: { info: SettingsInfo }) {
   );
 }
 
-// ---------- commentator screen online ----------
-interface PushInfo {
-  target: string; enabled: boolean; hasPassword: boolean;
-  status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; viewerUrl: string; bytes: number; pictures: number };
-}
-interface ViewerInfo { path: string; passwordSet: boolean; feed: { pushedAt: string; receivedAt: string | null; from: string; day: string } | null; now: string }
-
-function CopyLink({ url }: { url: string }) {
+// ---------- commentator screen online: a static page on Cloudflare R2 ----------
+function CopyLink({ url, label = 'Link copied' }: { url: string; label?: string }) {
   const toast = useToast();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <code className="break-all rounded bg-ink-950 px-2 py-1 text-xs text-accent-200">{url}</code>
-      <Button size="sm" onClick={async () => { try { await navigator.clipboard.writeText(url); toast.ok('Link copied'); } catch { toast.info(url); } }}>Copy</Button>
+      <Button size="sm" onClick={async () => { try { await navigator.clipboard.writeText(url); toast.ok(label); } catch { toast.info(url); } }}>Copy</Button>
     </div>
   );
 }
 
-/**
- * Two halves of one feature. On the PC at the venue: send the commentator data to the online dashboard.
- * On the online dashboard: the read-only link for commentators, and what arrived from the venue.
- */
-function CommentatorOnlineSection() {
+interface StaticSiteInfo {
+  publicUrl: string; everySeconds: number;
+  s3Endpoint: string; s3Bucket: string; s3AccessKey: string; hasS3Secret: boolean;
+  enabled: boolean; url: string;
+  status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
+}
+type SiteForm = Pick<StaticSiteInfo, 'publicUrl' | 'everySeconds' | 's3Endpoint' | 's3Bucket' | 's3AccessKey'> & { s3Secret: string };
+const EVERY: [number, string][] = [[15, '15 seconds'], [30, '30 seconds'], [60, '1 minute'], [120, '2 minutes'], [300, '5 minutes']];
+
+/** The commentator screen as a static page: this PC builds it and sends what changed to Cloudflare R2 (commentary.em27code.com). */
+function StaticPageSection() {
   const qc = useQueryClient();
   const toast = useToast();
-  const { ask, dialog } = useConfirm();
-  const push = useQuery({ queryKey: ['live-push'], queryFn: () => api.get<PushInfo>('/api/live/push'), refetchInterval: 5000 });
-  const viewer = useQuery({ queryKey: ['live-viewer'], queryFn: () => api.get<ViewerInfo>('/api/live/viewer'), refetchInterval: 10000 });
-  const [target, setTarget] = useState<string | null>(null);
-  const [password, setPassword] = useState('');
+  const q = useQuery({ queryKey: ['static-site'], queryFn: () => api.get<StaticSiteInfo>('/api/static-site'), refetchInterval: 5000 });
+  const [f, setF] = useState<SiteForm | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const p = push.data;
-  const st = p?.status;
-  const save = async (body: Partial<{ target: string; password: string; enabled: boolean }>, msg: string) => {
-    setBusy('save');
-    try {
-      qc.setQueryData(['live-push'], await api.put<PushInfo>('/api/live/push', body));
-      if (body.enabled !== false && (body.enabled || p?.enabled)) qc.setQueryData(['live-push'], await api.post<PushInfo>('/api/live/push/now'));
-      setTarget(null); setPassword(''); toast.ok(msg);
-    } catch (e) { toast.error(e); } finally { setBusy(null); }
+  const d = q.data;
+  useEffect(() => { if (d && !f) setF({ publicUrl: d.publicUrl, everySeconds: d.everySeconds, s3Endpoint: d.s3Endpoint, s3Bucket: d.s3Bucket, s3AccessKey: d.s3AccessKey, s3Secret: '' }); }, [d, f]);
+  if (q.isLoading || !f) return <Section id="commentator-online" title="Commentator online"><Loading /></Section>;
+  if (q.error || !d) return <Section id="commentator-online" title="Commentator online"><ErrorBox error={q.error} /></Section>;
+  const set = <K extends keyof SiteForm>(k: K, v: SiteForm[K]) => setF({ ...f, [k]: v });
+  const run = async (key: string, call: () => Promise<StaticSiteInfo>, msg?: string) => {
+    setBusy(key);
+    try { const r = await call(); qc.setQueryData(['static-site'], r); qc.invalidateQueries({ queryKey: ['commentator-link'] }); if (r.status.error) toast.error(r.status.error); else if (msg) toast.ok(msg); }
+    catch (e) { toast.error(e); } finally { setBusy(null); }
   };
-  const onSubmit = (e: FormEvent) => { e.preventDefault(); void save({ target: target ?? p?.target ?? '', ...(password ? { password } : {}) }, 'Saved'); };
-  const v = viewer.data;
-  const link = v ? window.location.origin + v.path : '';
-  const ago = (iso: string | null | undefined) => iso ? fmtDateTime(iso) : '—';
+  // saving always sends the form (with the secret only when typed), then publishes at once when publishing is on
+  const send = (extra: { enabled?: boolean } = {}) => async () => {
+    const { s3Secret, ...rest } = f;
+    await api.put('/api/static-site', { ...rest, ...(s3Secret ? { s3Secret } : {}), ...extra });
+    setF({ ...f, s3Secret: '' });
+    return (extra.enabled ?? d.enabled) ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site');
+  };
+  const st = d.status;
+  const when = (iso: string | null) => (iso ? fmtDateTime(iso) : '—');
   return (
-    <Section id="commentator-push" title="Commentator via the online dashboard (alternative)"
-      desc={<>Instead of the static page above: the PC at the venue sends the data every 5 s to the online dashboard (for example <code>https://sslgfx.em27code.com</code>); commentators open a link that shows only the commentator screen and cannot change anything. The venue PC is not reachable from the internet.</>}>
-      <h3 className="text-sm font-semibold text-ink-200">1. On the PC at the venue: send the data</h3>
-      {push.isLoading ? <Loading /> : push.error ? <ErrorBox error={push.error} /> : p && (
-        <>
-          <form onSubmit={onSubmit} className="mt-2 grid gap-3 md:grid-cols-[2fr_1fr_auto] md:items-end">
-            <Field label="Online dashboard address">
-              <input className="input font-mono text-xs" value={target ?? p.target} onChange={(e) => setTarget(e.target.value)} placeholder="https://sslgfx.em27code.com" />
-            </Field>
-            <Field label={p.hasPassword ? 'Its password (saved; type to change)' : 'Its password (DASHBOARD_PASSWORD)'}>
-              <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={p.hasPassword ? '••••••••' : ''} autoComplete="new-password" />
-            </Field>
-            <Button type="submit" variant="primary" busy={busy === 'save'} disabled={(target === null || target === p.target) && !password}>Save</Button>
-          </form>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={p.enabled} disabled={!p.target || busy === 'save'}
-                onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? 'Sending switched on' : 'Sending switched off')} />
-              Send every 5 seconds
-            </label>
-            <Button size="sm" busy={busy === 'now'} disabled={!p.target} onClick={async () => {
-              setBusy('now');
-              try { const r = await api.post<PushInfo>('/api/live/push/now'); qc.setQueryData(['live-push'], r); if (r.status.error) toast.error(r.status.error); else toast.ok('Sent'); }
-              catch (e) { toast.error(e); } finally { setBusy(null); }
-            }}>Send now</Button>
-            {st && (st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Sent {ago(st.lastOkAt)}</Badge> : p.enabled ? <Badge>Waiting</Badge> : <Badge>Off</Badge>)}
-          </div>
-          {st?.error && <p className="mt-2 text-sm text-red-300">{st.error}</p>}
-          {st?.lastOkAt && <p className="mt-2 text-xs text-ink-400">Last change sent {ago(st.lastChangeAt)} · {Math.round(st.bytes / 1024)} KB of data · {st.pictures} pictures</p>}
-          {st?.viewerUrl && <div className="mt-3"><p className="mb-1 text-xs text-ink-400">Link for commentators (open in any browser; read-only):</p><CopyLink url={st.viewerUrl} /></div>}
-        </>
-      )}
-
-      <h3 className="mt-6 text-sm font-semibold text-ink-200">2. On the online dashboard: the commentator link</h3>
-      {viewer.isLoading ? <Loading /> : viewer.error ? <ErrorBox error={viewer.error} /> : v && (
-        <div className="mt-2 space-y-2 text-sm">
-          {!v.passwordSet ? <p className="text-ink-400">This is a local dashboard (no DASHBOARD_PASSWORD), so it does not receive data: the link for commentators is the one in part 1, or in these settings on the online dashboard.</p> : <>
-          <CopyLink url={link} />
-          <p className="text-xs text-ink-400">
-            {v.feed ? <>Data from the venue: received {ago(v.feed.receivedAt)}{v.feed.from ? ` from ${v.feed.from}` : ''}, day {v.feed.day}. </> : <>Nothing received from the venue yet: the link shows this dashboard&apos;s own data. </>}
-            Preview: <a className="text-accent-300 underline" href="/live" target="_blank" rel="noreferrer">/live</a>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="danger" busy={busy === 'rotate'} onClick={async () => {
-              if (!(await ask('Make a new commentator link?', 'The current link and everyone who opened it stop working at once. Send the new link to the commentators.', 'Make a new link'))) return;
-              setBusy('rotate');
-              try { await api.post('/api/live/viewer/rotate'); qc.invalidateQueries({ queryKey: ['live-viewer'] }); qc.invalidateQueries({ queryKey: ['live-push'] }); toast.ok('New link ready'); }
-              catch (e) { toast.error(e); } finally { setBusy(null); }
-            }}>New link (old one stops working)</Button>
-            {v.feed && <Button size="sm" busy={busy === 'clear'} onClick={async () => {
-              if (!(await ask('Forget the data from the venue?', 'The link then shows this dashboard\'s own data until the venue PC sends again.', 'Forget'))) return;
-              setBusy('clear');
-              try { await api.del('/api/live-feed'); qc.invalidateQueries({ queryKey: ['live-viewer'] }); toast.ok('Data from the venue removed'); }
-              catch (e) { toast.error(e); } finally { setBusy(null); }
-            }}>Forget data from the venue</Button>}
-          </div>
-          </>}
+    <Section id="commentator-online" title="Commentator online"
+      desc={<>The commentator screen as a read-only web page on <b>{f.publicUrl || 'our domain'}</b>: this PC builds it and sends what changed to Cloudflare R2. Nothing runs there but the web server, so there is nothing to crash; the page keeps the last data when this PC is off. Put it on any website with the iframe code below.</>}>
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); void run('save', send(), 'Saved'); }} className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-[2fr_1fr]">
+          <Field label="S3 endpoint (Cloudflare R2 → bucket → Settings)"><input className="input font-mono text-xs" value={f.s3Endpoint} onChange={(e) => set('s3Endpoint', e.target.value)} placeholder="https://<account-id>.r2.cloudflarestorage.com" /></Field>
+          <Field label="Bucket"><input className="input font-mono text-xs" value={f.s3Bucket} onChange={(e) => set('s3Bucket', e.target.value)} placeholder="ssl-commentary" /></Field>
+          <Field label="Access Key ID"><input className="input font-mono text-xs" value={f.s3AccessKey} onChange={(e) => set('s3AccessKey', e.target.value)} autoComplete="off" /></Field>
+          <Field label={d.hasS3Secret ? 'Secret Access Key (saved; type to change)' : 'Secret Access Key'}><input className="input" type="password" value={f.s3Secret} onChange={(e) => set('s3Secret', e.target.value)} placeholder={d.hasS3Secret ? '••••••••' : ''} autoComplete="new-password" /></Field>
+          <Field label="Web address (the bucket's custom domain)"><input className="input font-mono text-xs" value={f.publicUrl} onChange={(e) => set('publicUrl', e.target.value)} placeholder="https://commentary.em27code.com" /></Field>
+          <Field label="Send new data every">
+            <select className="input" value={f.everySeconds} onChange={(e) => set('everySeconds', Number(e.target.value))}>
+              {EVERY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </Field>
         </div>
-      )}
-      {dialog}
+        <Button type="submit" variant="primary" busy={busy === 'save'}>Save</Button>
+      </form>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={d.enabled} disabled={busy !== null}
+            onChange={(e) => run('toggle', send({ enabled: e.target.checked }), e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
+          Publish automatically
+        </label>
+        <Button size="sm" busy={busy === 'now'} onClick={() => run('now', () => api.post<StaticSiteInfo>('/api/static-site/publish'), 'Published')}>Publish now</Button>
+        {st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Published {when(st.lastOkAt)}</Badge> : <Badge>{d.enabled ? 'Waiting' : 'Off'}</Badge>}
+      </div>
+      {st.error && <p className="mt-2 text-sm text-red-300">{st.error}</p>}
+      {st.lastOkAt && <p className="mt-2 text-xs text-ink-400">Data last changed {when(st.lastChangeAt)} · data.json {Math.round(st.dataBytes / 1024)} KB · {st.pictures} pictures · last round sent {st.uploadedFiles} file{st.uploadedFiles === 1 ? '' : 's'}</p>}
+      <div className="mt-3 space-y-2">
+        <p className="text-xs text-ink-400">Link for commentators (any network, any browser; read-only):</p>
+        <CopyLink url={d.url} />
+        <p className="text-xs text-ink-400">Iframe, to put the screen inside another web page:</p>
+        <CopyLink url={iframeCode(d.url)} label="Iframe code copied" />
+      </div>
     </Section>
   );
 }
-
-// ---------- commentator screen as a static page ----------
-interface StaticSiteInfo {
-  mode: 'folder' | 'ftp' | 'https' | 's3'; localDir: string; publicUrl: string; ftpHost: string; ftpPort: number; ftpUser: string; ftpDir: string; ftpSecure: boolean; hasFtpPassword: boolean;
-  s3Endpoint: string; s3Bucket: string; s3AccessKey: string; s3Region: string; hasS3Secret: boolean;
-  enabled: boolean; url: string; folderName: string;
-  status: { lastAttemptAt: string | null; lastOkAt: string | null; lastChangeAt: string | null; error: string; uploadedFiles: number; dataBytes: number; pictures: number; target: string };
-}
-type SiteForm = Omit<StaticSiteInfo, 'enabled' | 'url' | 'folderName' | 'status' | 'hasFtpPassword' | 'hasS3Secret'> & { ftpPassword: string; s3Secret: string };
 
 /** The Tracking tab of the commentator screen: a live tracking page (e.g. GeoRacing) in a frame. */
 function TrackingSection() {
@@ -496,95 +463,3 @@ function TrackingSection() {
   );
 }
 
-/** The PC at the venue writes the commentator screen as a static web page and uploads it (FTP) or saves it to a folder. */
-function StaticPageSection() {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const { ask, dialog } = useConfirm();
-  const q = useQuery({ queryKey: ['static-site'], queryFn: () => api.get<StaticSiteInfo>('/api/static-site'), refetchInterval: 5000 });
-  const [f, setF] = useState<SiteForm | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const d = q.data;
-  useEffect(() => { if (d && !f) setF({ mode: d.mode, localDir: d.localDir, publicUrl: d.publicUrl, ftpHost: d.ftpHost, ftpPort: d.ftpPort, ftpUser: d.ftpUser, ftpDir: d.ftpDir, ftpSecure: d.ftpSecure, ftpPassword: '', s3Endpoint: d.s3Endpoint, s3Bucket: d.s3Bucket, s3AccessKey: d.s3AccessKey, s3Region: d.s3Region, s3Secret: '' }); }, [d, f]);
-  if (q.isLoading || !f) return <Section id="commentator-online" title="Commentator online"><Loading /></Section>;
-  if (q.error || !d) return <Section id="commentator-online" title="Commentator online"><ErrorBox error={q.error} /></Section>;
-  const set = <K extends keyof SiteForm>(k: K, v: SiteForm[K]) => setF({ ...f, [k]: v });
-  const run = async (key: string, call: () => Promise<StaticSiteInfo>, msg?: string) => {
-    setBusy(key);
-    try { const r = await call(); qc.setQueryData(['static-site'], r); qc.invalidateQueries({ queryKey: ['commentator-link'] }); if (r.status.error && key !== 'save') toast.error(r.status.error); else if (msg) toast.ok(msg); }
-    catch (e) { toast.error(e); } finally { setBusy(null); }
-  };
-  const save = (e: FormEvent) => {
-    e.preventDefault();
-    const { ftpPassword, s3Secret, ...rest } = f;
-    void run('save', async () => { await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}), ...(s3Secret ? { s3Secret } : {}) }); setF({ ...f, ftpPassword: '', s3Secret: '' }); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'Saved');
-  };
-  const st = d.status;
-  const when = (iso: string | null) => (iso ? fmtDateTime(iso) : '—');
-  return (
-    <Section id="commentator-online" title="Commentator online"
-      desc={<>The commentator screen as a <b>static web page</b>: every 5 minutes this PC writes <code>index.html</code>, <code>data.json</code> and the pictures, and uploads only what changed. On the web host nothing runs but the web server, so there is nothing to crash. The random folder name in the address is the key; the page is read-only.</>}>
-      <form onSubmit={save} className="space-y-3">
-        <div className="flex flex-wrap gap-4 text-sm">
-          {(['s3', 'https', 'ftp', 'folder'] as const).map((m) => (
-            <label key={m} className="flex items-center gap-2"><input type="radio" checked={f.mode === m} onChange={() => set('mode', m)} />{{ s3: 'Cloudflare R2 / S3 (recommended)', https: 'HTTPS to upload.php', ftp: 'FTP', folder: 'Only a folder on this PC' }[m]}</label>
-          ))}
-        </div>
-        {f.mode === 's3' ? (
-          <div className="space-y-3">
-            <p className="text-sm text-ink-400">Cloudflare R2: R2 → Create bucket → Settings → Public access (r2.dev) on; R2 → Manage API tokens → Object Read &amp; Write for this bucket. Paste the S3 endpoint, the bucket name and the token's Access Key ID and Secret here; the web address below is the bucket's public <code>https://pub-….r2.dev</code>.</p>
-            <div className="grid gap-3 md:grid-cols-[2fr_1fr_100px]">
-              <Field label="S3 endpoint"><input className="input font-mono text-xs" value={f.s3Endpoint} onChange={(e) => set('s3Endpoint', e.target.value)} placeholder="https://<account-id>.r2.cloudflarestorage.com" /></Field>
-              <Field label="Bucket"><input className="input font-mono text-xs" value={f.s3Bucket} onChange={(e) => set('s3Bucket', e.target.value)} placeholder="ssl-commentary" /></Field>
-              <Field label="Region"><input className="input font-mono text-xs" value={f.s3Region} onChange={(e) => set('s3Region', e.target.value)} placeholder="auto" /></Field>
-              <Field label="Access Key ID"><input className="input font-mono text-xs" value={f.s3AccessKey} onChange={(e) => set('s3AccessKey', e.target.value)} autoComplete="off" /></Field>
-              <Field label={d.hasS3Secret ? 'Secret Access Key (saved; type to change)' : 'Secret Access Key'} className="md:col-span-2"><input className="input" type="password" value={f.s3Secret} onChange={(e) => set('s3Secret', e.target.value)} placeholder={d.hasS3Secret ? '••••••••' : ''} autoComplete="new-password" /></Field>
-            </div>
-          </div>
-        ) : f.mode === 'https' ? (
-          <div className="rounded-md border border-ink-800 bg-ink-950/40 p-3 text-sm text-ink-300">
-            Works on any network (port 443, like a web page). Once: download <b>upload.php</b> and put it in the web folder of the address below
-            (e.g. <code>public_html/commentary</code>) with the hosting's file manager. It holds only a fingerprint of this PC's key and accepts nothing but the commentator page files.
-            <div className="mt-2"><a className="btn btn-secondary inline-flex items-center rounded-md border border-ink-700 px-3 py-1.5 text-sm hover:bg-ink-800" href="/api/static-site/upload.php" download>Download upload.php</a></div>
-          </div>
-        ) : f.mode === 'ftp' ? (
-          <div className="grid gap-3 md:grid-cols-[2fr_100px_1fr_1fr]">
-            <Field label="FTP server"><input className="input font-mono text-xs" value={f.ftpHost} onChange={(e) => set('ftpHost', e.target.value)} placeholder="h55.seohost.pl" /></Field>
-            <Field label="Port"><input className="input font-mono text-xs" inputMode="numeric" value={f.ftpPort} onChange={(e) => set('ftpPort', Number(e.target.value.replace(/\D/g, '')) || 0)} /></Field>
-            <Field label="FTP user"><input className="input font-mono text-xs" value={f.ftpUser} onChange={(e) => set('ftpUser', e.target.value)} autoComplete="off" /></Field>
-            <Field label={d.hasFtpPassword ? 'Password (saved; type to change)' : 'Password'}><input className="input" type="password" value={f.ftpPassword} onChange={(e) => set('ftpPassword', e.target.value)} placeholder={d.hasFtpPassword ? '••••••••' : ''} autoComplete="new-password" /></Field>
-            <Field label="Folder on the server (empty = the FTP account's own folder)" className="md:col-span-2"><input className="input font-mono text-xs" value={f.ftpDir} onChange={(e) => set('ftpDir', e.target.value)} placeholder="" /></Field>
-            <label className="flex items-center gap-2 self-end pb-2 text-sm md:col-span-2"><input type="checkbox" className="h-4 w-4 accent-sky-500" checked={f.ftpSecure} onChange={(e) => set('ftpSecure', e.target.checked)} />Encrypted (FTPS); switch off only if the host does not offer it</label>
-          </div>
-        ) : (
-          <Field label="Folder on this PC"><input className="input font-mono text-xs" value={f.localDir} onChange={(e) => set('localDir', e.target.value)} /></Field>
-        )}
-        <Field label="Web address of that folder (what commentators open, without the random part)">
-          <input className="input font-mono text-xs" value={f.publicUrl} onChange={(e) => set('publicUrl', e.target.value)} placeholder={f.mode === 's3' ? 'https://pub-xxxxxxxx.r2.dev' : 'https://commentary.em27code.com'} />
-        </Field>
-        <Button type="submit" variant="primary" busy={busy === 'save'}>Save</Button>
-      </form>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="h-4 w-4 accent-sky-500" checked={d.enabled} disabled={busy !== null}
-            onChange={(e) => run('toggle', async () => { const { ftpPassword, s3Secret, ...rest } = f; await api.put('/api/static-site', { ...rest, ftpPort: Number(rest.ftpPort) || 21, ...(ftpPassword ? { ftpPassword } : {}), ...(s3Secret ? { s3Secret } : {}), enabled: e.target.checked }); setF({ ...f, ftpPassword: '', s3Secret: '' }); return e.target.checked ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, e.target.checked ? 'Publishing switched on' : 'Publishing switched off')} />
-          Publish every 5 minutes
-        </label>
-        <Button size="sm" busy={busy === 'now'} onClick={() => run('now', () => api.post<StaticSiteInfo>('/api/static-site/publish'), 'Published')}>Publish now</Button>
-        {st.error ? <Badge tone="error" title={st.error}>Error</Badge> : st.lastOkAt ? <Badge tone="ok">Published {when(st.lastOkAt)}</Badge> : <Badge>{d.enabled ? 'Waiting' : 'Off'}</Badge>}
-      </div>
-      {st.error && <p className="mt-2 text-sm text-red-300">{st.error}</p>}
-      {st.lastOkAt && <p className="mt-2 text-xs text-ink-400">Data last changed {when(st.lastChangeAt)} · data.json {Math.round(st.dataBytes / 1024)} KB · {st.pictures} pictures · last round sent {st.uploadedFiles} file{st.uploadedFiles === 1 ? '' : 's'} · {st.target}</p>}
-      <div className="mt-3">
-        <p className="mb-1 text-xs text-ink-400">Link for commentators (any network, any browser; read-only):</p>
-        {d.url ? <><CopyLink url={d.url} /><p className="mb-1 mt-3 text-xs text-ink-400">Iframe, to put the screen inside another web page:</p><CopyLink url={iframeCode(d.url)} /></> : <p className="text-sm text-ink-400">Fill in the web address above. Folder name: <code>{d.folderName}</code></p>}
-      </div>
-      <Button className="mt-3" size="sm" variant="danger" busy={busy === 'addr'} onClick={async () => {
-        if (!(await ask('Move the page to a new address?', 'The page is published under a new random folder name, so the old link stops getting new data. Delete the old folder on the host by hand (FTP) so it disappears completely.', 'New address'))) return;
-        void run('addr', async () => { await api.post('/api/static-site/new-address'); return d.enabled ? api.post<StaticSiteInfo>('/api/static-site/publish') : api.get<StaticSiteInfo>('/api/static-site'); }, 'New address ready');
-      }}>New address (old link stops updating)</Button>
-      {dialog}
-    </Section>
-  );
-}

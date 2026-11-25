@@ -13,8 +13,8 @@ import '../index.css';
  */
 setStaticSource('');
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 2, refetchOnWindowFocus: true, staleTime: 3_000 } } });
-// New data from the venue shows within a few seconds: ?refresh=<seconds> in the address sets how often to look (2–60, default 3).
-const every = Math.min(60, Math.max(2, Number(new URLSearchParams(window.location.search).get('refresh')) || 3)) * 1000;
+// New data from the venue shows within a few seconds: ?refresh=<seconds> in the address sets how often to look (2–60, default 10).
+const every = Math.min(60, Math.max(2, Number(new URLSearchParams(window.location.search).get('refresh')) || 10)) * 1000;
 watchStaticData(every, () => void qc.invalidateQueries());
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

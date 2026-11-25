@@ -4,21 +4,13 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { Button, cx, useToast } from './ui';
 
-interface ViewerInfo { path: string; passwordSet: boolean }
-interface PushInfo { enabled: boolean; status: { viewerUrl: string; error: string; lastOkAt: string | null } }
+interface SiteInfo { enabled: boolean; url: string; status: { error: string; lastOkAt: string | null } }
 
-/**
- * The read-only link for commentators, one click away in the top bar.
- * Online dashboard: its own link. Venue PC: the link the online dashboard returned to the last push.
- */
+/** The read-only link for commentators (the static page on our domain), one click away in the top bar. */
 export function useCommentatorLink() {
-  const site = useQuery({ queryKey: ['commentator-link', 'static'], queryFn: () => api.get<{ enabled: boolean; url: string; status: { error: string; lastOkAt: string | null } }>('/api/static-site'), refetchInterval: 10_000 });
-  const viewer = useQuery({ queryKey: ['live-viewer'], queryFn: () => api.get<ViewerInfo>('/api/live/viewer'), staleTime: 30_000 });
-  const push = useQuery({ queryKey: ['live-push'], queryFn: () => api.get<PushInfo>('/api/live/push'), enabled: viewer.data?.passwordSet === false, refetchInterval: 10_000 });
-  // the static page comes first: it is what the venue PC publishes when switched on
-  if (site.data?.enabled && site.data.url) return { url: site.data.url, sending: { enabled: true, status: { viewerUrl: site.data.url, error: site.data.status.error, lastOkAt: site.data.status.lastOkAt } } as PushInfo };
-  if (viewer.data?.passwordSet) return { url: window.location.origin + viewer.data.path, sending: null as PushInfo | null };
-  return { url: push.data?.status.viewerUrl ?? '', sending: push.data ?? null };
+  const site = useQuery({ queryKey: ['commentator-link', 'static'], queryFn: () => api.get<SiteInfo>('/api/static-site'), refetchInterval: 10_000 });
+  const d = site.data;
+  return { url: d?.enabled ? d.url : '', sending: d ? { enabled: d.enabled, status: d.status } : null };
 }
 
 /** HTML that puts the commentator screen inside another page (the page fills the frame; 16:9 by default). */
