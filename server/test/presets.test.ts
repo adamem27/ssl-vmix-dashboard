@@ -99,7 +99,7 @@ describe('rooming list', () => {
     const ant = createTeam(db, { name: 'Antigua and Barbuda', code: 'ANT' });
     createSailor(db, ant, { firstName: 'Jules', lastName: 'Mitchell', defaultPosition: 'Tactician' });
     const r = applyFinalsSquadsOnStart(ctx)!;
-    expect(r.teams).toBe(1);
+    expect(r.first!.teams).toBe(1);
     const s = db.prepare('SELECT * FROM sailors WHERE id = ?').get(simon) as any;
     expect([s.default_position, s.default_number, s.best_result_1]).toEqual(['Helm', '10', 'World Champion Sunfish 2025 gold medal']);
     expect((db.prepare('SELECT COUNT(*) n FROM sailors WHERE team_id = ?').get(col) as any).n).toBe(10);
@@ -108,5 +108,31 @@ describe('rooming list', () => {
     db.prepare("UPDATE sailors SET default_position = 'Pit' WHERE id = ?").run(simon);
     expect(applyFinalsSquadsOnStart(ctx)).toBeNull();
     expect((db.prepare('SELECT default_position p FROM sailors WHERE id = ?').get(simon) as any).p).toBe('Pit');
+  });
+
+  it('second batch of squad sheets: the sheet names spelled in the dashboard, two of one family name told apart', async () => {
+    const { applyFinalsSquadsOnStart, loadFinalsSquads } = await import('../src/services/presets.js');
+    const { createTeam } = await import('../src/services/teams.js');
+    const { createSailor } = await import('../src/services/sailors.js');
+    const squads = loadFinalsSquads('goldcup-finals-squads-2.json');
+    expect(squads.map((t) => t.code)).toEqual(['CHI', 'CZE', 'ECU', 'HUN', 'JPN', 'PER', 'RSA', 'THA']);
+    for (const t of squads) for (const m of t.crew) expect(Object.keys(m).sort()).toEqual(['best', 'captain', 'firstName', 'lastName', 'number', 'position']);
+    const db = openDb(':memory:');
+    const ctx = { db, assetsDir: '/tmp/ssl-rooming-test' };
+    const chi = createTeam(db, { name: 'Chile', code: 'CHI' });
+    const felipe = createSailor(db, chi, { firstName: 'Pedro Felipe', lastName: 'Robles', defaultPosition: 'Helm' });
+    const rodrigo = createSailor(db, chi, { firstName: 'Rodrigo', lastName: 'Robles' });
+    const rsa = createTeam(db, { name: 'South Africa', code: 'RSA' });
+    const georgeo = createSailor(db, rsa, { firstName: 'Georgeo', lastName: 'Divaris' });
+    const ecu = createTeam(db, { name: 'Ecuador', code: 'ECU' });
+    const julio = createSailor(db, ecu, { firstName: 'Jullo', lastName: 'Velez', defaultNumber: '10' });
+    const r = applyFinalsSquadsOnStart(ctx)!;
+    expect(r.second!.teams).toBe(3);
+    const get = (id: string) => db.prepare('SELECT * FROM sailors WHERE id = ?').get(id) as any;
+    expect([get(felipe).default_number, get(rodrigo).default_number]).toEqual(['8', '6']);
+    expect(get(georgeo).last_name).toBe('Davaris');
+    expect([get(julio).first_name, get(julio).is_captain]).toEqual(['Julio', 1]);
+    expect(r.second!.renamed).toBe(2);
+    expect(applyFinalsSquadsOnStart(ctx)).toBeNull();
   });
 });
