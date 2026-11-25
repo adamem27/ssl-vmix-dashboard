@@ -301,25 +301,35 @@ describe('show control', () => {
     expect(v.overlays[1]).toBe('10');
   });
 
-  it('clean break on a vMix Mix: the virtual copy of each board fades in there as the boards switch, no ticker', async () => {
+  it('clean break on a vMix Mix: all the time the boards in turn, as their virtual copies, every switch time; no ticker', async () => {
     const { s } = race();
-    setShowConfig(s.db, { breakMix: 2, breakOutMs: 0 });
-    const v = fakeVmix({ ...TITLES, 'ssl_schedule - Virtual': [] });
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30 });
+    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text', 'Ticker1.Text'], 'ssl_schedule - Virtual': [], 'ssl_lbar - Virtual': [] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    await show.run('show:break');
-    show.stopRotation();
-    const virt = v.num('ssl_schedule - Virtual');
-    expect(v.calls).toContain(`?Function=Fade&Duration=500&Input=k${virt}&Mix=1`);
-    v.calls.length = 0;
-    await show.run('nextslide');
-    // a board with no copy of its own goes to the Mix itself
-    expect(v.calls.at(-1)).toMatch(/^\?Function=Fade&Duration=500&Input=k\d+&Mix=1$/);
-    expect(v.calls.some((c) => /Fade.*Mix=/.test(c) && c.includes(`Input=k${v.num('ssl_ticker')}&`))).toBe(false);
+    const fades = () => v.calls.filter((c) => c.startsWith('?Function=Fade'));
+    // off air: the first board at once
+    await show.mixLoop(100_000);
+    expect(fades()).toEqual([`?Function=Fade&Duration=500&Input=k${v.num('ssl_schedule - Virtual')}&Mix=1`]);
+    expect(Object.values(v.overlays).filter(Boolean)).toEqual([]);
+    // not before the switch time, then the next board (a group's results: no copy, the input itself)
+    await show.mixLoop(110_000);
+    expect(fades()).toHaveLength(1);
+    await show.mixLoop(131_000);
+    expect(fades()).toHaveLength(2);
+    expect(fades()[1]).toMatch(/^\?Function=Fade&Duration=500&Input=k\d+&Mix=1$/);
+    expect(fades().some((c) => c.includes(`Input=k${v.num('ssl_ticker')}&`))).toBe(false);
+    // and round again
+    await show.mixLoop(162_000);
+    expect(fades()[2]).toBe(fades()[0]);
+    // the L-bar is kept in step without a key (its copy is the Mix's layer), its ticker line left alone
+    await show.syncData();
+    expect(v.vals.get(`${v.num('ssl_lbar - Virtual')}|TITLE.Text`)).toBe('TODAY');
+    expect(v.vals.get(`${v.num('ssl_lbar')}|Ticker1.Text`)).toBeUndefined();
     // Mix 1 would be the program: off
     setShowConfig(s.db, { breakMix: 1 });
     v.calls.length = 0;
-    await show.run('nextslide');
-    expect(v.calls.some((c) => c.includes('Mix='))).toBe(false);
+    await show.mixLoop(300_000);
+    expect(fades()).toEqual([]);
   });
 
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
