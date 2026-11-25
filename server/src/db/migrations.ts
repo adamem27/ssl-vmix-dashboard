@@ -410,5 +410,21 @@ CREATE TABLE sailor_details_rows (
 );
 `,
   },
+  {
+    version: 13,
+    name: 'translated tickers',
+    sql: `
+-- The bottom ticker's messages in other languages (Show control → Ticker languages): machine translations, kept so a
+-- message is translated once, and corrections typed by hand (manual = 1), which a machine translation never replaces.
+CREATE TABLE ticker_translations (
+  source TEXT NOT NULL,
+  lang TEXT NOT NULL,
+  text TEXT NOT NULL,
+  manual INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (source, lang)
+);
+`,
+  },
 ];
 

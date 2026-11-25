@@ -346,6 +346,21 @@ describe('show control', () => {
     expect(show.mixStatus.missing).toEqual([]);
   });
 
+  it('the bottom ticker source for the translated tickers: the messages of the version on air, else one loop of the text typed in vMix', async () => {
+    const { s } = race();
+    seedGraphicSets(s.db, activeEvent(s.db).id);
+    const v = fakeVmix({ ...TITLES, ssl_ticker: ['Ticker1.Text'] });
+    v.vals.set(`${v.num('ssl_ticker')}|Ticker1.Text`, repeatLoop('TYPED IN VMIX I '));
+    expect(await new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher).tickerSource()).toEqual({ messages: ['TYPED IN VMIX I'], sep: ' ' });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('ticker:thanks');
+    show.invalidate();
+    const src = await show.tickerSource();
+    expect(src?.messages).toHaveLength(1);
+    expect(src?.messages[0]).toMatch(/^THANKS FOR WATCHING/);
+    expect(src?.sep).toBe(' I ');
+  });
+
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);

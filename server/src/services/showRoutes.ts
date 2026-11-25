@@ -16,6 +16,8 @@ import { getLtConfig } from './lowerthirds.js';
 import { todayIn } from './dates.js';
 
 /** Show control: one GET per Stream Deck key (/api/show/key/<page>/<row>/<col>, older presets /api/show/do?a=…), the tab's view and the Companion page files. */
+import { hasDeeplKey, setDeeplKey, setManualTranslation, setTickerLangsConfig } from './tickerLangs.js';
+
 export function registerShowRoutes(app: FastifyInstance, ctx: AssetCtx, show: Show) {
   const { db } = ctx;
   // a change anywhere in the dashboard (teams, groups, line-ups, General graphics…) shows on the keys at once
@@ -25,6 +27,18 @@ export function registerShowRoutes(app: FastifyInstance, ctx: AssetCtx, show: Sh
     const fleets = (listSets(db, ev) as { id: string; name: string }[]).flatMap((s) => getSetDetail(db, s.id).fleets.map((f) => ({ id: f.id, name: `${s.name} · ${f.name}`, size: f.filled })));
     return { ...(await show.view()), fleets, tickers: listGraphicSets(db, ev, 'ticker').map((t) => ({ id: t.id, name: t.name })), breakGroups: show.breakStageFleets(), breakShown: show.breakFleets(), companionUrl: JSON.parse(getSetting(db, 'lt.config') || '{}').companionUrl ?? '', companion: show.companionStatus() };
   });
+  // Ticker languages: the bottom ticker translated (DeepL) onto the streaming PCs
+  app.get('/api/ticker-langs', async () => show.langs.view());
+  app.put('/api/ticker-langs/config', async (req) => { const c = setTickerLangsConfig(db, req.body); show.langs.resend(); return c; });
+  app.put('/api/ticker-langs/key', async (req: any) => { setDeeplKey(db, String(req.body?.key ?? '')); show.langs.resend(); return { hasKey: hasDeeplKey(db) }; });
+  app.put('/api/ticker-langs/translation', async (req: any) => {
+    const b = req.body ?? {};
+    if (typeof b.source !== 'string' || typeof b.lang !== 'string') throw badRequest('Give source and lang.');
+    setManualTranslation(db, b.source, b.lang, String(b.text ?? ''));
+    show.langs.resend();
+    return { ok: true };
+  });
+  app.post('/api/ticker-langs/send', async () => { show.langs.resend(); await show.langs.tick(); return show.langs.view(); });
   app.put('/api/show/config', async (req) => {
     const c = setShowConfig(db, showConfigSchema.partial().parse(req.body));
     void show.pushLabels(); // only the keys that changed (the key editor, colours…)

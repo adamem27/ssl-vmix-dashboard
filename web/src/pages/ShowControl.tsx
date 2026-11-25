@@ -4,6 +4,7 @@ import { api } from '../api';
 import { FoldTitle, useFold } from '../components/fold';
 import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
+import { TickerLangsPanel } from './TickerLangs';
 
 interface Config {
   inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; tickerNext: string; tickerEnd: string;
@@ -179,6 +180,7 @@ function Show({ data }: { data: ShowData }) {
         </div>
       </Panel>
       <BreakScene data={data} onSaved={refresh} />
+      <TickerLangsPanel />
       <CompanionSetup data={data} onSaved={refresh} />
     </div>
   );
