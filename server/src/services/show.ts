@@ -123,6 +123,8 @@ export const showConfigSchema = z.object({
   /** its overlay channels (shown on that Mix only): the copies of the boards in turn, and the copy of the L-bar */
   mixBoardLayer: z.number().int().min(5).max(8).default(6),
   mixLbarLayer: z.number().int().min(0).max(8).default(5),
+  /** vMix numbers Mix in shortcuts from 1 (1 = the main output, 2 = Mix 2); on = from 0, as a fallback */
+  mixZeroBased: z.boolean().default(false),
   /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
   cfgVersion: z.number().int().default(4),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
@@ -1465,10 +1467,11 @@ export class Show {
     const mix = cfg.breakMix;
     if (mix < 2 || this.mixBusy) return; // Mix 1 is the program
     this.mixBusy = true;
-    const at = `&Mix=${mix - 1}`;
+    const at = `&Mix=${cfg.mixZeroBased ? mix - 1 : mix}`;
     // what this loop put on the Mix's channels: vMix's XML may show only the program's overlays, so a channel is
     // sent again only when it should change (never every 2 s, which would replay the animation)
-    if (this.mixFor !== `${mix}|${cfg.mixBoardLayer}|${cfg.mixLbarLayer}`) { this.mixOn = {}; this.mixFor = `${mix}|${cfg.mixBoardLayer}|${cfg.mixLbarLayer}`; }
+    const key = `${mix}|${cfg.mixBoardLayer}|${cfg.mixLbarLayer}|${cfg.mixZeroBased}`;
+    if (this.mixFor !== key) { this.mixOn = {}; this.mixFor = key; }
     try {
       const { inputs } = await this.snapshot();
       const missing: string[] = [];

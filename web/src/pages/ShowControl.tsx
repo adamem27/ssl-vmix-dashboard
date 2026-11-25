@@ -7,7 +7,7 @@ import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 import { TickerLangsPanel } from './TickerLangs';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; mixZeroBased?: boolean; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -303,6 +303,7 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           {(c.breakMix ?? 0) >= 2 && <div className="flex gap-3">
             <label className="block text-xs text-ink-400">Mix: boards channel<input type="number" min={5} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixBoardLayer ?? 6} onChange={(e) => setC({ ...c, mixBoardLayer: Math.max(5, Math.min(8, Number(e.target.value) || 6)) })} /></label>
             <label className="block text-xs text-ink-400">Mix: L-bar channel (0 = none)<input type="number" min={0} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixLbarLayer ?? 5} onChange={(e) => setC({ ...c, mixLbarLayer: Math.max(0, Math.min(8, Number(e.target.value) || 0)) })} /></label>
+            <label className="flex items-center gap-2 self-end text-xs text-ink-400" title="Off (default): the Mix number is sent as in vMix (Mix=2 for Mix 2, 1 is the main output). On: counted from 0 (Mix=1 for Mix 2), for a vMix that takes it so."><input type="checkbox" checked={!!c.mixZeroBased} onChange={(e) => setC({ ...c, mixZeroBased: e.target.checked })} /> Mix counted from 0</label>
           </div>}
           {(c.breakMix ?? 0) >= 2 && data.mixStatus && <div className="text-xs text-ink-400">
             Mix {c.breakMix}: {data.mixStatus.board || 'no board yet'}{data.mixStatus.lbar ? ` + ${data.mixStatus.lbar}` : ''}

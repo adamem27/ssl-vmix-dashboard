@@ -309,8 +309,8 @@ describe('show control', () => {
     const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
     await show.mixLoop(100_000);
     expect(ov()).toEqual([
-      `?Function=OverlayInput5In&Input=k${v.num('ssl_lbar 2')}&Mix=1`,
-      `?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=1`,
+      `?Function=OverlayInput5In&Input=k${v.num('ssl_lbar 2')}&Mix=2`,
+      `?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=2`,
     ]);
     // a board with no copy named 2 is never put on the Mix as itself: it is listed as missing
     expect(show.mixStatus.missing).toContain('ssl_results_group_4 2');
@@ -338,9 +338,9 @@ describe('show control', () => {
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
     await show.mixLoop(100_000);
-    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=1`]);
+    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=2`]);
     await show.mixLoop(131_000);
-    expect(ov().slice(1)).toEqual(['?Function=OverlayInput6Out&Mix=1', `?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=1`]);
+    expect(ov().slice(1)).toEqual(['?Function=OverlayInput6Out&Mix=2', `?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`]);
     await show.mixLoop(162_000);
     expect(ov().at(-1)).toBe(ov()[0]);
     expect(show.mixStatus.missing).toEqual([]);
