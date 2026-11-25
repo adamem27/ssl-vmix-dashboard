@@ -44,7 +44,7 @@ function fakeVmix(titles: Record<string, string[]>) {
     if (sv) vals.set(`${sv[1]}|${sv[2]}`, sv[3]);
     const m = q.match(/Function=OverlayInput(\d)In&Input=k?(\d+)/);
     if (m) overlays[Number(m[1])] = m[2];
-    const o = q.match(/Function=OverlayInput(\d)(Out|Off)$/);
+    const o = q.match(/Function=OverlayInput(\d)(Out|Off)(?:&Mix=\d+)?$/);
     if (o) overlays[Number(o[1])] = '';
     return { ok: true, status: 200, text: async () => '' };
   };
@@ -301,35 +301,49 @@ describe('show control', () => {
     expect(v.overlays[1]).toBe('10');
   });
 
-  it('clean break on a vMix Mix: all the time the boards in turn, as their virtual copies, every switch time; no ticker', async () => {
+  it('clean break on a vMix Mix: the board copies named 2 loop on channel 6 of Mix 2, the L-bar copy stays on 5; UNDO and ALL OUT leave them', async () => {
     const { s } = race();
-    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30 });
-    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text', 'Ticker1.Text'], 'ssl_schedule - Virtual': [], 'ssl_lbar - Virtual': [] });
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0 });
+    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text', 'Ticker1.Text'], 'ssl_schedule 2': [], 'ssl_lbar 2': [] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
-    const fades = () => v.calls.filter((c) => c.startsWith('?Function=Fade'));
-    // off air: the first board at once
+    const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
     await show.mixLoop(100_000);
-    expect(fades()).toEqual([`?Function=Fade&Duration=500&Input=k${v.num('ssl_schedule - Virtual')}&Mix=1`]);
-    expect(Object.values(v.overlays).filter(Boolean)).toEqual([]);
-    // not before the switch time, then the next board (a group's results: no copy, the input itself)
+    expect(ov()).toEqual([
+      `?Function=OverlayInput5In&Input=k${v.num('ssl_lbar 2')}&Mix=1`,
+      `?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=1`,
+    ]);
+    // a board with no copy named 2 is never put on the Mix as itself: it is listed as missing
+    expect(show.mixStatus.missing).toContain('ssl_results_group_4 2');
+    expect(show.mixStatus.board).toBe('ssl_schedule 2');
+    // nothing sent again every 2 s (that would replay the animations), and only one copy: it stays in
     await show.mixLoop(110_000);
-    expect(fades()).toHaveLength(1);
     await show.mixLoop(131_000);
-    expect(fades()).toHaveLength(2);
-    expect(fades()[1]).toMatch(/^\?Function=Fade&Duration=500&Input=k\d+&Mix=1$/);
-    expect(fades().some((c) => c.includes(`Input=k${v.num('ssl_ticker')}&`))).toBe(false);
-    // and round again
-    await show.mixLoop(162_000);
-    expect(fades()[2]).toBe(fades()[0]);
-    // the L-bar is kept in step without a key (its copy is the Mix's layer), its ticker line left alone
-    await show.syncData();
-    expect(v.vals.get(`${v.num('ssl_lbar - Virtual')}|TITLE.Text`)).toBe('TODAY');
-    expect(v.vals.get(`${v.num('ssl_lbar')}|Ticker1.Text`)).toBeUndefined();
+    expect(ov()).toHaveLength(2);
+    expect(v.calls.some((c) => c.includes(`Input=k${v.num('ssl_ticker')}&`))).toBe(false);
+    // UNDO and ALL OUT leave the Mix channels alone
+    v.calls.length = 0;
+    await show.allOut();
+    expect(v.calls.some((c) => /OverlayInput[56]/.test(c))).toBe(false);
     // Mix 1 would be the program: off
     setShowConfig(s.db, { breakMix: 1 });
     v.calls.length = 0;
     await show.mixLoop(300_000);
-    expect(fades()).toEqual([]);
+    expect(ov()).toEqual([]);
+  });
+
+  it('clean break on a vMix Mix: every switch time the board goes out with its animation and the next copy comes in', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0, mixLbarLayer: 0 });
+    const v = fakeVmix({ ...TITLES, 'ssl_schedule 2': [], 'ssl_results_group_4 2': [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
+    await show.mixLoop(100_000);
+    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=1`]);
+    await show.mixLoop(131_000);
+    expect(ov().slice(1)).toEqual(['?Function=OverlayInput6Out&Mix=1', `?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=1`]);
+    await show.mixLoop(162_000);
+    expect(ov().at(-1)).toBe(ov()[0]);
+    expect(show.mixStatus.missing).toEqual([]);
   });
 
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {

@@ -6,7 +6,7 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -24,6 +24,7 @@ interface ShowData {
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
   pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; companion?: CompanionStatus; breakGroups: { id: string; name: string }[]; breakShown: string[];
   lbarSwap?: { title: string; onAir: boolean; look: 'first' | 'second'; field: string; changedAt: string | null; error: string }[];
+  mixStatus?: { board: string; lbar: string; missing: string[]; error: string };
   lbarLooks?: { look1: boolean; look2: boolean; ready: boolean; size: string; changed: number };
 }
 
@@ -296,7 +297,16 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="block text-xs text-ink-400">Team comparison: wait for the flags' out animation (ms)<input type="number" min={0} max={3000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.flagChangeMs ?? 500} onChange={(e) => setC({ ...c, flagChangeMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
-          <label className="block text-xs text-ink-400" title="All the time (on air or not): the day schedule and each group's results in turn on a vMix Mix (as numbered in vMix), every board switch time, without the ticker, for the ATEM. A virtual input of each board (ssl_schedule - Virtual, ssl_results_H - Virtual…) fades in there; put the L-bar's virtual input as a layer of the Mix input. 0 = off.">Clean break (no ticker) on Mix (0 = off)<input type="number" min={0} max={16} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.breakMix ?? 0} onChange={(e) => setC({ ...c, breakMix: Math.max(0, Math.min(16, Number(e.target.value) || 0)) })} /></label>
+          <label className="block text-xs text-ink-400" title="All the time (on air or not), for the ATEM: the copies of the day schedule and of each group's results named with 2 (ssl_schedule 2, ssl_results_H 2…) come in and go out in turn on the board channel of this vMix Mix, with their own animations, every board switch time; the L-bar's copy (ssl_lbar 2) stays in on the L-bar channel and changes look with the L-bar. No ticker. UNDO and ALL OUT leave these channels alone. 0 = off.">Clean break (no ticker) on Mix (0 = off)<input type="number" min={0} max={16} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.breakMix ?? 0} onChange={(e) => setC({ ...c, breakMix: Math.max(0, Math.min(16, Number(e.target.value) || 0)) })} /></label>
+          {(c.breakMix ?? 0) >= 2 && <div className="flex gap-3">
+            <label className="block text-xs text-ink-400">Mix: boards channel<input type="number" min={5} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixBoardLayer ?? 6} onChange={(e) => setC({ ...c, mixBoardLayer: Math.max(5, Math.min(8, Number(e.target.value) || 6)) })} /></label>
+            <label className="block text-xs text-ink-400">Mix: L-bar channel (0 = none)<input type="number" min={0} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixLbarLayer ?? 5} onChange={(e) => setC({ ...c, mixLbarLayer: Math.max(0, Math.min(8, Number(e.target.value) || 0)) })} /></label>
+          </div>}
+          {(c.breakMix ?? 0) >= 2 && data.mixStatus && <div className="text-xs text-ink-400">
+            Mix {c.breakMix}: {data.mixStatus.board || 'no board yet'}{data.mixStatus.lbar ? ` + ${data.mixStatus.lbar}` : ''}
+            {data.mixStatus.missing.length > 0 && <div className="text-amber-400">Missing in vMix: {data.mixStatus.missing.join(', ')}</div>}
+            {data.mixStatus.error && <div className="text-red-400">{data.mixStatus.error}</div>}
+          </div>}
           <label className="block text-xs text-ink-400" title="An L-bar title with a Swap picture (L-bar_switch.gtzip) changes look while it is on air: only the parts that differ cross-fade. 0 = off.">L-bar switch: change look every (s, 0 = off)<input type="number" min={0} max={300} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.lbarSwapSeconds ?? 8} onChange={(e) => setC({ ...c, lbarSwapSeconds: Math.max(0, Math.min(300, Number(e.target.value) || 0)) })} /></label>
           <div className="text-xs text-ink-400">
             {!data.lbarSwap?.length ? <span>L-bar switch: no title with a Swap picture in vMix (load L-bar_switch.gtzip).</span>
