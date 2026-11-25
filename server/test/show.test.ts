@@ -301,6 +301,27 @@ describe('show control', () => {
     expect(v.overlays[1]).toBe('10');
   });
 
+  it('clean break on a vMix Mix: the virtual copy of each board fades in there as the boards switch, no ticker', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, breakOutMs: 0 });
+    const v = fakeVmix({ ...TITLES, 'ssl_schedule - Virtual': [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.run('show:break');
+    show.stopRotation();
+    const virt = v.num('ssl_schedule - Virtual');
+    expect(v.calls).toContain(`?Function=Fade&Duration=500&Input=k${virt}&Mix=1`);
+    v.calls.length = 0;
+    await show.run('nextslide');
+    // a board with no copy of its own goes to the Mix itself
+    expect(v.calls.at(-1)).toMatch(/^\?Function=Fade&Duration=500&Input=k\d+&Mix=1$/);
+    expect(v.calls.some((c) => /Fade.*Mix=/.test(c) && c.includes(`Input=k${v.num('ssl_ticker')}&`))).toBe(false);
+    // Mix 1 would be the program: off
+    setShowConfig(s.db, { breakMix: 1 });
+    v.calls.length = 0;
+    await show.run('nextslide');
+    expect(v.calls.some((c) => c.includes('Mix='))).toBe(false);
+  });
+
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);

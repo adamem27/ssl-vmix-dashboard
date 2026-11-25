@@ -117,6 +117,8 @@ export const showConfigSchema = z.object({
   flagChangeMs: z.number().int().min(0).max(3000).default(500),
   /** s between the two looks of an L-bar title with a Swap picture (L-bar_switch.gtzip) while it is on air; 0 = off */
   lbarSwapSeconds: z.number().int().min(0).max(300).default(8),
+  /** a vMix Mix (2–16) that follows the break scene's boards without the ticker: a copy of each board fades in there; 0 = off */
+  breakMix: z.number().int().min(0).max(16).default(0),
   /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
   cfgVersion: z.number().int().default(4),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
@@ -1402,9 +1404,23 @@ export class Show {
     }
     await this.fillSlide(this.slides()[0], board);
     await this.overlayIn(cfg.breakBoardLayer, board, snap.overlays);
+    await this.mixBoard(board, snap.inputs);
     this.patchState({ slide: 0 });
     if (cfg.breakAuto) this.startRotation();
     return { in: 'break', lbar: lbar?.title ?? null, ticker: tk?.title ?? null, board: board.title };
+  }
+  /**
+   * The break scene without the ticker, on its own vMix Mix (Show control → Break scene): the board shown now fades in
+   * there, as its copy (a virtual input of it, which gets the same data) so the board's animations on the program do
+   * not play in the Mix too; the L-bar is a layer of the Mix input in vMix.
+   */
+  private async mixBoard(board: VmixInput, inputs: VmixInput[]) {
+    const mix = this.config.breakMix;
+    if (mix < 2) return; // Mix 1 is the program itself
+    const copies = copiesOf(board, inputs);
+    const use = copies.find((c) => /virtual|mix|clean/i.test(c.title)) ?? copies[0] ?? board;
+    try { await this.vmix(`?Function=Fade&Duration=500&Input=${encodeURIComponent(use.key || use.number)}&Mix=${mix - 1}`); }
+    catch (e: any) { this.log(`Break scene Mix ${mix}: ${e?.message ?? e}`); }
   }
   private slideInput(s: { kind: 'schedule' | 'results'; fleetId?: string }, inputs: VmixInput[]) {
     if (s.kind === 'results' && s.fleetId) return this.resultsFor(s.fleetId, inputs);
@@ -1436,6 +1452,7 @@ export class Show {
       this.patchState({ slide: i });
       await this.fillSlide(s, input);
       if (onAir) await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(input.key || input.number)}`);
+      if (onAir) await this.mixBoard(input, snap.inputs);
     } finally { this.switching = false; }
     return { slide: i, of: slides.length, showing: s };
   }

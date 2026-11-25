@@ -6,7 +6,7 @@ import { groupLabel } from '../../../server/src/services/groupNames';
 import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; tickerNext: string; tickerEnd: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -296,6 +296,7 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           <label className="block text-xs text-ink-400">Switch every (s)<input type="number" min={4} max={120} className="input mt-1 w-20 py-1 text-sm" value={c.rotateSeconds} onChange={(e) => setC({ ...c, rotateSeconds: Number(e.target.value) || 30 })} /></label>
           <label className="block text-xs text-ink-400">Out animation before the next board (ms)<input type="number" min={0} max={5000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.breakOutMs} onChange={(e) => setC({ ...c, breakOutMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
           <label className="block text-xs text-ink-400">Team comparison: wait for the flags' out animation (ms)<input type="number" min={0} max={3000} step={100} className="input mt-1 w-24 py-1 text-sm" value={c.flagChangeMs ?? 500} onChange={(e) => setC({ ...c, flagChangeMs: Math.max(0, Number(e.target.value) || 0) })} /></label>
+          <label className="block text-xs text-ink-400" title="The break scene's boards without the ticker on a vMix Mix (as numbered in vMix): a virtual input of each board (ssl_schedule - Virtual…) fades in there as the boards switch; put the L-bar as a layer of the Mix input. 0 = off.">Clean break (no ticker) on Mix (0 = off)<input type="number" min={0} max={16} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.breakMix ?? 0} onChange={(e) => setC({ ...c, breakMix: Math.max(0, Math.min(16, Number(e.target.value) || 0)) })} /></label>
           <label className="block text-xs text-ink-400" title="An L-bar title with a Swap picture (L-bar_switch.gtzip) changes look while it is on air: only the parts that differ cross-fade. 0 = off.">L-bar switch: change look every (s, 0 = off)<input type="number" min={0} max={300} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.lbarSwapSeconds ?? 8} onChange={(e) => setC({ ...c, lbarSwapSeconds: Math.max(0, Math.min(300, Number(e.target.value) || 0)) })} /></label>
           <div className="text-xs text-ink-400">
             {!data.lbarSwap?.length ? <span>L-bar switch: no title with a Swap picture in vMix (load L-bar_switch.gtzip).</span>
