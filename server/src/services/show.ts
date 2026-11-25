@@ -47,6 +47,18 @@ export const QUALIFIED_TEXT = 'QUALIFIED FOR THE FINAL SERIES';
 export type Kind = 'board' | 'lt' | 'bug' | 'scene';
 export interface Graphic { id: string; label: string; kind: Kind; overlay: number; inputs: string[]; aliases?: string[] }
 
+/**
+ * The other inputs showing the same title: one of the same name, or its name followed by Virtual, Copy or a number
+ * (ssl_schedule - Virtual, ssl_schedule (2)); ssl_results_group_4 is not a copy of ssl_results_group.
+ */
+export function copiesOf(input: VmixInput, inputs: VmixInput[]) {
+  const base = inputKey(input.title);
+  if (!base) return [];
+  const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^(?:${esc}|(?:virtual|copy)\\W*${esc})(?:[\\s(\\-–]+(?:virtual|copy|\\d+)\\)?)*$`, 'i');
+  return inputs.filter((i) => i !== input && i.number !== input.number && re.test(inputKey(i.title)));
+}
+
 /** Default registry. `inputs` are tried in order; `{n}` is the number of teams of the race (3/4), `{crew}` the crew size. */
 export const DEFAULT_GRAPHICS: Graphic[] = [
   { id: 'welcome', label: 'Welcome', kind: 'board', overlay: 1, inputs: ['ssl_welcome'] },
@@ -631,15 +643,22 @@ export class Show {
    * changed only with the REFRESH PNG key (refreshPictures). The calls go a few at a time. Returns how many fields were set.
    */
   private async set(input: VmixInput, fields: Map<string, string>) {
+    let n = await this.setOne(input, fields, input.fields);
+    // its copies in vMix (a virtual input of it, a second one of the same name) get the same data
+    for (const c of copiesOf(input, this.lastInputs)) n += await this.setOne(c, fields, c.fields.length ? c.fields : input.fields);
+    return n;
+  }
+  private async setOne(input: VmixInput, fields: Map<string, string>, names: string[]) {
     fields = withOverrides(this.ctx, input, fields); // the Graphics editor's edits win
-    const match = titleFieldMatcher(input.fields);
+    const match = titleFieldMatcher(names);
     const done = new Set<string>();
     const todo: [string, string][] = [];
     for (const [name, value] of fields) {
       const real = match(name);
       if (!real || done.has(real)) continue;
       done.add(real);
-      const same = input.values !== undefined && (input.values[real] ?? '') === value;
+      // a copy that lists no fields (a virtual input) shows no values either: everything goes
+      const same = input.values !== undefined && (input.fields.includes(real) || input.values[real] !== undefined) && (input.values[real] ?? '') === value;
       if (same) continue;
       todo.push([real, value]);
     }

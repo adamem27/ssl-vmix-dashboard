@@ -12,7 +12,7 @@ import { removeAsset, saveUpload } from '../src/services/assets.js';
 import { saveResults } from '../src/services/results.js';
 import { createGraphicSet, listGraphicSets, repeatLoop, seedGraphicSets, updateGraphicSet } from '../src/services/graphicSets.js';
 import { LowerThirds } from '../src/services/lowerthirds.js';
-import { companionFiles, deckPages, getShowConfig, setShowConfig, Show } from '../src/services/show.js';
+import { companionFiles, copiesOf, deckPages, getShowConfig, setShowConfig, Show } from '../src/services/show.js';
 import { nationColours, teamKeyColours, textOn } from '../src/services/nationColours.js';
 import { setCurrentStage } from '../src/services/workbookSheets.js';
 import { compareTab, scheduleRows, setCompareOverride } from '../src/services/showData.js';
@@ -653,6 +653,24 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.syncData();
     expect(v.calls.some((c) => c.includes(`Input=k${v.num(`ssl_compare_${k2}`)}&SelectedName=1 COUNTRY.Text`))).toBe(true);
+  });
+
+  it('a virtual input or a second input of the same name gets the same data as the title', async () => {
+    const { s } = race();
+    const sched = ['DateText.Text', 'Day.Text', 'RACE 1.Text', 'POSITION 1.Text'];
+    const v = fakeVmix({ ...TITLES, ssl_schedule: sched, 'ssl_schedule - Virtual': [], 'ssl_results_group_4 (2)': ['SUBTITLE.Text', 'TEAM 1.Text'], ssl_schedule_old: sched });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.syncData();
+    const got = (name: string, f: string) => v.vals.get(`${v.num(name)}|${f}`);
+    // the virtual input lists no fields of its own: the title's go to it
+    expect(got('ssl_schedule - Virtual', 'RACE 1.Text')).toBe(got('ssl_schedule', 'RACE 1.Text'));
+    expect(got('ssl_schedule - Virtual', 'DateText.Text')).toMatch(/\d/);
+    expect(got('ssl_results_group_4 (2)', 'TEAM 1.Text')).toBe(got('ssl_results_group_4', 'TEAM 1.Text'));
+    // another name is another title
+    expect(got('ssl_schedule_old', 'RACE 1.Text')).toBeUndefined();
+    const mk = (title: string, number: string) => ({ key: number, number, title, fields: [] });
+    const all = ['ssl_schedule', 'ssl_schedule.gtzip', 'Virtual - ssl_schedule', 'ssl_schedule 2', 'ssl_schedule (copy)', 'ssl_schedule_2', 'ssl_schedules'].map((t, i) => mk(t, String(i + 1)));
+    expect(copiesOf(all[0], all).map((i) => i.title)).toEqual(['ssl_schedule.gtzip', 'Virtual - ssl_schedule', 'ssl_schedule 2', 'ssl_schedule (copy)']);
   });
 
   it('a key press sends only what the title does not show yet, so the graphic comes in at once', async () => {
