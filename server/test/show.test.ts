@@ -361,38 +361,44 @@ describe('show control', () => {
     expect(src?.sep).toBe(' I ');
   });
 
-  it('the Mix loop: MIX LOOP off takes its channels out and it stays off; its own boards; MIX NEXT at once', async () => {
+  it('the Mix loop: MIX LOOP off only stops the switching (the board and the L-bar stay); MIX NEXT by hand; its own boards', async () => {
     const { s } = race();
-    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0, mixLbarLayer: 0 });
-    const v = fakeVmix({ ...TITLES, 'ssl_schedule 2': [], 'ssl_results_group_4 2': [] });
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0 });
+    const v = fakeVmix({ ...TITLES, ssl_lbar: ['TITLE.Text'], 'ssl_lbar 2': [], 'ssl_schedule 2': [], 'ssl_results_group_4 2': [] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
+    const sched = `?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=2`;
+    const res = `?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`;
     // without the day schedule: the group results only
     setShowConfig(s.db, { mixSchedule: false });
     await show.mixLoop(100_000);
-    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`]);
-    expect(await show.run('mixloop')).toEqual({ mixLoop: false });
-    expect(ov().at(-1)).toBe('?Function=OverlayInput6Out&Mix=2');
-    v.calls.length = 0;
-    await show.mixLoop(200_000);
-    expect(ov()).toEqual([]);
-    await expect(show.run('mixnext')).rejects.toThrow(/off/);
-    // switched off in Show control (not the key): out once at the next round
-    setShowConfig(s.db, { mixLoopOn: true });
-    await show.mixLoop(300_000);
-    setShowConfig(s.db, { mixLoopOn: false });
-    v.calls.length = 0;
-    await show.mixLoop(300_100);
-    await show.mixLoop(300_200);
-    expect(ov()).toEqual(['?Function=OverlayInput6Out&Mix=2']);
-    v.calls.length = 0;
-    // on again: at once, then MIX NEXT does not wait for the switch time
+    expect(ov()).toEqual([`?Function=OverlayInput5In&Input=k${v.num('ssl_lbar 2')}&Mix=2`, res]);
     setShowConfig(s.db, { mixSchedule: true });
-    await show.run('mixloop');
-    await show.mixLoop(400_000);
-    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=2`]);
+    // off: nothing goes out, nothing switches
+    v.calls.length = 0;
+    expect(await show.run('mixloop')).toEqual({ mixLoop: false });
+    await show.mixLoop(200_000);
+    await show.mixLoop(300_000);
+    expect(ov()).toEqual([]);
+    expect(show.keyAt(2, 1, 4)?.action).toBe('mixloop');
+    expect(show.keyAt(2, 0, 7)?.action).toBe('show:tickertop');
+    // MIX NEXT by hand while it is off
     await show.run('mixnext');
-    expect(ov().at(-1)).toBe(`?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`);
+    expect(ov()).toEqual(['?Function=OverlayInput6Out&Mix=2', sched]);
+    await show.mixLoop(400_000);
+    expect(ov()).toHaveLength(2);
+    // switched off in Show control too: nothing goes out
+    setShowConfig(s.db, { mixLoopOn: true });
+    setShowConfig(s.db, { mixLoopOn: false });
+    await show.mixLoop(500_000);
+    expect(ov()).toHaveLength(2);
+    // on again: from that board, the next one after the switch time
+    v.calls.length = 0;
+    await show.toggleMixLoop(600_000);
+    await show.mixLoop(610_000);
+    expect(ov()).toEqual([]);
+    await show.mixLoop(631_000);
+    expect(ov().at(-1)).toBe(res);
   });
 
   it('CB VELA: the film from its start on channel 7, again = out', async () => {
@@ -640,7 +646,7 @@ describe('show control', () => {
     const v = fakeVmix({ ...TITLES, ssl_ticker: ['Ticker1.Text'], ssl_ticker_top: ['Ticker1.Text'] });
     const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
     const after = show.pages().find((p) => p.name === 'C-E AFTER / BREAK')!;
-    expect(after.keys[1].slice(4, 6).map((x) => x?.action)).toEqual(['show:ticker', 'show:tickertop']);
+    expect(after.keys[0].slice(6, 8).map((x) => x?.action)).toEqual(['show:ticker', 'show:tickertop']); // top right of AFTER / BREAK
     // the bottom ticker on its own on channel 1 (channels 3 and 4 serve only with the L-bar)
     await show.run('show:ticker');
     expect(v.overlays[1]).toBe(v.num('ssl_ticker'));

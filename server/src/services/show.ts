@@ -309,12 +309,11 @@ function defaultDeckPages(cfg0: ShowConfig, teams: PresetTeam[] = [], groups: Pr
       deck: 1, name: 'C-E AFTER / BREAK', page: p1 + 1, keys: [
         // the groups' results (Provisional overall) are on COMPARE, under each group's comparison
         row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'),
-          k('show:titles', 'TITLES', 'scene')),
-        // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
-        // scene's ticker channel) and the top one (ssl_ticker_top)
+          // top right: the tickers on their own, on and off without the break scene (ssl_ticker on the break scene's
+          // ticker channel, ssl_ticker_top)
+          k('show:titles', 'TITLES', 'scene'), null, k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
         row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'),
-          k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug'),
-          // the clean break loop on the Mix (for the ATEM): on / off, the next board at once
+          // the clean break loop on the Mix (for the ATEM): its switching on / off, the next board at once
           k('mixloop', 'MIX LOOP\\nON / OFF', 'scene'), k('mixnext', 'MIX\\nNEXT', 'scene')),
         // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
         row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
@@ -1488,7 +1487,6 @@ export class Show {
    * program's animations would play on the Mix); the status says which.
    */
   private mixAt = 0; private mixOn: Record<number, string> = {}; private mixFor = '';
-  private mixIndex = -1;
   private mixBusy = false;
   mixStatus: { board: string; lbar: string; missing: string[]; error: string } = { board: '', lbar: '', missing: [], error: '' };
   /** The copy of a title for the clean break Mix: ssl_schedule 2 (or a virtual input of it). */
@@ -1511,37 +1509,28 @@ export class Show {
     for (const f of picked.length ? picked : this.breakFleets()) out.push({ kind: 'results', fleetId: f });
     return out.length ? out : [{ kind: 'schedule' as const }];
   }
-  /** MIX LOOP: the loop on the Mix on or off; off takes its channels out there. */
-  async toggleMixLoop() {
-    const cfg = this.config;
-    const on = !cfg.mixLoopOn;
+  /**
+   * MIX LOOP: the switching of the boards on the Mix on or off. Off only stops the switching: the board on its channel
+   * and the L-bar stay on the Mix (MIX NEXT still changes the board by hand); on again, it goes on from that board.
+   */
+  async toggleMixLoop(now = Date.now()) {
+    const on = !this.config.mixLoopOn;
     setShowConfig(this.ctx.db, { mixLoopOn: on });
-    if (!on && cfg.breakMix >= 2) {
-      const at = `&Mix=${cfg.mixZeroBased ? cfg.breakMix - 1 : cfg.breakMix}`;
-      for (const n of this.mixChannels()) await this.vmix(`?Function=OverlayInput${n}Out${at}`);
-      this.mixOn = {}; this.mixIndex = -1;
-      this.mixStatus = { ...this.mixStatus, board: '', lbar: '' };
-    } else this.mixAt = 0;
+    if (on) this.mixAt = now;
     return { mixLoop: on };
   }
-  /** MIX NEXT: the Mix's next board at once. */
+  private mixForce = false;
+  /** MIX NEXT: the Mix's next board at once, the loop on or off. */
   async mixNext() {
-    if (this.config.breakMix < 2 || !this.config.mixLoopOn) throw badRequest('The Mix loop is off (Show control → Break scene).');
-    this.mixAt = 0;
+    if (this.config.breakMix < 2) throw badRequest('No Mix for the clean break (Show control → Break scene).');
+    this.mixForce = true;
     await this.mixLoop();
     return { mix: this.mixStatus.board };
   }
   async mixLoop(now = Date.now()) {
     const cfg = this.config;
     const mix = cfg.breakMix;
-    if (mix >= 2 && !cfg.mixLoopOn && Object.values(this.mixOn).some(Boolean) && !this.mixBusy) {
-      // switched off in Show control: what the loop put on the Mix goes out once
-      const on = this.mixOn; this.mixOn = {}; this.mixIndex = -1;
-      this.mixStatus = { ...this.mixStatus, board: '', lbar: '' };
-      for (const n of Object.keys(on)) await this.vmix(`?Function=OverlayInput${n}Out&Mix=${cfg.mixZeroBased ? mix - 1 : mix}`).catch(() => undefined);
-      return;
-    }
-    if (mix < 2 || !cfg.mixLoopOn || this.mixBusy) return; // Mix 1 is the program
+    if (mix < 2 || this.mixBusy) return; // Mix 1 is the program
     this.mixBusy = true;
     const at = `&Mix=${cfg.mixZeroBased ? mix - 1 : mix}`;
     // what this loop put on the Mix's channels: vMix's XML may show only the program's overlays, so a channel is
@@ -1567,10 +1556,14 @@ export class Show {
         const c = this.mixCopy(i, inputs);
         if (c) boards.push(c); else missing.push(`${i.title} 2`);
       }
-      if (!boards.length || now - this.mixAt < cfg.rotateSeconds * 1000) return;
-      this.mixIndex = (this.mixIndex + 1) % boards.length;
-      const board = boards[this.mixIndex];
       const n = cfg.mixBoardLayer;
+      // the next board: by hand (MIX NEXT), or with the loop on every switch time (and at once while none is on)
+      const due = this.mixForce || (cfg.mixLoopOn && (!this.mixOn[n] || now - this.mixAt >= cfg.rotateSeconds * 1000));
+      this.mixForce = false;
+      if (!boards.length || !due) return;
+      // the one after the board on the Mix now (the list may have changed since: groups ticked, a copy added)
+      const now_ = boards.findIndex((b) => b.number === this.mixOn[n]);
+      const board = boards[(now_ + 1) % boards.length];
       if (this.mixOn[n] !== board.number) {
         if (this.mixOn[n]) { await this.vmix(`?Function=OverlayInput${n}Out${at}`); await this.wait(cfg.breakOutMs); }
         await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(board.key || board.number)}${at}`);

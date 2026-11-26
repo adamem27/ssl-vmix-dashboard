@@ -321,7 +321,7 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
             <label className="flex items-center gap-2 self-end text-xs text-ink-400" title="Off (default): the Mix number is sent as in vMix (Mix=2 for Mix 2, 1 is the main output). On: counted from 0 (Mix=1 for Mix 2), for a vMix that takes it so."><input type="checkbox" checked={!!c.mixZeroBased} onChange={(e) => setC({ ...c, mixZeroBased: e.target.checked })} /> Mix counted from 0</label>
           </div>}
           {(c.breakMix ?? 0) >= 2 && <div className="space-y-1 rounded border border-ink-800 p-2 text-xs text-ink-400">
-            <label className="flex items-center gap-2 text-ink-200" title="Off: the boards and the L-bar go out of the Mix and stay out (also the MIX LOOP key on AFTER / BREAK)."><input type="checkbox" checked={c.mixLoopOn !== false} onChange={(e) => setC({ ...c, mixLoopOn: e.target.checked })} /> Loop on the Mix on</label>
+            <label className="flex items-center gap-2 text-ink-200" title="Off: the boards stop switching; the board and the L-bar stay on the Mix (MIX NEXT still changes the board). Also the MIX LOOP key on AFTER / BREAK."><input type="checkbox" checked={c.mixLoopOn !== false} onChange={(e) => setC({ ...c, mixLoopOn: e.target.checked })} /> Loop on the Mix on</label>
             <label className="flex items-center gap-2 text-ink-300"><input type="checkbox" checked={c.mixSchedule !== false} onChange={(e) => setC({ ...c, mixSchedule: e.target.checked })} /> Day schedule in the Mix loop</label>
             {data.breakGroups.length > 0 && <div>Group results in the Mix loop
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
