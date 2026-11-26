@@ -1,8 +1,14 @@
 {
-  "version": "1.0.280",
-  "commit": "f3500d7",
-  "date": "2026-11-26T14:32:42Z",
+  "version": "1.0.281",
+  "commit": "e82bacb",
+  "date": "2026-11-26T19:21:57Z",
   "changes": [
+    {
+      "version": "1.0.281",
+      "commit": "e82bacb",
+      "date": "2026-11-26T19:21:57Z",
+      "text": "Sponsor logos sized by what they cover (their visual area), not their picture: the line-up strip gives every logo the same visual area and puts each one's visual centre on the row's middle; the lower third tab gives every team's logo one visual area, centred by its weight. Logos already uploaded are redrawn the same way"
+    },
     {
       "version": "1.0.280",
       "commit": "f3500d7",
@@ -476,12 +482,6 @@
       "commit": "f32e2b6",
       "date": "2026-11-16T16:16:27Z",
       "text": "DRAW: wider side strips (adjustable, default 300 px) with bigger country rows"
-    },
-    {
-      "version": "1.0.201",
-      "commit": "ff24344",
-      "date": "2026-11-16T16:11:24Z",
-      "text": "DRAW screen: much bigger country codes and flags in both strips and the all-groups view"
     }
   ]
 }
