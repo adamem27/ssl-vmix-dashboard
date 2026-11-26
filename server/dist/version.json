@@ -1,8 +1,14 @@
 {
-  "version": "1.0.275",
-  "commit": "a340f0d",
-  "date": "2026-11-26T13:08:03Z",
+  "version": "1.0.276",
+  "commit": "61cdc6e",
+  "date": "2026-11-26T13:25:44Z",
   "changes": [
+    {
+      "version": "1.0.276",
+      "commit": "61cdc6e",
+      "date": "2026-11-26T13:25:44Z",
+      "text": "MIX LOOP off only stops the switching (board and L-bar stay on the Mix), MIX NEXT works with the loop off, the next board follows the one on the Mix; tickers ON/OFF top right of AFTER / BREAK"
+    },
     {
       "version": "1.0.275",
       "commit": "a340f0d",
@@ -476,12 +482,6 @@
       "commit": "8283b6f",
       "date": "2026-11-16T15:09:41Z",
       "text": "Race flags: C + minus and C + plus without the minus / plus board (plain C)"
-    },
-    {
-      "version": "1.0.196",
-      "commit": "19096e4",
-      "date": "2026-11-16T14:13:45Z",
-      "text": "Race flags back in the original square look (AP pennant, A swallowtail cut, rounded); Announcements in Stream Deck order; drag to reorder versions"
     }
   ]
 }
