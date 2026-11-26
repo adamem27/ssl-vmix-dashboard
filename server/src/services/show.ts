@@ -1490,7 +1490,12 @@ export class Show {
    */
   private mixAt = 0; private mixOn: Record<number, string> = {}; private mixFor = '';
   private mixBusy = false;
-  mixStatus: { board: string; lbar: string; missing: string[]; error: string } = { board: '', lbar: '', missing: [], error: '' };
+  mixStatus: { board: string; lbar: string; missing: string[]; error: string; loop?: boolean; boards?: string[]; nextAt?: string | null; log?: { at: string; q: string; ok: boolean; answer: string }[] } = { board: '', lbar: '', missing: [], error: '', log: [] };
+  /** The Mix's own commands and vMix's answers, the last ten (Show control shows them). */
+  private async mixSend(q: string) {
+    const log = (ok: boolean, answer: string) => { this.mixStatus = { ...this.mixStatus, log: [{ at: new Date().toISOString(), q, ok, answer: answer.slice(0, 160) }, ...(this.mixStatus.log ?? [])].slice(0, 10) }; };
+    try { const r = await this.vmix(q); log(true, (r ?? '').trim() || 'OK'); return r; } catch (e: any) { log(false, String(e?.message ?? e)); throw e; }
+  }
   /** The copy of a title for the clean break Mix: ssl_schedule 2 (or a virtual input of it). */
   private mixCopy(input: VmixInput | undefined, inputs: VmixInput[]) {
     if (!input) return undefined;
@@ -1544,7 +1549,7 @@ export class Show {
       const { inputs } = await this.snapshot();
       const missing: string[] = [];
       // the Mix itself (its L-bar and first board) is started in vMix (a Companion key): only the boards' channel is ours
-      this.mixStatus = { ...this.mixStatus, lbar: '', missing, error: '' };
+      this.mixStatus = { ...this.mixStatus, lbar: '', missing };
       // the boards in turn, every switch time
       const boards: VmixInput[] = [];
       const seen = new Set<VmixInput>();
@@ -1562,18 +1567,28 @@ export class Show {
       // the next board: by hand (MIX NEXT), or with the loop on every switch time (and at once while none is on)
       const due = this.mixForce || (cfg.mixLoopOn && now - this.mixAt >= cfg.rotateSeconds * 1000);
       this.mixForce = false;
+      this.mixStatus = { ...this.mixStatus, loop: cfg.mixLoopOn, boards: boards.map((b) => b.title), nextAt: cfg.mixLoopOn ? new Date(this.mixAt + cfg.rotateSeconds * 1000).toISOString() : null,
+        error: !boards.length ? 'No board copy named 2 in vMix (ssl_schedule 2, ssl_results_… 2).' : boards.length === 1 ? `Only one board for the Mix (${boards[0].title}): nothing to switch to. Add the copies named 2 of the group results, or tick the day schedule.` : '' };
       if (!boards.length || !due) return;
       // the one after the board on the Mix now (the list may have changed since: groups ticked, a copy added)
       const now_ = boards.findIndex((b) => b.number === this.mixOn[n]);
       const board = boards[(now_ + 1) % boards.length];
       if (this.mixOn[n] !== board.number) {
-        await this.vmix(`?Function=OverlayInput${n}Out${at}`); await this.wait(cfg.breakOutMs);
-        await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(board.key || board.number)}${at}`);
+        // out with its animation; a vMix that does not take the out on a Mix: the next board comes in over it anyway
+        // (an In on a channel replaces what is there), so the loop never sticks on one board
+        let outErr = '';
+        try { await this.mixSend(`?Function=OverlayInput${n}Out${at}`); } catch (e: any) { outErr = String(e?.message ?? e); }
+        await this.wait(cfg.breakOutMs);
+        await this.mixSend(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(board.key || board.number)}${at}`);
         this.mixOn[n] = board.number;
+        if (outErr) this.mixStatus = { ...this.mixStatus, error: `The out was not taken (${outErr}); the next board came in over it.` };
       }
       this.mixAt = now;
-      this.mixStatus = { ...this.mixStatus, board: board.title };
-    } catch (e: any) { this.mixOn = {}; this.mixStatus = { ...this.mixStatus, error: String(e?.message ?? e) }; this.log(`Break scene Mix ${mix}: ${e?.message ?? e}`); this.mixAt = now; }
+      this.mixStatus = { ...this.mixStatus, board: board.title, nextAt: cfg.mixLoopOn ? new Date(now + cfg.rotateSeconds * 1000).toISOString() : null };
+    } catch (e: any) {
+      // what is on the channel is kept (not forgotten): the next round tries the same next board again
+      this.mixStatus = { ...this.mixStatus, error: String(e?.message ?? e) }; this.log(`Break scene Mix ${mix}: ${e?.message ?? e}`); this.mixAt = now;
+    }
     finally { this.mixBusy = false; }
   }
   private slideInput(s: { kind: 'schedule' | 'results'; fleetId?: string }, inputs: VmixInput[]) {

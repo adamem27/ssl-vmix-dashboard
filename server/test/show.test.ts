@@ -403,6 +403,37 @@ describe('show control', () => {
     expect(ov().every((c) => c === out || c === res)).toBe(true);
   });
 
+  it('the Mix loop never sticks: a vMix that refuses the out on a Mix still gets the next board, and an error keeps the board on the channel', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0 });
+    const v = fakeVmix({ ...TITLES, 'ssl_schedule 2': [], 'ssl_results_group_4 2': [] });
+    let refuse = true; let down = false;
+    const fetcher = async (url: string, init?: any) => {
+      if (down && url.includes('Function=')) throw new Error('timeout');
+      if (refuse && /OverlayInput6Out/.test(url)) { v.calls.push(decodeURIComponent(url.split('/api/')[1])); return { ok: false, status: 500, text: async () => 'Error' }; }
+      return v.fetcher(url);
+    };
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, fetcher as any), fetcher as any);
+    const ins = () => v.calls.filter((c) => /OverlayInput6In/.test(c));
+    await show.mixLoop(100_000);
+    await show.mixLoop(131_000);
+    await show.mixLoop(162_000);
+    expect(ins().map((c) => c.match(/Input=k(\d+)/)?.[1])).toEqual([v.num('ssl_results_group_4 2'), v.num('ssl_schedule 2')]);
+    expect(show.mixStatus.error).toMatch(/out was not taken/);
+    expect(show.mixStatus.log?.[0].q).toMatch(/OverlayInput6In/);
+    // vMix gone for a round: the board on the channel is kept, the same next board comes the round after
+    down = true; refuse = false;
+    await show.mixLoop(193_000);
+    down = false;
+    await show.mixLoop(224_000);
+    expect(ins().at(-1)).toContain(`Input=k${v.num('ssl_results_group_4 2')}`);
+    // one board only: said why nothing switches
+    const w = fakeVmix({ ...TITLES, 'ssl_schedule 2': [] });
+    const one = new Show(s.ctx, new LowerThirds(s.ctx, w.fetcher), w.fetcher);
+    await one.mixNext();
+    expect(one.mixStatus.error).toMatch(/Only one board/);
+  });
+
   it('CB VELA: the film from its start on channel 7, again = out', async () => {
     const { s } = race();
     const v = fakeVmix({ ...TITLES, CBVela: [] });

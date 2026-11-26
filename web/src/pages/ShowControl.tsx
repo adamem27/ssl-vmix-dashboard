@@ -25,7 +25,7 @@ interface ShowData {
   sailors: { slot: string; number: string; name: string; position: string; photo: boolean }[];
   pages: Page[]; actions: KeyDef[]; kindColours: Record<string, string>; fleets: { id: string; name: string; size: number }[]; tickers: { id: string; name: string }[]; companionUrl: string; companion?: CompanionStatus; breakGroups: { id: string; name: string }[]; breakShown: string[];
   lbarSwap?: { title: string; onAir: boolean; look: 'first' | 'second'; field: string; changedAt: string | null; error: string }[];
-  mixStatus?: { board: string; lbar: string; missing: string[]; error: string };
+  mixStatus?: { board: string; lbar: string; missing: string[]; error: string; loop?: boolean; boards?: string[]; nextAt?: string | null; log?: { at: string; q: string; ok: boolean; answer: string }[] };
   lbarLooks?: { look1: boolean; look2: boolean; ready: boolean; size: string; changed: number };
 }
 
@@ -348,7 +348,11 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           {(c.breakMix ?? 0) >= 2 && data.mixStatus && <div className="text-xs text-ink-400">
             Mix {c.breakMix}: {data.mixStatus.board || 'no board yet'}{data.mixStatus.lbar ? ` + ${data.mixStatus.lbar}` : ''}
             {data.mixStatus.missing.length > 0 && <div className="text-amber-400">Missing in vMix: {data.mixStatus.missing.join(', ')}</div>}
+            {data.mixStatus.boards && data.mixStatus.boards.length > 0 && <div>In turn: {data.mixStatus.boards.join(' → ')}{data.mixStatus.nextAt ? ` · next at ${new Date(data.mixStatus.nextAt).toLocaleTimeString()}` : data.mixStatus.loop === false ? ' · loop off' : ''}</div>}
             {data.mixStatus.error && <div className="text-red-400">{data.mixStatus.error}</div>}
+            {(data.mixStatus.log ?? []).length > 0 && <details className="mt-1"><summary className="cursor-pointer">Sent to vMix ({data.mixStatus.log!.length})</summary>
+              {data.mixStatus.log!.map((l, i) => <div key={i} className={cx('font-mono', l.ok ? 'text-ink-400' : 'text-red-400')}>{new Date(l.at).toLocaleTimeString()} {l.q} → {l.answer}</div>)}
+            </details>}
           </div>}
           <label className="block text-xs text-ink-400" title="An L-bar title with a Swap picture (L-bar_switch.gtzip) changes look while it is on air: only the parts that differ cross-fade. 0 = off.">L-bar switch: change look every (s, 0 = off)<input type="number" min={0} max={300} step={1} className="input mt-1 w-24 py-1 text-sm" value={c.lbarSwapSeconds ?? 8} onChange={(e) => setC({ ...c, lbarSwapSeconds: Math.max(0, Math.min(300, Number(e.target.value) || 0)) })} /></label>
           <div className="text-xs text-ink-400">
