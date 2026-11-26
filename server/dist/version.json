@@ -1,8 +1,14 @@
 {
-  "version": "1.0.270",
-  "commit": "57f2883",
-  "date": "2026-11-26T02:05:25Z",
+  "version": "1.0.271",
+  "commit": "3c9f401",
+  "date": "2026-11-26T02:24:39Z",
   "changes": [
+    {
+      "version": "1.0.271",
+      "commit": "3c9f401",
+      "date": "2026-11-26T02:24:39Z",
+      "text": "Race officials with no gaps: Race_officials_PanAm_auto.gtzip lines (R1-R44 roles, N1-N44 names) close up what is left out, its PANEL as high as the list"
+    },
     {
       "version": "1.0.270",
       "commit": "57f2883",
@@ -476,12 +482,6 @@
       "commit": "c867003",
       "date": "2026-11-15T19:08:59Z",
       "text": "Graphics editor: push an edit only to inputs with exactly that title"
-    },
-    {
-      "version": "1.0.191",
-      "commit": "37abacc",
-      "date": "2026-11-15T19:08:59Z",
-      "text": "Graphics editor: edit any vMix title's texts and pictures from the dashboard"
     }
   ]
 }
