@@ -6,6 +6,7 @@ import { cx, Empty, ErrorBox, fmtDate, Loading, todayIn, useToast } from '../com
 import { useStage } from '../components/StagePicker';
 import { groupTitle } from '../../../server/src/services/groupNames';
 import { COUNTRY_FACTS } from '../countryFacts';
+import { SailorPopover, SailorThumb, sailorRow } from '../components/SailorCard';
 
 const LS_KEY = 'commentator.v1';
 const readLs = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -120,6 +121,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const onTracking = view === 'tracking' && !!tracking;
   return (
     <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')} style={{ ['--cs' as string]: scale }}>
+      <SailorPopover />
       {tracking && (
         <nav className="flex shrink-0 items-center gap-1" aria-label="Screen">
           {([['dashboard', 'Dashboard', 'D'], ['tracking', 'Tracking', 'T']] as const).map(([k, label, key]) => (
@@ -310,8 +312,8 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
   const rows = Math.max(5, lines.length);
   const font = `calc(clamp(15px, calc((100vh - 250px) / ${rows} * 0.32), 32px) * var(--cs, 1))`;
   return (
-    <button type="button" onClick={onOpen} title="Open this team"
-      className="card group flex min-h-0 flex-col overflow-hidden text-left transition-shadow hover:ring-2 hover:ring-accent-500">
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }} title="Open this team"
+      className="card group cursor-pointer flex min-h-0 flex-col overflow-hidden text-left transition-shadow hover:ring-2 hover:ring-accent-500">
       <header className="relative w-full shrink-0 px-3 py-2" style={{ background: bg ?? '#1b212a' }}>
         <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/80 via-[#0e1217]/55 to-[#0e1217]/20" aria-hidden />
         <div className="relative flex items-center gap-3">
@@ -338,15 +340,16 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
         {lines.map((l) => {
           const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
           return (
-            <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0">
+            <li key={l.key} {...sailorRow(l, team, flag)} className="flex min-h-0 flex-1 cursor-pointer items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0 hover:bg-ink-800/60">
+              <SailorThumb line={l} size="1.6em" />
               {hasPos && <span className="w-[4.2em] shrink-0 text-[0.6em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
               <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold leading-tight text-ink-50" title={`${l.first} ${l.last}`}>
+                <span className="block truncate font-semibold leading-tight text-ink-50">
                   {l.captain && <span className="mr-[0.2em] text-amber-400">★</span>}
                   {l.first} <span className="font-black uppercase">{l.last}</span>
                 </span>
-                {best.length > 0 && <span className="block truncate text-[0.5em] leading-tight text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
+                {best.length > 0 && <span className="block truncate text-[0.5em] leading-tight text-ink-400">🏆 {best.join(' · ')}</span>}
               </span>
               {ageHeight(l.sailor) && <span className="shrink-0 text-[0.5em] tabular-nums text-ink-400">{ageHeight(l.sailor)}</span>}
             </li>
@@ -354,7 +357,7 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
         })}
         {!lines.length && <li className="px-3 py-4 text-center text-base text-ink-600">No crew yet</li>}
       </ol>
-    </button>
+    </div>
   );
 }
 
@@ -477,7 +480,8 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
           {lines.map((l) => {
             const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
             return (
-              <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0">
+              <li key={l.key} {...sailorRow(l, team, flag)} className="flex min-h-0 flex-1 cursor-pointer items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0 hover:bg-ink-800/60">
+                <SailorThumb line={l} size="1.3em" />
                 {hasPos && <span className="w-[5em] shrink-0 text-[0.55em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
                 <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
                 <span className="min-w-0 flex-1">
@@ -485,7 +489,7 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
                     {l.captain && <span className="mr-[0.2em] text-amber-400">★</span>}
                     {l.first} <span className="font-black uppercase">{l.last}</span>
                   </span>
-                  {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
+                  {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400">🏆 {best.join(' · ')}</span>}
                 </span>
                 {(l.weight || ageHeight(l.sailor)) && <span className="shrink-0 text-[0.45em] tabular-nums text-ink-400">{[ageHeight(l.sailor), l.weight ? `${l.weight} kg` : ''].filter(Boolean).join(' · ')}</span>}
               </li>
