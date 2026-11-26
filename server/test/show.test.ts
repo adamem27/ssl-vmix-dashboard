@@ -409,6 +409,17 @@ describe('show control', () => {
     expect(v.overlays[7]).toBe('');
   });
 
+  it('saving one setting of Show control leaves every other one as it was', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 45, mixLoopOn: true });
+    const lt = new LowerThirds(s.ctx);
+    const app = await buildApp({ db: s.db, assetsDir: s.ctx.assetsDir, lowerThirds: lt, show: new Show(s.ctx, lt) } as any);
+    await app.inject({ method: 'PUT', url: '/api/show/config', payload: { championsText: 'x' } });
+    const c = getShowConfig(s.db);
+    expect([c.breakMix, c.rotateSeconds, c.mixLoopOn, c.championsText]).toEqual([2, 45, true, 'x']);
+    await app.close();
+  });
+
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);
@@ -1084,6 +1095,21 @@ describe('show control', () => {
     const set = (input: string, f: string, val: string) => `?Function=${f.endsWith('.Source') ? 'SetImage' : 'SetText'}&Input=k${input}&SelectedName=${f}&Value=${val}`;
     for (const [f, val] of [['BowSURNAME.Text', 'BOW'], ['BowPosition.Text', 'BOW'], ['FloaterSURNAME.Text', 'FLOATER'], ['FloaterPOSITION.Text', 'FLOATER'], ['TrimmerSURNAME.Text', 'TRIMMER'],
       ['Trimmer1SURNAME.Text', 'TRIMMER1'], ['Trimmer1POSITIO.Text', 'TRIMMER'], ['TacticianSURNAM.Text', 'TACTICIAN'], ['TacticianNAME.Text', 'FTACTICIAN'], ['HelmNUMBER.Text', '2']]) expect(v.calls).toContain(set(k, f, val));
+    // the title's own label over the logos: nothing without sponsors, TEAM PARTNER for one, TEAM PARTNERS for more
+    expect(v.calls).toContain(set(k, 'team partners.Text', ''));
+    const sp = encodePng(80, 40, (x, y) => (x > 10 && x < 70 && y > 10 && y < 30 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
+    saveUpload(s.ctx, 'team', teams[0], 'sponsor_1', sp, 'sp.png');
+    (show as any).memo.clear(); show.invalidate();
+    v.calls.length = 0;
+    await show.run(`lineup:${code}`);
+    expect(v.calls).toContain(set(k, 'team partners.Text', 'TEAM PARTNER'));
+    saveUpload(s.ctx, 'team', teams[0], 'sponsor_2', sp, 'sp2.png');
+    (show as any).memo.clear(); show.invalidate();
+    v.calls.length = 0;
+    await show.run(`lineup:${code}`);
+    expect(v.calls).toContain(set(k, 'team partners.Text', 'TEAM PARTNERS'));
+    removeAsset(s.ctx, 'team', teams[0], 'sponsor_1'); removeAsset(s.ctx, 'team', teams[0], 'sponsor_2');
+    (show as any).memo.clear(); show.invalidate();
     // eight (no Midbow, no Floater) on the numbered board: the two trimmers side by side, the grinder behind them
     saveLineup(s.ctx, ev, teams[0], { rows: [{ slot: 'Midbow', firstName: '', lastName: '', number: '' }, { slot: 'Floater', firstName: '', lastName: '', number: '' }] });
     v.calls.length = 0;

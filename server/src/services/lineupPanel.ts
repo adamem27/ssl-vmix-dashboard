@@ -25,7 +25,9 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-6';
+const VERSION = 'partners-7';
+/** The label over the logos: one partner or several. */
+export const partnersLabel = (n: number) => (n === 1 ? 'TEAM PARTNER' : 'TEAM PARTNERS');
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
 
 /**
@@ -195,7 +197,7 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
   g.fillStyle = '#ffffff';
   g.font = `600 ${labelSize}px "General Sans", "Segoe UI", Arial, sans-serif`;
   g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.fillText('TEAM PARTNERS', s.x + s.w / 2, top + labelSize / 2);
+  g.fillText(partnersLabel(n), s.x + s.w / 2, top + labelSize / 2);
   const cy = top + labelSize + LABEL_GAP + rowH / 2;
   let x = s.x + (s.w - sum - gap * (n - 1)) / 2;
   imgs.forEach(({ im, box }, i) => {
