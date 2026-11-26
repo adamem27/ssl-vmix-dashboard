@@ -1,8 +1,14 @@
 {
-  "version": "1.0.271",
-  "commit": "3c9f401",
-  "date": "2026-11-26T02:24:39Z",
+  "version": "1.0.272",
+  "commit": "3df16e9",
+  "date": "2026-11-26T02:36:07Z",
   "changes": [
+    {
+      "version": "1.0.272",
+      "commit": "3df16e9",
+      "date": "2026-11-26T02:36:07Z",
+      "text": "Race officials panel: always the size of the PANEL box (292x588), drawn from the top and clear below, so vMix does not scale and centre it under the heading"
+    },
     {
       "version": "1.0.271",
       "commit": "3c9f401",
@@ -476,12 +482,6 @@
       "commit": "592765f",
       "date": "2026-11-15T19:09:27Z",
       "text": "Race flags drawn like the race signals chart; combinations (C + red/green/−/+, AP over 1–3); Announcements sorted: often, combinations, rest"
-    },
-    {
-      "version": "1.0.192",
-      "commit": "c867003",
-      "date": "2026-11-15T19:08:59Z",
-      "text": "Graphics editor: push an edit only to inputs with exactly that title"
     }
   ]
 }
