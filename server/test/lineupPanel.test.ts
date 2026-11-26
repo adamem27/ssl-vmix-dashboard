@@ -73,6 +73,32 @@ describe('line-up panel with team partners', () => {
     }
   });
 
+  it('the logo on the lower third tab as big as the tab allows, a margin kept above, below and at the sides', () => {
+    const { db, ctx } = setup();
+    const a = createTeam(db, { name: 'Alpha', code: 'AAA' });
+    const box = (file: string) => {
+      const im = decode(fs.readFileSync(file));
+      let x0 = im.width, y0 = im.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < im.height; y++) for (let x = 0; x < im.width; x++) {
+        const i = (y * im.width + x) * 4;
+        // the logo: dark (a white logo goes dark on the light tab)
+        if (im.data[i + 3] === 255 && im.data[i] < 100) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      }
+      return { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    };
+    // square: from 16 px under the top to 10 px above the bar
+    saveUpload(ctx, 'team', a, 'sponsor_1', logo(200, 200), 's1.png');
+    const sq = box(ltSponsorFor(ctx, listTeams(ctx)[0] as never)!);
+    expect(sq.h).toBeGreaterThanOrEqual(88);
+    expect(sq.y0).toBeGreaterThanOrEqual(14);
+    expect(TAG.height - (sq.y0 + sq.h)).toBeGreaterThanOrEqual(8);
+    // a wide one: as wide as allowed, margins left at the sides
+    saveUpload(ctx, 'team', a, 'sponsor_1', logo(600, 60), 's2.png');
+    const wide = box(ltSponsorFor(ctx, listTeams(ctx)[0] as never)!);
+    expect(wide.w).toBeGreaterThanOrEqual(416);
+    expect(wide.x0).toBeGreaterThanOrEqual(48);
+  });
+
   it('shows the sponsor picked for the lower third, logo 1 when that place is empty, nothing for none', () => {
     const { db, ctx } = setup();
     const a = createTeam(db, { name: 'Alpha', code: 'AAA' });

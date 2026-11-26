@@ -25,7 +25,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-7';
+const VERSION = 'partners-8';
 /** The label over the logos: one partner or several. */
 export const partnersLabel = (n: number) => (n === 1 ? 'TEAM PARTNER' : 'TEAM PARTNERS');
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
@@ -238,8 +238,12 @@ export function lineupPanelFor(ctx: AssetCtx, team: { code: string; assets: Reco
 // ---------- the sailor lower third: a tab with the team’s first sponsor above the bar ----------
 /** The tab, drawn at twice its size in the title (260×58): page 20 of finals-broadcast_ssl26_v2. */
 export const TAG = { width: 520, height: 116 };
-const TAG_SIDE = 120;
-const TAG_MAX = { w: 380, h: 76 };
+/**
+ * The logo as big as the tab allows, a margin kept all round for it to read: 90 of the 116 px high (16 above, 10 to
+ * the bar), at most 420 of the 520 wide (the sides lean in at the top).
+ */
+const TAG_MAX = { w: 420, h: 90 };
+const TAG_DOWN = 3;
 
 function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   const { width: w, height: h } = TAG;
@@ -256,10 +260,9 @@ function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
   const box = inkBox(d);
   const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
-  let s = TAG_SIDE / Math.sqrt(box.w * box.h);
-  s = Math.min(s, TAG_MAX.w / box.w, TAG_MAX.h / box.h);
+  const s = Math.min(TAG_MAX.w / box.w, TAG_MAX.h / box.h);
   const lw = Math.round(box.w * s), lh = Math.round(box.h * s);
-  g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round((w - lw) / 2), Math.round((h - lh) / 2 + 4), lw, lh);
+  g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round((w - lw) / 2), Math.round((h - lh) / 2 + TAG_DOWN), lw, lh);
   return cv.toBuffer('image/png');
 }
 
