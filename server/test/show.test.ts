@@ -434,6 +434,18 @@ describe('show control', () => {
     expect(one.mixStatus.error).toMatch(/Only one board/);
   });
 
+  it('the Mix loop with no group racing picked: the current stage groups, else every results copy named 2 in vMix', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0, fleetId: '' });
+    const v = fakeVmix({ ...TITLES, 'ssl_schedule 2': [], 'ssl_results_B 2': [], 'ssl_results_A 2': [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    await show.mixLoop(100_000);
+    expect(show.mixStatus.boards).toEqual(['ssl_schedule 2', 'ssl_results_A 2', 'ssl_results_B 2']);
+    expect(show.mixStatus.error).toBe('');
+    await show.mixNext();
+    expect(v.calls.at(-1)).toBe(`?Function=OverlayInput6In&Input=k${v.num('ssl_results_A 2')}&Mix=1`);
+  });
+
   it('CB VELA: the film from its start on channel 7, again = out', async () => {
     const { s } = race();
     const v = fakeVmix({ ...TITLES, CBVela: [] });

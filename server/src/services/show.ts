@@ -606,7 +606,9 @@ export class Show {
       const fleets = getSetDetail(this.ctx.db, st.id).fleets;
       if (fleets.some((f) => f.id === cfg.fleetId)) return fleets.map((f) => ({ id: f.id, name: f.name }));
     }
-    return [];
+    // no group racing picked (or one of no stage): the current stage's groups (Stage on the top bar)
+    const cur = currentStage(this.ctx.db, ev);
+    return cur ? getSetDetail(this.ctx.db, cur.id).fleets.map((f) => ({ id: f.id, name: f.name })) : [];
   }
   /** Fleets that rotate in the break scene. */
   breakFleets(): string[] {
@@ -1559,6 +1561,11 @@ export class Show {
         seen.add(i);
         const c = this.mixCopy(i, inputs);
         if (c) boards.push(c); else missing.push(`${i.title} 2`);
+      }
+      // no group results found that way: every results copy named 2 in vMix (ssl_results_B 2…), in name order
+      if (!boards.some((b) => /results/i.test(b.title))) {
+        const extra = inputs.filter((x) => /^ssl_results.*\s2$/i.test(inputKey(x.title)) && !boards.includes(x)).sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true }));
+        boards.push(...extra);
       }
       const n = cfg.mixBoardLayer;
       // not known what is on the channel (the dashboard started, or the Mix was started in vMix): the first board, as
