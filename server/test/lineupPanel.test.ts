@@ -5,7 +5,7 @@ import { createTeam, listTeams } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
 import { encodePng } from '../src/services/png.js';
 import { decode } from '../src/services/logo.js';
-import { lineupPanelFor, logoSizes, ltSponsorFor, setLtSponsorSlot, PANEL, stripRect, TAG } from '../src/services/lineupPanel.js';
+import { lineupLogos, lineupPanelFor, logoSizes, ltSponsorFor, setLtSponsorSlot, PANEL, stripRect, TAG } from '../src/services/lineupPanel.js';
 
 // a logo: a solid block w×h on a transparent canvas
 const logo = (w: number, h: number) => encodePng(w + 40, h + 40, (x, y) => (x >= 20 && x < w + 20 && y >= 20 && y < h + 20 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
@@ -121,5 +121,36 @@ describe('line-up panel with team partners', () => {
     expect(ltSponsorFor(ctx, t())).toMatch(/AAA_lt_sponsor\.png$/);
     setLtSponsorSlot(ctx, a, 'none');
     expect(ltSponsorFor(ctx, t())).toMatch(/lt_sponsor_none\.png$/);
+  });
+
+  it('RSA: the line-up only Sponsor logo 1, the lower third Sponsor logo 2, both with their colours and background as they are', () => {
+    const { db, ctx } = setup();
+    const r = createTeam(db, { name: 'South Africa', code: 'RSA' });
+    // black on a solid white background: any other team gets the background cleared and the logo turned white / kept
+    const boxed = (w: number, h: number, ink: number[]) => encodePng(w, h, (x, y) => (x > w / 4 && x < (3 * w) / 4 && y > h / 4 && y < (3 * h) / 4 ? ink : [255, 255, 255, 255]));
+    saveUpload(ctx, 'team', r, 'sponsor_1', boxed(200, 100, [0, 0, 0, 255]), 'a.png');
+    saveUpload(ctx, 'team', r, 'sponsor_2', boxed(120, 120, [0, 0, 0, 255]), 'b.png');
+    saveUpload(ctx, 'team', r, 'sponsor_3', boxed(120, 120, [255, 0, 0, 255]), 'c.png');
+    const t = listTeams(ctx)[0] as never;
+    expect(lineupLogos(ctx, t)).toHaveLength(1);
+    const img = decode(fs.readFileSync(lineupPanelFor(ctx, t)!));
+    const STRIP = stripRect(9, PANEL.height);
+    let white = 0, black = 0, red = 0;
+    for (let y = STRIP.y; y < STRIP.y + STRIP.h; y++) for (let x = STRIP.x; x < STRIP.x + STRIP.w; x++) {
+      const o = (y * img.width + x) * 4;
+      if (img.data[o] > 245 && img.data[o + 1] > 245 && img.data[o + 2] > 245) white++;
+      if (img.data[o] < 10 && img.data[o + 1] < 10 && img.data[o + 2] < 10) black++;
+      if (img.data[o] > 200 && img.data[o + 1] < 50) red++;
+    }
+    // its white background stays and its black ink stays black (not turned white); sponsor 3 is not there
+    expect(white).toBeGreaterThan(2000);
+    expect(black).toBeGreaterThan(500);
+    expect(red).toBe(0);
+    // the lower third: Sponsor logo 2, its white background kept on the tab
+    const tab = ltSponsorFor(ctx, t)!;
+    expect(tab).toMatch(/RSA_lt_sponsor_2\.png$/);
+    const ti = decode(fs.readFileSync(tab));
+    const mid = ((TAG.height / 2) * ti.width + TAG.width / 2 - 40) * 4;
+    expect([ti.data[mid], ti.data[mid + 1], ti.data[mid + 2]]).toEqual([255, 255, 255]);
   });
 });

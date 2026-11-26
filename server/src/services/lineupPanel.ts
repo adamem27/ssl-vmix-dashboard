@@ -54,11 +54,17 @@ const MAX_GAP = 150;
 const LABEL_GAP = 18;
 
 /** A logo as it shows: the solid colour around a JPG / flat PNG cleared, like an upload is. */
-function visible(buf: Buffer) {
+function visible(buf: Buffer, asIs = false) {
   const d = decode(buf);
-  clearSolidBackground(d);
+  if (!asIs) clearSolidBackground(d);
   return d;
 }
+/**
+ * Teams whose sponsor logos go on as they are (only sized, never recoloured, their background kept), and which logo
+ * each graphic takes: RSA, the line-up Sponsor logo 1 only and the lower third Sponsor logo 2.
+ */
+export const AS_IS_SPONSORS: Record<string, { lineup: (typeof SPONSOR_SLOTS)[number]; lt: (typeof SPONSOR_SLOTS)[number] }> = { RSA: { lineup: 'sponsor_1', lt: 'sponsor_2' } };
+const asIsFor = (code: string | undefined) => (code ? AS_IS_SPONSORS[code.trim().toUpperCase()] : undefined);
 /** Where the logo's ink is: faint glow, shadows and stray pixels around it do not count. */
 const inkBox = (d: ReturnType<typeof decode>) => { try { return trimBox(d, 64); } catch { return trimBox(d); } };
 /**
@@ -110,7 +116,15 @@ export function sponsorLogos(ctx: AssetCtx, assets: Record<string, Asset>) {
   return SPONSOR_SLOTS.map((s) => readAsset(ctx, assets[s])).filter((x): x is { file: string; buf: Buffer } => !!x);
 }
 
-export const hasSponsorLogos = (ctx: AssetCtx, team: { assets: Record<string, Asset> }) => sponsorLogos(ctx, team.assets).length > 0;
+/** The logos of the line-up's strip: every sponsor logo, or the one a team's exception names. */
+export function lineupLogos(ctx: AssetCtx, team: { code?: string; assets: Record<string, Asset> }) {
+  const x = asIsFor(team.code);
+  if (!x) return sponsorLogos(ctx, team.assets);
+  const l = readAsset(ctx, team.assets[x.lineup]);
+  return l ? [l] : [];
+}
+
+export const hasSponsorLogos = (ctx: AssetCtx, team: { code?: string; assets: Record<string, Asset> }) => lineupLogos(ctx, team).length > 0;
 
 /** The neutral element of the PNG generator named “Lineup” (plain) or “Lineup sponsor”, when its file exists. */
 export function generatedPanel(ctx: AssetCtx, which: 'plain' | 'sponsor'): string | null {
@@ -161,17 +175,17 @@ export function logoSizes(boxes: { w: number; h: number; fill?: number }[], slot
   return boxes.map((b) => { const s = areaScale(b, fill(b), area, room, maxH); return { w: Math.round(b.w * s), h: Math.round(b.h * s) }; });
 }
 
-function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], kind: StripKind): Buffer {
+function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], kind: StripKind, asIs = false): Buffer {
   const cv = c.createCanvas(PANEL.width, PANEL.height);
   const g = cv.getContext('2d');
   // decoded here (pngjs / jpeg-js) and drawn from a canvas: an Image fed a buffer decodes later, after the draw
   const pic = (buf: Buffer) => {
-    const d = visible(buf);
+    const d = visible(buf, asIs);
     const t = c.createCanvas(d.width, d.height);
     t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
-    // dark logos turn white on the dark strip (as on the design), every other logo keeps its colours
+    // dark logos turn white on the dark strip (as on the design), every other logo keeps its colours; as-is logos too
     const box = inkBox(d);
-    return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box, ...inkStats(d, box) };
+    return { im: !asIs && brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box, ...inkStats(d, box) };
   };
   const rr = (x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
   const sponsors = logos.length > 0;
@@ -232,16 +246,17 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
 export function lineupPanelFor(ctx: AssetCtx, team: { code: string; assets: Record<string, Asset> }, kind: StripKind = 9): string | null {
   const c = canvas(ctx.assetsDir);
   if (!c) return null;
-  const logos = sponsorLogos(ctx, team.assets);
+  const logos = lineupLogos(ctx, team);
+  const asIs = !!asIsFor(team.code);
   const base = generatedPanel(ctx, logos.length ? 'sponsor' : 'plain');
   const name = logos.length ? `${team.code.replace(/[^\w.-]+/g, '_')}_lineup_sponsors${kind === 10 ? '_10' : ''}.png` : 'lineup_plain.png';
   const rel = `${PANEL_DIR}/${name}`;
   const file = path.join(ctx.assetsDir, PANEL_DIR, name);
-  const hash = createHash('sha1').update(JSON.stringify([VERSION, base && stamp(base), logos.map((l) => stamp(l.file))])).digest('hex');
+  const hash = createHash('sha1').update(JSON.stringify([VERSION, base && stamp(base), logos.map((l) => stamp(l.file)), asIs])).digest('hex');
   const key = `lineupPanel.${name}`;
   if (getSetting(ctx.db, key) !== hash || !fs.existsSync(file)) {
     try {
-      const buf = draw(ctx, c, base, logos.map((l) => l.buf), kind);
+      const buf = draw(ctx, c, base, logos.map((l) => l.buf), kind, asIs);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(`${file}.tmp`, buf);
       fs.renameSync(`${file}.tmp`, file);
@@ -267,7 +282,7 @@ const TAG_MAX = { w: 420, h: 90 };
 const TAG_AREA = 9000;
 const TAG_DOWN = 3;
 
-function drawTag(c: Canvas, logo: Buffer | null): Buffer {
+function drawTag(c: Canvas, logo: Buffer | null, asIs = false): Buffer {
   const { width: w, height: h } = TAG;
   const cv = c.createCanvas(w, h);
   if (!logo) return cv.toBuffer('image/png');
@@ -277,11 +292,11 @@ function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   g.moveTo(0, h); g.lineTo(26, 18); g.quadraticCurveTo(32, 0, 52, 0);
   g.lineTo(w - 52, 0); g.quadraticCurveTo(w - 32, 0, w - 26, 18); g.lineTo(w, h); g.closePath();
   g.fillStyle = '#dfe5ef'; g.fill();
-  const d = visible(logo);
+  const d = visible(logo, asIs);
   const t = c.createCanvas(d.width, d.height);
   t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
   const box = inkBox(d);
-  const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
+  const pic = !asIs && brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
   const st = inkStats(d, box);
   const s = areaScale(box, st.fill, TAG_AREA, TAG_MAX.w, TAG_MAX.h);
   const lw = Math.round(box.w * s), lh = Math.round(box.h * s);
@@ -310,7 +325,10 @@ export function setLtSponsorSlot(ctx: AssetCtx, teamId: string, slot: LtSponsorC
 export function ltSponsorFor(ctx: AssetCtx, team: { id?: string; code: string; assets: Record<string, Asset> } | null): string | null {
   const c = canvas(ctx.assetsDir);
   if (!c) return null;
-  const pick = team?.id ? getLtSponsorSlot(ctx, team.id) : 'sponsor_1';
+  const asIs = asIsFor(team?.code);
+  const chosen = team?.id ? getLtSponsorSlot(ctx, team.id) : 'sponsor_1';
+  // a team's exception names its logo (RSA: Sponsor logo 2); none picked stays none
+  const pick = asIs && chosen !== 'none' ? asIs.lt : chosen;
   // the chosen logo; when its place is empty, Sponsor logo 1, then the first one there is
   const logo = !team || pick === 'none' ? null
     : readAsset(ctx, team.assets[pick]) ?? readAsset(ctx, team.assets.sponsor_1) ?? SPONSOR_SLOTS.map((x) => readAsset(ctx, team.assets[x])).find(Boolean) ?? null;
@@ -318,12 +336,12 @@ export function ltSponsorFor(ctx: AssetCtx, team: { id?: string; code: string; a
   const n = logo && team ? (SPONSOR_SLOTS.find((x) => readAsset(ctx, team.assets[x])?.file === logo.file) ?? 'sponsor_1').replace('sponsor_', '') : '';
   const name = logo && team ? `${team.code.replace(/[^\w.-]+/g, '_')}_lt_sponsor${n === '1' ? '' : `_${n}`}.png` : 'lt_sponsor_none.png';
   const file = path.join(ctx.assetsDir, PANEL_DIR, name);
-  const hash = createHash('sha1').update(JSON.stringify([VERSION, logo && stamp(logo.file)])).digest('hex');
+  const hash = createHash('sha1').update(JSON.stringify([VERSION, logo && stamp(logo.file), !!asIs])).digest('hex');
   const key = `ltSponsor.${name}`;
   if (getSetting(ctx.db, key) !== hash || !fs.existsSync(file)) {
     try {
       fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(`${file}.tmp`, drawTag(c, logo?.buf ?? null));
+      fs.writeFileSync(`${file}.tmp`, drawTag(c, logo?.buf ?? null, !!asIs));
       fs.renameSync(`${file}.tmp`, file);
       setSetting(ctx.db, key, hash);
     } catch { if (!fs.existsSync(file)) return null; }

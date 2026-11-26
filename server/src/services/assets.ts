@@ -3,7 +3,7 @@ import path from 'node:path';
 import { DB, getSetting, newId, nowIso } from '../db/db.js';
 import { inspectImage, kindLabel } from './images.js';
 import { allowedKinds, isSponsorSlot, OwnerType, slotsFor } from './slots.js';
-import { normalizeLogo } from './logo.js';
+import { AS_IS_LOGO_TEAMS, normalizeLogo } from './logo.js';
 import { FLAG_SLOTS, roundFlag } from './flagShape.js';
 import { joinVmixPath, localCandidate, readIfExists, validateEnteredPath } from './paths.js';
 import { badRequest, notFound } from './errors.js';
@@ -160,7 +160,11 @@ export function saveUpload(ctx: AssetCtx, owner: OwnerType, ownerId: string, slo
   if (!ownerExists(ctx.db, owner, ownerId)) throw notFound(OWNER_LABEL[owner]);
   if (!buf.length) throw badRequest('The file is empty.');
   // Sponsor logos (PNG or JPG) are evened out onto one standard transparent PNG canvas.
-  if (isSponsorSlot(owner, slot)) buf = normalizeLogo(buf);
+  if (isSponsorSlot(owner, slot)) {
+    // a team whose logos go on as they are (RSA): only evened out in size, its background kept
+    const code = owner === 'team' ? (ctx.db.prepare('SELECT code FROM teams WHERE id = ?').get(ownerId) as { code?: string } | undefined)?.code : undefined;
+    buf = normalizeLogo(buf, !!code && AS_IS_LOGO_TEAMS.has(code.trim().toUpperCase()));
+  }
   // Flags always get rounded corners (never square on air).
   if (owner === 'team' && FLAG_SLOTS.includes(slot) && !opts.flagRounded) buf = roundFlag(buf);
   const info = inspectImage(buf);
