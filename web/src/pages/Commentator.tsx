@@ -6,6 +6,7 @@ import { cx, Empty, ErrorBox, fmtDate, Loading, todayIn, useToast } from '../com
 import { useStage } from '../components/StagePicker';
 import { groupTitle } from '../../../server/src/services/groupNames';
 import { COUNTRY_FACTS } from '../countryFacts';
+import { SailorPopover, SailorThumb, sailorRow } from '../components/SailorCard';
 
 const LS_KEY = 'commentator.v1';
 const readLs = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -120,6 +121,7 @@ export function CommentatorPage({ live = false }: { live?: boolean }) {
   const onTracking = view === 'tracking' && !!tracking;
   return (
     <div className={cx('mx-auto flex max-w-[1920px] flex-col gap-2 px-3 py-2', live ? 'h-screen' : 'h-[calc(100vh-53px)]')} style={{ ['--cs' as string]: scale }}>
+      <SailorPopover />
       {tracking && (
         <nav className="flex shrink-0 items-center gap-1" aria-label="Screen">
           {([['dashboard', 'Dashboard', 'D'], ['tracking', 'Tracking', 'T']] as const).map(([k, label, key]) => (
@@ -291,15 +293,36 @@ function crewOf(team: OverviewTeam, lineup?: LineupPlace[]): { lines: Line[]; so
   const declared = !!team.declaration;
   const byId = new Map(team.sailors.map((s) => [s.id, s]));
   const source: 'Line-up' | 'Declared today' | 'Roster' = lineup?.length ? 'Line-up' : declared ? 'Declared today' : 'Roster';
-  const lines: Line[] = source === 'Line-up'
-    ? lineup!.map((p, i) => { const s = p.sailorId ? byId.get(p.sailorId) : undefined; return { key: `l${i}`, number: p.number, first: p.firstName, last: p.lastName, position: s?.declared?.position ?? '', weight: s?.declared?.weight ?? '', captain: p.captain, sailor: s }; })
+  const raw: Line[] = source === 'Line-up'
+    ? lineup!.map((p, i) => { const s = p.sailorId ? byId.get(p.sailorId) : undefined; return { key: `l${i}`, number: p.number, first: p.firstName, last: p.lastName, position: s?.declared?.position || p.position || s?.defaultPosition || '', weight: s?.declared?.weight ?? '', captain: p.captain, sailor: s }; })
     : [
       ...(declared ? team.sailors.filter((s) => s.declared).sort((a, b) => a.declared!.sort - b.declared!.sort) : [...team.sailors].sort((a, b) => Number(b.isCaptain) - Number(a.isCaptain)))
-        .map((s) => ({ key: s.id, number: s.declared?.number || s.defaultNumber, first: s.firstName, last: s.lastName, position: s.declared?.position ?? '', weight: s.declared?.weight ?? '', captain: s.isCaptain, sailor: s })),
+        .map((s) => ({ key: s.id, number: s.declared?.number || s.defaultNumber, first: s.firstName, last: s.lastName, position: s.declared?.position || s.defaultPosition || '', weight: s.declared?.weight ?? '', captain: s.isCaptain, sailor: s })),
       ...(team.declaration?.unmatched ?? []).map((m, i) => ({ key: `u${i}`, number: m.number, first: m.name, last: '', position: m.position, weight: m.weight, captain: false })),
     ];
+  // always from the bow to the tactician, as the crew sits on the boat (a crew without positions keeps its order)
+  const lines = raw.map((l, i) => ({ l, i, r: positionRank(l.position) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.l);
   return { lines, source };
 }
+
+/** Place on the boat from the bow to the stern; anything else (reserve, coach, unknown) after the crew. */
+const BOW_TO_TACTICIAN: [RegExp, number][] = [
+  [/mid.?bow/i, 1], [/\bbow/i, 0], [/pit/i, 2], [/floater/i, 3], [/grinder/i, 4], [/main/i, 6], [/trim/i, 5], [/helm|skipper|driver/i, 7], [/tactic/i, 8],
+];
+function positionRank(pos: string): number {
+  if (!pos.trim()) return 99;
+  for (const [re, r] of BOW_TO_TACTICIAN) if (re.test(pos)) return r;
+  return 50;
+}
+/** The position as the commentators read it: written out in full (TRIMMER1 → Trimmer, MIDBOW → Mid-bow). */
+const positionLabel = (pos: string) => {
+  const p = pos.trim();
+  if (!p) return '—';
+  if (/^mid.?bow$/i.test(p)) return 'Mid-bow';
+  if (/^main$/i.test(p)) return 'Main trimmer';
+  const t = p.replace(/\d+$/, '').replace(/[_]+/g, ' ').trim();
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+};
 
 function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team: OverviewTeam; colour?: Gradient | null; lineup?: LineupPlace[]; points?: string; remarks?: Msg[]; onOpen: () => void }) {
   const flag = flagOf(team);
@@ -310,8 +333,8 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
   const rows = Math.max(5, lines.length);
   const font = `calc(clamp(15px, calc((100vh - 250px) / ${rows} * 0.32), 32px) * var(--cs, 1))`;
   return (
-    <button type="button" onClick={onOpen} title="Open this team"
-      className="card group flex min-h-0 flex-col overflow-hidden text-left transition-shadow hover:ring-2 hover:ring-accent-500">
+    <div role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }} title="Open this team"
+      className="card group cursor-pointer flex min-h-0 flex-col overflow-hidden text-left transition-shadow hover:ring-2 hover:ring-accent-500">
       <header className="relative w-full shrink-0 px-3 py-2" style={{ background: bg ?? '#1b212a' }}>
         <div className="absolute inset-0 bg-gradient-to-r from-[#0e1217]/80 via-[#0e1217]/55 to-[#0e1217]/20" aria-hidden />
         <div className="relative flex items-center gap-3">
@@ -338,15 +361,16 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
         {lines.map((l) => {
           const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
           return (
-            <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0">
-              {hasPos && <span className="w-[4.2em] shrink-0 text-[0.6em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
+            <li key={l.key} {...sailorRow(l, team, flag)} className="flex min-h-0 flex-1 cursor-pointer items-center gap-[0.4em] border-b border-ink-800/60 px-[0.4em] py-[0.15em] last:border-0 hover:bg-ink-800/60">
+              {hasPos && <span className="w-[6.3em] shrink-0 text-[0.68em] font-black uppercase leading-[1.05] text-sky-300">{positionLabel(l.position)}</span>}
+              <SailorThumb line={l} size="1.6em" />
               <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold leading-tight text-ink-50" title={`${l.first} ${l.last}`}>
+                <span className="block truncate font-semibold leading-tight text-ink-50">
                   {l.captain && <span className="mr-[0.2em] text-amber-400">★</span>}
                   {l.first} <span className="font-black uppercase">{l.last}</span>
                 </span>
-                {best.length > 0 && <span className="block truncate text-[0.5em] leading-tight text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
+                {best.length > 0 && <span className="block truncate text-[0.5em] leading-tight text-ink-400">🏆 {best.join(' · ')}</span>}
               </span>
               {ageHeight(l.sailor) && <span className="shrink-0 text-[0.5em] tabular-nums text-ink-400">{ageHeight(l.sailor)}</span>}
             </li>
@@ -354,7 +378,7 @@ function TeamCard({ team, colour, lineup, points, remarks = [], onOpen }: { team
         })}
         {!lines.length && <li className="px-3 py-4 text-center text-base text-ink-600">No crew yet</li>}
       </ol>
-    </button>
+    </div>
   );
 }
 
@@ -477,15 +501,16 @@ function TeamFocus({ team, colour, lineup, points, races, history, note, group, 
           {lines.map((l) => {
             const best = l.sailor ? [l.sailor.bestResult1, l.sailor.bestResult2, l.sailor.bestResult3].filter(Boolean) : [];
             return (
-              <li key={l.key} className="flex min-h-0 flex-1 items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0">
-                {hasPos && <span className="w-[5em] shrink-0 text-[0.55em] font-bold uppercase leading-tight text-sky-300">{l.position || '—'}</span>}
+              <li key={l.key} {...sailorRow(l, team, flag)} className="flex min-h-0 flex-1 cursor-pointer items-center gap-[0.5em] border-b border-ink-800/60 px-[0.5em] py-[0.1em] last:border-0 hover:bg-ink-800/60">
+                {hasPos && <span className="w-[6.3em] shrink-0 text-[0.66em] font-black uppercase leading-[1.05] text-sky-300">{positionLabel(l.position)}</span>}
+                <SailorThumb line={l} size="1.3em" />
                 <span className="w-[1.6em] shrink-0 text-right font-mono font-black tabular-nums text-ink-300">{l.number}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold leading-tight text-ink-50">
                     {l.captain && <span className="mr-[0.2em] text-amber-400">★</span>}
                     {l.first} <span className="font-black uppercase">{l.last}</span>
                   </span>
-                  {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400" title={best.join('\n')}>🏆 {best.join(' · ')}</span>}
+                  {best.length > 0 && <span className="block truncate text-[0.42em] leading-snug text-ink-400">🏆 {best.join(' · ')}</span>}
                 </span>
                 {(l.weight || ageHeight(l.sailor)) && <span className="shrink-0 text-[0.45em] tabular-nums text-ink-400">{[ageHeight(l.sailor), l.weight ? `${l.weight} kg` : ''].filter(Boolean).join(' · ')}</span>}
               </li>
