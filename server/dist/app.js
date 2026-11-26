@@ -5,7 +5,6 @@ import fastifyStatic from '@fastify/static';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { gunzipSync } from 'node:zlib';
 import { z, ZodError } from 'zod';
 import { activeEvent, getSetting, nowIso, setSetting } from './db/db.js';
 import { listAssets, previewFile, recheckAsset, removeAsset, saveUpload, savePath } from './services/assets.js';
@@ -41,11 +40,10 @@ import { versionInfo } from './version.js';
 import { applyGoldCupAll, PRESETS } from './services/presets.js';
 import { isWindowsPath, joinVmixPath, validateEnteredPath } from './services/paths.js';
 import { authToken, cookieOk, listMirrorFiles, loginPage, mirrorFilePath, passwordOk } from './services/mirror.js';
-import { siteSettings, saveSiteSettings, siteTarget, uploadKey } from './services/siteTargets.js';
-import { uploadPhp } from './services/httpsTarget.js';
+import { PUBLISH_EVERY, publishEverySeconds, siteSettings, saveSiteSettings, siteTarget } from './services/siteTargets.js';
 import { StaticSitePublisher } from './services/staticSite.js';
 import { assignDetails, ignoreDetails, importSailorDetails, unmatchedDetails } from './services/sailorDetails.js';
-import { FEED_TYPE, feedKey, INTERNAL_KEY, LiveFeedPusher, LiveFeedStore, viewerMayRead } from './services/liveFeed.js';
+import { CommentatorSnapshot, INTERNAL_KEY } from './services/commentatorSnapshot.js';
 const str = (max = 500) => z.string().max(max);
 const id = z.string().min(1).max(64);
 export async function buildApp(deps) {
@@ -73,28 +71,16 @@ export async function buildApp(deps) {
         app.log.error(err);
         return reply.status(err.statusCode ?? 500).send({ error: err.statusCode && err.statusCode < 500 ? err.message : 'Internal server error.' });
     });
-    // Commentator screen online: a read-only snapshot pushed by the venue PC, opened with the link /c/<token>.
-    const live = new LiveFeedStore(db, deps.liveDir ?? path.join(path.dirname(deps.assetsDir), 'live-feed'));
-    const pusher = new LiveFeedPusher(app, ctx, deps.liveFetch);
-    app.decorate('liveFeed', pusher);
-    app.addHook('onClose', async () => pusher.stop());
+    // everything the commentator screen reads, for the static commentator page
+    const snapshot = new CommentatorSnapshot(app, ctx);
     const password = deps.password ?? '';
     // Online hosting: one shared password. Browsers log in with a form (cookie); the vMix sync sends HTTP Basic auth.
     // Unauthenticated requests never get a WWW-Authenticate challenge, so no browser popup and no 401 bursts.
-    // A commentator link holder ("viewer") may only read the commentator routes, and is served the pushed snapshot.
     app.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_req, body, done) => done(null, Object.fromEntries(new URLSearchParams(body))));
-    app.addContentTypeParser(FEED_TYPE, { parseAs: 'buffer', bodyLimit: 40 * 1024 * 1024 }, (_req, body, done) => {
-        try {
-            done(null, JSON.parse(gunzipSync(body, { maxOutputLength: 200 * 1024 * 1024 }).toString('utf8')));
-        }
-        catch {
-            done(badRequest('Unreadable commentator data.'), undefined);
-        }
-    });
     app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: 40 * 1024 * 1024 }, (_req, body, done) => done(null, body));
     app.addHook('onRequest', async (req, reply) => {
         const [pathname, qs = ''] = req.url.split('?');
-        if (pathname === '/api/health' || pathname === '/login' || pathname.startsWith('/c/'))
+        if (pathname === '/api/health' || pathname === '/login')
             return;
         // the DRAW output page (vMix Browser input): its page, the app's own script files, its data and fonts, no login
         if (req.method === 'GET' && (isDrawOutputPath(pathname) || /^\/assets\/[\w.-]+\.(js|css|woff2?|ttf|otf|svg|png)$/.test(pathname) || pathname.startsWith('/api/matchboard/fonts/')))
@@ -102,44 +88,11 @@ export async function buildApp(deps) {
         if (req.headers['x-ssl-internal'] === INTERNAL_KEY)
             return;
         const admin = !password || cookieOk(req.headers.cookie, password) || passwordOk(req.headers.authorization, password);
-        const viewer = !admin && live.cookieOk(req.headers.cookie);
-        if (viewer) {
-            const isApi = pathname.startsWith('/api/') || pathname.startsWith('/json/') || pathname.startsWith('/xml/');
-            if (!isApi) {
-                // the app's own files load as usual; every page is the commentator screen
-                if (req.method === 'GET' && !/\.[a-z0-9]+$/i.test(pathname) && pathname !== '/live')
-                    return reply.redirect('/live');
-                if (req.method === 'GET')
-                    return;
-            }
-            if (req.method !== 'GET' || !viewerMayRead(pathname))
-                return reply.status(403).send({ error: 'The commentator link can only show the commentator screen.' });
-        }
-        if (!admin && !viewer) {
+        if (!admin) {
             if (req.method === 'GET' && !pathname.startsWith('/api/') && !pathname.startsWith('/json/') && !pathname.startsWith('/xml/'))
                 return reply.redirect('/login');
             return reply.status(401).send({ error: 'Log in first.' });
         }
-        // Snapshot answers, once the venue PC has pushed one: for viewers, and for the commentator screen at /live.
-        if (!live.feed || req.method !== 'GET' || pathname === '/api/live/status')
-            return;
-        const blob = live.feed.blobs[req.url];
-        if (blob && live.hasBlob(blob.hash))
-            return reply.header('Content-Type', blob.mime).header('Cache-Control', 'private, max-age=3600').send(fs.createReadStream(live.blobPath(blob.hash)));
-        if (!viewer && req.headers['x-ssl-live'] !== '1')
-            return;
-        const key = feedKey(pathname, new URLSearchParams(qs));
-        if (key in live.feed.routes)
-            return reply.header('Cache-Control', 'no-store').send(live.feed.routes[key]);
-        if (viewer && !pathname.startsWith('/api/assets/') && pathname !== '/api/version')
-            return reply.status(404).send({ error: 'Not in the commentator data.' });
-    });
-    app.get('/c/:token', async (req, reply) => {
-        if (!live.tokenOk(req.params.token))
-            return reply.status(404).type('text/html').send(loginPage(false).replace(/<form[\s\S]*<\/form>/, '<p style="color:#e6e9ef">This commentator link is no longer valid. Ask the operator for the new one.</p>'));
-        const secure = req.headers['x-forwarded-proto'] === 'https' || req.protocol === 'https' ? '; Secure' : '';
-        reply.header('Set-Cookie', `ssl_view=${live.cookieValue()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}${secure}`);
-        return reply.redirect('/live');
     });
     if (password) {
         app.get('/login', async (_req, reply) => reply.type('text/html').send(loginPage(false)));
@@ -152,57 +105,17 @@ export async function buildApp(deps) {
             return reply.redirect('/');
         });
     }
-    // receiving side: the venue PC pushes here (needs the dashboard password, so a server without one refuses)
-    app.post('/api/live-feed/push', { bodyLimit: 40 * 1024 * 1024 }, async (req, reply) => {
-        if (!password)
-            return reply.status(403).send({ error: 'Set DASHBOARD_PASSWORD on the online dashboard first: without it anyone could push data.' });
-        const from = String(req.headers['x-forwarded-for'] ?? req.ip).split(',')[0].trim();
-        const body = req.body;
-        if (body && typeof body.hash === 'string' && !body.routes) {
-            if (!live.feed || body.hash !== live.hash)
-                return reply.status(409).send({ error: 'Send the full data.' });
-            live.touch(from, String(body.pushedAt ?? nowIso()));
-            return { ok: true, missing: [], viewerPath: live.viewerPath() };
-        }
-        const feed = z.object({
-            version: z.literal(1), pushedAt: z.string().max(40), day: z.string().max(20),
-            routes: z.record(z.string().max(300), z.unknown()),
-            blobs: z.record(z.string().max(500), z.object({ hash: z.string().regex(/^[0-9a-f]{40}$/), mime: z.string().regex(/^image\/[\w.+-]+$/) })),
-        }).parse(body);
-        if (!Object.keys(feed.routes).every((k) => viewerMayRead(k.split('?')[0])))
-            throw badRequest('Unexpected route in the commentator data.');
-        if (!Object.keys(feed.blobs).every((k) => /^\/api\/assets\/[\w-]+\/file(\?v=[^"\\]*)?$/.test(k)))
-            throw badRequest('Unexpected picture address.');
-        return { ok: true, missing: live.accept(feed, from), viewerPath: live.viewerPath() };
-    });
-    app.put('/api/live-feed/blob/:hash', async (req, reply) => {
-        if (!password)
-            return reply.status(403).send({ error: 'Set DASHBOARD_PASSWORD on the online dashboard first.' });
-        if (!Buffer.isBuffer(req.body) || !live.saveBlob(req.params.hash, req.body))
-            throw badRequest('The picture does not match its checksum.');
-        return { ok: true };
-    });
-    app.get('/api/live/status', async () => live.status());
-    app.get('/api/live/viewer', async () => ({ path: live.viewerPath(), passwordSet: !!password, ...live.status() }));
-    app.post('/api/live/viewer/rotate', async () => { live.rotate(); return { path: live.viewerPath() }; });
-    app.delete('/api/live-feed', async () => { live.clear(); return { ok: true }; });
-    // sending side
-    const pushBody = z.object({ target: str(300), password: str(200), enabled: z.boolean() }).partial();
-    app.get('/api/live/push', async () => ({ ...pusher.settings(), status: pusher.status }));
-    app.put('/api/live/push', async (req) => { pusher.save(pushBody.parse(req.body)); return { ...pusher.settings(), status: pusher.status }; });
-    app.post('/api/live/push/now', async () => ({ ...pusher.settings(), status: await pusher.pushNow() }));
-    // ---------- commentator screen as a static page (folder or web host; nothing runs on the host) ----------
+    // ---------- commentator screen as a static page on Cloudflare R2 (commentary.em27code.com; nothing runs there) ----------
     const siteDir = deps.siteDir ?? path.join(path.dirname(deps.assetsDir), 'commentator-site');
-    const site = new StaticSitePublisher(db, () => pusher.build(), deps.webDist, (d, folder) => siteTarget(d, folder, siteDir));
+    const site = new StaticSitePublisher(db, () => snapshot.build(), deps.webDist, deps.siteTarget ?? siteTarget, () => publishEverySeconds(db) * 1000, path.join(siteDir, 'sent.json'));
     app.decorate('staticSite', site);
     app.addHook('onClose', async () => site.stop());
-    const siteInfo = () => ({ ...siteSettings(db, siteDir), enabled: site.enabled(), url: site.url(), folderName: site.folderName(), status: site.status });
+    const siteInfo = () => ({ ...siteSettings(db), enabled: site.enabled(), url: site.url(), status: site.status });
     app.get('/api/static-site', async () => siteInfo());
     app.put('/api/static-site', async (req) => {
         const b = z.object({
-            enabled: z.boolean(), mode: z.enum(['folder', 'ftp', 'https', 's3']), localDir: str(500), publicUrl: str(300),
-            ftpHost: str(200), ftpPort: z.number().int().min(1).max(65535), ftpUser: str(200), ftpPassword: str(200), ftpDir: str(300), ftpSecure: z.boolean(),
-            s3Endpoint: str(300), s3Bucket: str(100), s3AccessKey: str(200), s3Secret: str(300), s3Region: str(40),
+            enabled: z.boolean(), publicUrl: str(300), everySeconds: z.number().refine((v) => PUBLISH_EVERY.includes(v), 'Unknown interval.'),
+            s3Endpoint: str(300), s3Bucket: str(100), s3AccessKey: str(200), s3Secret: str(300),
         }).partial().parse(req.body);
         saveSiteSettings(db, b);
         if (b.enabled !== undefined)
@@ -210,9 +123,7 @@ export async function buildApp(deps) {
         site.reset();
         return siteInfo();
     });
-    app.get('/api/static-site/upload.php', async (_req, reply) => reply.header('Content-Type', 'application/octet-stream').header('Content-Disposition', 'attachment; filename="upload.php"').send(uploadPhp(uploadKey(db))));
     app.post('/api/static-site/publish', async () => { await site.publishNow(); return siteInfo(); });
-    app.post('/api/static-site/new-address', async () => { site.newFolder(); return siteInfo(); });
     const ev = () => activeEvent(db);
     // ---------- meta ----------
     app.get('/api/health', async () => ({ ok: true, time: nowIso(), version: versionInfo().version }));

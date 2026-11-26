@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { getSetting, nowIso, setSetting } from '../db/db.js';
+import { DEFAULT_PUBLIC_URL } from './siteTargets.js';
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg' };
 const sha1 = (b) => createHash('sha1').update(b).digest('hex');
 /** The page and the scripts and styles it loads (relative paths, so it works in any folder). */
@@ -49,6 +50,7 @@ export function dataFiles(feed, files) {
     const version = sha1(JSON.stringify({ day: feed.day, routes: feed.routes, blobs: feed.blobs }));
     return { data: json.replace(`"pushedAt":${JSON.stringify(feed.pushedAt)}`, `"pushedAt":${JSON.stringify(feed.pushedAt)},"version":"${version}"`), images, version };
 }
+/** Writes the folder to disk (tests). */
 export class LocalFolderTarget {
     dir;
     label;
@@ -73,8 +75,9 @@ export class StaticSitePublisher {
     build;
     webDist;
     makeTarget;
-    everyMs;
     publishEveryMs;
+    stateFile;
+    everyMs;
     status = { lastAttemptAt: null, lastOkAt: null, lastChangeAt: null, error: '', url: '', uploadedFiles: 0, dataBytes: 0, pictures: 0, target: '' };
     sent = new Map(); // rel → sha1 already on the target
     sentTo = '';
@@ -83,16 +86,39 @@ export class StaticSitePublisher {
     timer = null;
     target = null;
     failures = 0;
-    retryAt = 0; // kept between rounds: one FTP connection, not one every 5 s
-    constructor(db, build, webDist, makeTarget, everyMs = 5000, publishEveryMs = 300_000) {
+    retryAt = 0; // when the next routine round may start
+    /**
+     * everyMs: how often the timer looks; publishEveryMs: the time between routine rounds (the setting);
+     * stateFile: where the list of files already on the target is kept, so a restart does not send everything again.
+     */
+    constructor(db, build, webDist, makeTarget, publishEveryMs = () => 60_000, stateFile, everyMs = 5000) {
         this.db = db;
         this.build = build;
         this.webDist = webDist;
         this.makeTarget = makeTarget;
-        this.everyMs = everyMs;
         this.publishEveryMs = publishEveryMs;
+        this.stateFile = stateFile;
+        this.everyMs = everyMs;
+        try {
+            const st = stateFile ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : null;
+            if (st?.target) {
+                this.sentTo = st.target;
+                this.sent = new Map(Object.entries(st.files ?? {}));
+            }
+        }
+        catch { /* first start, or an unreadable file: send everything once */ }
     }
-    /** Random part of the address; a new one moves the page (the old address keeps its last data until removed on the host). */
+    saveSent() {
+        if (!this.stateFile)
+            return;
+        try {
+            fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+            fs.writeFileSync(`${this.stateFile}.tmp`, JSON.stringify({ target: this.sentTo, files: Object.fromEntries(this.sent) }));
+            fs.renameSync(`${this.stateFile}.tmp`, this.stateFile);
+        }
+        catch { /* only costs a full send after the next restart */ }
+    }
+    /** The folder on the bucket (random, made once; the address of the page). */
     folderName() {
         let f = getSetting(this.db, 'static.folder');
         if (!f) {
@@ -101,21 +127,19 @@ export class StaticSitePublisher {
         }
         return f;
     }
-    newFolder() { setSetting(this.db, 'static.folder', ''); this.sent.clear(); return this.folderName(); }
     url() {
-        const base = getSetting(this.db, 'static.publicUrl').trim().replace(/\/+$/, '');
-        return base ? `${base}/${this.folderName()}/index.html` : ''; // index.html: object stores have no folder index
+        const base = (getSetting(this.db, 'static.publicUrl').trim() || DEFAULT_PUBLIC_URL).replace(/\/+$/, '');
+        return `${base}/${this.folderName()}/index.html`; // index.html: object stores have no folder index
     }
     enabled() { return getSetting(this.db, 'static.enabled') === '1'; }
     setEnabled(on) { setSetting(this.db, 'static.enabled', on ? '1' : ''); if (!on)
         this.status.error = ''; }
-    /** Settings changed: send everything again on the next round. */
-    reset() { this.status.error = ''; this.failures = 0; this.retryAt = 0; this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
+    /** Settings changed: a new round at once (files already on the same bucket are not sent again). */
+    reset() { this.status.error = ''; this.failures = 0; this.retryAt = 0; void this.target?.close?.(); this.target = null; }
     start() {
         if (this.timer)
             return;
-        // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min): a host's firewall bans an
-        // address that keeps failing to connect, and a ban blocks the page for everyone on that network.
+        // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min).
         this.timer = setInterval(() => {
             if (!this.enabled() || Date.now() < this.retryAt || this.current)
                 return;
@@ -151,6 +175,7 @@ export class StaticSitePublisher {
             if (target.label !== this.sentTo) {
                 this.sent.clear();
                 this.sentTo = target.label;
+                this.saveSent();
             }
             const { feed, files } = await this.build();
             const { data, images, version } = dataFiles(feed, files);
@@ -173,10 +198,16 @@ export class StaticSitePublisher {
                 hashes.set('data.json', version);
             }
             // auto: the page knows whether to expect a new status every few seconds or only when someone publishes
-            const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled() });
+            const every = Math.round(this.publishEveryMs() / 1000);
+            const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled(), every });
             pending.push({ rel: 'status.json', data: status });
-            await target.put(pending, (rel) => { const h = hashes.get(rel); if (h)
-                this.sent.set(rel, h); });
+            try {
+                await target.put(pending, (rel) => { const h = hashes.get(rel); if (h)
+                    this.sent.set(rel, h); });
+            }
+            finally {
+                this.saveSent();
+            }
             if (dataChanged) {
                 this.status.lastChangeAt = feed.pushedAt;
                 this.status.dataBytes = Buffer.byteLength(data);
@@ -186,8 +217,8 @@ export class StaticSitePublisher {
             this.status.lastOkAt = nowIso();
             this.status.error = '';
             this.failures = 0;
-            // the next routine round in 5 min: light on the PC during the show ('Publish now' and a settings change send at once)
-            this.retryAt = Date.now() + this.publishEveryMs;
+            // the next routine round after the chosen time ('Publish now' and a settings change send at once)
+            this.retryAt = Date.now() + this.publishEveryMs();
         }
         catch (e) {
             this.failures++;

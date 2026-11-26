@@ -1,8 +1,14 @@
 {
-  "version": "1.0.283",
-  "commit": "d208c0a",
-  "date": "2026-11-26T20:14:13Z",
+  "version": "1.0.284",
+  "commit": "7b8cc6d",
+  "date": "2026-11-26T21:09:25Z",
   "changes": [
+    {
+      "version": "1.0.284",
+      "commit": "7b8cc6d",
+      "date": "2026-11-26T21:09:25Z",
+      "text": "Commentator online: only Cloudflare R2 on commentary.em27code.com, new data every minute (#27)"
+    },
     {
       "version": "1.0.283",
       "commit": "d208c0a",
@@ -476,12 +482,6 @@
       "commit": "f172df0",
       "date": "2026-11-16T18:28:02Z",
       "text": "DRAW: group to the centre before each team, flag videos, strips slide off for all groups, draw matchboard PNG + vMix input, quieter empty places"
-    },
-    {
-      "version": "1.0.204",
-      "commit": "2bcae3a",
-      "date": "2026-11-16T17:33:01Z",
-      "text": "DRAW: teams go to the group with the fewest teams, waving-flag reveal, full-width all-groups view"
     }
   ]
 }
