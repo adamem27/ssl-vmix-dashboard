@@ -1,8 +1,14 @@
 {
-  "version": "1.0.274",
-  "commit": "4382d58",
-  "date": "2026-11-26T12:30:39Z",
+  "version": "1.0.275",
+  "commit": "a340f0d",
+  "date": "2026-11-26T13:08:03Z",
   "changes": [
+    {
+      "version": "1.0.275",
+      "commit": "a340f0d",
+      "date": "2026-11-26T13:08:03Z",
+      "text": "Show control: saving one setting no longer puts every other one back to its default (zod 4 partial defaults), which switched the Mix loop off; TEAM PARTNER for a team with one sponsor on the line-ups"
+    },
     {
       "version": "1.0.274",
       "commit": "4382d58",
@@ -476,12 +482,6 @@
       "commit": "19096e4",
       "date": "2026-11-16T14:13:45Z",
       "text": "Race flags back in the original square look (AP pennant, A swallowtail cut, rounded); Announcements in Stream Deck order; drag to reorder versions"
-    },
-    {
-      "version": "1.0.195",
-      "commit": "3ff0fbc",
-      "date": "2026-11-16T14:13:45Z",
-      "text": "Stream Decks for the next stages: 16 team places in group order, team LTs on the team pages, ticker and top ticker on/off"
     }
   ]
 }

@@ -38,7 +38,11 @@ export function registerShowRoutes(app, ctx, show) {
     });
     app.post('/api/ticker-langs/send', async () => { show.langs.resend(); await show.langs.tick(); return show.langs.view(); });
     app.put('/api/show/config', async (req) => {
-        const c = setShowConfig(db, showConfigSchema.partial().parse(req.body));
+        // only the fields sent: zod 4 fills every left-out field of a partial schema with its default, which put the rest
+        // of the settings back to their defaults on any save of a single field (the champions line, a key edit)
+        const body = (req.body ?? {});
+        const parsed = showConfigSchema.partial().parse(body);
+        const c = setShowConfig(db, Object.fromEntries(Object.entries(parsed).filter(([k]) => k in body)));
         void show.pushLabels(); // only the keys that changed (the key editor, colours…)
         return c;
     });
