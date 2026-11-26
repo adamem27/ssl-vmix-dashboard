@@ -1,8 +1,14 @@
 {
-  "version": "1.0.278",
-  "commit": "7c7d933",
-  "date": "2026-11-26T14:01:49Z",
+  "version": "1.0.279",
+  "commit": "36db049",
+  "date": "2026-11-26T14:19:39Z",
   "changes": [
+    {
+      "version": "1.0.279",
+      "commit": "36db049",
+      "date": "2026-11-26T14:19:39Z",
+      "text": "Mix loop never sticks: a refused out on the Mix no longer stops the next board, an error keeps the board on the channel; Show control lists the boards in turn, the next switch time and what was sent to vMix with its answers"
+    },
     {
       "version": "1.0.278",
       "commit": "7c7d933",
@@ -476,12 +482,6 @@
       "commit": "032871b",
       "date": "2026-11-16T16:04:36Z",
       "text": "DRAW screen: strips run the full height, header picture between them (height follows the picture); team list stays in the upper part for the host"
-    },
-    {
-      "version": "1.0.199",
-      "commit": "887aa42",
-      "date": "2026-11-16T15:52:07Z",
-      "text": "DRAW tab: 1/32 Finals draw on the LED wall (vMix Browser input + Companion page) (#23)"
     }
   ]
 }
