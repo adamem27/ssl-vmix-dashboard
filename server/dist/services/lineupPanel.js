@@ -23,7 +23,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-9';
+const VERSION = 'partners-10';
 /** The label over the logos: one partner or several. */
 export const partnersLabel = (n) => (n === 1 ? 'TEAM PARTNER' : 'TEAM PARTNERS');
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
@@ -41,13 +41,16 @@ export function stripRect(kind, panelH) {
     const compact = h < 104;
     // label row on top (smaller on a low strip), the logos in the rest
     const label = compact ? 22 : 44;
-    return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, label, maxH: Math.max(26, Math.min(100, h - label - 14)) };
+    // the logos' height: what is left under the label and its gap, up to 112 px
+    const labelSize = compact ? 14 : 17;
+    return { x: 125, y, w: 1481, h, radius: compact ? 18 : 22, compact, label, maxH: Math.max(26, Math.min(112, h - labelSize - LABEL_GAP - 12)) };
 }
 const MAX_W = 300;
 /** Between the ink edges of two logos (the row is centred), and from the label to the logos. */
 const MIN_GAP = 60;
 const MAX_GAP = 150;
-const LABEL_GAP = 18;
+/** From the TEAM PARTNERS label to the logos: enough that the label never runs into them. */
+const LABEL_GAP = 28;
 /** A logo as it shows: the solid colour around a JPG / flat PNG cleared, like an upload is. */
 function visible(buf, asIs = false) {
     const d = decode(buf);
@@ -179,17 +182,23 @@ catch {
     return f;
 } };
 /**
- * Logos that read as one size: each scaled so that what it covers (its visual area: the ink, not the file or its box)
- * is the same for all, within its slot and the row's height. The common area is the one most logos can reach (the
- * middle one); a logo that cannot reach it at its largest stays at its largest.
+ * Logos that read as one size: the height falls with the width-to-height ratio (ratio^-0.35, between one height for all
+ * and one area for all), a square logo 88% of the row's height. When a logo is too wide for its slot, all of them
+ * shrink together (down to 75%) so they stay alike; only past that is the wide one capped on its own.
  */
 export function logoSizes(boxes, slotW, strip = stripRect(9, 952)) {
     const { maxH } = strip;
     const room = Math.min(MAX_W, slotW - 36);
-    const fill = (b) => b.fill ?? 1;
-    const largest = boxes.map((b) => { const s = Math.min(room / b.w, maxH / b.h); return fill(b) * b.w * b.h * s * s; }).sort((x, y) => x - y);
-    const area = largest[Math.floor((largest.length - 1) / 2)];
-    return boxes.map((b) => { const s = areaScale(b, fill(b), area, room, maxH); return { w: Math.round(b.w * s), h: Math.round(b.h * s) }; });
+    const want = boxes.map(({ w, h }) => {
+        const ratio = w / h;
+        const th = Math.min(maxH, maxH * 0.88 * Math.pow(ratio, -0.35));
+        return { w: th * ratio, h: th };
+    });
+    const common = Math.max(0.75, Math.min(1, ...want.map((x) => room / x.w)));
+    return want.map((x) => {
+        const s = Math.min(common, room / x.w);
+        return { w: Math.round(x.w * s), h: Math.round(x.h * s) };
+    });
 }
 function draw(ctx, c, base, logos, kind, asIs = false) {
     const cv = c.createCanvas(PANEL.width, PANEL.height);
@@ -201,7 +210,7 @@ function draw(ctx, c, base, logos, kind, asIs = false) {
         t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
         // dark logos turn white on the dark strip (as on the design), every other logo keeps its colours; as-is logos too
         const box = inkBox(d);
-        return { im: !asIs && brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box, ...inkStats(d, box) };
+        return { im: !asIs && brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box };
     };
     const rr = (x, y, w, h, r) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
     const sponsors = logos.length > 0;
@@ -241,7 +250,7 @@ function draw(ctx, c, base, logos, kind, asIs = false) {
         return cv.toBuffer('image/png');
     // sizes from what each logo really shows (its ink, not its picture), then equal gaps between the ink edges
     const n = imgs.length;
-    const sizes = logoSizes(imgs.map((x) => ({ ...x.box, fill: x.fill })), Math.min((s.w - 80 - MIN_GAP * (n - 1)) / n + 36, MAX_W + 36), s);
+    const sizes = logoSizes(imgs.map((x) => x.box), Math.min((s.w - 80 - MIN_GAP * (n - 1)) / n + 36, MAX_W + 36), s);
     const sum = sizes.reduce((t, x) => t + x.w, 0);
     const gap = n > 1 ? Math.max(MIN_GAP, Math.min(MAX_GAP, (s.w - 80 - sum) / (n - 1))) : 0;
     const rowH = Math.max(...sizes.map((x) => x.h));
@@ -256,13 +265,9 @@ function draw(ctx, c, base, logos, kind, asIs = false) {
     g.fillText(partnersLabel(n), s.x + s.w / 2, top + labelSize / 2);
     const cy = top + labelSize + LABEL_GAP + rowH / 2;
     let x = s.x + (s.w - sum - gap * (n - 1)) / 2;
-    // each logo's visual centre on the row's middle line (a logo with a heavy top or a tagline below sits as the eye
-    // expects), kept inside the row
-    const rowTop = cy - rowH / 2;
-    imgs.forEach(({ im, box, cy: vc }, i) => {
+    imgs.forEach(({ im, box }, i) => {
         const { w, h } = sizes[i];
-        const y = Math.max(rowTop, Math.min(rowTop + rowH - h, cy - h * vc));
-        g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(y), w, h);
+        g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(cy - h / 2), w, h);
         x += w + gap;
     });
     return cv.toBuffer('image/png');

@@ -1,8 +1,14 @@
 {
-  "version": "1.0.282",
-  "commit": "2080343",
-  "date": "2026-11-26T19:52:37Z",
+  "version": "1.0.283",
+  "commit": "d208c0a",
+  "date": "2026-11-26T20:14:13Z",
   "changes": [
+    {
+      "version": "1.0.283",
+      "commit": "d208c0a",
+      "date": "2026-11-26T20:14:13Z",
+      "text": "Line-up sponsor strip back to the sizing before the visual-area change, the logos a little bigger (88% of a row up to 112 px), and a 28 px gap under the TEAM PARTNERS label; the lower third tab keeps the visual-area sizing"
+    },
     {
       "version": "1.0.282",
       "commit": "2080343",
@@ -476,12 +482,6 @@
       "commit": "2bcae3a",
       "date": "2026-11-16T17:33:01Z",
       "text": "DRAW: teams go to the group with the fewest teams, waving-flag reveal, full-width all-groups view"
-    },
-    {
-      "version": "1.0.203",
-      "commit": "bec0302",
-      "date": "2026-11-16T17:30:20Z",
-      "text": "RESULTS/COMPARE page: only the groups of the stage picked at the top, no COMPARE PICKED key"
     }
   ]
 }
