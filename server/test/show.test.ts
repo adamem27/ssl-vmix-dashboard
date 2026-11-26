@@ -936,6 +936,16 @@ describe('show control', () => {
     v.calls.length = 0;
     await show.run('lineup:ESP');
     expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/NEUTRAL_Lineup\.png$/);
+    // the title's own BG as a bare name from inside its GTZIP (vMix cannot load it again: 500): the plain panel
+    v.vals.set('3|BG.Source', 'BG.png');
+    saveUpload(s.ctx, 'team', espId, 'sponsor_1', encodePng(80, 40, (x, y) => (x > 10 && x < 70 && y > 10 && y < 30 ? [255, 255, 255, 255] : [0, 0, 0, 0])), 'sp.png');
+    (show as any).memo.clear();
+    await show.run('lineup:ESP');
+    removeAsset(s.ctx, 'team', espId, 'sponsor_1');
+    (show as any).memo.clear();
+    v.calls.length = 0;
+    await show.run('lineup:ESP');
+    expect(v.calls.find((c) => c.includes('SelectedName=BG.Source'))).toMatch(/lineup_plain\.png$/);
     // General graphics → Team comparison: what is typed there wins
     const fleetId = show.config.fleetId;
     setCompareOverride(s.ctx.db, fleetId, 1, 'nick', 'The Bulls');
