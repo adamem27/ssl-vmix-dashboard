@@ -134,9 +134,12 @@ export function officialsLines(groups: { role: string; names: string[] }[]) {
 }
 /** The panel behind the officials: 292 wide, its height as given; dark, 80 %, rounded, an orange to yellow edge. */
 export function officialsPanelPng(H: number) {
-  const W = 292, R = 26, B = 1.5;
+  // always the size of the title's PANEL box (292×588): vMix fits a picture into its box, so a shorter one would be
+  // scaled and centred (its top below the RACE OFFICIALS heading); the panel is drawn from the top, the rest left clear
+  const W = 292, R = 26, B = 1.5, FULL = 588;
+  H = Math.max(2 * R, Math.min(FULL, Math.round(H)));
   const from = [176, 102, 4], to = [240, 196, 10];
-  return encodePng(W, H, (x, y) => {
+  return encodePng(W, FULL, (x, y) => {
     const cx = Math.min(Math.max(x + 0.5, R), W - R), cy = Math.min(Math.max(y + 0.5, R), H - R);
     const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) - R; // < 0 inside
     const a = Math.max(0, Math.min(1, 0.5 - d));
@@ -148,7 +151,7 @@ export function officialsPanelPng(H: number) {
   });
 }
 export function officialsPanelPath(ctx: AssetCtx, h: number) {
-  const rel = `icons/officials_panel_${h}.png`;
+  const rel = `icons/officials_panel_${h}_full.png`;
   if (ctx.assetsDir) {
     const file = path.join(ctx.assetsDir, ...rel.split('/'));
     try { if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, officialsPanelPng(h)); } } catch { /* read-only folder: the path is still sent */ }

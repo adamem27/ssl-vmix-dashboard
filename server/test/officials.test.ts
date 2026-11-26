@@ -22,7 +22,12 @@ describe('race officials as lines (no gaps)', () => {
     expect(lines.filter(Boolean).map((l) => l!.text)).not.toContain('CHIEF UMPIRE');
     expect(panel).toBe(497);
     const p = PNG.sync.read(officialsPanelPng(panel));
-    expect([p.width, p.height]).toEqual([292, panel]);
+    // the size of the PANEL box, so vMix does not scale it; clear under the panel, the panel from the top
+    expect([p.width, p.height]).toEqual([292, 588]);
+    const alpha = (x: number, y: number) => p.data[(y * p.width + x) * 4 + 3];
+    expect(alpha(146, 2)).toBeGreaterThan(150);
+    expect(alpha(146, panel - 3)).toBeGreaterThan(150);
+    expect(alpha(146, panel + 3)).toBe(0);
   });
 
   it('nobody: only the title on a short panel', () => {
