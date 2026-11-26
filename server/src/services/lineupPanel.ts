@@ -25,7 +25,7 @@ import { joinVmixPath, localCandidate, readIfExists } from './paths.js';
 export const PANEL = { width: 1731, height: 972 };
 export const PLAIN_HEIGHT = 861;
 export const PANEL_DIR = 'Line-up panels';
-const VERSION = 'partners-8';
+const VERSION = 'partners-9';
 /** The label over the logos: one partner or several. */
 export const partnersLabel = (n: number) => (n === 1 ? 'TEAM PARTNER' : 'TEAM PARTNERS');
 const SPONSOR_SLOTS = ['sponsor_1', 'sponsor_2', 'sponsor_3', 'sponsor_4', 'sponsor_5'];
@@ -61,6 +61,24 @@ function visible(buf: Buffer) {
 }
 /** Where the logo's ink is: faint glow, shadows and stray pixels around it do not count. */
 const inkBox = (d: ReturnType<typeof decode>) => { try { return trimBox(d, 64); } catch { return trimBox(d); } };
+/**
+ * What the eye sees of a logo in its ink box: how much of the box it covers (alpha-weighted, 0–1: a solid block 1, a
+ * thin wordmark much less) and its visual centre (its weight's middle, 0–1 across and down the box).
+ */
+export function inkStats(d: { width: number; data: Uint8Array }, box: { x0: number; y0: number; w: number; h: number }) {
+  let a = 0, sx = 0, sy = 0;
+  for (let y = 0; y < box.h; y++) {
+    for (let x = 0; x < box.w; x++) {
+      const al = d.data[((box.y0 + y) * d.width + box.x0 + x) * 4 + 3] / 255;
+      a += al; sx += al * (x + 0.5); sy += al * (y + 0.5);
+    }
+  }
+  if (!a) return { fill: 1, cx: 0.5, cy: 0.5 };
+  return { fill: Math.max(0.12, Math.min(1, a / (box.w * box.h))), cx: sx / a / box.w, cy: sy / a / box.h };
+}
+/** The scale that gives a logo this visual area (covered pixels), within its own largest size. */
+const areaScale = (box: { w: number; h: number }, fill: number, area: number, maxW: number, maxH: number) =>
+  Math.min(maxW / box.w, maxH / box.h, Math.sqrt(area / (fill * box.w * box.h)));
 
 type Asset = { storedPath: string | null; enteredPath: string | null } | null | undefined;
 type Canvas = typeof import('@napi-rs/canvas');
@@ -130,23 +148,17 @@ function silhouette(c: Canvas, src: import('@napi-rs/canvas').Canvas, colour: st
 const stamp = (f: string) => { try { const s = fs.statSync(f); return `${f}:${s.size}:${s.mtimeMs}`; } catch { return f; } };
 
 /**
- * Logos that read as one size: the height falls with the width-to-height ratio (ratio^-0.35, between one height for all
- * and one area for all), a square logo 80% of the row's height. When a logo is too wide for its slot, all of them
- * shrink together (down to 75%) so they stay alike; only past that is the wide one capped on its own.
+ * Logos that read as one size: each scaled so that what it covers (its visual area: the ink, not the file or its box)
+ * is the same for all, within its slot and the row's height. The common area is the one most logos can reach (the
+ * middle one); a logo that cannot reach it at its largest stays at its largest.
  */
-export function logoSizes(boxes: { w: number; h: number }[], slotW: number, strip: { maxH: number } = stripRect(9, 952)) {
+export function logoSizes(boxes: { w: number; h: number; fill?: number }[], slotW: number, strip: { maxH: number } = stripRect(9, 952)) {
   const { maxH } = strip;
   const room = Math.min(MAX_W, slotW - 36);
-  const want = boxes.map(({ w, h }) => {
-    const ratio = w / h;
-    const th = Math.min(maxH, maxH * 0.8 * Math.pow(ratio, -0.35));
-    return { w: th * ratio, h: th };
-  });
-  const common = Math.max(0.75, Math.min(1, ...want.map((x) => room / x.w)));
-  return want.map((x) => {
-    const s = Math.min(common, room / x.w);
-    return { w: Math.round(x.w * s), h: Math.round(x.h * s) };
-  });
+  const fill = (b: { fill?: number }) => b.fill ?? 1;
+  const largest = boxes.map((b) => { const s = Math.min(room / b.w, maxH / b.h); return fill(b) * b.w * b.h * s * s; }).sort((x, y) => x - y);
+  const area = largest[Math.floor((largest.length - 1) / 2)];
+  return boxes.map((b) => { const s = areaScale(b, fill(b), area, room, maxH); return { w: Math.round(b.w * s), h: Math.round(b.h * s) }; });
 }
 
 function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], kind: StripKind): Buffer {
@@ -158,7 +170,8 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
     const t = c.createCanvas(d.width, d.height);
     t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
     // dark logos turn white on the dark strip (as on the design), every other logo keeps its colours
-    return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box: inkBox(d) };
+    const box = inkBox(d);
+    return { im: brightness(d) < 0.3 ? silhouette(c, t, '#ffffff') : t, box, ...inkStats(d, box) };
   };
   const rr = (x: number, y: number, w: number, h: number, r: number) => { g.beginPath(); g.roundRect(x, y, w, h, r); };
   const sponsors = logos.length > 0;
@@ -186,7 +199,7 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
   if (!imgs.length) return cv.toBuffer('image/png');
   // sizes from what each logo really shows (its ink, not its picture), then equal gaps between the ink edges
   const n = imgs.length;
-  const sizes = logoSizes(imgs.map((x) => x.box), Math.min((s.w - 80 - MIN_GAP * (n - 1)) / n + 36, MAX_W + 36), s);
+  const sizes = logoSizes(imgs.map((x) => ({ ...x.box, fill: x.fill })), Math.min((s.w - 80 - MIN_GAP * (n - 1)) / n + 36, MAX_W + 36), s);
   const sum = sizes.reduce((t, x) => t + x.w, 0);
   const gap = n > 1 ? Math.max(MIN_GAP, Math.min(MAX_GAP, (s.w - 80 - sum) / (n - 1))) : 0;
   const rowH = Math.max(...sizes.map((x) => x.h));
@@ -200,9 +213,13 @@ function draw(ctx: AssetCtx, c: Canvas, base: string | null, logos: Buffer[], ki
   g.fillText(partnersLabel(n), s.x + s.w / 2, top + labelSize / 2);
   const cy = top + labelSize + LABEL_GAP + rowH / 2;
   let x = s.x + (s.w - sum - gap * (n - 1)) / 2;
-  imgs.forEach(({ im, box }, i) => {
+  // each logo's visual centre on the row's middle line (a logo with a heavy top or a tagline below sits as the eye
+  // expects), kept inside the row
+  const rowTop = cy - rowH / 2;
+  imgs.forEach(({ im, box, cy: vc }, i) => {
     const { w, h } = sizes[i];
-    g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(cy - h / 2), w, h);
+    const y = Math.max(rowTop, Math.min(rowTop + rowH - h, cy - h * vc));
+    g.drawImage(im, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(y), w, h);
     x += w + gap;
   });
   return cv.toBuffer('image/png');
@@ -243,6 +260,11 @@ export const TAG = { width: 520, height: 116 };
  * the bar), at most 420 of the 520 wide (the sides lean in at the top).
  */
 const TAG_MAX = { w: 420, h: 90 };
+/**
+ * The visual area every team's logo takes on the tab (covered pixels at the tab's double size): a solid square logo
+ * reaches about this at the full 90 px, a wordmark is wider and lower, so all teams' logos look one size.
+ */
+const TAG_AREA = 9000;
 const TAG_DOWN = 3;
 
 function drawTag(c: Canvas, logo: Buffer | null): Buffer {
@@ -260,9 +282,14 @@ function drawTag(c: Canvas, logo: Buffer | null): Buffer {
   t.getContext('2d').putImageData(new c.ImageData(new Uint8ClampedArray(d.data.buffer, d.data.byteOffset, d.data.length), d.width, d.height), 0, 0);
   const box = inkBox(d);
   const pic = brightness(d) > 0.8 ? silhouette(c, t, '#1a1a1a') : t; // a white logo would vanish on the light tab
-  const s = Math.min(TAG_MAX.w / box.w, TAG_MAX.h / box.h);
+  const st = inkStats(d, box);
+  const s = areaScale(box, st.fill, TAG_AREA, TAG_MAX.w, TAG_MAX.h);
   const lw = Math.round(box.w * s), lh = Math.round(box.h * s);
-  g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round((w - lw) / 2), Math.round((h - lh) / 2 + TAG_DOWN), lw, lh);
+  // its visual centre on the tab's middle (as the box's middle was), inside the margins
+  const top = (h - TAG_MAX.h) / 2 + TAG_DOWN;
+  const y = Math.max(top, Math.min(top + TAG_MAX.h - lh, h / 2 + TAG_DOWN - lh * st.cy));
+  const x = Math.max((w - TAG_MAX.w) / 2, Math.min((w + TAG_MAX.w) / 2 - lw, w / 2 - lw * st.cx));
+  g.drawImage(pic, box.x0, box.y0, box.w, box.h, Math.round(x), Math.round(y), lw, lh);
   return cv.toBuffer('image/png');
 }
 

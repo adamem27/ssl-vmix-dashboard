@@ -11,17 +11,19 @@ import { lineupPanelFor, logoSizes, ltSponsorFor, setLtSponsorSlot, PANEL, strip
 const logo = (w: number, h: number) => encodePng(w + 40, h + 40, (x, y) => (x >= 20 && x < w + 20 && y >= 20 && y < h + 20 ? [255, 255, 255, 255] : [0, 0, 0, 0]));
 
 describe('line-up panel with team partners', () => {
-  it('sizes the logos alike: wider ones lower, all within the row and their slots', () => {
-    const [sq, wide, tall] = logoSizes([{ w: 100, h: 100 }, { w: 400, h: 100 }, { w: 50, h: 200 }], 400, { maxH: 80 });
-    expect(sq.h).toBe(64);
-    expect(wide.h).toBeLessThan(sq.h);
-    expect(wide.w).toBeGreaterThan(sq.w);
+  it('sizes the logos by what they cover, not by their picture: the same visual area for all, within the row and their slots', () => {
+    const [sq, wide, thin] = logoSizes([{ w: 100, h: 100, fill: 1 }, { w: 400, h: 100, fill: 1 }, { w: 400, h: 100, fill: 0.25 }], 400, { maxH: 80 });
+    const seen = (x: { w: number; h: number }, f: number) => x.w * x.h * f;
+    // the solid square and the solid wide one cover the same; the light wordmark (a quarter of its box) is bigger
+    expect(seen(wide, 1) / seen(sq, 1)).toBeCloseTo(1, 1);
     expect(wide.w / wide.h).toBeCloseTo(4, 0);
-    expect(tall.h).toBeLessThanOrEqual(80);
-    // one logo too wide for its slot: all shrink together first
-    const [a, b] = logoSizes([{ w: 100, h: 100 }, { w: 1000, h: 100 }], 300, { maxH: 80 });
-    expect(b.w).toBeLessThanOrEqual(264);
-    expect(a.h).toBeLessThan(64);
+    expect(thin.w).toBeGreaterThan(wide.w);
+    expect(seen(thin, 0.25) / seen(sq, 1)).toBeGreaterThan(0.8);
+    for (const x of [sq, wide, thin]) { expect(x.h).toBeLessThanOrEqual(80); expect(x.w).toBeLessThanOrEqual(364); }
+    // one that cannot reach the common area stays at its largest
+    const [a, b2] = logoSizes([{ w: 100, h: 100, fill: 1 }, { w: 1000, h: 100, fill: 1 }], 300, { maxH: 80 });
+    expect(b2.w).toBeLessThanOrEqual(264);
+    expect(a.h).toBeLessThanOrEqual(80);
   });
 
   it('draws the strip with the logos for a team with sponsors and the plain panel for one without', () => {
@@ -92,11 +94,18 @@ describe('line-up panel with team partners', () => {
     expect(sq.h).toBeGreaterThanOrEqual(88);
     expect(sq.y0).toBeGreaterThanOrEqual(14);
     expect(TAG.height - (sq.y0 + sq.h)).toBeGreaterThanOrEqual(8);
-    // a wide one: as wide as allowed, margins left at the sides
+    // a wide one: the same visual area as the square (not as wide as the tab), margins left at the sides
     saveUpload(ctx, 'team', a, 'sponsor_1', logo(600, 60), 's2.png');
     const wide = box(ltSponsorFor(ctx, listTeams(ctx)[0] as never)!);
-    expect(wide.w).toBeGreaterThanOrEqual(416);
+    expect((wide.w * wide.h) / (sq.w * sq.h)).toBeGreaterThan(0.85);
+    expect((wide.w * wide.h) / (sq.w * sq.h)).toBeLessThan(1.25);
     expect(wide.x0).toBeGreaterThanOrEqual(48);
+    // a thin outline wordmark of the same box covers less: drawn bigger, up to the tab's width
+    const outline = encodePng(640, 100, (x, y) => (x >= 20 && x < 620 && y >= 20 && y < 80 && (x < 26 || x > 613 || y < 26 || y > 73) ? [0, 0, 0, 255] : [0, 0, 0, 0]));
+    saveUpload(ctx, 'team', a, 'sponsor_1', outline, 's3.png');
+    const thin = box(ltSponsorFor(ctx, listTeams(ctx)[0] as never)!);
+    expect(thin.w).toBeGreaterThan(wide.w);
+    expect(thin.w).toBeLessThanOrEqual(422);
   });
 
   it('shows the sponsor picked for the lower third, logo 1 when that place is empty, nothing for none', () => {
