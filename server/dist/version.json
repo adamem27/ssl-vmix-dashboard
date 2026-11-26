@@ -1,8 +1,14 @@
 {
-  "version": "1.0.276",
-  "commit": "61cdc6e",
-  "date": "2026-11-26T13:25:44Z",
+  "version": "1.0.277",
+  "commit": "a295ca2",
+  "date": "2026-11-26T13:34:49Z",
   "changes": [
+    {
+      "version": "1.0.277",
+      "commit": "a295ca2",
+      "date": "2026-11-26T13:34:49Z",
+      "text": "Lower third sponsor tab: the logo as big as the tab allows (90 of 116 px high, up to 420 wide), a margin kept round it"
+    },
     {
       "version": "1.0.276",
       "commit": "61cdc6e",
@@ -476,12 +482,6 @@
       "commit": "1c90667",
       "date": "2026-11-16T15:31:31Z",
       "text": "Ticker on its own back on channel 1; COMPARE page: each group's comparison and results (A–D from the start); deck pages scroll in Show control"
-    },
-    {
-      "version": "1.0.197",
-      "commit": "8283b6f",
-      "date": "2026-11-16T15:09:41Z",
-      "text": "Race flags: C + minus and C + plus without the minus / plus board (plain C)"
     }
   ]
 }
