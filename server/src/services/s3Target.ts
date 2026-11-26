@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import type { SiteFile, SiteTarget } from './staticSite.js';
 
 /**
@@ -12,6 +13,8 @@ const TYPES: Record<string, string> = {
   html: 'text/html; charset=utf-8', json: 'application/json', js: 'text/javascript', css: 'text/css',
   png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', woff2: 'font/woff2', woff: 'font/woff',
 };
+/** Text files go up gzipped (Content-Encoding: gzip): data.json shrinks about tenfold, browsers unpack it themselves. */
+const GZIP = new Set(['html', 'json', 'js', 'css', 'svg']);
 const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex');
 const hmac = (k: Buffer | string, s: string) => createHmac('sha256', k).update(s).digest();
 const enc = (s: string) => encodeURIComponent(s).replace(/[!'()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
@@ -40,12 +43,17 @@ export class S3Target implements SiteTarget {
   async put(files: SiteFile[], done: (rel: string) => void) {
     const base = this.o.endpoint.replace(/\/+$/, '');
     for (const f of files) {
-      const body = typeof f.data === 'string' ? Buffer.from(f.data) : f.data;
+      const raw = typeof f.data === 'string' ? Buffer.from(f.data) : f.data;
       const ext = f.rel.split('.').pop() ?? '';
+      const zip = GZIP.has(ext) && raw.length > 1024;
+      const body = zip ? gzipSync(raw) : raw;
       // the screen's data changes; scripts and pictures have their hash in the name and never do
       const fixed = f.rel.startsWith('img/') || f.rel.startsWith('assets/');
       const url = new URL(`${base}/${enc(this.o.bucket)}/${[this.o.folder, ...f.rel.split('/')].map(enc).join('/')}`);
-      const headers = signPut(this.o, url, body, { 'content-type': TYPES[ext] ?? 'application/octet-stream', 'cache-control': fixed ? 'public, max-age=31536000, immutable' : 'no-cache, max-age=0' });
+      const headers = signPut(this.o, url, body, {
+        'content-type': TYPES[ext] ?? 'application/octet-stream', 'cache-control': fixed ? 'public, max-age=31536000, immutable' : 'no-cache, max-age=0',
+        ...(zip ? { 'content-encoding': 'gzip' } : {}),
+      });
       let res: Response;
       try {
         res = await this.doFetch(url, { method: 'PUT', body: new Uint8Array(body), headers, signal: AbortSignal.timeout(60_000) });

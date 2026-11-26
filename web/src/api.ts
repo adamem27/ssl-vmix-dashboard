@@ -4,7 +4,7 @@ export class ApiError extends Error {
 
 // ---------- static commentator page: answers come from one data.json written by the venue PC ----------
 interface StaticFeed { pushedAt: string; version: string; routes: Record<string, unknown> }
-interface StaticStatus { pushedAt: string; version: string; auto?: boolean }
+interface StaticStatus { pushedAt: string; version: string; auto?: boolean; every?: number }
 let staticBase: string | null = null;
 let statusLoad: { at: number; p: Promise<StaticStatus> } | null = null;
 let feedCache: Promise<StaticFeed> | null = null;
@@ -52,7 +52,7 @@ async function loadFeed(): Promise<StaticFeed> {
 
 async function staticGet<T>(url: string): Promise<T> {
   const [path, qs = ''] = url.split('?');
-  if (path === '/api/live/status') { const st = await loadStatus(); return { feed: { pushedAt: st.pushedAt, receivedAt: st.pushedAt, auto: st.auto }, now: new Date().toISOString() } as T; }
+  if (path === '/api/live/status') { const st = await loadStatus(); return { feed: { pushedAt: st.pushedAt, receivedAt: st.pushedAt, auto: st.auto, every: st.every }, now: new Date().toISOString() } as T; }
   const feed = await loadFeed();
   const set = new URLSearchParams(qs).get('set');
   const key = set && (path === '/api/overview' || path === '/api/commentator') ? `${path}?set=${set}` : path;
@@ -65,9 +65,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
     if (method !== 'GET') throw new ApiError(403, 'This screen is read-only.');
     return staticGet<T>(url);
   }
-  // The commentator screen at /live reads the snapshot pushed by the venue PC when there is one.
-  const onLive = window.location.pathname === '/live';
-  const init: RequestInit = { method, headers: onLive ? { 'x-ssl-live': '1' } : {} };
+  const init: RequestInit = { method, headers: {} };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) {
     init.body = JSON.stringify(body);
@@ -83,7 +81,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
   // Logged out (online mode): back to the login form.
-  if (res.status === 401 && !onLive) window.location.href = '/login';
+  if (res.status === 401) window.location.href = '/login';
   if (res.status === 401) throw new ApiError(401, 'This commentator link is no longer valid. Ask the operator for the new one.');
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `Server error (HTTP ${res.status}).`, data?.details);
   return data as T;

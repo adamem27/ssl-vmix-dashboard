@@ -215,20 +215,20 @@ function Clock({ tz }: { tz: string }) {
   return <span className="font-mono text-2xl font-black tabular-nums text-ink-50">{s}</span>;
 }
 
-interface LiveStatus { feed: { pushedAt: string; receivedAt: string | null; auto?: boolean } | null; now: string }
+interface LiveStatus { feed: { pushedAt: string; receivedAt: string | null; auto?: boolean; every?: number } | null; now: string }
 
-/** Online: how fresh the data from the venue PC is. Green while it keeps coming, red once it stops. */
+/** Online: how fresh the data from the venue PC is. Green while it keeps coming, red once two rounds are missed. */
 function FreshnessBadge() {
   const q = useQuery({ queryKey: ['live-status'], queryFn: () => api.get<LiveStatus>('/api/live/status'), refetchInterval: 5000 });
   if (!q.data?.feed) return null;
   const at = q.data.feed.receivedAt ?? q.data.feed.pushedAt;
   const ago = Math.max(0, Math.round((Date.parse(q.data.now) - Date.parse(at)) / 1000));
-  const ok = ago < 30;
+  const ok = ago < Math.max(30, (q.data.feed.every ?? 15) * 2 + 30);
   const time = new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   // published by hand (Publish now): no new data is expected every few seconds, so the age is not an alarm
   if (q.data.feed.auto === false) return <span className="shrink-0 rounded px-2 py-1 text-sm font-semibold text-ink-300" title="The operator publishes the data by hand">Updated {time.slice(0, 5)}</span>;
   return (
-    <span title={ok ? 'Data from the venue arrives every few seconds' : 'The venue PC stopped sending: these are the last data it sent'}
+    <span title={ok ? `Data from the venue arrives every ${q.data.feed.every ?? 5} s` : 'The venue PC stopped sending: these are the last data it sent'}
       className={cx('flex shrink-0 items-center gap-1.5 rounded px-2 py-1 text-xs font-semibold', ok ? 'bg-emerald-950/60 text-emerald-300' : 'bg-red-950/70 text-red-300')}>
       <span className={cx('h-2 w-2 rounded-full', ok ? 'bg-emerald-400' : 'animate-pulse bg-red-400')} />
       {ok ? 'Live' : `Data from ${time} (${ago < 120 ? `${ago}s` : `${Math.round(ago / 60)} min`} ago)`}

@@ -7,7 +7,7 @@ import { createTeam } from '../src/services/teams.js';
 import { saveUpload } from '../src/services/assets.js';
 import { createSet } from '../src/services/fleets.js';
 import { encodePng } from '../src/services/png.js';
-import type { StaticSitePublisher } from '../src/services/staticSite.js';
+import { LocalFolderTarget, StaticSitePublisher } from '../src/services/staticSite.js';
 
 const png = encodePng(10, 6, () => [0, 0, 255, 255]);
 
@@ -29,10 +29,14 @@ describe('static commentator page', () => {
     saveUpload(ctx, 'team', teamId, 'flag_small', png, 'flag.png');
     createSet(db, eventId, 'Group stage', 2);
     const out = path.join(dir, 'site');
-    const app = await buildApp({ db, assetsDir: ctx.assetsDir, sync, webDist: fakeDist(path.join(dir, 'dist')), siteDir: out });
+    const target = (_db: unknown, folder: string) => new LocalFolderTarget(path.join(out, folder));
+    const app = await buildApp({ db, assetsDir: ctx.assetsDir, sync, webDist: fakeDist(path.join(dir, 'dist')), siteDir: out, siteTarget: target });
     const site = (app as any).staticSite as StaticSitePublisher;
     const put = (b: object) => app.inject({ method: 'PUT', url: '/api/static-site', payload: b });
-    expect((await put({ publicUrl: 'https://komentator.example.com/', mode: 'folder' })).statusCode).toBe(200);
+    // our domain unless set otherwise; once a minute unless set otherwise
+    expect((await app.inject({ url: '/api/static-site' })).json()).toMatchObject({ publicUrl: 'https://commentary.em27code.com', everySeconds: 60 });
+    expect((await put({ publicUrl: 'https://komentator.example.com/' })).statusCode).toBe(200);
+    expect((await put({ everySeconds: 7 })).statusCode).toBe(400);
 
     const s = await site.publishNow();
     expect(s.error).toBe('');
@@ -50,6 +54,7 @@ describe('static commentator page', () => {
     expect(JSON.stringify(data)).not.toContain('/api/assets/');
     const status = JSON.parse(fs.readFileSync(path.join(folder, 'status.json'), 'utf8'));
     expect(status.version).toBe(data.version);
+    expect(status.every).toBe(60);
 
     expect((await site.publishNow()).uploadedFiles).toBe(1); // status.json only
     createTeam(db, { name: 'Chile', code: 'CHI' });
@@ -64,21 +69,23 @@ describe('static commentator page', () => {
     await first;
     await second;
     expect(fs.readFileSync(path.join(folder, 'data.json'), 'utf8')).toContain('"PER"');
+
+    // saving the settings again, or a restart, does not send the pictures and scripts again
+    await put({ everySeconds: 30 });
+    expect((await site.publishNow()).uploadedFiles).toBe(1);
+    const again = await buildApp({ db, assetsDir: ctx.assetsDir, sync, webDist: path.join(dir, 'dist'), siteDir: out, siteTarget: target });
+    expect((await ((again as any).staticSite as StaticSitePublisher).publishNow()).uploadedFiles).toBe(1);
+    expect(JSON.parse(fs.readFileSync(path.join(folder, 'status.json'), 'utf8')).every).toBe(30);
   });
 
-  it('a new address moves the page; settings never return the FTP password', async () => {
+  it('backs off after failures and never returns the secret', async () => {
     const { db, ctx, sync, dir } = setup();
     const app = await buildApp({ db, assetsDir: ctx.assetsDir, sync, webDist: fakeDist(path.join(dir, 'dist')), siteDir: path.join(dir, 'site') });
-    const before = (await app.inject({ url: '/api/static-site' })).json().folderName;
-    const after = (await app.inject({ method: 'POST', url: '/api/static-site/new-address' })).json().folderName;
-    expect(after).not.toBe(before);
-    const r = (await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'ftp', ftpHost: 'h55.example.pl', ftpUser: 'kom', ftpPassword: 'secret' } })).json();
-    expect(r.hasFtpPassword).toBe(true);
-    // failures back off instead of hammering the host (its firewall would ban this address)
-    await app.inject({ method: 'PUT', url: '/api/static-site', payload: { mode: 'https', publicUrl: '' } });
+    const r = (await app.inject({ method: 'PUT', url: '/api/static-site', payload: { s3Endpoint: 'abc.r2.cloudflarestorage.com', s3AccessKey: 'k', s3Secret: 'secret' } })).json();
+    expect(r.hasS3Secret).toBe(true);
+    expect(JSON.stringify(r)).not.toContain('secret"');
     const site = (app as any).staticSite as StaticSitePublisher;
-    expect((await site.publishNow()).error).toMatch(/next try in 5 s/);
+    expect((await site.publishNow()).error).toMatch(/Missing .*Bucket.*next try in 5 s/);
     expect((await site.publishNow()).error).toMatch(/next try in 10 s/);
-    expect(JSON.stringify(r)).not.toContain('secret');
   });
 });

@@ -101,39 +101,24 @@ W prawym górnym rogu dashboardu jest znacznik "vMix PC": zielony = synchronizac
 
 W vMix: Data Sources → Excel → `C:\SSL-vMix\ssl-vmix.xlsx` (lub JSON → `C:\SSL-vMix\ssl-vmix.json`). Okno synchronizacji musi być otwarte.
 
-## Ekran komentatora jako statyczna strona (zalecane)
+## Ekran komentatora online: commentary.em27code.com
 
-Ekran komentatora może być zwykłą statyczną stroną na dowolnym hostingu: na serwerze nie działa żaden program, tylko serwer WWW podaje pliki, więc nie ma czego wysypać. Co 5 s PC na regatach zapisuje folder:
+Ekran komentatora to statyczna strona w Cloudflare R2 pod naszą domeną. Na serwerze nie działa żaden program, tylko serwer WWW podaje pliki, więc nie ma czego wysypać; gdy PC na regatach jest wyłączony, strona pokazuje ostatnie dane. Co minutę (do zmiany w ustawieniach: 15 s … 5 min) dashboard buduje folder i wysyła tylko to, co się zmieniło:
 
 - `index.html` i `assets/` – sam ekran (budowany razem z aplikacją: `web/dist/commentator.html`),
-- `data.json` – wszystkie dane ekranu; adresy obrazków wskazują na `img/`,
+- `data.json` – wszystkie dane ekranu (wysyłany jako gzip); adresy obrazków wskazują na `img/`,
 - `img/<sha1>.png|jpg` – flagi, emblematy, zdjęcia,
-- `status.json` – godzina i wersja danych, nadpisywany co rundę; strona pobiera duży `data.json` tylko, gdy zmieni się wersja.
+- `status.json` – godzina, wersja danych i co ile przychodzą; otwarta strona sprawdza go co 10 s i od razu pokazuje nowe dane (`?refresh=<s>` w adresie zmienia ten czas).
 
-Wysyłane są tylko zmienione pliki (każdy pod tymczasową nazwą, potem zmiana nazwy, więc komentator nigdy nie czyta połowy pliku). Nazwa folderu ma losową część (`komentator-xxxxxxxx`): adres jest kluczem, a strona nie daje możliwości zmiany czegokolwiek.
+Lista wysłanych plików jest zapisana w `DATA_DIR/commentator-site/sent.json`, więc restart nie wysyła zdjęć od nowa.
 
-**Cloudflare R2 (zalecane):** hosting współdzielony (np. seohost) potrafi blokować adresy spoza kraju albo takie, które często się łączą; magazyn plików w chmurze tego nie robi. Raz: konto Cloudflare → R2 → bucket (np. `ssl-commentary`) → Settings → Public access (r2.dev) włączone; R2 → Manage API tokens → token „Object Read & Write” tylko do tego bucketu. W dashboardzie tryb „Cloudflare R2 / S3”: endpoint S3 (`https://<account-id>.r2.cloudflarestorage.com`), bucket, Access Key ID, Secret, a jako adres strony publiczny `https://pub-….r2.dev`. Link: `https://pub-….r2.dev/komentator-xxxx/index.html`. Pliki z danymi mają `Cache-Control: no-cache`, skrypty i obrazki (z hashem w nazwie) cache na rok. Działa też z innym S3 (AWS, Backblaze B2). Po błędach kolejne próby są coraz rzadsze (5 s … 5 min).
+**Konfiguracja (raz):**
+1. Cloudflare → R2 → bucket `ssl-commentary` → Settings → Custom Domains → `commentary.em27code.com` (domena em27code.com ma DNS w Cloudflare; strona i poczta zostają na seohost).
+2. R2 → Manage API tokens → token „Object Read & Write” tylko do tego bucketu.
+3. Dashboard → **Settings → Commentator online**: endpoint S3 (`https://<account-id>.r2.cloudflarestorage.com`), bucket, Access Key ID, Secret, adres `https://commentary.em27code.com`, co ile wysyłać → Save → zaznacz „Publish automatically”.
+4. Link dla komentatorów (`https://commentary.em27code.com/komentator-xxxx/index.html`) i kod iframe są pod spodem i w przycisku **🎙 Commentator link**. Żeby działał sam `https://commentary.em27code.com`, w Cloudflare → Rules → Redirect Rules dodaj przekierowanie ścieżki `/` na ten link.
 
-**Wysyłka po HTTPS do upload.php:** tryb „Upload by HTTPS (upload.php)”. Raz pobierz z dashboardu **Download upload.php** i wgraj go menedżerem plików hostingu do folderu strony (np. `public_html/commentary`). Plik zawiera tylko skrót klucza tego PC, przyjmuje wyłącznie pliki strony (`index.html`, `data.json`, `status.json`, `assets/*.js|css`, `img/<sha1>.png`) w folderach `komentator-*` i zapisuje je atomowo. W polu adresu wpisz adres folderu, np. `https://commentary.em27code.com`.
-
-Konfiguracja FTP (gdy port 21 jest dostępny; seohost może blokować FTP spoza Polski) na PC z vMixem: **Settings → Commentator online**:
-1. „Upload by FTP”: serwer, port, użytkownik i hasło FTP, folder na serwerze (puste = folder konta FTP), FTPS włączone. Na seohost: w DirectAdmin utwórz subdomenę (np. `komentator.em27code.com`) i osobne konto FTP ograniczone do jej folderu.
-2. „Web address of that folder”: adres tego folderu w przeglądarce, np. `https://komentator.em27code.com`.
-3. Save, zaznacz „Publish every 5 seconds”. Link dla komentatorów (`https://komentator.em27code.com/komentator-xxxxxxxx/`) jest pod spodem i w przycisku **🎙 Commentator link** na górnym pasku.
-
-„Only save to a folder on this PC” zapisuje to samo do lokalnego folderu (np. do synchronizowania własnym narzędziem). „New address” przenosi stronę pod nowy losowy folder; stary folder usuń ręcznie przez FTP.
-
-## Ekran komentatora przez dashboard online (alternatywa)
-
-Komentatorzy mogą oglądać zakładkę Commentator pod adresem w internecie, nawet gdy baza działa lokalnie na PC na regatach. Lokalny dashboard co 5 s wysyła na dashboard online wyłącznie dane tego ekranu (JSON i obrazki flag/zdjęć, gzip, zmienione obrazki tylko raz), a gdy nic się nie zmieniło, tylko krótki sygnał „żyję”. PC na regatach niczego nie wystawia do internetu: potrzebuje tylko wyjścia HTTPS.
-
-1. **Serwer online** (np. `https://sslgfx.em27code.com`, wdrożony jak w sekcji wyżej) musi mieć ustawione `DASHBOARD_PASSWORD`. Bez hasła odbiór danych jest wyłączony.
-2. **PC na regatach:** Settings → **Commentator online** → adres serwera online i jego hasło → Save → zaznacz „Send every 5 seconds”. Pod spodem pojawia się **link dla komentatorów**, np. `https://sslgfx.em27code.com/c/<token>`.
-3. **Komentator** otwiera link w dowolnej przeglądarce. Widzi tylko ekran komentatora (bez menu) z plakietką „Live”; gdy PC na regatach przestanie wysyłać, plakietka robi się czerwona i pokazuje godzinę ostatnich danych.
-
-Zabezpieczenie: link ustawia ciasteczko, które pozwala tylko na odczyt kilku adresów ekranu komentatora (`/api/meta`, `/api/stage`, `/api/fleet-sets`, `/api/overview`, `/api/commentator`, obrazki). Każdy zapis i każdy inny adres zwraca 403, a inne strony przekierowują na `/live`. Przycisk **New link** na serwerze online (Settings → Commentator online, część 2) unieważnia stary link i wszystkie otwarte sesje. Wysyłanie danych wymaga hasła dashboardu online.
-
-Własna subdomena (np. `komentator.em27code.com`): w DirectAdmin dodaj ją jako alias (domain pointer) domeny, pod którą działa aplikacja Node; link działa pod każdą z nazw. Dane odebrane z regat leżą w `DATA_DIR/live-feed/` i przetrwają restart serwera. Zalogowany admin podgląda je pod `/live`.
+**Zakładka Tracking:** Settings → **Commentator tracking tab**: wklej kod iframe (np. GeoRacing) albo sam adres. Ekran dostaje wtedy zakładki Dashboard / Tracking (klawisze D i T); puste pole ukrywa zakładkę.
 
 ## Dashboard i vMix na różnych komputerach (sieć lokalna)
 

@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { S3Target, signPut } from '../src/services/s3Target.js';
 
@@ -10,13 +11,20 @@ describe('S3 / Cloudflare R2 upload', () => {
   });
 
   it('puts each file under the folder with its type and caching, and explains refusals', async () => {
-    const seen: { url: string; type: string; cache: string }[] = [];
-    const ok = (async (u: URL, init: RequestInit) => { const h = init.headers as Record<string, string>; seen.push({ url: String(u), type: h['content-type'], cache: h['cache-control'] }); return new Response('', { status: 200 }); }) as unknown as typeof fetch;
+    const seen: { url: string; type: string; cache: string; encoding?: string; body: Uint8Array }[] = [];
+    const ok = (async (u: URL, init: RequestInit) => { const h = init.headers as Record<string, string>; seen.push({ url: String(u), type: h['content-type'], cache: h['cache-control'], encoding: h['content-encoding'], body: init.body as Uint8Array }); return new Response('', { status: 200 }); }) as unknown as typeof fetch;
     const t = new S3Target({ endpoint: 'https://acc.r2.cloudflarestorage.com/', bucket: 'b', accessKey: 'k', secret: 's', region: 'auto', folder: 'komentator-abc123' }, ok);
     await t.put([{ rel: 'data.json', data: '{}' }, { rel: 'img/' + 'a'.repeat(40) + '.jpg', data: Buffer.from([1]) }], () => undefined);
-    expect(seen[0]).toEqual({ url: 'https://acc.r2.cloudflarestorage.com/b/komentator-abc123/data.json', type: 'application/json', cache: 'no-cache, max-age=0' });
+    expect(seen[0]).toMatchObject({ url: 'https://acc.r2.cloudflarestorage.com/b/komentator-abc123/data.json', type: 'application/json', cache: 'no-cache, max-age=0', encoding: undefined });
     expect(seen[1].type).toBe('image/jpeg');
     expect(seen[1].cache).toContain('immutable');
+    // a big data.json goes up gzipped
+    const big = JSON.stringify({ teams: Array.from({ length: 500 }, (_, i) => ({ code: `T${i}`, name: 'Team name' })) });
+    await t.put([{ rel: 'data.json', data: big }], () => undefined);
+    const last = seen[seen.length - 1];
+    expect(last.encoding).toBe('gzip');
+    expect(last.body.length).toBeLessThan(big.length / 4);
+    expect(gunzipSync(last.body).toString()).toBe(big);
     const denied = (async () => new Response('<Error><Code>SignatureDoesNotMatch</Code></Error>', { status: 403 })) as unknown as typeof fetch;
     await expect(new S3Target({ endpoint: 'https://x', bucket: 'b', accessKey: 'k', secret: 's', region: 'auto', folder: 'f' }, denied).put([{ rel: 'data.json', data: '{}' }], () => undefined)).rejects.toThrow(/refused the keys/);
   });
@@ -34,17 +42,17 @@ describe('R2 settings as pasted', () => {
     const { setup } = await import('./helpers.js');
     const { saveSiteSettings, siteTarget } = await import('../src/services/siteTargets.js');
     const { db } = setup();
-    saveSiteSettings(db, { mode: 's3', s3Endpoint: 'abc.r2.cloudflarestorage.com', s3Bucket: 'ssl-commentary' });
-    expect(() => siteTarget(db, 'komentator-abc123', '/tmp')).toThrow(/Missing .*Access Key ID, Secret Access Key/);
+    saveSiteSettings(db, { s3Endpoint: 'abc.r2.cloudflarestorage.com', s3Bucket: 'ssl-commentary' });
+    expect(() => siteTarget(db, 'komentator-abc123')).toThrow(/Missing .*Access Key ID, Secret Access Key/);
   });
 
   it('takes the bucket from an endpoint pasted with it', async () => {
     const { setup } = await import('./helpers.js');
     const { saveSiteSettings, siteTarget } = await import('../src/services/siteTargets.js');
     const { db } = setup();
-    saveSiteSettings(db, { mode: 's3', s3Endpoint: 'https://abc.r2.cloudflarestorage.com/ssl-commentary', s3Bucket: '', s3AccessKey: 'k', s3Secret: 's' });
-    expect((siteTarget(db, 'komentator-abc123', '/tmp') as any).o.bucket).toBe('ssl-commentary');
+    saveSiteSettings(db, { s3Endpoint: 'https://abc.r2.cloudflarestorage.com/ssl-commentary', s3Bucket: '', s3AccessKey: 'k', s3Secret: 's' });
+    expect((siteTarget(db, 'komentator-abc123') as any).o.bucket).toBe('ssl-commentary');
     saveSiteSettings(db, { s3Endpoint: 'https://abc.r2.cloudflarestorage.com' });
-    expect(() => siteTarget(db, 'komentator-abc123', '/tmp')).toThrow(/Missing .*Bucket/);
+    expect(() => siteTarget(db, 'komentator-abc123')).toThrow(/Missing .*Bucket/);
   });
 });

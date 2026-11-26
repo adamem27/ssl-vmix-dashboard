@@ -165,7 +165,6 @@ export function App() {
   return (
     <Routes>
       {/* Commentator screen on its own, without the menu: what the commentator link opens online. */}
-      <Route path="/live" element={<div className="min-h-screen"><CommentatorPage live /></div>} />
       {/* DRAW stage screen (vMix Browser input), 1536×1024 LED wall, no menu and no login */}
       <Route path="/draw/output" element={<DrawOutputPage />} />
       <Route path="*" element={<MainApp />} />

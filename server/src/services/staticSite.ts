@@ -2,22 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { DB, getSetting, nowIso, setSetting } from '../db/db.js';
-import type { Feed } from './liveFeed.js';
+import type { Feed } from './commentatorSnapshot.js';
+import { DEFAULT_PUBLIC_URL } from './siteTargets.js';
 
 /**
  * The commentator screen as a static web page.
  *
- * Every few seconds the venue PC writes a folder that any plain web host can serve:
+ * Every minute (Settings → Commentator online) the dashboard builds a folder that any plain web host can serve:
  *   index.html, assets/*.js|css   the screen (built once with the app: web/dist/commentator.html)
  *   data.json                     every answer the screen needs, picture addresses pointing at img/
  *   img/<sha1>.<ext>              flags, emblems and photos
- *   status.json                   { pushedAt, version }: tiny, rewritten every round so the screen knows the data is fresh
- * Then it uploads what changed. Nothing runs on the host but the web server, so there is nothing there to crash.
- * The folder name has a random part: the address is the key, and the page holds nothing that can be changed.
+ *   status.json                   { pushedAt, version, every }: tiny, rewritten every round so the screen knows the data is fresh
+ * Then it uploads what changed to Cloudflare R2 (commentary.em27code.com). Nothing runs there but the web server,
+ * so there is nothing to crash. What is already there is remembered across restarts, so a restart sends only changes.
  */
 
 export interface SiteFile { rel: string; data: Buffer | string }
-/** Where the folder goes: a local folder, or a web host. */
+/** Where the folder goes (R2; a local folder in tests). */
 export interface SiteTarget {
   label: string;
   /** Writes the files in order; calls done() after each one, so a broken connection only resends the rest. */
@@ -68,6 +69,7 @@ export function dataFiles(feed: Feed, files: Map<string, string>): { data: strin
   return { data: json.replace(`"pushedAt":${JSON.stringify(feed.pushedAt)}`, `"pushedAt":${JSON.stringify(feed.pushedAt)},"version":"${version}"`), images, version };
 }
 
+/** Writes the folder to disk (tests). */
 export class LocalFolderTarget implements SiteTarget {
   label: string;
   constructor(private dir: string) { this.label = dir; }
@@ -90,6 +92,7 @@ export interface SiteStatus {
 
 type Build = () => Promise<{ feed: Feed; files: Map<string, string> }>;
 type MakeTarget = (db: DB, folderName: string) => SiteTarget | null;
+interface SentState { target: string; files: Record<string, string> }
 
 /** Builds the folder each round and sends only what changed. */
 export class StaticSitePublisher {
@@ -101,30 +104,46 @@ export class StaticSitePublisher {
   private timer: NodeJS.Timeout | null = null;
   private target: SiteTarget | null = null;
   private failures = 0;
-  private retryAt = 0; // kept between rounds: one FTP connection, not one every 5 s
+  private retryAt = 0; // when the next routine round may start
 
-  constructor(private db: DB, private build: Build, private webDist: string | undefined, private makeTarget: MakeTarget, private everyMs = 5000, private publishEveryMs = 300_000) {}
+  /**
+   * everyMs: how often the timer looks; publishEveryMs: the time between routine rounds (the setting);
+   * stateFile: where the list of files already on the target is kept, so a restart does not send everything again.
+   */
+  constructor(private db: DB, private build: Build, private webDist: string | undefined, private makeTarget: MakeTarget,
+    private publishEveryMs: () => number = () => 60_000, private stateFile?: string, private everyMs = 5000) {
+    try {
+      const st = stateFile ? (JSON.parse(fs.readFileSync(stateFile, 'utf8')) as SentState) : null;
+      if (st?.target) { this.sentTo = st.target; this.sent = new Map(Object.entries(st.files ?? {})); }
+    } catch { /* first start, or an unreadable file: send everything once */ }
+  }
+  private saveSent() {
+    if (!this.stateFile) return;
+    try {
+      fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+      fs.writeFileSync(`${this.stateFile}.tmp`, JSON.stringify({ target: this.sentTo, files: Object.fromEntries(this.sent) } satisfies SentState));
+      fs.renameSync(`${this.stateFile}.tmp`, this.stateFile);
+    } catch { /* only costs a full send after the next restart */ }
+  }
 
-  /** Random part of the address; a new one moves the page (the old address keeps its last data until removed on the host). */
+  /** The folder on the bucket (random, made once; the address of the page). */
   folderName(): string {
     let f = getSetting(this.db, 'static.folder');
     if (!f) { f = `komentator-${randomBytes(9).toString('base64url').toLowerCase().replace(/[^a-z0-9]/g, '')}`; setSetting(this.db, 'static.folder', f); }
     return f;
   }
-  newFolder() { setSetting(this.db, 'static.folder', ''); this.sent.clear(); return this.folderName(); }
   url() {
-    const base = getSetting(this.db, 'static.publicUrl').trim().replace(/\/+$/, '');
-    return base ? `${base}/${this.folderName()}/index.html` : ''; // index.html: object stores have no folder index
+    const base = (getSetting(this.db, 'static.publicUrl').trim() || DEFAULT_PUBLIC_URL).replace(/\/+$/, '');
+    return `${base}/${this.folderName()}/index.html`; // index.html: object stores have no folder index
   }
   enabled() { return getSetting(this.db, 'static.enabled') === '1'; }
   setEnabled(on: boolean) { setSetting(this.db, 'static.enabled', on ? '1' : ''); if (!on) this.status.error = ''; }
-  /** Settings changed: send everything again on the next round. */
-  reset() { this.status.error = ''; this.failures = 0; this.retryAt = 0; this.sent.clear(); this.sentTo = ''; void this.target?.close?.(); this.target = null; }
+  /** Settings changed: a new round at once (files already on the same bucket are not sent again). */
+  reset() { this.status.error = ''; this.failures = 0; this.retryAt = 0; void this.target?.close?.(); this.target = null; }
 
   start() {
     if (this.timer) return;
-    // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min): a host's firewall bans an
-    // address that keeps failing to connect, and a ban blocks the page for everyone on that network.
+    // After failures, wait longer between attempts (5 s, 10 s, 20 s … up to 5 min).
     this.timer = setInterval(() => {
       if (!this.enabled() || Date.now() < this.retryAt || this.current) return;
       void this.publishNow();
@@ -152,7 +171,7 @@ export class StaticSitePublisher {
       if (!fresh) throw new Error('Fill in where to publish the page.');
       if (fresh.label !== this.target?.label) { await this.target?.close?.().catch(() => undefined); this.target = fresh; }
       target = this.target;
-      if (target.label !== this.sentTo) { this.sent.clear(); this.sentTo = target.label; }
+      if (target.label !== this.sentTo) { this.sent.clear(); this.sentTo = target.label; this.saveSent(); }
       const { feed, files } = await this.build();
       const { data, images, version } = dataFiles(feed, files);
       const pending: SiteFile[] = [];
@@ -168,17 +187,19 @@ export class StaticSitePublisher {
       const dataChanged = this.sent.get('data.json') !== version;
       if (dataChanged) { pending.push({ rel: 'data.json', data }); hashes.set('data.json', version); }
       // auto: the page knows whether to expect a new status every few seconds or only when someone publishes
-      const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled() });
+      const every = Math.round(this.publishEveryMs() / 1000);
+      const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled(), every });
       pending.push({ rel: 'status.json', data: status });
-      await target.put(pending, (rel) => { const h = hashes.get(rel); if (h) this.sent.set(rel, h); });
+      try { await target.put(pending, (rel) => { const h = hashes.get(rel); if (h) this.sent.set(rel, h); }); }
+      finally { this.saveSent(); }
       if (dataChanged) { this.status.lastChangeAt = feed.pushedAt; this.status.dataBytes = Buffer.byteLength(data); }
       this.status.uploadedFiles = pending.length;
       this.status.pictures = images.length;
       this.status.lastOkAt = nowIso();
       this.status.error = '';
       this.failures = 0;
-      // the next routine round in 5 min: light on the PC during the show ('Publish now' and a settings change send at once)
-      this.retryAt = Date.now() + this.publishEveryMs;
+      // the next routine round after the chosen time ('Publish now' and a settings change send at once)
+      this.retryAt = Date.now() + this.publishEveryMs();
     } catch (e: any) {
       this.failures++;
       const wait = Math.min(300_000, this.everyMs * 2 ** Math.min(this.failures - 1, 10));
