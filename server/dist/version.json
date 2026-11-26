@@ -1,8 +1,14 @@
 {
-  "version": "1.0.281",
-  "commit": "e82bacb",
-  "date": "2026-11-26T19:21:57Z",
+  "version": "1.0.282",
+  "commit": "2080343",
+  "date": "2026-11-26T19:52:37Z",
   "changes": [
+    {
+      "version": "1.0.282",
+      "commit": "2080343",
+      "date": "2026-11-26T19:52:37Z",
+      "text": "RSA sponsors: the line-up only Sponsor logo 1, the lower third Sponsor logo 2; their logos only sized, never recoloured, their background kept (also at upload)"
+    },
     {
       "version": "1.0.281",
       "commit": "e82bacb",
@@ -476,12 +482,6 @@
       "commit": "bec0302",
       "date": "2026-11-16T17:30:20Z",
       "text": "RESULTS/COMPARE page: only the groups of the stage picked at the top, no COMPARE PICKED key"
-    },
-    {
-      "version": "1.0.202",
-      "commit": "f32e2b6",
-      "date": "2026-11-16T16:16:27Z",
-      "text": "DRAW: wider side strips (adjustable, default 300 px) with bigger country rows"
     }
   ]
 }

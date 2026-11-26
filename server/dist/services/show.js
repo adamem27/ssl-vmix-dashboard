@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { hasSponsorLogos, lineupPanelFor, partnersLabel, sponsorLogos, stripFor } from './lineupPanel.js';
+import { hasSponsorLogos, lineupPanelFor, partnersLabel, lineupLogos, stripFor } from './lineupPanel.js';
 import { lbarFiles, samePicture, status as lbarLooks } from './lbarSwap.js';
 import { KEPT_PEOPLE_PAGE } from './companionKept.js';
 import path from 'node:path';
@@ -1273,7 +1273,7 @@ export class Show {
         // a title with its own label over the logos (team partners): one partner or several, nothing without sponsors
         const labelField = input.fields.find((x) => /^team\s*partners?\.Text$/i.test(x));
         if (labelField) {
-            const n = sponsorLogos(this.ctx, team.assets ?? {}).length;
+            const n = lineupLogos(this.ctx, { code: team.code, assets: team.assets ?? {} }).length;
             f.set(labelField, n ? partnersLabel(n) : '');
         }
         await this.set(input, f);

@@ -142,11 +142,14 @@ export function resample(src, box, ow, oh) {
     return out;
 }
 /** Any PNG/JPG logo → an 800×400 transparent PNG with the logo trimmed, evened out in size and centred. */
-export function normalizeLogo(buf) {
+/** Teams whose sponsor logos are kept as they are (only sized): their background is not cleared. */
+export const AS_IS_LOGO_TEAMS = new Set(['RSA']);
+export function normalizeLogo(buf, keepBackground = false) {
     const img = decode(buf);
     if (img.width * img.height > 40_000_000)
         throw badRequest('This logo is too large (over 40 megapixels).');
-    clearSolidBackground(img);
+    if (!keepBackground)
+        clearSolidBackground(img);
     const box = trimBox(img);
     const s = Math.min(LOGO_SIDE / Math.sqrt(box.w * box.h), MAX_W / box.w, MAX_H / box.h);
     const ow = Math.max(1, Math.round(box.w * s)), oh = Math.max(1, Math.round(box.h * s));
