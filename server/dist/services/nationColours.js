@@ -90,6 +90,11 @@ const SHIRTS = {
     MYA: { bg: '#193d72', fg: '#ee3b43' }, // navy, red text
     OMA: { bg: '#c82a31', fg: '#ffffff' }, // red, white text
     SGP: { bg: '#ffffff', fg: '#c8102e' }, // white, red text
+    // the second 1/32 Finals squads (2026-11-26): CHI, RSA, THA and JPN keep their national colours
+    ECU: { bg: '#ffd100', fg: '#0b2a5b' }, // yellow, navy text
+    HUN: { bg: '#ffffff', fg: '#ce2939' }, // white, red text
+    PER: { bg: '#ffffff', fg: '#d91023' }, // white, red text
+    CZE: { bg: '#d7141a', fg: '#ffffff' }, // red, white text
 };
 /** The look of a key in the team's colours, with a marker in the text when it is selected (▶) or on air (●). */
 export function teamKeyLook(c, text, state) {

@@ -1,8 +1,14 @@
 {
-  "version": "1.0.272",
-  "commit": "3df16e9",
-  "date": "2026-11-26T02:36:07Z",
+  "version": "1.0.273",
+  "commit": "731c622",
+  "date": "2026-11-26T12:15:30Z",
   "changes": [
+    {
+      "version": "1.0.273",
+      "commit": "731c622",
+      "date": "2026-11-26T12:15:30Z",
+      "text": "Defending champions key (CHAMPIONS on HUN's team page): the team lower third with an editable bottom line; ECU, HUN, PER and CZE keys in their shirt colours"
+    },
     {
       "version": "1.0.272",
       "commit": "3df16e9",
@@ -476,12 +482,6 @@
       "commit": "8dbce8f",
       "date": "2026-11-16T14:11:34Z",
       "text": "Final Series stages: one click prepares 1/32 Finals to Quarterfinals (groups A–D of four), starred teams first in the pickers"
-    },
-    {
-      "version": "1.0.193",
-      "commit": "592765f",
-      "date": "2026-11-15T19:09:27Z",
-      "text": "Race flags drawn like the race signals chart; combinations (C + red/green/−/+, AP over 1–3); Announcements sorted: often, combinations, rest"
     }
   ]
 }

@@ -121,6 +121,9 @@ export const showConfigSchema = z.object({
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
     tickerNext: z.string().default(''),
     tickerEnd: z.string().default(''),
+    /** the defending champions: their own key (CHAMPIONS) on their team page, the team lower third with this line */
+    championsTeam: z.string().default('HUN'),
+    championsText: z.string().default('DEFENDING CHAMPIONS - SSL GOLD CUP 2023'),
     /** Companion pages: deck 1 (program) base, deck 2 (race) base, the shared fallback page */
     deck1Page: z.number().int().min(1).max(99).default(1),
     deck2Page: z.number().int().min(1).max(99).default(11),
@@ -280,7 +283,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
         slotPage(p2 + 2, 'BUGS RARE', (n) => `bug:r${n}`, 3, nav(p2 + 2)),
         // the ticker input: its versions (two rows); the top ticker's versions on the row under them
         slotPage(p2 + 3, 'TICKERS', (n) => `ticker:${n}`, 2, nav(p2 + 3), row8(...Array.from({ length: 8 }, (_, n) => k(`tickertop:${n + 1}`, '—', 'bug')))),
-        ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)))),
+        ...teams.map((t, i) => teamPage(t, i, teams, teamsPage(Math.floor(i / TEAMS_PER_PAGE)), cfg.championsTeam)),
         // Team comparison of each group of the stage, each in its own vMix input (after the team pages)
         {
             deck: 1, name: COMPARE_PAGE, page: comparePage, keys: [
@@ -307,7 +310,7 @@ const withPhoto = (row) => row.map((x, i) => (i === 4 ? k('photo', 'PHOTO\\nMODE
  * A team's page on deck 2: its lower thirds (TEAM LT, QUALIFIED, LINEUP LT) and line-up board, its places (sailor's
  * name on the key), ◀ ▶ to the next team. An empty place of a group has the same keys, named by the place (A1).
  */
-function teamPage(t, i, teams, teamsPage) {
+function teamPage(t, i, teams, teamsPage, champions = '') {
     const page = PRESET_PAGES.teams + i;
     // the other teams of its group (the place's letter: A1–A4), else of its four in the list
     const group = (x, n) => (x.place ?? '').replace(/\d+$/, '') || `#${Math.floor(n / 4)}`;
@@ -317,7 +320,9 @@ function teamPage(t, i, teams, teamsPage) {
     const places = t.crew.slice(0, 16).map((c) => tk(`sailorof:${arg}/${c.slot}`, `${c.label.toUpperCase()}\\n${c.name ? `${c.number ? `#${c.number} ` : ''}${c.name.toUpperCase()}`.slice(0, 14) : '—'}`, 'sailor'));
     return {
         deck: 2, name: label, page, keys: [
-            row8(tk(`qualified:${arg}`, `QUALIFIED\\n${label}`, 'lt'), tk(`lineup:${arg}`, `LINEUP\\n${label}`, 'board'), tk(`lult:${arg}`, `LINEUP LT\\n${label}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), tk(`teamlt:${arg}`, `TEAM LT\\n${label}`, 'lt'), null, null, k('next', 'NEXT\\nRESULT', 'lt')),
+            row8(tk(`qualified:${arg}`, `QUALIFIED\\n${label}`, 'lt'), tk(`lineup:${arg}`, `LINEUP\\n${label}`, 'board'), tk(`lult:${arg}`, `LINEUP LT\\n${label}`, 'lt'), k('lultswap', 'LINEUP LT\\n5 ⇄ 4', 'lt'), tk(`teamlt:${arg}`, `TEAM LT\\n${label}`, 'lt'), 
+            // the defending champions: the team lower third with their title line
+            t.code && champions && t.code.toUpperCase() === champions.trim().toUpperCase() ? tk(`champions:${arg}`, `CHAMPIONS\\n${label}`, 'lt') : null, null, k('next', 'NEXT\\nRESULT', 'lt')),
             row8(...places.slice(0, 8)),
             row8(...places.slice(8, 16)),
             // HOME (TEAMS), then straight to the other teams of its group
@@ -1786,6 +1791,7 @@ export class Show {
             }
             case 'next': return this.lt.nextLine();
             case 'teamlt': return this.lt.showTeam(arg ? this.teamRef(arg).code : this.boat(this.state.boat).code);
+            case 'champions': return this.lt.showTeam(arg ? this.teamRef(arg).code : this.config.championsTeam, this.config.championsText.trim() || 'DEFENDING CHAMPIONS');
             case 'out':
             case 'ltout':
             case 'boardout': return this.layerOut();
@@ -1839,7 +1845,7 @@ export class Show {
             team = t;
             if (t && kind === 'sailorof')
                 onAir = lt.onAir && lt.kind === 'sailor' && lt.teamId === t.id && lt.slot === arg.split('/')[1];
-            if (t && (kind === 'teamlt' || kind === 'anthem'))
+            if (t && (kind === 'teamlt' || kind === 'anthem' || kind === 'champions'))
                 onAir = lt.onAir && lt.kind === 'team' && lt.teamId === t.id;
         }
         else if (kind === 'anthem' || kind === 'lineup' || kind === 'boat' || kind === 'qualified') {
