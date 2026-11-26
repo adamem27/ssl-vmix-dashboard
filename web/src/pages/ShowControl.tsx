@@ -7,7 +7,7 @@ import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 import { TickerLangsPanel } from './TickerLangs';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; mixZeroBased?: boolean; tickerNext: string; tickerEnd: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; mixZeroBased?: boolean; tickerNext: string; tickerEnd: string; championsTeam?: string; championsText?: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -108,6 +108,7 @@ function Show({ data }: { data: ShowData }) {
         <span className={cx('rounded px-2 py-1 text-xs font-bold', data.vmix.ok ? 'bg-emerald-800 text-emerald-100' : 'bg-red-800 text-red-100')}>{data.vmix.ok ? 'vMix connected' : 'vMix not answering'}</span>
         {[1, 2, 3, 4].map((n) => <span key={n} className={cx('rounded px-2 py-1 text-xs', data.vmix.overlays[n] ? 'bg-red-700 text-white' : 'bg-ink-800 text-ink-400')}>{OVERLAY[n]}{data.vmix.overlays[n] ? ` · ${data.graphics.find((g) => g.input && g.overlay === n && g.onAir)?.label ?? `input ${data.vmix.overlays[n]}`}` : ''}</span>)}
       </>}>
+        <Champions config={data.config} onSave={(patch) => persist(patch)} />
         {last && (
           <div className={cx('mb-3 rounded px-3 py-2 text-sm', last.error ? 'bg-red-950/60 text-red-200' : 'bg-ink-900 text-ink-400')}>
             Last key ({new Date(last.at).toLocaleTimeString()}, {last.action}): {last.error ?? 'OK'}
@@ -227,6 +228,20 @@ function KeyEditor({ look, edit, actions, onChange, onClose }: { look: KeyLook |
         <input type="color" className="h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0" value={edit.fg ?? '#ffffff'} onChange={(e) => onChange({ fg: e.target.value }, 300)} />
         <span className="ml-2 text-[11px] text-ink-500">Red (on air) and orange (selected) still show over your colour.</span>
       </div>
+    </div>
+  );
+}
+
+/** The defending champions: their CHAMPIONS key (on their team page) shows the team lower third with this line. */
+function Champions({ config, onSave }: { config: Config; onSave: (patch: Partial<Config>) => void }) {
+  const [team, setTeam] = useState(config.championsTeam ?? 'HUN');
+  const [text, setText] = useState(config.championsText ?? '');
+  useEffect(() => { setTeam(config.championsTeam ?? 'HUN'); setText(config.championsText ?? ''); }, [config.championsTeam, config.championsText]);
+  const save = () => { if (team.trim().toUpperCase() !== (config.championsTeam ?? '') || text !== (config.championsText ?? '')) onSave({ championsTeam: team.trim().toUpperCase(), championsText: text }); };
+  return (
+    <div className="mb-3 flex flex-wrap items-end gap-2 text-xs text-ink-400" title="The CHAMPIONS key on this team's page (Companion and the keys below) shows its team lower third (no photo) with this bottom line, exactly as typed.">
+      <label className="block">Defending champions<input className="input mt-1 w-20 py-1 text-sm uppercase" value={team} onChange={(e) => setTeam(e.target.value)} onBlur={save} /></label>
+      <label className="block flex-1">CHAMPIONS lower third: bottom line<input className="input mt-1 w-full max-w-xl py-1 text-sm" value={text} onChange={(e) => setText(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} /></label>
     </div>
   );
 }

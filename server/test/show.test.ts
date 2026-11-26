@@ -555,6 +555,11 @@ describe('show control', () => {
     expect(teamKeyColours(null, 'COL')!.normal).toEqual({ bg: '#2c4a9a', fg: '#fdd116' });
     expect(teamKeyColours(null, 'KOR')!.normal).toEqual({ bg: '#ffffff', fg: '#cd2e3a' });
     expect(teamKeyColours(null, 'PUR')!.normal).toEqual({ bg: '#ffffff', fg: '#1d4fa3' });
+    // the second 1/32 Finals squads after their shirts
+    expect(teamKeyColours(null, 'ECU')!.normal).toEqual({ bg: '#ffd100', fg: '#0b2a5b' });
+    expect(teamKeyColours(null, 'HUN')!.normal).toEqual({ bg: '#ffffff', fg: '#ce2939' });
+    expect(teamKeyColours(null, 'PER')!.normal).toEqual({ bg: '#ffffff', fg: '#d91023' });
+    expect(teamKeyColours(null, 'CZE')!.normal).toEqual({ bg: '#d7141a', fg: '#ffffff' });
     expect(teamKeyColours(null, 'ANT')!.normal).toEqual({ bg: '#000000', fg: '#ffe95c' });
     expect(teamKeyColours(null, 'CUB')!.normal).toEqual({ bg: '#e03a3e', fg: '#0a2a8c' });
   });
@@ -956,6 +961,23 @@ describe('show control', () => {
     await show.syncData();
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=1 NICKNAME.Text&Value=The Bulls');
     expect(v.calls).toContain('?Function=SetText&Input=k2&SelectedName=Group.Text&Value=GROUP X');
+  });
+
+  it('the defending champions: a CHAMPIONS key on their team page only, the team lower third with the line typed in Show control', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { championsTeam: 'ESP' });
+    const v = fakeVmix(TITLES);
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const pages = (await show.view()).pages;
+    const keyOf = (code: string) => pages.flatMap((p) => p.keys.flat()).filter((k) => k && k.action.startsWith(`champions:`) && k.action.includes(code));
+    expect(pages.flatMap((p) => p.keys.flat()).filter((k) => k?.action.startsWith('champions:'))).toHaveLength(1);
+    expect(keyOf('ESP')).toHaveLength(1);
+    await show.run(keyOf('ESP')[0]!.action);
+    expect(v.calls.some((c) => c.includes('Bottom text.Text&Value=DEFENDING CHAMPIONS - SSL GOLD CUP 2023'))).toBe(true);
+    setShowConfig(s.db, { championsText: 'Gold Cup 2023 champions' });
+    v.calls.length = 0;
+    await show.run('champions:ESP');
+    expect(v.calls.some((c) => c.includes('Bottom text.Text&Value=Gold Cup 2023 champions'))).toBe(true);
   });
 
   it('a team page key shows that place of that team, whatever team is picked', async () => {

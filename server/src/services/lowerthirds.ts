@@ -313,10 +313,13 @@ export class LowerThirds {
     return this.state;
   }
 
-  async showTeam(code: string) {
+  /** The team lower third (no photo); `bottom` = its own bottom line instead (the defending champions' title). */
+  async showTeam(code: string, bottom?: string) {
     const t = this.teamByCode(code);
     const cfg = this.config;
-    return this.show(cfg.noPhotoInput || cfg.photoInput, ltFields(this.ctx, cfg, t.id, null), { kind: 'team', teamId: t.id, slot: null, line: 0 });
+    const f = ltFields(this.ctx, cfg, t.id, null);
+    if (bottom) f.set(`${cfg.fields.bottom}.Text`, bottom);
+    return this.show(cfg.noPhotoInput || cfg.photoInput, f, { kind: 'team', teamId: t.id, slot: null, line: 0 });
   }
 
   /** The sailor on a place of the line-up (`Pit`, `Trimmer1`…, or the place's label/position, any case). */
