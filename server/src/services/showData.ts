@@ -112,6 +112,50 @@ export function scheduleDoublePath(ctx: AssetCtx) {
   return imagePath(ctx.db, ctx.assetsDir, SCHEDULE_DOUBLE);
 }
 
+/**
+ * The Race officials panel as lines (Race_officials_PanAm_auto.gtzip): 44 lines 11.5 px apart from y 343.8, each with a
+ * role (Rn, regular) and a name (Nn, bold) text. A role takes a line, each of its names two more, the next role three
+ * more: the spacing of Race_officials_PanAm, whatever is left out. A role with no name and no names is left out.
+ */
+export const OFFICIAL_LINES = 44;
+export function officialsLines(groups: { role: string; names: string[] }[]) {
+  const lines: ({ kind: 'role' | 'name'; text: string } | undefined)[] = [];
+  let j = 0; let last = -1;
+  for (const g of groups) {
+    const names = g.names.filter(Boolean);
+    if (!g.role && !names.length) continue;
+    if (last >= 0) j = last + 3;
+    lines[j] = { kind: 'role', text: g.role }; last = j;
+    for (const n of names) { last += 2; lines[last] = { kind: 'name', text: n }; }
+  }
+  // the panel (95,293) down to 12 px under the last line (20 px high), else under the title
+  const bottom = last >= 0 ? 343.8 + Math.min(last, OFFICIAL_LINES - 1) * 11.5 + 32.2 : 303.78 + 20.06 + 12.14;
+  return { lines: lines.slice(0, OFFICIAL_LINES), panel: Math.round(bottom - 293) };
+}
+/** The panel behind the officials: 292 wide, its height as given; dark, 80 %, rounded, an orange to yellow edge. */
+export function officialsPanelPng(H: number) {
+  const W = 292, R = 26, B = 1.5;
+  const from = [176, 102, 4], to = [240, 196, 10];
+  return encodePng(W, H, (x, y) => {
+    const cx = Math.min(Math.max(x + 0.5, R), W - R), cy = Math.min(Math.max(y + 0.5, R), H - R);
+    const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) - R; // < 0 inside
+    const a = Math.max(0, Math.min(1, 0.5 - d));
+    if (a <= 0) return [0, 0, 0, 0];
+    const e = Math.max(0, Math.min(1, d + B + 0.5)); // 1 on the edge
+    const t = Math.min(1, (x / W + y / H) / 2);
+    const c = [0, 1, 2].map((i) => Math.round(18 * (1 - e) + (from[i] + (to[i] - from[i]) * t) * e));
+    return [c[0], c[1], c[2], Math.round((204 + 31 * e) * a)];
+  });
+}
+export function officialsPanelPath(ctx: AssetCtx, h: number) {
+  const rel = `icons/officials_panel_${h}.png`;
+  if (ctx.assetsDir) {
+    const file = path.join(ctx.assetsDir, ...rel.split('/'));
+    try { if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, officialsPanelPng(h)); } } catch { /* read-only folder: the path is still sent */ }
+  }
+  return imagePath(ctx.db, ctx.assetsDir, rel);
+}
+
 /** The neutral “?” flag of a place with no team yet (day schedule). */
 export const UNKNOWN_FLAG = 'icons/flag_unknown.png';
 export function unknownFlagPath(ctx: AssetCtx) {
@@ -232,6 +276,11 @@ export function showDataFields(ctx: AssetCtx, graphicId: string, o: ShowDataOpts
       f.set('TITLE.Text', up(x.title));
       for (let i = 1; i <= OFFICIAL_ROLES.length; i++) f.set(`ROLE ${i}.Text`, up(x[`role_${i}`]));
       for (let i = 1; i <= OFFICIAL_NAMES; i++) f.set(`NAME ${i}.Text`, (x[`name_${i}`] ?? '').trim());
+      // Race_officials_PanAm_auto.gtzip: the same panel as lines (R1–R44 a role, N1–N44 a name), so the roles and
+      // names left close up with no gap, and its PANEL as high as what is on it
+      const { lines, panel } = officialsLines(OFFICIAL_ROLES.map((r, i) => ({ role: up(x[`role_${i + 1}`]), names: r.names.map((n) => (x[`name_${n.i}`] ?? '').trim()) })));
+      for (let i = 0; i < OFFICIAL_LINES; i++) { const l = lines[i]; f.set(`R${i + 1}.Text`, l?.kind === 'role' ? l.text : ''); f.set(`N${i + 1}.Text`, l?.kind === 'name' ? l.text : ''); }
+      f.set('PANEL.Source', officialsPanelPath(ctx, panel));
       return f;
     }
     case 'weather': {
