@@ -80,6 +80,8 @@ export const DEFAULT_GRAPHICS = [
     { id: 'lbar2', label: 'L-bar ranking', kind: 'scene', overlay: 1, inputs: ['ssl_bar_2'] },
     // the rolling titles (credits) on overlay channel 8, on and off by the TITLES key (AFTER / BREAK)
     { id: 'titles', label: 'Rolling titles', kind: 'bug', overlay: 8, inputs: ['Rolling_Titles'] },
+    // the CB Vela film (BEFORE): from its start on overlay channel 7, again = out
+    { id: 'cbvela', label: 'CB Vela', kind: 'bug', overlay: 7, inputs: ['CBVela'] },
 ];
 /** Actions of keys taken off the decks: a key edit that set one is left out (the key keeps its built-in action). */
 const REMOVED_ACTIONS = new Set(['show:lcrinfo', 'panic']);
@@ -116,6 +118,11 @@ export const showConfigSchema = z.object({
     mixLbarLayer: z.number().int().min(0).max(8).default(5),
     /** vMix numbers Mix in shortcuts from 1 (1 = the main output, 2 = Mix 2); on = from 0, as a fallback */
     mixZeroBased: z.boolean().default(false),
+    /** the loop on the Mix on (MIX LOOP key / Show control); off: its channels go out and stay out */
+    mixLoopOn: z.boolean().default(true),
+    /** the Mix loop's boards, as the break scene's: the day schedule, and these groups (empty: those of the break scene) */
+    mixSchedule: z.boolean().default(true),
+    mixFleets: z.array(z.string()).default([]),
     /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
     cfgVersion: z.number().int().default(4),
     /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
@@ -258,7 +265,7 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
             // before the race: boards and the studio lower thirds (each graphic once; OUT, UNDO… on the bottom row of every page)
             deck: 1, name: 'A BEFORE', page: p1, keys: [
                 row8(k('show:welcome', 'WELCOME', 'board'), k('show:matchboard', 'MATCH-\\nBOARD', 'board'), k('show:schedule', 'DAY\\nSCHEDULE', 'board'), k('show:course', 'RACE\\nCOURSE', 'board'), k('show:officials', 'OFFICIALS', 'board'), k('show:weather', 'WEATHER', 'board'), k('show:socials', 'SOCIALS', 'bug')),
-                row8(),
+                row8(k('show:cbvela', 'CB VELA', 'scene')),
                 // REFRESH PNG: every picture from the dashboard into vMix again (a PNG remade in the PNG generator)
                 row8(k('refreshpng', 'REFRESH\\nPNG', 'mode')),
                 nav(p1),
@@ -270,7 +277,9 @@ function defaultDeckPages(cfg0, teams = [], groups = [], resultGroups = groups) 
                 row8(k('show:socials', 'SOCIALS', 'bug'), k('show:lbar', 'L-BAR', 'scene'), k('show:lbar2', 'L-BAR\\nRANKING', 'scene'), k('show:sponsors', 'SPONSORS\\nBAR', 'bug'), k('show:titles', 'TITLES', 'scene')),
                 // the tickers on their own, on and off without the break scene: the bottom one (ssl_ticker, on the break
                 // scene's ticker channel) and the top one (ssl_ticker_top)
-                row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug')),
+                row8(k('show:break', 'BREAK\\nSCENE', 'scene'), k('breakout', 'BREAK\\nOUT', 'scene'), k('rotate', 'AUTO\\nSWITCH', 'scene'), k('nextslide', 'NEXT\\nSLIDE', 'scene'), k('show:ticker', 'TICKER\\nON / OFF', 'bug'), k('show:tickertop', 'TOP TICKER\\nON / OFF', 'bug'), 
+                // the clean break loop on the Mix (for the ATEM): on / off, the next board at once
+                k('mixloop', 'MIX LOOP\\nON / OFF', 'scene'), k('mixnext', 'MIX\\nNEXT', 'scene')),
                 // a key per ticker (Tickers in General graphics, by position): the ticker of the break scene; a new ticker is on the next key at once
                 row8(...Array.from({ length: 8 }, (_, n) => k(`breakticker:${n + 1}`, '—', 'scene'))),
                 nav(p1 + 1),
@@ -1116,6 +1125,14 @@ export class Show {
             return { out: g.id };
         }
         await this.fill(g, input);
+        if (id === 'cbvela') {
+            // the film from its start each time
+            const at = encodeURIComponent(input.key || input.number);
+            await this.vmix(`?Function=Restart&Input=${at}`);
+            await this.bringIn(g, input, snap);
+            await this.vmix(`?Function=Play&Input=${at}`);
+            return { in: g.id, input: input.title };
+        }
         if (id === 'titles' && this.titlesDelayMs > 0) {
             // the transition in at once; the video waits on its first frame (vMix may start it as it comes in)
             const at = encodeURIComponent(input.key || input.number);
@@ -1559,10 +1576,55 @@ export class Show {
         const c = this.config;
         return c.breakMix >= 2 ? [c.mixBoardLayer, c.mixLbarLayer].filter((n) => n > 0) : [];
     }
+    /** The Mix loop's boards: as the break scene's, with their own day schedule switch and groups. */
+    mixSlides() {
+        const cfg = this.config;
+        const stage = this.breakStageFleets();
+        const picked = stage.filter((f) => cfg.mixFleets.includes(f.id)).map((f) => f.id);
+        const out = cfg.mixSchedule ? [{ kind: 'schedule' }] : [];
+        for (const f of picked.length ? picked : this.breakFleets())
+            out.push({ kind: 'results', fleetId: f });
+        return out.length ? out : [{ kind: 'schedule' }];
+    }
+    /** MIX LOOP: the loop on the Mix on or off; off takes its channels out there. */
+    async toggleMixLoop() {
+        const cfg = this.config;
+        const on = !cfg.mixLoopOn;
+        setShowConfig(this.ctx.db, { mixLoopOn: on });
+        if (!on && cfg.breakMix >= 2) {
+            const at = `&Mix=${cfg.mixZeroBased ? cfg.breakMix - 1 : cfg.breakMix}`;
+            for (const n of this.mixChannels())
+                await this.vmix(`?Function=OverlayInput${n}Out${at}`);
+            this.mixOn = {};
+            this.mixIndex = -1;
+            this.mixStatus = { ...this.mixStatus, board: '', lbar: '' };
+        }
+        else
+            this.mixAt = 0;
+        return { mixLoop: on };
+    }
+    /** MIX NEXT: the Mix's next board at once. */
+    async mixNext() {
+        if (this.config.breakMix < 2 || !this.config.mixLoopOn)
+            throw badRequest('The Mix loop is off (Show control → Break scene).');
+        this.mixAt = 0;
+        await this.mixLoop();
+        return { mix: this.mixStatus.board };
+    }
     async mixLoop(now = Date.now()) {
         const cfg = this.config;
         const mix = cfg.breakMix;
-        if (mix < 2 || this.mixBusy)
+        if (mix >= 2 && !cfg.mixLoopOn && Object.values(this.mixOn).some(Boolean) && !this.mixBusy) {
+            // switched off in Show control: what the loop put on the Mix goes out once
+            const on = this.mixOn;
+            this.mixOn = {};
+            this.mixIndex = -1;
+            this.mixStatus = { ...this.mixStatus, board: '', lbar: '' };
+            for (const n of Object.keys(on))
+                await this.vmix(`?Function=OverlayInput${n}Out&Mix=${cfg.mixZeroBased ? mix - 1 : mix}`).catch(() => undefined);
+            return;
+        }
+        if (mix < 2 || !cfg.mixLoopOn || this.mixBusy)
             return; // Mix 1 is the program
         this.mixBusy = true;
         const at = `&Mix=${cfg.mixZeroBased ? mix - 1 : mix}`;
@@ -1589,7 +1651,7 @@ export class Show {
             // the boards in turn, every switch time
             const boards = [];
             const seen = new Set();
-            for (const sl of this.slides()) {
+            for (const sl of this.mixSlides()) {
                 const i = sl.kind === 'results' && sl.fleetId ? this.ownResults(sl.fleetId, inputs) ?? this.resolve(this.graphic('results'), inputs) : this.resolve(this.graphic('schedule'), inputs);
                 if (!i || seen.has(i))
                     continue;
@@ -1812,6 +1874,8 @@ export class Show {
             }
             case 'rotate': return this.toggleRotation();
             case 'nextslide': return this.nextSlide();
+            case 'mixloop': return this.toggleMixLoop();
+            case 'mixnext': return this.mixNext();
             case 'nextticker': return this.nextTicker();
             case 'breakticker': return this.breakTicker(arg);
             case 'tickermode': return this.tickerMode();
@@ -1919,6 +1983,11 @@ export class Show {
         }
         else if (kind === 'tickermode')
             text = st.tickerMode === 'end' ? 'TICKER:\\nEND OF DAY' : 'TICKER:\\nNEXT RACE';
+        else if (kind === 'mixloop') {
+            const on = this.config.breakMix >= 2 && this.config.mixLoopOn;
+            text = on ? 'MIX LOOP\\nON' : 'MIX LOOP\\nOFF';
+            active = on;
+        }
         else if (kind === 'rotate') {
             text = this.config.breakAuto ? 'AUTO SWITCH\\nON' : 'AUTO SWITCH\\nOFF';
             active = this.config.breakAuto;

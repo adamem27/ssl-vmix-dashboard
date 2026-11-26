@@ -1,8 +1,14 @@
 {
-  "version": "1.0.273",
-  "commit": "731c622",
-  "date": "2026-11-26T12:15:30Z",
+  "version": "1.0.274",
+  "commit": "4382d58",
+  "date": "2026-11-26T12:30:39Z",
   "changes": [
+    {
+      "version": "1.0.274",
+      "commit": "4382d58",
+      "date": "2026-11-26T12:30:39Z",
+      "text": "Mix loop controls as the break scene's (MIX LOOP on/off, MIX NEXT, its own day schedule and groups); CB VELA key on BEFORE (the CBVela film from its start on channel 7)"
+    },
     {
       "version": "1.0.273",
       "commit": "731c622",
@@ -476,12 +482,6 @@
       "commit": "3ff0fbc",
       "date": "2026-11-16T14:13:45Z",
       "text": "Stream Decks for the next stages: 16 team places in group order, team LTs on the team pages, ticker and top ticker on/off"
-    },
-    {
-      "version": "1.0.194",
-      "commit": "8dbce8f",
-      "date": "2026-11-16T14:11:34Z",
-      "text": "Final Series stages: one click prepares 1/32 Finals to Quarterfinals (groups A–D of four), starred teams first in the pickers"
     }
   ]
 }
