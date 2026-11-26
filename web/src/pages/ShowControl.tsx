@@ -252,7 +252,7 @@ function useConfig(data: ShowData, onSaved: () => void) {
   useEffect(() => setC(data.config), [JSON.stringify(data.config)]);
   const dirty = JSON.stringify(c) !== JSON.stringify(data.config);
   const qcc = useQueryClient();
-  const save = async () => { try { const { keys: _k, kindColours: _c, ...rest } = c; await api.put('/api/show/config', rest); qcc.invalidateQueries({ queryKey: ['stage'] }); toast.ok('Saved'); onSaved(); } catch (e) { toast.error(e); } };
+  const save = async () => { try { const { keys: _k, kindColours: _c, mixLoopOn: _m, ...rest } = c; await api.put('/api/show/config', rest); qcc.invalidateQueries({ queryKey: ['stage'] }); toast.ok('Saved'); onSaved(); } catch (e) { toast.error(e); } };
   return { c, setC, dirty, save };
 }
 
@@ -283,6 +283,8 @@ function LbarLooks({ looks }: { looks?: ShowData['lbarLooks'] }) {
 
 function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) {
   const { c, setC, dirty, save } = useConfig(data, onSaved);
+  const toast = useToast();
+  const mixDo = async (a: 'mixloop' | 'mixnext') => { try { await api.post(`/api/show/do?a=${a}`); } catch (e) { toast.error(e); } finally { onSaved(); } };
   return (
     <Panel title="Break scene" right={<Button size="sm" variant="primary" disabled={!dirty} onClick={save}>Save</Button>}>
       <div className="max-w-3xl">
@@ -318,10 +320,14 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
           {(c.breakMix ?? 0) >= 2 && <div className="flex gap-3">
             <label className="block text-xs text-ink-400">Mix: boards channel<input type="number" min={5} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixBoardLayer ?? 6} onChange={(e) => setC({ ...c, mixBoardLayer: Math.max(5, Math.min(8, Number(e.target.value) || 6)) })} /></label>
             <label className="block text-xs text-ink-400">Mix: L-bar channel (0 = none)<input type="number" min={0} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixLbarLayer ?? 5} onChange={(e) => setC({ ...c, mixLbarLayer: Math.max(0, Math.min(8, Number(e.target.value) || 0)) })} /></label>
-            <label className="flex items-center gap-2 self-end text-xs text-ink-400" title="Off (default): the Mix number is sent as in vMix (Mix=2 for Mix 2, 1 is the main output). On: counted from 0 (Mix=1 for Mix 2), for a vMix that takes it so."><input type="checkbox" checked={!!c.mixZeroBased} onChange={(e) => setC({ ...c, mixZeroBased: e.target.checked })} /> Mix counted from 0</label>
+            <label className="flex items-center gap-2 self-end text-xs text-ink-400" title="On (default): counted from 0, as the show's vMix takes it (Mix=1 for Mix 2). Off: Mix=2 for Mix 2."><input type="checkbox" checked={!!c.mixZeroBased} onChange={(e) => setC({ ...c, mixZeroBased: e.target.checked })} /> Mix counted from 0</label>
           </div>}
           {(c.breakMix ?? 0) >= 2 && <div className="space-y-1 rounded border border-ink-800 p-2 text-xs text-ink-400">
-            <label className="flex items-center gap-2 text-ink-200" title="Off: the boards stop switching; the board and the L-bar stay on the Mix (MIX NEXT still changes the board). Also the MIX LOOP key on AFTER / BREAK."><input type="checkbox" checked={c.mixLoopOn !== false} onChange={(e) => setC({ ...c, mixLoopOn: e.target.checked })} /> Loop on the Mix on</label>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-ink-200">The Mix is started in vMix (your Companion key: ssl_lbar 2 on 5, ssl_schedule 2 on 6). Here only the boards on channel {c.mixBoardLayer ?? 6} switch.</span>
+              <Button size="sm" variant={data.config.mixLoopOn !== false ? 'primary' : undefined} title="Off: the boards stop switching and stay as they are. On: the next board at once, then every switch time. Same as the MIX LOOP key on AFTER / BREAK." onClick={() => mixDo('mixloop')}>Mix loop: {data.config.mixLoopOn !== false ? 'ON' : 'OFF'}</Button>
+              <Button size="sm" title="The next board on the Mix now, the loop on or off. Same as the MIX NEXT key." onClick={() => mixDo('mixnext')}>Mix next</Button>
+            </div>
             <label className="flex items-center gap-2 text-ink-300"><input type="checkbox" checked={c.mixSchedule !== false} onChange={(e) => setC({ ...c, mixSchedule: e.target.checked })} /> Day schedule in the Mix loop</label>
             {data.breakGroups.length > 0 && <div>Group results in the Mix loop
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">

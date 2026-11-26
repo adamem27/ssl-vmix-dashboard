@@ -126,14 +126,14 @@ export const showConfigSchema = z.object({
   mixBoardLayer: z.number().int().min(5).max(8).default(6),
   mixLbarLayer: z.number().int().min(0).max(8).default(5),
   /** vMix numbers Mix in shortcuts from 1 (1 = the main output, 2 = Mix 2); on = from 0, as a fallback */
-  mixZeroBased: z.boolean().default(false),
+  mixZeroBased: z.boolean().default(true),
   /** the loop on the Mix on (MIX LOOP key / Show control); off: its channels go out and stay out */
   mixLoopOn: z.boolean().default(true),
   /** the Mix loop's boards, as the break scene's: the day schedule, and these groups (empty: those of the break scene) */
   mixSchedule: z.boolean().default(true),
   mixFleets: z.array(z.string()).default([]),
   /** 2: the switch time went from 12 to 30 s (an old 12 becomes 30 once) */
-  cfgVersion: z.number().int().default(4),
+  cfgVersion: z.number().int().default(5),
   /** ticker versions (Tickers in General graphics) for the break before the next race (D) and at the end (E) */
   tickerNext: z.string().default(''),
   tickerEnd: z.string().default(''),
@@ -168,6 +168,8 @@ export function getShowConfig(db: AssetCtx['db']): ShowConfig {
   if (Number(r.cfgVersion ?? 0) < 3) { r.breakLbarLayer = 2; r.breakTickerLayer = 3; r.breakBoardLayer = 4; }
   // 4: the results' out animation takes up to 1.2 s, so the next board waits 1.5 s (an old 1000 ms becomes 1500)
   if (Number(r.cfgVersion ?? 0) < 4 && (r.breakOutMs === undefined || r.breakOutMs === 1000)) r.breakOutMs = 1500;
+  // 5: vMix takes the Mix counted from 0 (Mix=1 is Mix 2), as checked on the show's vMix
+  if (Number(r.cfgVersion ?? 0) < 5) r.mixZeroBased = true;
   return showConfigSchema.parse(r);
 }
 export function setShowConfig(db: AssetCtx['db'], patch: Partial<ShowConfig>) {
@@ -1516,7 +1518,8 @@ export class Show {
   async toggleMixLoop(now = Date.now()) {
     const on = !this.config.mixLoopOn;
     setShowConfig(this.ctx.db, { mixLoopOn: on });
-    if (on) this.mixAt = now;
+    // on again: the next board at once, so the key shows it works; then every switch time
+    if (on) { this.mixAt = now; this.mixForce = true; }
     return { mixLoop: on };
   }
   private mixForce = false;
@@ -1540,12 +1543,8 @@ export class Show {
     try {
       const { inputs } = await this.snapshot();
       const missing: string[] = [];
-      // the L-bar's copy stays in
-      const lbar = this.resolve(this.graphic('lbar'), inputs);
-      const lc = cfg.mixLbarLayer > 0 ? this.mixCopy(lbar, inputs) : undefined;
-      if (cfg.mixLbarLayer > 0 && lbar && !lc) missing.push(`${lbar.title} 2`);
-      if (lc && this.mixOn[cfg.mixLbarLayer] !== lc.number) { await this.vmix(`?Function=OverlayInput${cfg.mixLbarLayer}In&Input=${encodeURIComponent(lc.key || lc.number)}${at}`); this.mixOn[cfg.mixLbarLayer] = lc.number; }
-      this.mixStatus = { ...this.mixStatus, lbar: lc?.title ?? '', missing, error: '' };
+      // the Mix itself (its L-bar and first board) is started in vMix (a Companion key): only the boards' channel is ours
+      this.mixStatus = { ...this.mixStatus, lbar: '', missing, error: '' };
       // the boards in turn, every switch time
       const boards: VmixInput[] = [];
       const seen = new Set<VmixInput>();
@@ -1557,15 +1556,18 @@ export class Show {
         if (c) boards.push(c); else missing.push(`${i.title} 2`);
       }
       const n = cfg.mixBoardLayer;
+      // not known what is on the channel (the dashboard started, or the Mix was started in vMix): the first board, as
+      // the Companion key that starts the Mix puts it in (ssl_schedule 2); the switching goes on from it
+      if (boards.length && !this.mixOn[n]) { this.mixOn[n] = boards[0].number; this.mixAt = now; this.mixStatus = { ...this.mixStatus, board: boards[0].title }; }
       // the next board: by hand (MIX NEXT), or with the loop on every switch time (and at once while none is on)
-      const due = this.mixForce || (cfg.mixLoopOn && (!this.mixOn[n] || now - this.mixAt >= cfg.rotateSeconds * 1000));
+      const due = this.mixForce || (cfg.mixLoopOn && now - this.mixAt >= cfg.rotateSeconds * 1000);
       this.mixForce = false;
       if (!boards.length || !due) return;
       // the one after the board on the Mix now (the list may have changed since: groups ticked, a copy added)
       const now_ = boards.findIndex((b) => b.number === this.mixOn[n]);
       const board = boards[(now_ + 1) % boards.length];
       if (this.mixOn[n] !== board.number) {
-        if (this.mixOn[n]) { await this.vmix(`?Function=OverlayInput${n}Out${at}`); await this.wait(cfg.breakOutMs); }
+        await this.vmix(`?Function=OverlayInput${n}Out${at}`); await this.wait(cfg.breakOutMs);
         await this.vmix(`?Function=OverlayInput${n}In&Input=${encodeURIComponent(board.key || board.number)}${at}`);
         this.mixOn[n] = board.number;
       }
