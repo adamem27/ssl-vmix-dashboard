@@ -1,8 +1,14 @@
 {
-  "version": "1.0.284",
-  "commit": "7b8cc6d",
-  "date": "2026-11-26T21:09:25Z",
+  "version": "1.0.285",
+  "commit": "c23f024",
+  "date": "2026-11-26T21:09:42Z",
   "changes": [
+    {
+      "version": "1.0.285",
+      "commit": "c23f024",
+      "date": "2026-11-26T21:09:42Z",
+      "text": "Commentator: sailor photos and a sailor card on hover or click (#29)"
+    },
     {
       "version": "1.0.284",
       "commit": "7b8cc6d",
@@ -476,12 +482,6 @@
       "commit": "21f2a64",
       "date": "2026-11-16T18:41:02Z",
       "text": "DRAW: manual steps (flag off, group back) on keys in the dashboard and Companion, automatic as an option"
-    },
-    {
-      "version": "1.0.205",
-      "commit": "f172df0",
-      "date": "2026-11-16T18:28:02Z",
-      "text": "DRAW: group to the centre before each team, flag videos, strips slide off for all groups, draw matchboard PNG + vMix input, quieter empty places"
     }
   ]
 }
