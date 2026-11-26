@@ -1216,6 +1216,7 @@ export class Show {
         // every other team keeps the title's own BG. What the BG held before our first change is remembered (per title)
         // and put back for the next team without sponsors.
         const bgField = input.fields.find((x) => /^BG\.Source$/i.test(x));
+        let back = '';
         if (bgField) {
             const t = team;
             const cur = input.values?.[bgField] ?? '';
@@ -1234,13 +1235,27 @@ export class Show {
                 }
             }
             else if (ours(cur) || this.partnersShown.has(id)) {
-                const back = getSetting(this.ctx.db, origKey) || lineupPanelFor(this.ctx, { code: '', assets: {} });
-                if (back)
-                    f.set(bgField, back);
+                // the title's own BG as vMix showed it (only a full path: a bare name from inside the GTZIP is not a file vMix
+                // can load again), else the plain panel
+                const orig = getSetting(this.ctx.db, origKey);
+                back = (/^([a-z]:[\\/]|\\\\|\/)/i.test(orig) ? orig : '') || lineupPanelFor(this.ctx, { code: '', assets: {} }) || '';
                 this.partnersShown.delete(id);
             }
         }
         await this.set(input, f);
+        // the panel on its own: a picture vMix cannot load (500) never keeps the line-up off air
+        if (bgField && back) {
+            try {
+                await this.set(input, new Map([[bgField, back]]));
+            }
+            catch (e) {
+                const plain = lineupPanelFor(this.ctx, { code: '', assets: {} });
+                setSetting(this.ctx.db, `lineupPanel.original.${input.title}`, ''); // not that picture again
+                this.log(`Line-up ${input.title}: vMix cannot load the BG picture ${back} (${e?.message ?? e})${plain && plain !== back ? '; the plain panel instead' : ''}`);
+                if (plain && plain !== back)
+                    await this.set(input, new Map([[bgField, plain]])).catch(() => undefined);
+            }
+        }
         await this.bringIn(g, input, snap);
         return { in: 'lineup', team: b.code, input: input.title };
     }

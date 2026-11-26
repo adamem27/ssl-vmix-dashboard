@@ -1,8 +1,14 @@
 {
-  "version": "1.0.269",
-  "commit": "a1f2c29",
-  "date": "2026-11-25T23:51:40Z",
+  "version": "1.0.270",
+  "commit": "57f2883",
+  "date": "2026-11-26T02:05:25Z",
   "changes": [
+    {
+      "version": "1.0.270",
+      "commit": "57f2883",
+      "date": "2026-11-26T02:05:25Z",
+      "text": "Line-up of a team without sponsors: the title's own BG only as a full path, else the plain panel; a BG picture vMix cannot load (500) no longer keeps the line-up off air"
+    },
     {
       "version": "1.0.269",
       "commit": "a1f2c29",
@@ -476,12 +482,6 @@
       "commit": "37abacc",
       "date": "2026-11-15T19:08:59Z",
       "text": "Graphics editor: edit any vMix title's texts and pictures from the dashboard"
-    },
-    {
-      "version": "1.0.190",
-      "commit": "a50c796",
-      "date": "2026-11-15T19:08:58Z",
-      "text": "Companion panel: address, live keys switch, push now and status"
     }
   ]
 }
