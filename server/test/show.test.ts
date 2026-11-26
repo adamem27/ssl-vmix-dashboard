@@ -361,6 +361,54 @@ describe('show control', () => {
     expect(src?.sep).toBe(' I ');
   });
 
+  it('the Mix loop: MIX LOOP off takes its channels out and it stays off; its own boards; MIX NEXT at once', async () => {
+    const { s } = race();
+    setShowConfig(s.db, { breakMix: 2, rotateSeconds: 30, breakOutMs: 0, mixLbarLayer: 0 });
+    const v = fakeVmix({ ...TITLES, 'ssl_schedule 2': [], 'ssl_results_group_4 2': [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    const ov = () => v.calls.filter((c) => c.startsWith('?Function=OverlayInput'));
+    // without the day schedule: the group results only
+    setShowConfig(s.db, { mixSchedule: false });
+    await show.mixLoop(100_000);
+    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`]);
+    expect(await show.run('mixloop')).toEqual({ mixLoop: false });
+    expect(ov().at(-1)).toBe('?Function=OverlayInput6Out&Mix=2');
+    v.calls.length = 0;
+    await show.mixLoop(200_000);
+    expect(ov()).toEqual([]);
+    await expect(show.run('mixnext')).rejects.toThrow(/off/);
+    // switched off in Show control (not the key): out once at the next round
+    setShowConfig(s.db, { mixLoopOn: true });
+    await show.mixLoop(300_000);
+    setShowConfig(s.db, { mixLoopOn: false });
+    v.calls.length = 0;
+    await show.mixLoop(300_100);
+    await show.mixLoop(300_200);
+    expect(ov()).toEqual(['?Function=OverlayInput6Out&Mix=2']);
+    v.calls.length = 0;
+    // on again: at once, then MIX NEXT does not wait for the switch time
+    setShowConfig(s.db, { mixSchedule: true });
+    await show.run('mixloop');
+    await show.mixLoop(400_000);
+    expect(ov()).toEqual([`?Function=OverlayInput6In&Input=k${v.num('ssl_schedule 2')}&Mix=2`]);
+    await show.run('mixnext');
+    expect(ov().at(-1)).toBe(`?Function=OverlayInput6In&Input=k${v.num('ssl_results_group_4 2')}&Mix=2`);
+  });
+
+  it('CB VELA: the film from its start on channel 7, again = out', async () => {
+    const { s } = race();
+    const v = fakeVmix({ ...TITLES, CBVela: [] });
+    const show = new Show(s.ctx, new LowerThirds(s.ctx, v.fetcher), v.fetcher);
+    expect(show.keyAt(1, 1, 0)?.action).toBe('show:cbvela');
+    await show.run('show:cbvela');
+    const n = v.num('CBVela');
+    expect(v.calls).toEqual(expect.arrayContaining([`?Function=Restart&Input=k${n}`, `?Function=OverlayInput7In&Input=k${n}`, `?Function=Play&Input=k${n}`]));
+    expect(v.overlays[7]).toBe(n);
+    show.invalidate();
+    await show.run('show:cbvela');
+    expect(v.overlays[7]).toBe('');
+  });
+
   it('cuts everything only on the second PANIC press and rotates the break scene', async () => {
     const { s } = race();
     const v = fakeVmix(TITLES);
@@ -571,7 +619,7 @@ describe('show control', () => {
     expect(show.graphics().some((g) => g.id === 'lcrinfo')).toBe(false);
     const all = show.pages().flatMap((p) => p.keys.flat());
     expect(all.some((x) => x?.action === 'show:lcrinfo')).toBe(false);
-    expect(show.keyAt(1, 1, 0)).toBeNull();
+    expect(show.keyAt(1, 1, 0)?.action).toBe('show:cbvela'); // the built-in key of that place (CB VELA)
     expect(show.keyAt(2, 0, 0)?.action).toBe('show:socials');
   });
 

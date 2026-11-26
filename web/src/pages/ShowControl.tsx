@@ -7,7 +7,7 @@ import { Button, cx, ErrorBox, Loading, useToast } from '../components/ui';
 import { TickerLangsPanel } from './TickerLangs';
 
 interface Config {
-  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; mixZeroBased?: boolean; tickerNext: string; tickerEnd: string; championsTeam?: string; championsText?: string;
+  inputs: Record<string, string>; fleetId: string; race: number; breakFleets: string[]; breakLbarLayer: number; breakTickerLayer: number; breakBoardLayer: number; tickerTopLayer: number; breakAuto: boolean; breakSchedule: boolean; rotateSeconds: number; breakOutMs: number; flagChangeMs: number; lbarSwapSeconds: number; breakMix?: number; mixBoardLayer?: number; mixLbarLayer?: number; mixZeroBased?: boolean; mixLoopOn?: boolean; mixSchedule?: boolean; mixFleets?: string[]; tickerNext: string; tickerEnd: string; championsTeam?: string; championsText?: string;
   deck1Page: number; deck2Page: number; fallbackPage: number; vmixForCompanion: string; labels: boolean; lineup5: string[];
   keys: Record<string, KeyEdit>; kindColours: Record<string, string>;
 }
@@ -319,6 +319,25 @@ function BreakScene({ data, onSaved }: { data: ShowData; onSaved: () => void }) 
             <label className="block text-xs text-ink-400">Mix: boards channel<input type="number" min={5} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixBoardLayer ?? 6} onChange={(e) => setC({ ...c, mixBoardLayer: Math.max(5, Math.min(8, Number(e.target.value) || 6)) })} /></label>
             <label className="block text-xs text-ink-400">Mix: L-bar channel (0 = none)<input type="number" min={0} max={8} step={1} className="input mt-1 w-20 py-1 text-sm" value={c.mixLbarLayer ?? 5} onChange={(e) => setC({ ...c, mixLbarLayer: Math.max(0, Math.min(8, Number(e.target.value) || 0)) })} /></label>
             <label className="flex items-center gap-2 self-end text-xs text-ink-400" title="Off (default): the Mix number is sent as in vMix (Mix=2 for Mix 2, 1 is the main output). On: counted from 0 (Mix=1 for Mix 2), for a vMix that takes it so."><input type="checkbox" checked={!!c.mixZeroBased} onChange={(e) => setC({ ...c, mixZeroBased: e.target.checked })} /> Mix counted from 0</label>
+          </div>}
+          {(c.breakMix ?? 0) >= 2 && <div className="space-y-1 rounded border border-ink-800 p-2 text-xs text-ink-400">
+            <label className="flex items-center gap-2 text-ink-200" title="Off: the boards and the L-bar go out of the Mix and stay out (also the MIX LOOP key on AFTER / BREAK)."><input type="checkbox" checked={c.mixLoopOn !== false} onChange={(e) => setC({ ...c, mixLoopOn: e.target.checked })} /> Loop on the Mix on</label>
+            <label className="flex items-center gap-2 text-ink-300"><input type="checkbox" checked={c.mixSchedule !== false} onChange={(e) => setC({ ...c, mixSchedule: e.target.checked })} /> Day schedule in the Mix loop</label>
+            {data.breakGroups.length > 0 && <div>Group results in the Mix loop
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                {data.breakGroups.map((g) => {
+                  const mine = (c.mixFleets ?? []).filter((id) => data.breakGroups.some((x) => x.id === id));
+                  const shown = mine.length ? mine : data.breakShown;
+                  const on = shown.includes(g.id);
+                  return (
+                    <label key={g.id} className="flex items-center gap-1 text-ink-200">
+                      <input type="checkbox" checked={on} onChange={() => setC({ ...c, mixFleets: data.breakGroups.map((x) => x.id).filter((id) => (id === g.id ? !on : shown.includes(id))) })} /> {groupLabel(g.name)}
+                    </label>
+                  );
+                })}
+              </div>
+              <span className="text-ink-500">None ticked: the groups of the break scene.</span>
+            </div>}
           </div>}
           {(c.breakMix ?? 0) >= 2 && data.mixStatus && <div className="text-xs text-ink-400">
             Mix {c.breakMix}: {data.mixStatus.board || 'no board yet'}{data.mixStatus.lbar ? ` + ${data.mixStatus.lbar}` : ''}
