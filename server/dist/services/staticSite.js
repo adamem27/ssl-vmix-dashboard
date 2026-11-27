@@ -5,10 +5,15 @@ import { getSetting, nowIso, setSetting } from '../db/db.js';
 import { DEFAULT_PUBLIC_URL } from './siteTargets.js';
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg' };
 const sha1 = (b) => createHash('sha1').update(b).digest('hex');
+/** A short mark of the built page (changes with every new app version). */
+export const buildOf = (html) => sha1(html).slice(0, 12);
 /** The page and the scripts and styles it loads (relative paths, so it works in any folder). */
 export function pageFiles(webDist) {
     const html = fs.readFileSync(path.join(webDist, 'commentator.html'), 'utf8');
-    const out = [{ rel: 'index.html', data: html.replace(/(src|href)="\/assets\//g, '$1="assets/') }];
+    // the build mark: an open screen compares it with status.json and reloads itself when the venue PC runs a newer app
+    const build = buildOf(html);
+    const page = html.replace(/(src|href)="\/assets\//g, '$1="assets/').replace('<head>', `<head>\n    <meta name="ssl-build" content="${build}" />`);
+    const out = [{ rel: 'index.html', data: page }];
     const seen = new Set();
     const queue = [...html.matchAll(/\/assets\/([\w.-]+)/g)].map((m) => m[1]);
     while (queue.length) {
@@ -199,7 +204,8 @@ export class StaticSitePublisher {
             }
             // auto: the page knows whether to expect a new status every few seconds or only when someone publishes
             const every = Math.round(this.publishEveryMs() / 1000);
-            const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled(), every });
+            const build = buildOf(fs.readFileSync(path.join(this.webDist, 'commentator.html'), 'utf8'));
+            const status = JSON.stringify({ pushedAt: feed.pushedAt, version, auto: this.enabled(), every, build });
             pending.push({ rel: 'status.json', data: status });
             try {
                 await target.put(pending, (rel) => { const h = hashes.get(rel); if (h)

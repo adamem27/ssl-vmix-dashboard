@@ -1,8 +1,14 @@
 {
-  "version": "1.0.285",
-  "commit": "c23f024",
-  "date": "2026-11-26T21:09:42Z",
+  "version": "1.0.286",
+  "commit": "98758af",
+  "date": "2026-11-27T13:03:46Z",
   "changes": [
+    {
+      "version": "1.0.286",
+      "commit": "98758af",
+      "date": "2026-11-27T13:03:46Z",
+      "text": "Commentator screen never stays white after an update (#30)"
+    },
     {
       "version": "1.0.285",
       "commit": "c23f024",
@@ -476,12 +482,6 @@
       "commit": "a56906f",
       "date": "2026-11-16T18:43:23Z",
       "text": "DRAW: every change on the screen animates (flag fades out, rows cross-fade, highlights fade, all-groups view fades out)"
-    },
-    {
-      "version": "1.0.206",
-      "commit": "21f2a64",
-      "date": "2026-11-16T18:41:02Z",
-      "text": "DRAW: manual steps (flag off, group back) on keys in the dashboard and Companion, automatic as an option"
     }
   ]
 }
