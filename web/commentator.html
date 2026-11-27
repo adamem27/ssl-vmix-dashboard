@@ -9,6 +9,22 @@
   </head>
   <body class="bg-ink-950 text-ink-100 antialiased">
     <div id="root"></div>
+    <script>
+      // A white screen never stays: a script that cannot load, or a screen still empty after 15 s, loads the page
+      // again with a fresh address (past every cache). At most once a minute, so a broken host cannot loop.
+      (function () {
+        var KEY = 'ssl-boot-retry';
+        function again() {
+          try { var at = Number(sessionStorage.getItem(KEY) || 0); if (Date.now() - at < 60000) return; sessionStorage.setItem(KEY, String(Date.now())); } catch (e) { return; }
+          var u = new URL(window.location.href); u.searchParams.set('r', String(Date.now())); window.location.replace(u.toString());
+        }
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) again();
+        }, true);
+        setTimeout(function () { var r = document.getElementById('root'); if (r && !r.childElementCount) again(); }, 15000);
+      })();
+    </script>
     <script type="module" src="/src/static/main.tsx"></script>
   </body>
 </html>
