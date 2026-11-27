@@ -4,7 +4,7 @@ export class ApiError extends Error {
 
 // ---------- static commentator page: answers come from one data.json written by the venue PC ----------
 interface StaticFeed { pushedAt: string; version: string; routes: Record<string, unknown> }
-interface StaticStatus { pushedAt: string; version: string; auto?: boolean; every?: number }
+interface StaticStatus { pushedAt: string; version: string; auto?: boolean; every?: number; build?: string }
 let staticBase: string | null = null;
 let statusLoad: { at: number; p: Promise<StaticStatus> } | null = null;
 let feedCache: Promise<StaticFeed> | null = null;
@@ -33,10 +33,27 @@ function loadStatus(): Promise<StaticStatus> {
  */
 export function watchStaticData(everyMs: number, onChange: () => void): () => void {
   let last = '';
-  const tick = () => loadStatus().then((st) => { if (st.version && st.version !== last) { const first = !last; last = st.version; if (!first) onChange(); } }, () => undefined);
+  const tick = () => loadStatus().then((st) => {
+    if (newerBuild(st.build)) return;
+    if (st.version && st.version !== last) { const first = !last; last = st.version; if (!first) onChange(); }
+  }, () => undefined);
   void tick();
   const t = setInterval(tick, everyMs);
   return () => clearInterval(t);
+}
+
+/**
+ * The venue PC runs a newer app than this open page: load the new page (with the build in the address, so no cache
+ * anywhere can hand back the old one). Once per build, so a host that still serves the old page cannot loop.
+ */
+function newerBuild(build?: string): boolean {
+  const mine = document.querySelector<HTMLMetaElement>('meta[name="ssl-build"]')?.content;
+  if (!build || !mine || build === mine) return false;
+  try { if (sessionStorage.getItem('ssl-build-reload') === build) return false; sessionStorage.setItem('ssl-build-reload', build); } catch { return false; }
+  const u = new URL(window.location.href);
+  u.searchParams.set('b', build);
+  window.location.replace(u.toString());
+  return true;
 }
 
 async function loadFeed(): Promise<StaticFeed> {

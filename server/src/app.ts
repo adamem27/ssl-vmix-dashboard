@@ -579,10 +579,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // ---------- web UI ----------
   if (deps.webDist && fs.existsSync(deps.webDist)) {
-    await app.register(fastifyStatic, { root: deps.webDist, prefix: '/', wildcard: false });
+    await app.register(fastifyStatic, {
+      root: deps.webDist, prefix: '/', wildcard: false,
+      // the pages always fresh (a browser never keeps an old page that points at scripts of an older version); the hashed scripts for good
+      setHeaders: (res, file) => res.header('cache-control', /[\\/]assets[\\/]/.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+    });
     app.setNotFoundHandler((req, reply) => {
       if (req.url.startsWith('/api/')) return reply.status(404).send({ error: 'Not found.' });
-      return reply.type('text/html').send(fs.createReadStream(deps.webDist + '/index.html'));
+      return reply.type('text/html').header('cache-control', 'no-cache').send(fs.createReadStream(deps.webDist + '/index.html'));
     });
   }
   return app;
